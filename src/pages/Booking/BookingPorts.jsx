@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
 import ChargersCard from "../../components/station/ChargersCard";
-import "./BookingPorts.css";
-// ⬇️ Sửa: dùng đúng tên component đã import
 import ChargersGun from "../../components/station/ChargersGun";
+import "./BookingPorts.css";
 
 const API_URL = "http://127.0.0.1:4000/stations";
 
@@ -13,15 +12,14 @@ const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
 
 export default function BookingPorts() {
   const { id, cid } = useParams(); // station id & charger id
+  const navigate = useNavigate();
+
   const [station, setStation] = useState(null);
   const [selectedGun, setSelectedGun] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // ================== PHẦN THỜI GIAN (đúng theo mô tả) ==================
-  const MINUTE_STEPS = [0, 10, 20, 30, 40, 50];
-
-  // "Bây giờ" cập nhật mỗi phút để luôn thời gian thực
+  // ================== PHẦN THỜI GIAN (từng phút) ==================
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000);
@@ -30,78 +28,70 @@ export default function BookingPorts() {
   const nowHour = now.getHours();
   const nowMinute = now.getMinutes();
 
-  // Ceil "bây giờ" lên mốc 10 phút kế tiếp (baseline)
-  const ceilNowToNext10 = () => {
+  // Làm tròn lên đúng phút kế tiếp
+  const ceilNowToNextMinute = () => {
     let h = nowHour;
-    let next10 = Math.ceil((nowMinute + 1) / 10) * 10; // +1 để chắc chắn > hiện tại
-    if (next10 >= 60) {
+    let m = nowMinute + 1;
+    if (m >= 60) {
       h = nowHour + 1;
-      next10 = 0;
+      m = 0;
     }
-    return { h, m: next10 };
+    return { h, m };
   };
 
-  const baseline = ceilNowToNext10(); // ví dụ 3:47 -> baseline 3:50
-  // Min selectable = baseline + 60' (tối thiểu 1 giờ)
-  const minSelAbsMin = (baseline.h * 60 + baseline.m) + 60;
+  const baseline = ceilNowToNextMinute();
+
+  // Giờ đặt tối thiểu cách baseline 60 phút
+  const minSelAbsMin = baseline.h * 60 + baseline.m + 60;
   const minSelHour = Math.floor(minSelAbsMin / 60);
   const minSelMinute = minSelAbsMin % 60;
 
-  // Còn đặt trong hôm nay không? (tối đa tới 23:50)
-  const LAST_ABS_MIN = 23 * 60 + 50;
+  // Cho phép tới 23:59
+  const LAST_ABS_MIN = 23 * 60 + 59;
   const canBookToday = minSelAbsMin <= LAST_ABS_MIN;
 
-  // Khởi tạo giờ/phút chọn = mốc nhỏ nhất hợp lệ (từng 10')
   const [startHour, setStartHour] = useState(() => Math.min(minSelHour, 23));
   const [startMinute, setStartMinute] = useState(() => minSelMinute);
 
-  // Nếu "bây giờ" trôi khiến min chọn tăng → đẩy selection lên cho hợp lệ
   useEffect(() => {
     if (!canBookToday) return;
     if (startHour < minSelHour || (startHour === minSelHour && startMinute < minSelMinute)) {
       setStartHour(minSelHour);
       setStartMinute(minSelMinute);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nowHour, nowMinute, minSelHour, minSelMinute, canBookToday]);
 
-  // Minutes abs
-  const nowAbsMin = nowHour * 60 + nowMinute;
   const baselineAbsMin = baseline.h * 60 + baseline.m;
 
-  // Options: giờ từ minSelHour..23, phút theo bước 10' (giờ min thì phút >= minSelMinute)
   const hourOptions = useMemo(() => {
     const arr = [];
     for (let h = minSelHour; h <= 23; h++) arr.push(h);
     return arr;
   }, [minSelHour]);
 
+  // phút theo từng phút (0–59), nếu cùng giờ min thì chỉ từ minSelMinute..59
   const minuteOptionsForHour = (h) => {
-    if (h > minSelHour) return MINUTE_STEPS;
-    // h === minSelHour -> chỉ những phút >= minSelMinute
-    return MINUTE_STEPS.filter((m) => m >= minSelMinute);
+    const all = Array.from({ length: 60 }, (_, i) => i);
+    if (h > minSelHour) return all;
+    return all.filter((m) => m >= minSelMinute);
   };
 
-  // Tổng phút tính phí = max(60, selected - baseline)
-  // -> đúng ví dụ: 3:47 (baseline 3:50) chọn 5:00 -> (300 - 230) = 70' (1h10)
   const totalMinutes = useMemo(() => {
     if (!canBookToday) return 0;
     const selAbs = startHour * 60 + startMinute;
     const diff = Math.max(0, selAbs - baselineAbsMin);
     if (diff === 0) return 0;
-    return Math.max(60, diff);
+    return Math.max(60, diff); // tối thiểu 60 phút
   }, [startHour, startMinute, baselineAbsMin, canBookToday]);
 
-  const totalHoursFloat = useMemo(() => (totalMinutes / 60), [totalMinutes]);
-  // ================== HẾT PHẦN THỜI GIAN =================================
+  const totalHoursFloat = useMemo(() => totalMinutes / 60, [totalMinutes]);
 
-  // ================== TÍNH PHÍ (đơn giá theo phút) =======================
+  // ================== PHÍ ==================
   const [parkingFee, setParkingFee] = useState(20000); // đ/giờ
   const perMinute = useMemo(() => parkingFee / 60, [parkingFee]);
   const bookingFee = useMemo(() => Math.round(totalMinutes * perMinute), [totalMinutes, perMinute]);
-  // =======================================================================
 
-  // load trạm
+  // ================== LOAD TRẠM ==================
   useEffect(() => {
     (async () => {
       try {
@@ -117,45 +107,58 @@ export default function BookingPorts() {
     })();
   }, [id]);
 
-  // lấy trụ theo cid
   const charger = useMemo(() => {
     return station?.chargers?.find((c) => String(c.id) === String(cid));
   }, [station, cid]);
 
-  // Auto-chọn súng rảnh (và giữ nguyên nếu lựa chọn cũ vẫn còn rảnh)
+  // Auto-chọn súng
   useEffect(() => {
     const guns = charger?.guns || [];
     if (!guns.length) {
       setSelectedGun(null);
       return;
     }
-    if (selectedGun && guns.some(g => g.id === selectedGun.id && g.status === "available")) {
+    if (selectedGun && guns.some((g) => g.id === selectedGun.id && g.status === "available")) {
       return;
     }
-    const firstAvail = guns.find(g => g.status === "available") || null;
+    const firstAvail = guns.find((g) => g.status === "available") || null;
     setSelectedGun(firstAvail);
   }, [charger, selectedGun]);
 
-  // Action đặt chỗ (demo)
-  const handleBook = async () => {
+  // ================== ĐẶT CHỖ ==================
+  const handleBook = () => {
     if (!selectedGun || totalMinutes <= 0) return;
-    try {
-      const hh = String(startHour).padStart(2, "0");
-      const mm = String(startMinute).padStart(2, "0");
-      const hoursPretty = Math.floor(totalMinutes / 60);
-      const minsPretty = totalMinutes % 60;
-      alert(
-        `Đặt chỗ thành công!\n` +
-        `Giờ bắt đầu: ${hh}:${mm} hôm nay\n` +
-        `Súng: ${selectedGun.name || selectedGun.id}\n` +
-        `Thời lượng tính phí: ${hoursPretty} giờ ${minsPretty} phút\n` +
-        `Tổng phí: ${vnd(bookingFee)}`
-      );
-    } catch (e) {
-      alert("Có lỗi khi đặt chỗ!");
-    }
+
+    const hh = String(startHour).padStart(2, "0");
+    const mm = String(startMinute).padStart(2, "0");
+
+    const payload = {
+      station: {
+        id,
+        name: station?.name,
+        address: station?.address,
+      },
+      charger: {
+        id: cid,
+        connector: charger?.connector,
+        power: charger?.power,
+        price: charger?.price,
+      },
+      gun: {
+        id: selectedGun?.id,
+        name: selectedGun?.name || `Súng ${selectedGun?.id}`,
+      },
+      startTime: `${hh}:${mm}`,
+      baseline: `${String(baseline.h).padStart(2, "0")}:${String(baseline.m).padStart(2, "0")}`,
+      totalMinutes,
+      perMinute,
+      bookingFee,
+    };
+
+    navigate("/payment", { state: payload });
   };
 
+  // ================== RENDER ==================
   if (loading) return <MainLayout><div>Đang tải dữ liệu...</div></MainLayout>;
   if (error) return <MainLayout><div className="error-text">Lỗi: {error}</div></MainLayout>;
   if (!station) return <MainLayout><div>Không có dữ liệu trạm.</div></MainLayout>;
@@ -164,31 +167,25 @@ export default function BookingPorts() {
   return (
     <MainLayout>
       <div className="bp-container">
-        <Link to="/" className="bp-back">← Quay về</Link>
         <Link to={`/stations/${id}`} className="bp-back">← Quay về trạm</Link>
 
         <div className="bp-grid">
           {/* Cột trái */}
           <div className="bp-left-col">
-            {/* Tóm tắt trạm */}
             <div className="bp-panel">
               <div className="bp-title">{station.name}</div>
               <div className="bp-subtle">{station.address}</div>
             </div>
 
-            {/* Trụ đã chọn + biểu giá */}
             <div className="bp-panel-chargers">
               <ChargersCard charger={charger} />
               <div className="bp-charger-grid">
                 <div className="bp-panel-note">
                   <div className="bp-note">Biểu giá dịch vụ sạc điện</div>
                   <div className="bp-price">{charger.price || "—"}</div>
-                  <div className="bp-footnote">
-                    © Biểu giá có thể thay đổi theo từng trạm và khung giờ.
-                  </div>
+                  <div className="bp-footnote">© Biểu giá có thể thay đổi theo từng trạm và khung giờ.</div>
                 </div>
 
-                {/* Chọn súng sạc */}
                 <div className="bp-section">
                   <div className="bp-label">Chọn súng sạc</div>
                   <ChargersGun
@@ -206,7 +203,6 @@ export default function BookingPorts() {
               </div>
             </div>
 
-            {/* Khung giá demo */}
             <div className="bp-panel">
               <div className="bp-title">Khung giá</div>
               <div className="bp-table-wrapper">
@@ -230,7 +226,6 @@ export default function BookingPorts() {
             <div className="bp-panel">
               <div className="bp-title">Đặt trước trụ sạc</div>
 
-              {/* Chọn giờ bắt đầu (bước 10', sau 4:50 nếu now=3:47) */}
               <div className="bp-section">
                 <div className="bp-label">Giờ bắt đầu hôm nay</div>
 
@@ -248,7 +243,6 @@ export default function BookingPorts() {
                       value={startHour}
                       onChange={(e) => {
                         let h = Number(e.target.value) || minSelHour;
-                        // nếu chọn đúng giờ min, đảm bảo phút >= minSelMinute
                         const mins = minuteOptionsForHour(h);
                         let m = startMinute;
                         if (!mins.includes(m)) m = mins[0] ?? 0;
@@ -292,7 +286,6 @@ export default function BookingPorts() {
                 </div>
               </div>
 
-              {/* Phí đặt chỗ (đ/giờ) */}
               <div className="bp-section">
                 <div className="bp-label">Phí đặt chỗ</div>
                 <select
@@ -305,7 +298,6 @@ export default function BookingPorts() {
                 </select>
               </div>
 
-              {/* Tổng phí */}
               <div className="bp-summary">
                 <RowKV k="Cổng sạc" v={`${charger?.connector || "—"} • ${charger?.power || "—"}`} />
                 <RowKV k="Súng" v={selectedGun ? (selectedGun.name || `Súng ${selectedGun.id}`) : "—"} />
@@ -326,7 +318,6 @@ export default function BookingPorts() {
               </button>
             </div>
 
-            {/* Đánh giá demo */}
             <div className="bp-panel">
               <div className="bp-title with-mb">Đánh giá</div>
               <Review name="N***n" text="Nhân viên hỗ trợ tốt. Dịch vụ okie." />

@@ -1,0 +1,260 @@
+/****************************************************
+ 🔷 1. PHẦN CHUNG - BỐ CỤC & KHUNG CHÍNH
+****************************************************/
+.charging-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 20px;
+  min-height: 100vh;
+  background-color: #e5e9ec;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+}
+
+.charging-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  padding: 20px 25px;
+  max-width: 600px;
+  width: 100%;
+  text-align: center;
+  margin-top: 50px;
+}
+
+/****************************************************
+ 🔷 2. TIÊU ĐỀ & THÔNG TIN TRẠM
+****************************************************/
+.charging-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: #333;
+  text-align: left;
+}
+
+.charging-station {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+/****************************************************
+ 🔷 3. KHUNG TRẠNG THÁI SẠC (PIN + THỜI GIAN)
+****************************************************/
+.charging-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #c1bebe62;
+  border-radius: 20px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.447);
+  padding: 15px 20px;
+  margin-bottom: 20px;
+}
+
+/* Cấu trúc hộp con trong khung trạng thái */
+.status-box {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  text-align: left;
+}
+
+/****************************************************
+ 🔋 4. CỘT TRÁI - PHẦN TRĂM PIN
+****************************************************/
+.battery-box {
+  display: flex;
+  align-items: center; /* Icon giữa dọc với nội dung */
+  justify-content: flex-start;
+  gap: 12px;
+}
+
+.battery-icon {
+  font-size: 46px;
+  color: #4caf50;
+  flex-shrink: 0;
+}
+
+.battery-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Căn giữa dọc chữ */
+}
+
+.battery-info p {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.2;
+}
+
+.battery-info h3 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #222;
+  line-height: 1.2;
+}
+
+/****************************************************
+ ⏰ 5. CỘT PHẢI - THỜI GIAN DỰ KIẾN
+****************************************************/
+.status-box:last-child {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: right;
+  padding-right: 15px;
+}
+
+.status-box p {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.status-box h3 {
+  font-size: 30px;
+  font-weight: 700;
+  color: #333;
+  margin: 0;
+  line-height: 1.2;
+}
+
+/****************************************************
+ 🧾 6. KHUNG THÔNG TIN XE & GIÁ
+****************************************************/
+.charging-info-wrapper {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 25px;
+  padding-top: 15px;
+}
+
+/* Mỗi cột (trái & phải) */
+.info-box {
+  flex: 1;
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(32, 32, 32, 0.497);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* Dòng thông tin trong từng hộp */
+.info-box > div {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.info-box p {
+  font-size: 12px;
+  color: #999;
+  margin: 0 0 3px 0;
+}
+
+.info-box h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+/****************************************************
+ 🔘 7. NÚT ĐIỀU KHIỂN & TRẠNG THÁI HOÀN TẤT
+****************************************************/
+.charging-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  width: 100%;
+}
+
+.charging-buttons > div {
+  width: 100%;
+}
+
+/* --- Nút DỪNG SẠC --- */
+.btn-stop {
+  background-color: #dc3545;
+  color: white;
+  padding: 12px 10px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  width: 100%;
+  font-weight: 600;
+  margin-bottom: 10px;
+  transition: background-color 0.2s;
+}
+.btn-stop:hover {
+  background-color: #c82333;
+}
+
+/* --- Nút BÁO CÁO SỰ CỐ --- */
+.btn-error {
+  background-color: #f8f9fa;
+  color: #6c757d;
+  padding: 12px 10px;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  width: 100%;
+  margin-bottom: 10px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+.btn-error:hover {
+  background-color: #e2e6ea;
+}
+.btn-error .anticon {
+  margin-right: 5px;
+}
+
+/* --- Trạng thái sạc hoàn tất --- */
+.charging-buttons h2 {
+  color: #333;
+  font-size: 16px;
+  margin-bottom: 5px !important;
+}
+
+.charging-buttons p {
+  color: #666;
+  font-size: 12px;
+  margin: 0 0 5px 0;
+}
+
+.btn-finish {
+  background-color: #007bff;
+  color: white;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  width: 100%;
+  font-weight: 600;
+  margin-top: 15px;
+  transition: background-color 0.2s;
+}
+.btn-finish:hover {
+  background-color: #0056b3;
+}

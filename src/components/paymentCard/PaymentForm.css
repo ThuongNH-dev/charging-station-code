@@ -1,0 +1,111 @@
+/* ===== LEFT PANEL: PAYMENT FORM (pf-*) ===== */
+.pf-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pf-title {
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: var(--bp-primary-strong);         /* tone đồng bộ */
+}
+
+.pf-methods h3,
+.pf-contact h3,
+.pf-card-info h3 {
+  margin: 8px 0;
+  color: var(--bp-text);
+}
+
+/* Grid chọn phương thức – khớp “bp-input feel” */
+.pf-method-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+}
+.pf-method-item {
+  border: 1px solid var(--bp-border);
+  border-radius: var(--bp-radius-md);
+  padding: 12px;
+  background: var(--bp-surface);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+.pf-method-item img { max-height: 32px; object-fit: contain; }
+.pf-method-item.active {
+  border-color: var(--bp-primary);
+  box-shadow: 0 0 0 3px var(--bp-primary-soft);
+  background: #fff;
+}
+
+/* Inputs – khớp bp-input-select */
+.pf-form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--bp-border);
+  background: var(--bp-surface);
+  color: var(--bp-text);
+  border-radius: var(--bp-radius-md);
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.pf-form-group input:focus {
+  border-color: var(--bp-primary);
+  box-shadow: 0 0 0 3px var(--bp-primary-soft);
+}
+
+.pf-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Liên hệ readonly – khớp bp-summary */
+.pf-readonly {
+  border: 1px dashed var(--bp-dashed);
+  border-radius: var(--bp-radius-md);
+  padding: 12px;
+  background: transparent;
+  color: var(--bp-text);
+}
+
+/* Ví */
+.pf-wallet {
+  border: 1px solid var(--bp-border);
+  border-radius: var(--bp-radius-md);
+  padding: 12px;
+  background: var(--bp-primary-soft);
+  margin-top: 8px;
+}
+.pf-wallet-warning { color: #b91c1c; margin-top: 6px; }
+.pf-wallet-ok { color: #166534; margin-top: 6px; }
+
+.pf-topup {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--bp-border);
+  background: var(--bp-surface);
+  border-radius: var(--bp-radius-md);
+  cursor: pointer;
+  transition: border-color .15s ease;
+}
+.pf-topup:hover { border-color: var(--bp-primary); }
+
+/* QR hint */
+.pf-qr-hint {
+  background: #f6f8fa;
+  border: 1px dashed var(--bp-dashed);
+  border-radius: var(--bp-radius-md);
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--bp-muted);
+  margin-top: 8px;
+}
+
+/* Responsive */
+@media (max-width: 960px) {
+  .pf-method-grid { grid-template-columns: repeat(2, 1fr); }
+}

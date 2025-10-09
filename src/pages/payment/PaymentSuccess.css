@@ -1,0 +1,76 @@
+.payment-success-container {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  padding: 24px;
+  font-family: Arial, sans-serif;
+}
+
+.left-column {
+  flex: 1;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.left-column .success-icon {
+  color: #22c55e;
+  font-size: 60px;
+}
+
+.left-column h2 {
+  color: #22c55e;
+  margin-top: 16px;
+}
+
+.left-column p {
+  color: #888;
+}
+
+.left-column .timer {
+  font-size: 36px;
+  font-weight: bold;
+  color: #000;
+  margin: 20px 0;
+}
+
+.left-column input {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  width: 60%;
+  margin-top: 8px;
+  outline: none;
+}
+
+.right-column {
+  width: 340px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  padding: 24px 20px;
+}
+
+.right-column h3 {
+  margin-top: 0;
+}
+
+.right-column p {
+  margin: 0;
+}
+
+.right-column table {
+  width: 100%;
+  margin-left: 8px;
+  line-height: 1.7;
+}
+
+.right-column td {
+  padding: 2px 0;
+}
+
+.right-column tr:last-child {
+  border-top: 1px solid #eee;
+}

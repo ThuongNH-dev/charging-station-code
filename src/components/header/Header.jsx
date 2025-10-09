@@ -1,10 +1,13 @@
 import React, { useState } from "react";
 import { Layout, Button } from "antd";
-import { Link, useLocation } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+
 const { Header } = Layout;
 
 const Head = ({ role = "guest", isAuthenticated = false, user = null }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+
   const items = [
     { key: "1", label: "Trang chủ", path: "/" },
     { key: "2", label: "Danh mục", path: "/stations" },
@@ -12,12 +15,24 @@ const Head = ({ role = "guest", isAuthenticated = false, user = null }) => {
     { key: "4", label: "Liên hệ", path: "/contact" },
   ];
 
-  const activeKey =
-    items.find((it) =>
-      it.path === "/"
-        ? location.pathname === "/"
-        : location.pathname.startsWith(it.path)
-    )?.key ?? "1";
+  // 🔧 SỬA Ở ĐÂY: map đường dẫn hiện tại sang key menu
+  const path = location.pathname;
+
+  let activeKey = "1";
+  if (path === "/") {
+    activeKey = "1";
+  } else if (
+    path.startsWith("/stations") ||
+    path.startsWith("/booking") ||
+    path.startsWith("/payment") ||       // ✅ /payment, /payment/success, /payment/fail
+    path.startsWith("/charging")         // ✅ nếu có màn hình sạc
+  ) {
+    activeKey = "2"; // “Danh mục”
+  } else if (path.startsWith("/services")) {
+    activeKey = "3";
+  } else if (path.startsWith("/contact")) {
+    activeKey = "4";
+  }
 
   const mainColor = "#006d32";
   const hoverColor = "#009e44";
@@ -37,14 +52,13 @@ const Head = ({ role = "guest", isAuthenticated = false, user = null }) => {
       >
         {/* Logo + Menu */}
         <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
-          {/* Giảm size logo để cân header */}
           <img src="/logoV2.png" alt="logo" style={{ height: 100, width: "auto" }} />
 
           <ul
             className="custom-menu"
             style={{
               display: "flex",
-              alignItems: "center",   // căn giữa cả list
+              alignItems: "center",
               listStyle: "none",
               margin: 0,
               padding: 0,
@@ -54,8 +68,8 @@ const Head = ({ role = "guest", isAuthenticated = false, user = null }) => {
           >
             {items.map((it) => (
               <li key={it.key} style={{ margin: 0, padding: 0 }}>
-                <Link
-                  to={it.path}
+                <div
+                  onClick={() => navigate(it.path)} // 👈 chuyển hướng khi click
                   className={`menu-item ${activeKey === it.key ? "active" : ""}`}
                   style={{
                     position: "relative",
@@ -66,10 +80,11 @@ const Head = ({ role = "guest", isAuthenticated = false, user = null }) => {
                     textDecoration: "none",
                     color: activeKey === it.key ? mainColor : "#000",
                     fontWeight: activeKey === it.key ? 600 : 500,
+                    cursor: "pointer", // 👈 thêm cho biết có thể click
                   }}
                 >
                   {it.label}
-                </Link>
+                </div>
               </li>
             ))}
           </ul>
@@ -96,6 +111,7 @@ const Head = ({ role = "guest", isAuthenticated = false, user = null }) => {
               e.currentTarget.style.background = "#fff";
               e.currentTarget.style.color = mainColor;
             }}
+            onClick={() => navigate("/login")} // 👈 ví dụ thêm điều hướng
           >
             Đăng nhập
           </Button>
@@ -121,6 +137,7 @@ const Head = ({ role = "guest", isAuthenticated = false, user = null }) => {
               e.currentTarget.style.background = "#fff";
               e.currentTarget.style.color = mainColor;
             }}
+            onClick={() => navigate("/register")} // 👈 ví dụ thêm điều hướng
           >
             Đăng kí
           </Button>
@@ -133,7 +150,7 @@ const Head = ({ role = "guest", isAuthenticated = false, user = null }) => {
           content: '';
           position: absolute;
           left: 0; right: 0;
-          bottom: 0;                 /* nếu giữ border-bottom của Header = 1px, đổi thành -1px */
+          bottom: 0;
           height: 2px;
           background-color: ${mainColor};
           border-radius: 2px;
