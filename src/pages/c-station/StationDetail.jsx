@@ -34,9 +34,11 @@ export default function StationDetail() {
       <div className="bp-container">
         <Link to="/stations" className="bp-back">← Quay về danh sách</Link>
 
+        <div className="bp-add">
         <h1 className="bp-title sd-title">{station.name}</h1>
         <div className="sd-address">{station.address}</div>
-
+        </div>
+        
         {(Number.isFinite(station.lat) && Number.isFinite(station.lng)) && (
           <div className="bp-panel sd-map-panel">
             <div className="sd-map-canvas">

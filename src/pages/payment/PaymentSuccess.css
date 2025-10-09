@@ -1,76 +1,209 @@
-.payment-success-container {
-  display: flex;
-  justify-content: center;
-  gap: 40px;
-  padding: 24px;
-  font-family: Arial, sans-serif;
+/* ================= PaymentSuccess (scoped by .ps-root) ================= */
+.ps-root {
+  color: var(--bp-text);
 }
 
-.left-column {
-  flex: 1;
-  background: #fff;
+/* Thanh điều hướng nhỏ ở trên */
+.ps-topbar {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 24px 0;
+}
+.ps-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--bp-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+.ps-link:hover { color: var(--bp-primary-strong); }
+.ps-link.is-back { font-size: 14px; }
+
+/* Lưới 2 cột */
+.ps-grid {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 24px 32px;
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 20px;
+}
+
+/* Panel */
+.ps-panel {
+  background: var(--bp-surface);
+  border: 1px solid var(--bp-border);
+  border-radius: 16px;
+  box-shadow: var(--bp-shadow);
+}
+
+/* Bên trái */
+.ps-pane-left { padding: 28px; }
+
+/* Đồng hồ đếm ngược */
+.ps-timer {
+  margin: 16px 0 4px;
+  font-size: 42px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: .5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--bp-text);
+}
+
+/* Form nhập ID trụ */
+.ps-form { margin-top: 8px; }
+.ps-label {
+  display: block;
+  font-size: 14px;
+  color: var(--bp-muted);
+  margin-bottom: 8px;
+}
+.ps-error { margin-top: 8px; color: #d4380d; font-size: 14px; }
+
+/* Bên phải: thông tin */
+.ps-pane-right { padding: 22px 20px; }
+.ps-pane-title {
+  margin: 0 0 10px;
+  font-weight: 800;
+  color: var(--bp-primary-strong);
+}
+
+.ps-block { 
+  border: 1px dashed var(--bp-dashed);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  padding: 32px 24px;
-  text-align: center;
+  padding: 12px;
+  margin-top: 14px;
+  background: #fff;
 }
-
-.left-column .success-icon {
-  color: #22c55e;
-  font-size: 60px;
-}
-
-.left-column h2 {
-  color: #22c55e;
-  margin-top: 16px;
-}
-
-.left-column p {
-  color: #888;
-}
-
-.left-column .timer {
-  font-size: 36px;
-  font-weight: bold;
-  color: #000;
-  margin: 20px 0;
-}
-
-.left-column input {
-  padding: 10px 14px;
+.ps-block-head {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bp-text-subtle);
+  margin-bottom: 8px;
+  background: var(--bp-table-head);
+  padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid #ccc;
-  width: 60%;
-  margin-top: 8px;
-  outline: none;
+}
+.ps-kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 8px 2px;
+  gap: 12px;
+}
+.ps-k { color: var(--bp-muted); }
+.ps-v { color: var(--bp-text); }
+.ps-sep {
+  height: 1px;
+  background: var(--bp-border);
+  margin: 6px 0;
+}
+.ps-total .ps-k,
+.ps-total .ps-v { font-weight: 800; }
+
+/* Empty state */
+.ps-empty {
+  max-width: 720px;
+  margin: 24px auto;
+  padding: 24px;
+  background: var(--bp-surface);
+  border: 1px solid var(--bp-border);
+  border-radius: 16px;
+  box-shadow: var(--bp-shadow);
+}
+.ps-empty h2 { margin: 0 0 6px; }
+.ps-empty p { margin: 0 0 10px; color: var(--bp-text-subtle); }
+
+/* Responsive */
+@media (max-width: 992px) {
+  .ps-grid { grid-template-columns: 1fr; gap: 16px; }
+  .ps-row { grid-template-columns: 1fr; }
 }
 
-.right-column {
-  width: 340px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  padding: 24px 20px;
+/* ========== SUCCESS CENTER BLOCK ========== */
+.ps-success-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  margin-bottom: 24px;
 }
 
-.right-column h3 {
-  margin-top: 0;
+.ps-success-icon {
+  width: 96px;
+  aspect-ratio: 1 / 1;
+  border-radius: 999px;
+  background: #d1fae5;
+  display: grid;
+  place-items: center;
+  line-height: 0;
+  margin-bottom: 12px;
 }
-
-.right-column p {
+.ps-success-icon svg {
+  display: block;
+  font-size: 44px;
+  color: #22c55e;
+}
+.ps-success-title {
+  color: #16a34a;
+  font-weight: 700;
+  font-size: 18px;
+  margin: 4px 0 2px;
+}
+.ps-success-time {
+  font-size: 13px;
+  color: #333;
   margin: 0;
 }
 
-.right-column table {
+/* ========== INPUT ROW (cao bằng nhau, không lệch) ========== */
+.ps-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: stretch;
+  max-width: 560px;
+}
+.ps-input {
   width: 100%;
-  margin-left: 8px;
-  line-height: 1.7;
+  height: 48px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--bp-border);
+  background: var(--bp-surface);
+  color: var(--bp-text);
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  line-height: 1.1;
+}
+.ps-input:focus {
+  border-color: var(--bp-primary);
+  box-shadow: 0 0 0 3px var(--bp-primary-soft);
+}
+.ps-btn {
+  height: 48px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: 1px solid var(--bp-primary);
+  background: var(--bp-primary);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, transform .03s;
+}
+.ps-btn:hover:not(:disabled) { background: var(--bp-primary-strong); }
+.ps-btn:active:not(:disabled) { transform: translateY(1px); }
+.ps-btn:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Center the countdown timer */
+.ps-timer{
+  display: flex;
+  justify-content: center;  
+  padding-bottom: 20px;   
+  margin: 16px auto 4px;      /* căn giữa theo chiều ngang */
+  text-align: center;         /* căn số bên trong cho chắc */
 }
 
-.right-column td {
-  padding: 2px 0;
-}
-
-.right-column tr:last-child {
-  border-top: 1px solid #eee;
-}

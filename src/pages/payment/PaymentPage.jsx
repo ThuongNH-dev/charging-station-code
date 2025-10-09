@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import PaymentForm from "../../components/paymentCard/PaymentForm";
 import { QRCodeCanvas } from "qrcode.react";
 import MainLayout from "../../layouts/MainLayout";
+import { ArrowLeftOutlined } from "@ant-design/icons";
 import "./style/PaymentPage.css";
-
 
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
 
@@ -24,7 +24,7 @@ export default function PaymentPage() {
     }
   }, []);
 
-  // Gán cứng contact
+  // Contact demo
   const contact = useMemo(
     () => ({
       fullName: "Nguyễn Văn A",
@@ -45,9 +45,10 @@ export default function PaymentPage() {
   if (!state) {
     return (
       <div className="page-fallback">
-        <p>Thiếu thông tin đơn hàng. Vui lòng đặt lại.</p>
+        <h2>Thiếu thông tin đơn hàng</h2>
+        <p>Vui lòng đặt lại từ trang danh sách trạm.</p>
         <button className="secondary-btn" onClick={() => navigate("/stations")}>
-          Quay về danh sách trạm
+          <ArrowLeftOutlined /> Về danh sách trạm
         </button>
       </div>
     );
@@ -109,7 +110,6 @@ export default function PaymentPage() {
   };
 
   const canPayByWallet = selectedPayment === "wallet" ? walletBalance >= amount : true;
-
   const payDisabled =
     loading || !selectedPayment || (selectedPayment === "wallet" && !canPayByWallet);
 
@@ -153,10 +153,10 @@ export default function PaymentPage() {
     <MainLayout>
       <div className="payment-page">
         <div className="payment-container">
-          {/* Left: Xác nhận thông tin */}
           {/* LEFT COLUMN */}
           <div className="left-col">
-            <a className="bp-back" onClick={() => navigate(-1)}>← Quay về</a>
+            {/* (bỏ nút/link quay về ở trên) */}
+
             <div className="left-panel">
               <PaymentForm
                 selectedPayment={selectedPayment}
@@ -167,9 +167,32 @@ export default function PaymentPage() {
                 amount={amount}
                 contact={contact}
               />
+
+              {selectedPayment === "qr" && (
+                <div className="os-qr">
+                  <QRCodeCanvas value={buildQrPayload()} size={180} includeMargin />
+                  <p className="os-qr-hint">Quét mã QR để thanh toán</p>
+                </div>
+              )}
+
+              {/* ✅ Nút trong card: Thanh toán (trên) + Quay về (dưới) */}
+              <div className="os-actions">
+                <button
+                  onClick={handlePay}
+                  className={`primary-btn ${payDisabled ? "disabled" : ""}`}
+                  disabled={payDisabled}
+                >
+                  {selectedPayment === "qr" ? "Xác nhận đã quét" : "Thanh Toán"}
+                </button>
+
+                <button className="secondary-btn" onClick={() => navigate(-1)}>
+                  <ArrowLeftOutlined /> Quay về
+                </button>
+              </div>
             </div>
           </div>
-          {/* Right: Xác nhận đặt đơn */}
+
+          {/* RIGHT COLUMN */}
           <div className="right-panel">
             <h2 className="os-title">Xác nhận đơn đặt trước</h2>
 
@@ -207,37 +230,14 @@ export default function PaymentPage() {
                     <td className="os-right">0%</td>
                   </tr>
                   <tr className="os-total">
-                    <td>
-                      <b>Tổng</b>
-                    </td>
-                    <td className="os-right">
-                      <b>{vnd(amount)}</b>
-                    </td>
+                    <td><b>Tổng</b></td>
+                    <td className="os-right"><b>{vnd(amount)}</b></td>
                   </tr>
                 </tbody>
               </table>
             </div>
-
-            {selectedPayment === "qr" && (
-              <div className="os-qr">
-                <QRCodeCanvas value={buildQrPayload()} size={180} includeMargin />
-                <p className="os-qr-hint">Quét mã QR để thanh toán</p>
-              </div>
-            )}
-
-            <div className="os-actions">
-              <button
-                onClick={handlePay}
-                className={`primary-btn ${payDisabled ? "disabled" : ""}`}
-                disabled={payDisabled}
-              >
-                {selectedPayment === "qr" ? "Xác nhận đã quét" : "Thanh Toán"}
-              </button>
-              {/* <button className="secondary-btn" onClick={() => navigate(-1)}>
-                Quay về
-              </button> */}
-            </div>
           </div>
+
         </div>
       </div>
     </MainLayout>

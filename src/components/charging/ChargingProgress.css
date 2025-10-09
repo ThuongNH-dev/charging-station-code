@@ -1,260 +1,347 @@
-/****************************************************
- 🔷 1. PHẦN CHUNG - BỐ CỤC & KHUNG CHÍNH
-****************************************************/
-.charging-wrapper {
+/* ===============================================
+   ChargingProgress (scoped by .cp-root)
+   — Đồng bộ token + hiệu ứng mới lạ nhưng tinh tế
+   =============================================== */
+.cp-root {
+  --bp-bg: var(--bp-bg, #f3f4f6);
+  --radius-lg: var(--bp-radius-lg, 16px);
+  --radius-md: var(--bp-radius-md, 12px);
+  --radius-sm: var(--bp-radius-sm, 10px);
+
+  --ok: #16a34a;           /* khớp hệ màu dot xanh */
+  --danger: #dc2626;       /* khớp hệ màu dot đỏ  */
+  --danger-strong: #b91c1c;
+
+  /* Accent gradient dùng màu brand */
+  --accent-grad: linear-gradient(135deg, var(--bp-primary), var(--bp-accent));
+}
+
+/* ===== BACKDROP đẹp hơn (pattern mềm) ===== */
+.cp-root .charging-wrapper {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 20px;
+  padding: 16px 24px 32px;
   min-height: 100vh;
-  background-color: #e5e9ec;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(14,165,163,0.08), transparent 60%),
+    radial-gradient(800px 400px at 110% 0%, rgba(15,118,110,0.06), transparent 60%),
+    var(--bp-bg);
+  color: var(--bp-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-.charging-card {
-  background-color: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
-  padding: 20px 25px;
-  max-width: 600px;
+/* ===== CARD: viền gradient mảnh + blur bóng mềm ===== */
+.cp-root .charging-card {
   width: 100%;
-  text-align: center;
-  margin-top: 50px;
+  max-width: 720px;
+  margin-top: 36px;
+  background: var(--bp-surface);
+  border-radius: var(--radius-lg);
+  position: relative;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(16,24,40,.08);
+  border: 1px solid var(--bp-border);
+}
+.cp-root .charging-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: calc(var(--radius-lg) + 1px);
+  padding: 1px;
+  background: var(--accent-grad);
+  -webkit-mask:
+     linear-gradient(#000 0 0) content-box, 
+     linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  opacity: .22;             /* viền gradient tinh tế */
 }
 
-/****************************************************
- 🔷 2. TIÊU ĐỀ & THÔNG TIN TRẠM
-****************************************************/
-.charging-title {
+/* ===== TITLE + ACCENT BAR ===== */
+.cp-root .charging-title {
+  margin: 0 0 8px 0;
+  font-weight: 800;
+  letter-spacing: .2px;
+  color: var(--bp-primary-strong);
   font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 5px;
-  color: #333;
   text-align: left;
 }
-
-.charging-station {
+.cp-root .charging-station {
+  margin: 0 0 16px 0;
   font-size: 13px;
-  color: #666;
-  margin-bottom: 20px;
+  color: var(--bp-text-subtle);
   text-align: left;
 }
-
-/****************************************************
- 🔷 3. KHUNG TRẠNG THÁI SẠC (PIN + THỜI GIAN)
-****************************************************/
-.charging-status {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: #c1bebe62;
-  border-radius: 20px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.447);
-  padding: 15px 20px;
-  margin-bottom: 20px;
+.cp-root .accent-bar {
+  height: 4px;
+  width: 84px;
+  border-radius: 999px;
+  background: var(--accent-grad);
+  margin: 0 0 18px 0;
+  opacity: .9;
 }
 
-/* Cấu trúc hộp con trong khung trạng thái */
-.status-box {
-  flex: 1;
-  background: transparent;
-  border: none;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
-  text-align: left;
-}
-
-/****************************************************
- 🔋 4. CỘT TRÁI - PHẦN TRĂM PIN
-****************************************************/
-.battery-box {
-  display: flex;
-  align-items: center; /* Icon giữa dọc với nội dung */
-  justify-content: flex-start;
+/* ===== STATUS: nền nhẹ + shadow + vòng tiến độ quanh icon ===== */
+.cp-root .charging-status {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
   gap: 12px;
-}
-
-.battery-icon {
-  font-size: 46px;
-  color: #4caf50;
-  flex-shrink: 0;
-}
-
-.battery-info {
-  display: flex;
-  flex-direction: column;
-  justify-content: center; /* Căn giữa dọc chữ */
-}
-
-.battery-info p {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
-  line-height: 1.2;
-}
-
-.battery-info h3 {
-  margin: 0;
-  font-size: 28px;
-  font-weight: 700;
-  color: #222;
-  line-height: 1.2;
-}
-
-/****************************************************
- ⏰ 5. CỘT PHẢI - THỜI GIAN DỰ KIẾN
-****************************************************/
-.status-box:last-child {
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  text-align: right;
-  padding-right: 15px;
+  background: var(--bp-table-head);
+  border: 1px solid var(--bp-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--bp-shadow);
+  padding: 16px 18px;
+  margin-bottom: 16px;
 }
 
-.status-box p {
-  font-size: 14px;
-  color: #333;
-  font-weight: 500;
+/* Vòng tiến độ (conic) bọc icon */
+/* === Vòng tiến độ pin dùng màu chủ đạo === */
+.cp-root .battery-ring {
+  --pct: 0;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  position: relative;
+  display: grid;
+  place-items: center;
+
+  /* viền màu brand chạy theo % */
+  background:
+    conic-gradient(
+      var(--bp-primary) calc(var(--pct) * 1%),
+      var(--bp-border) 0deg
+    );
+
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+/* lỗ giữa để icon nằm trong */
+.cp-root .battery-ring::after {
+  content: "";
+  position: absolute;
+  inset: 6px;               /* độ dày viền */
+  background: var(--bp-surface);
+  border-radius: 50%;
+  z-index: 1;
+}
+
+/* ánh sáng xoáy — overlay nhẹ, ăn theo màu nền viền */
+.cp-root .battery-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(255,255,255,0) 0%,
+    rgba(255,255,255,0.55) 10%,
+    rgba(255,255,255,0) 30%
+  );
+  animation: spin-light 2s linear infinite;
+  mix-blend-mode: overlay;
+  opacity: .75;
+  pointer-events: none;
+}
+
+/* Dừng xoáy khi đầy pin */
+.cp-root .battery-ring[data-full="true"]::before { display: none; }
+
+@keyframes spin-light {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Màu icon pin lấy brand đậm */
+.cp-root .battery-icon {
+  position: relative;
+  z-index: 2;
+  font-size: 26px;
+  color: var(--bp-primary-strong);
+}
+
+
+/* lỗ trắng giữa (icon nằm trong) */
+.cp-root .battery-ring::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  background: #fff;
+  border-radius: 50%;
+  z-index: 1;
+}
+
+/* ánh sáng xoáy */
+.cp-root .battery-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(255,255,255,0) 0%,
+    rgba(255,255,255,0.6) 10%,
+    rgba(255,255,255,0) 30%
+  );
+  animation: spin-light 2s linear infinite;
+  mix-blend-mode: overlay;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Dừng xoáy khi pin đầy */
+.cp-root .battery-ring[data-full="true"]::before {
+  display: none;
+}
+
+/* Icon sét ở giữa */
+.cp-root .battery-icon {
+  position: relative;
+  font-size: 26px;
+  color: var(--ok);
+  z-index: 2;
+}
+
+/* animation xoáy quanh */
+@keyframes spin-light {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.cp-root .battery-box { display: flex; align-items: center; gap: 12px; }
+.cp-root .battery-icon { font-size: 24px; color: var(--ok); }
+
+.cp-root .battery-info p {
   margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bp-muted);
+  line-height: 1.2;
+}
+.cp-root .battery-info h3 {
+  margin: 2px 0 0 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--bp-text);
   line-height: 1.2;
 }
 
-.status-box h3 {
-  font-size: 30px;
-  font-weight: 700;
-  color: #333;
-  margin: 0;
-  line-height: 1.2;
-}
+/* Cột thời gian */
+.cp-root .status-box { display: flex; align-items: center; gap: 12px; text-align: left; }
+.cp-root .status-box:last-child { flex-direction: column; align-items: flex-end; padding-right: 6px; }
+.cp-root .status-box p { margin: 0; font-size: 12px; font-weight: 600; color: var(--bp-muted); }
+.cp-root .status-box h3 { margin: 2px 0 0 0; font-size: 26px; font-weight: 800; color: var(--bp-text); }
 
-/****************************************************
- 🧾 6. KHUNG THÔNG TIN XE & GIÁ
-****************************************************/
-.charging-info-wrapper {
-  display: flex;
-  justify-content: space-between;
-  gap: 15px;
-  margin-bottom: 25px;
-  padding-top: 15px;
-}
-
-/* Mỗi cột (trái & phải) */
-.info-box {
-  flex: 1;
-  background-color: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 4px 10px rgba(32, 32, 32, 0.497);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-/* Dòng thông tin trong từng hộp */
-.info-box > div {
-  display: flex;
-  flex-direction: column;
-  text-align: left;
-}
-
-.info-box p {
+/* Chip nho nhỏ mới lạ */
+.cp-root .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
   font-size: 12px;
-  color: #999;
-  margin: 0 0 3px 0;
-}
-
-.info-box h4 {
-  font-size: 16px;
   font-weight: 600;
-  color: #333;
-  margin: 0;
+  color: var(--bp-primary-strong);
+  background: var(--bp-primary-soft);
+  border: 1px solid rgba(14,165,163,.25);
 }
 
-/****************************************************
- 🔘 7. NÚT ĐIỀU KHIỂN & TRẠNG THÁI HOÀN TẤT
-****************************************************/
-.charging-buttons {
-  display: flex;
-  justify-content: space-between;
-  gap: 15px;
+/* ===== INFO BOXES (xe & giá) ===== */
+.cp-root .charging-info-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-top: 8px;
+}
+.cp-root .info-box {
+  background: var(--bp-surface);
+  border: 1px solid var(--bp-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--bp-shadow);
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.cp-root .info-box > div { text-align: left; display: flex; flex-direction: column; }
+.cp-root .info-box p { margin: 0 0 4px 0; font-size: 12px; color: var(--bp-muted); }
+.cp-root .info-box h4 { margin: 0; font-size: 16px; font-weight: 700; color: var(--bp-text); }
+.cp-root .info-box .sub { font-size: 12px; color: var(--bp-muted); }
+
+/* Stripe cảnh báo khi tính phí phạt */
+.cp-root .penalty-stripe {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(220,38,38,.08) 0 10px,
+    rgba(220,38,38,.18) 10px 20px
+  );
+  border: 1px dashed rgba(220,38,38,.35);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+}
+
+/* ===== BUTTONS: micro-interactions + shadow mềm ===== */
+.cp-root .charging-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
   width: 100%;
 }
+.cp-root .charging-buttons > div { grid-column: 1 / -1; }
 
-.charging-buttons > div {
-  width: 100%;
+.cp-root .btn-stop,
+.cp-root .btn-error,
+.cp-root .btn-finish {
+  display: inline-flex;
+  align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-weight: 700; cursor: pointer;
+  transition: transform .05s ease, background-color .15s ease, border-color .15s ease, box-shadow .2s ease;
+  will-change: transform;
 }
+.cp-root .btn-stop:active,
+.cp-root .btn-error:active,
+.cp-root .btn-finish:active { transform: translateY(1px); }
 
-/* --- Nút DỪNG SẠC --- */
-.btn-stop {
-  background-color: #dc3545;
-  color: white;
-  padding: 12px 10px;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-  width: 100%;
-  font-weight: 600;
-  margin-bottom: 10px;
-  transition: background-color 0.2s;
+.cp-root .btn-stop {
+  background: var(--danger); color: #fff; box-shadow: 0 8px 18px rgba(220,38,38,.18);
 }
-.btn-stop:hover {
-  background-color: #c82333;
-}
+.cp-root .btn-stop:hover { background: var(--danger-strong); }
 
-/* --- Nút BÁO CÁO SỰ CỐ --- */
-.btn-error {
-  background-color: #f8f9fa;
-  color: #6c757d;
-  padding: 12px 10px;
-  border: 1px solid #ced4da;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-  width: 100%;
-  margin-bottom: 10px;
-  font-weight: 500;
-  transition: background-color 0.2s;
+.cp-root .btn-error {
+  background: #fff; color: var(--bp-muted); border-color: var(--bp-border);
 }
-.btn-error:hover {
-  background-color: #e2e6ea;
+.cp-root .btn-error:hover { background: #f9fafb; }
+
+.cp-root .btn-finish {
+  background: var(--bp-primary); color: #fff; box-shadow: 0 8px 18px rgba(14,165,163,.22);
 }
-.btn-error .anticon {
-  margin-right: 5px;
+.cp-root .btn-finish:hover { background: var(--bp-primary-strong); }
+
+/* Text khối hoàn tất */
+.cp-root .charging-buttons h2 {
+  margin: 0 0 6px 0 !important; font-size: 16px; font-weight: 700; color: var(--bp-text);
+}
+.cp-root .charging-buttons p {
+  margin: 0 0 6px 0; font-size: 12px; color: var(--bp-muted);
 }
 
-/* --- Trạng thái sạc hoàn tất --- */
-.charging-buttons h2 {
-  color: #333;
-  font-size: 16px;
-  margin-bottom: 5px !important;
+/* ===== LITTLE HOVERS ===== */
+.cp-root .info-box:hover {
+  transform: translateY(-1px);
+  transition: transform .15s ease;
 }
 
-.charging-buttons p {
-  color: #666;
-  font-size: 12px;
-  margin: 0 0 5px 0;
-}
-
-.btn-finish {
-  background-color: #007bff;
-  color: white;
-  padding: 12px 20px;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  cursor: pointer;
-  width: 100%;
-  font-weight: 600;
-  margin-top: 15px;
-  transition: background-color 0.2s;
-}
-.btn-finish:hover {
-  background-color: #0056b3;
+/* ===== RESPONSIVE ===== */
+@media (max-width: 640px) {
+  .cp-root .charging-card { padding: 20px; margin-top: 24px; }
+  .cp-root .charging-status { grid-template-columns: 1fr; gap: 8px; }
+  .cp-root .status-box:last-child { align-items: flex-start; padding-right: 0; }
+  .cp-root .charging-info-wrapper { grid-template-columns: 1fr; }
+  .cp-root .charging-buttons { grid-template-columns: 1fr; }
+  .cp-root .battery-ring { width: 56px; height: 56px; }
 }
