@@ -1,0 +1,502 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.payment-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.back-button {
+  max-width: 1400px;
+  margin: 0 auto 20px;
+}
+
+.back-button button {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.back-button button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateX(-5px);
+}
+
+/* Payment Form Container */
+.payment-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 450px;
+  gap: 30px;
+  align-items: start;
+}
+
+.payment-card,
+.invoice-card {
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.section-title,
+.invoice-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 30px;
+  color: #1a1a1a;
+  text-align: center;
+}
+
+/* Payment Methods */
+.payment-methods {
+  margin-bottom: 30px;
+}
+
+.payment-methods h3,
+.contact-info h3,
+.card-info-section h3,
+.invoice-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.method-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+}
+
+.method-item {
+  aspect-ratio: 1;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: white;
+  padding: 15px;
+}
+
+.method-item:hover {
+  border-color: #667eea;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+}
+
+.method-item.active {
+  border-color: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+}
+
+.method-item img {
+  max-width: 80%;
+  max-height: 80%;
+  object-fit: contain;
+}
+
+.method-item.active img {
+  filter: brightness(0) invert(1);
+}
+
+.vnpay-logo,
+.qr-icon {
+  font-weight: 700;
+  font-size: 14px;
+  color: #e60013;
+}
+
+.method-item.active .vnpay-logo,
+.method-item.active .qr-icon {
+  color: white;
+}
+
+/* Card Info Section */
+.card-info-section {
+  margin-bottom: 30px;
+  padding: 25px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Form Styles */
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.contact-info {
+  margin-top: 30px;
+}
+
+/* Invoice Section */
+.invoice-section {
+  margin-bottom: 25px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.invoice-section:last-of-type {
+  border-bottom: none;
+}
+
+.station-name {
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #1a1a1a;
+  font-size: 15px;
+}
+
+.info-row,
+.cost-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #555;
+}
+
+.cost-row {
+  font-size: 15px;
+}
+
+.cost-row.subtotal {
+  padding-top: 10px;
+  border-top: 1px solid #e0e0e0;
+  margin-top: 10px;
+  font-weight: 600;
+}
+
+.cost-row.total {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a1a1a;
+  padding-top: 15px;
+  border-top: 2px solid #333;
+  margin-top: 15px;
+}
+
+/* QR Code Section */
+.qr-section {
+  margin: 30px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.qr-placeholder {
+  width: 200px;
+  height: 200px;
+  border: 2px dashed #ddd;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f8f9fa;
+}
+
+.qr-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #999;
+  margin-bottom: 8px;
+}
+
+.qr-placeholder small {
+  font-size: 12px;
+  color: #999;
+}
+
+/* Payment Button */
+.payment-button {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.payment-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+}
+
+.payment-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   PAYMENT RESULT PAGE STYLES
+   ======================================== */
+
+.payment-container-center {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 40px;
+  min-height: calc(100vh - 40px);
+}
+
+.status-page {
+  display: flex;
+  gap: 40px;
+  width: 100%;
+}
+
+.invoice-card-status {
+  background: white;
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  flex: 0 0 450px;
+}
+
+.status-result-card {
+  background: white;
+  border-radius: 20px;
+  padding: 60px 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 500px;
+}
+
+/* Loading State */
+.loading-status {
+  text-align: center;
+  width: 100%;
+}
+
+.spinner-large {
+  width: 80px;
+  height: 80px;
+  border: 6px solid #f3f3f3;
+  border-top: 6px solid #667eea;
+  border-radius: 50%;
+  margin: 0 auto 30px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-status h2 {
+  font-size: 24px;
+  color: #333;
+}
+
+/* Status Content */
+.status-content-page {
+  text-align: center;
+  width: 100%;
+  animation: fadeInScale 0.5s ease;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.status-icon-large {
+  margin: 0 auto 30px;
+  animation: bounceIn 0.6s ease;
+}
+
+@keyframes bounceIn {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.status-title {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 15px;
+}
+
+.status-title.success {
+  color: #10b981;
+}
+
+.status-title.failed {
+  color: #ef4444;
+}
+
+.status-time {
+  font-size: 16px;
+  color: #999;
+  margin-bottom: 15px;
+}
+
+.status-message {
+  font-size: 18px;
+  color: #666;
+  margin-bottom: 40px;
+  line-height: 1.6;
+}
+
+.status-button {
+  padding: 16px 50px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: none;
+}
+
+.status-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+}
+
+/* ========================================
+   RESPONSIVE DESIGN
+   ======================================== */
+
+@media (max-width: 1200px) {
+  .status-page {
+    flex-direction: column;
+  }
+
+  .invoice-card-status {
+    flex: 1;
+    width: 100%;
+  }
+
+  .status-result-card {
+    width: 100%;
+  }
+}
+
+@media (max-width: 1024px) {
+  .payment-container {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-right {
+    order: -1;
+  }
+}
+
+@media (max-width: 768px) {
+  .payment-card,
+  .invoice-card,
+  .invoice-card-status,
+  .status-result-card {
+    padding: 25px;
+  }
+
+  .method-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .status-title {
+    font-size: 26px;
+  }
+
+  .status-message {
+    font-size: 16px;
+  }
+
+  .payment-container-center {
+    padding: 0 10px;
+  }
+
+  .status-page {
+    gap: 20px;
+  }
+}

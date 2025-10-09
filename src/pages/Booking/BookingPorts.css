@@ -1,0 +1,294 @@
+/* ===== THEME TOKENS ===== */
+:root {
+  --bp-surface: #ffffff;          /* nền panel */
+  --bp-border: #e6edf3;           /* viền nhạt */
+  --bp-shadow: 0 10px 24px rgba(16, 24, 40, 0.06);
+
+  --bp-text: #0f172a;             /* chữ chính */
+  --bp-text-subtle: #475569;      /* chữ mờ */
+  --bp-muted: #667085;            /* label */
+
+  --bp-primary: #0f766e;          /* TEAL chính */
+  --bp-primary-strong: #0b615a;   /* hover/đậm */
+  --bp-primary-soft: #ecfdf5;     /* nền nhẹ */
+  --bp-accent: #0ea5a3;           /* điểm nhấn (tuỳ chọn) */
+
+  --bp-table-head: #f9fafb;       /* nền thead */
+  --bp-dashed: #e5e7eb;           /* gạch chấm summary */
+
+  --bp-radius-lg: 16px;
+  --bp-radius-md: 12px;
+  --bp-radius-sm: 10px;
+}
+
+
+/* ===== LAYOUT ===== */
+.bp-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 24px 32px;
+  background: var(--bp-bg);
+  color: var(--bp-text);
+}
+
+.bp-back {
+  display: inline-block;
+  margin-bottom: 12px;
+  text-decoration: none;
+  color: var(--bp-primary);
+}
+.bp-back:hover { color: var(--bp-primary-strong); }
+
+.bp-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 16px;
+}
+
+.bp-left-col {
+  display: grid;
+  gap: 16px;
+}
+
+/* ===== PANELS ===== */
+.bp-panel,
+.bp-panel-chargers,
+.bp-panel-note {
+  background: var(--bp-surface);
+  border: 1px solid var(--bp-border);
+  border-radius: var(--bp-radius-lg);
+  box-shadow: var(--bp-shadow);
+}
+
+.bp-panel,
+.bp-panel-chargers { padding: 30px; }
+
+.bp-panel-note {
+  width: 280px;
+  margin-top: 10px;
+  padding: 16px;
+}
+
+/* ===== TYPOGRAPHY ===== */
+.bp-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--bp-primary-strong);
+}
+.bp-title.with-mb { margin-bottom: 8px; }
+
+.bp-subtle { color: var(--bp-text-subtle); }
+
+.bp-note {
+  font-size: 14px;
+  color: var(--bp-muted);
+}
+
+.bp-price {
+  font-size: 28px;
+  font-weight: 700;
+  margin-top: 5px;
+  color: var(--bp-primary);
+}
+
+.bp-footnote {
+  color: var(--bp-muted);
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+/* ===== TABLE ===== */
+.bp-table-wrapper { overflow-x: auto; }
+
+.bp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.bp-table th,
+.bp-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-top: 1px solid var(--bp-border);
+}
+
+.bp-table thead th {
+  font-weight: 700;
+  background: var(--bp-table-head);
+  color: var(--bp-text);
+  border-top: none;
+}
+
+/* ===== FORM / INPUTS ===== */
+.bp-section { margin-top: 12px; }
+.bp-label { font-size: 14px; color: var(--bp-muted); margin-bottom: 6px; }
+
+.bp-time-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bp-input-time,
+.bp-input-select {
+  border: 1px solid var(--bp-border);
+  background: var(--bp-surface);
+  color: var(--bp-text);
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.bp-input-time {
+  width: 72px;
+  padding: 8px 10px;
+  border-radius: var(--bp-radius-sm);
+}
+
+.bp-input-select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--bp-radius-md);
+}
+
+.bp-input-time:focus,
+.bp-input-select:focus {
+  border-color: var(--bp-primary);
+  box-shadow: 0 0 0 3px var(--bp-primary-soft);
+}
+
+.bp-hint {
+  font-size: 12px;
+  color: var(--bp-muted);
+  margin-top: 6px;
+}
+
+/* ===== SUMMARY BOX ===== */
+.bp-summary {
+  margin-top: 16px;
+  padding: 12px 12px 0 12px;
+  border: 1px dashed var(--bp-dashed);
+  border-radius: var(--bp-radius-md);
+  background: transparent;
+}
+
+.bp-row-kv {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  /* border-top: 1px dashed var(--bp-dashed); */
+}
+
+.bp-row-kv-key { color: var(--bp-text-subtle); }
+.bp-row-kv-val { color: var(--bp-text); }
+
+/* ===== BUTTONS ===== */
+.bp-btn-primary {
+  margin-top: 16px;
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: var(--bp-radius-md);
+  background: var(--bp-primary);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color .15s ease, transform .05s ease;
+}
+.bp-btn-primary:hover { background: var(--bp-primary-strong); }
+.bp-btn-primary:active { transform: translateY(1px); }
+.bp-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ===== REVIEWS ===== */
+.bp-review {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--bp-border);
+}
+
+.bp-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--bp-border);
+}
+
+.bp-review-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ===== MISC ===== */
+.error-text { color: #ef4444; } /* đỏ dễ nhìn, accessible */
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 960px) {
+  .bp-grid { grid-template-columns: 1fr; }
+}
+/* ===== GUN SELECTOR ===== */
+.gun-list {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.gun-card {
+  position: relative;
+  width: 140px;
+  padding: 16px;
+  border-radius: var(--bp-radius-md);
+  box-shadow: 0 2px 8px rgba(16,24,40,0.08);
+  border: 2px solid transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  user-select: none;
+}
+
+.gun-card.available { background: var(--bp-primary-soft); } /* xanh nhạt */
+.gun-card.busy { background: #fef2f2; cursor: not-allowed; } /* đỏ nhạt */
+.gun-card.selected { border-color: var(--bp-primary); }
+
+.gun-card:hover { transform: translateY(-1px); }
+.gun-icon { font-size: 28px; }
+.gun-name { font-weight: 600; color: var(--bp-text); }
+
+.gun-dot {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.7);
+}
+.gun-dot.green { background: #16a34a; }
+.gun-dot.red { background: #dc2626; }
+
+/* Hai cột cho phần trụ + biểu giá + chọn súng */
+.bp-charger-grid {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;  /* 2 cột đều nhau */
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .bp-charger-grid {
+    grid-template-columns: 1fr; /* nhỏ hơn 800px thì xếp dọc */
+  }
+}
+/* Tạo khoảng cách giữa 2 panel liền nhau (bên phải là "Đặt trước..." và "Đánh giá") */
+.bp-panel + .bp-panel {
+  margin-top: 16px; /* chỉnh 16/20/24 tuỳ bạn */
+}
+
+
+

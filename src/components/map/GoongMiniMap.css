@@ -1,0 +1,76 @@
+/* Container của map (phần canvas nằm trong thẻ này) */
+.goong-mini-map {
+  width: 100%;
+  height: 220px;      /* sẽ bị override bởi inline style height={...} */
+  border-radius: 12px;
+  overflow: hidden;   /* bo góc cho canvas bên trong */
+  background: #f3f4f6; /* nền xám nhạt lúc tiles đang tải */
+}
+
+/* Làm đẹp popup/controls nếu có */
+.goong-mini-map .goongjs-popup-content,
+.goong-mini-map .mapboxgl-popup-content {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
+}
+
+.goong-mini-map .goongjs-ctrl,
+.goong-mini-map .mapboxgl-ctrl {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.goong-mini-map canvas:focus { outline: none; }
+
+/* Màn nhỏ giảm chiều cao */
+@media (max-width: 640px) {
+  .goong-mini-map { height: 180px; }
+}
+
+/* BẮT BUỘC: ép canvas khớp wrapper */
+.goong-mini-map {
+  position: relative;   /* để overflow:hidden hoạt động ổn định */
+  overflow: hidden;
+  border-radius: 12px;
+  width: 100%;
+  height: 220px;        /* sẽ bị override bằng inline height={...} */
+  background: #f3f4f6;
+  contain: content;     /* cô lập layout, tránh side-effect */
+}
+
+/* Mapbox/Goong sẽ gắn class .mapboxgl-canvas / .goongjs-canvas */
+.goong-mini-map .mapboxgl-canvas,
+.goong-mini-map .goongjs-canvas,
+.goong-mini-map canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;       /* tránh canvas inline gây tràn do baseline */
+  border-radius: inherit;
+}
+
+/* Control container tuyệt đối trong khung, không tràn click ra ngoài */
+.goong-mini-map .mapboxgl-control-container,
+.goong-mini-map .goongjs-control-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.goong-mini-map .mapboxgl-ctrl,
+.goong-mini-map .mapboxgl-ctrl-group,
+.goong-mini-map .mapboxgl-ctrl button,
+.goong-mini-map .goongjs-ctrl {
+  pointer-events: auto;
+}
+
+/* iOS/WebKit fix – đôi khi canvas le khỏi bo góc */
+@supports (-webkit-overflow-scrolling: touch) {
+  .goong-mini-map { -webkit-mask-image: -webkit-radial-gradient(white, black); }
+}
+
+/* Responsive height */
+@media (max-width: 640px) {
+  .goong-mini-map { height: 180px; }
+}

@@ -1,0 +1,45 @@
+/* Một hàng trên màn rộng, tự xuống hàng khi hẹp — KHÔNG cuộn ngang */
+.sf-row{
+  display: flex;
+  flex-wrap: wrap;          /* ✅ cho xuống hàng khi thiếu chỗ */
+  gap: 10px;
+  align-items: center;
+  overflow-x: visible;      /* ✅ bỏ cuộn ngang */
+  padding-bottom: 0;
+}
+
+/* Search: linh hoạt chiếm rộng, nhưng có “định hướng” 400px */
+.sf-search{
+  flex: 1 1 300px;          /* ✅ cố gắng ~400px, co giãn được */
+  max-width: 560px;         /* tuỳ thích, để không quá dài */
+  min-width: 280px;         /* tránh co quá nhỏ */
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+}
+.sf-search:focus{ border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.2); }
+
+/* Dropdown: giữ 120px nhưng cho wrap đều nhau */
+.sf-select{
+  flex: 0 0 120px;          /* ✅ đúng 120px, không co */
+  width: 120px;             /* backup */
+  min-width: 120px;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 13px;
+  background: #fff;
+  outline: none;
+}
+.sf-select:focus{ border-color:#0ea5e9; box-shadow:0 0 0 3px rgba(14,165,233,.2); }
+
+/* (Tuỳ chọn) tối ưu hàng lẻ: đẩy search lên đầu, dropdown nối tiếp */
+.sf-search { order: 0; }
+.sf-select { order: 1; }
+
+/* Responsive tinh tế hơn (tuỳ chọn) */
+@media (max-width: 1024px){
+  .sf-search{ flex-basis: 100%; max-width: 100%; } /* ✅ search chiếm 1 dòng */
+}

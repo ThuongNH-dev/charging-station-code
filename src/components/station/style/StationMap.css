@@ -1,0 +1,13 @@
+.smh-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.smh-overlay {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}

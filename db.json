@@ -1,0 +1,388 @@
+{
+  "stations": [
+    {
+      "id": "1",
+      "name": "Trạm EV Trung Tâm",
+      "address": "22 Lê Lợi, Q1, TP.HCM",
+      "lat": 10.77221,
+      "lng": 106.70448,
+      "coverImage": "https://i.pinimg.com/1200x/b0/d6/2d/b0d62df81ca90fb810ef00299594ddf4.jpg",
+      "chargers": [
+        {
+          "id": "c1",
+          "title": "DC Fast #1",
+          "power": "150kW",
+          "connector": "CCS2",
+          "status": "available",
+          "price": "5,500đ/kWh",
+          "imageUrl": "https://i.pinimg.com/736x/64/27/85/642785338fcdbabbb510cb5b4c451f25.jpg",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        },
+        {
+          "id": "c2",
+          "title": "DC Fast #2",
+          "power": "120kW",
+          "connector": "CCS2",
+          "status": "busy",
+          "price": "5,200đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/c2/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "busy" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        },
+        {
+          "id": "c3",
+          "title": "DC Fast #3",
+          "power": "60kW",
+          "connector": "CHAdeMO",
+          "status": "available",
+          "price": "5,000đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/c3/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "busy" }
+          ]
+        },
+        {
+          "id": "c4",
+          "title": "AC #1",
+          "power": "22kW",
+          "connector": "Type2",
+          "status": "available",
+          "price": "3,200đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/c4/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        },
+        {
+          "id": "c5",
+          "title": "AC #2",
+          "power": "22kW",
+          "connector": "Type2",
+          "status": "busy",
+          "price": "3,200đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/c5/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "busy" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        },
+        {
+          "id": "c6",
+          "title": "AC #3",
+          "power": "11kW",
+          "connector": "Type2",
+          "status": "available",
+          "price": "3,000đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/c6/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        },
+        {
+          "id": "c7",
+          "title": "AC #4",
+          "power": "7.4kW",
+          "connector": "Type2",
+          "status": "maintenance",
+          "price": "2,800đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/c7/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "maintenance" },
+            { "id": "B", "name": "Súng B", "status": "maintenance" }
+          ]
+        },
+        {
+          "id": "c8",
+          "title": "AC #5",
+          "power": "11kW",
+          "connector": "Type2",
+          "status": "available",
+          "price": "3,000đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/c8/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "busy" }
+          ]
+        },
+        {
+          "id": "c9",
+          "title": "AC #6",
+          "power": "22kW",
+          "connector": "Type2",
+          "status": "busy",
+          "price": "3,200đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/c9/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "busy" },
+            { "id": "B", "name": "Súng B", "status": "busy" }
+          ]
+        },
+        {
+          "id": "c10",
+          "title": "DC Ultra #1",
+          "power": "350kW",
+          "connector": "CCS2",
+          "status": "available",
+          "price": "6,200đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/c10/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        },
+        {
+          "id": "c11",
+          "title": "DC Ultra #2",
+          "power": "250kW",
+          "connector": "CCS2",
+          "status": "busy",
+          "price": "6,000đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/c11/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "busy" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        },
+        {
+          "id": "c12",
+          "title": "AC #7",
+          "power": "22kW",
+          "connector": "Type2",
+          "status": "available",
+          "price": "3,200đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/c12/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2",
+      "name": "Trạm EV Phú Nhuận",
+      "address": "18 Phan Xích Long, Phú Nhuận, TP.HCM",
+      "lat": 10.79865,
+      "lng": 106.68092,
+      "coverImage": "https://images.unsplash.com/photo-1494526585095-c41746248156?q=80&w=1600&auto=format&fit=crop",
+      "chargers": [
+        {
+          "id": "s2-c1",
+          "title": "DC Ultra #1",
+          "power": "350kW",
+          "connector": "CCS2",
+          "status": "available",
+          "price": "6,200đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c1/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        },
+        {
+          "id": "s2-c2",
+          "title": "DC Ultra #2",
+          "power": "350kW",
+          "connector": "CCS2",
+          "status": "busy",
+          "price": "6,200đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c2/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "busy" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        },
+        {
+          "id": "s2-c3",
+          "title": "DC Ultra #3",
+          "power": "250kW",
+          "connector": "CCS2",
+          "status": "available",
+          "price": "6,000đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c3/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "busy" }
+          ]
+        },
+        {
+          "id": "s2-c4",
+          "title": "DC Fast #1",
+          "power": "150kW",
+          "connector": "CCS2",
+          "status": "available",
+          "price": "5,500đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c4/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        },
+        {
+          "id": "s2-c5",
+          "title": "DC Fast #2",
+          "power": "150kW",
+          "connector": "CCS2",
+          "status": "busy",
+          "price": "5,500đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c5/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "busy" },
+            { "id": "B", "name": "Súng B", "status": "busy" }
+          ]
+        },
+        {
+          "id": "s2-c6",
+          "title": "DC Fast #3",
+          "power": "120kW",
+          "connector": "CCS2",
+          "status": "available",
+          "price": "5,200đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c6/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "busy" }
+          ]
+        },
+        {
+          "id": "s2-c7",
+          "title": "DC Fast #4",
+          "power": "90kW",
+          "connector": "CCS2",
+          "status": "maintenance",
+          "price": "5,000đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c7/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "maintenance" },
+            { "id": "B", "name": "Súng B", "status": "maintenance" }
+          ]
+        },
+        {
+          "id": "s2-c8",
+          "title": "DC CHAdeMO #1",
+          "power": "60kW",
+          "connector": "CHAdeMO",
+          "status": "available",
+          "price": "5,000đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c8/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "busy" }
+          ]
+        },
+        {
+          "id": "s2-c9",
+          "title": "AC #1",
+          "power": "22kW",
+          "connector": "Type2",
+          "status": "available",
+          "price": "3,200đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c9/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        },
+        {
+          "id": "s2-c10",
+          "title": "AC #2",
+          "power": "22kW",
+          "connector": "Type2",
+          "status": "busy",
+          "price": "3,200đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c10/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "busy" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        },
+        {
+          "id": "s2-c11",
+          "title": "AC #3",
+          "power": "22kW",
+          "connector": "Type2",
+          "status": "available",
+          "price": "3,200đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c11/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "busy" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        },
+        {
+          "id": "s2-c12",
+          "title": "AC #4",
+          "power": "22kW",
+          "connector": "Type2",
+          "status": "maintenance",
+          "price": "3,000đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c12/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "maintenance" },
+            { "id": "B", "name": "Súng B", "status": "maintenance" }
+          ]
+        },
+        {
+          "id": "s2-c13",
+          "title": "AC #5",
+          "power": "11kW",
+          "connector": "Type2",
+          "status": "available",
+          "price": "3,000đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c13/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        },
+        {
+          "id": "s2-c14",
+          "title": "AC #6",
+          "power": "11kW",
+          "connector": "Type2",
+          "status": "busy",
+          "price": "3,000đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c14/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "busy" },
+            { "id": "B", "name": "Súng B", "status": "busy" }
+          ]
+        },
+        {
+          "id": "s2-c15",
+          "title": "AC #7",
+          "power": "7.4kW",
+          "connector": "Type2",
+          "status": "available",
+          "price": "2,800đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c15/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "busy" }
+          ]
+        },
+        {
+          "id": "s2-c16",
+          "title": "AC #8",
+          "power": "7.4kW",
+          "connector": "Type2",
+          "status": "available",
+          "price": "2,800đ/kWh",
+          "imageUrl": "https://picsum.photos/seed/s2c16/600/400",
+          "guns": [
+            { "id": "A", "name": "Súng A", "status": "available" },
+            { "id": "B", "name": "Súng B", "status": "available" }
+          ]
+        }
+      ]
+    }
+  ]
+}

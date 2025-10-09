@@ -1,0 +1,20 @@
+.register-info {
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;        /* ✅ quan trọng để z-index âm không chui ra sau <body> */
+  overflow: hidden;
+}
+
+.register-info::before {
+  content: "";
+  position: absolute;        /* đổi sang absolute cho chắc chắn */
+  inset: 0;
+  z-index: -1;               /* nằm dưới nội dung nhưng vẫn trong .register-info */
+  background:
+    linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)),
+    url(Parking_lotV4.png)
+      center / cover no-repeat;
+  filter:  brightness(0.9);
+  transform: scale(1.05);
+  pointer-events: none;
+}
