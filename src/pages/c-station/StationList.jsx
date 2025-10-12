@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";          // ⬅️ thêm
+import { useNavigate } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
 import StationFilters from "../../components/station/StationFilters";
 import StationListItem from "../../components/station/StationListItem";
@@ -12,12 +12,11 @@ export default function StationList() {
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const navigate = useNavigate();                       // ⬅️ thêm
+  const navigate = useNavigate();
 
-  // Filters
+  // 🔎 Search + 🏙️ City
   const [q, setQ] = useState("");
-  const [connector, setConnector] = useState("");
-  const [minPower, setMinPower] = useState("");
+  const [city, setCity] = useState("");
 
   const itemRefs = useRef({});
 
@@ -32,29 +31,24 @@ export default function StationList() {
       .finally(() => setLoading(false));
   }, []);
 
+  const cityOptions = useMemo(() => {
+    const fromData = stations.map((s) => s.city || s.addressCity || "").filter(Boolean);
+    return Array.from(new Set(fromData)).sort((a, b) => a.localeCompare(b, "vi"));
+  }, [stations]);
+
+  // ✅ Lọc theo keyword + city
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
-    const minKW = parseFloat(minPower) || 0;
     return stations.filter((st) => {
+      const stCity = st.city || st.addressCity || "";
+      const hitCity = !city || stCity === city;
       const hitKW =
         !kw ||
         (st.name || "").toLowerCase().includes(kw) ||
         (st.address || "").toLowerCase().includes(kw);
-      const hitConnector =
-        !connector ||
-        (st.chargers || []).some(
-          (c) => (c.connector || "").toLowerCase() === connector.toLowerCase()
-        );
-      const hitPower =
-        !minKW ||
-        (st.chargers || []).some((c) => {
-          const m = String(c.power || "").match(/([\d.]+)/);
-          const kwVal = m ? parseFloat(m[1]) : 0;
-          return kwVal >= minKW;
-        });
-      return hitKW && hitConnector && hitPower;
+      return hitCity && hitKW;
     });
-  }, [stations, q, connector, minPower]);
+  }, [stations, q, city]);
 
   const handleMarkerClick = (id) => {
     const el = itemRefs.current[id];
@@ -72,12 +66,19 @@ export default function StationList() {
 
         <div className="bp-panel">
           <StationFilters
-            q={q}
-            onQChange={setQ}
-            connector={connector}
-            onConnectorChange={setConnector}
-            minPower={minPower}
-            onMinPowerChange={setMinPower}
+            context="list"
+            q={q} onQChange={setQ}
+            city={city} onCityChange={setCity}
+            cityOptions={cityOptions}
+            visible={{
+              search: true,  // ⬅️ bật lại thanh search
+              city: true,    // ⬅️ giữ dropdown địa điểm
+              power: false,
+              status: false,
+              sortPrice: false,
+              connector: false,
+              speed: false,
+            }}
           />
         </div>
 
@@ -86,7 +87,7 @@ export default function StationList() {
 
         {!loading && !error && (
           filtered.length === 0 ? (
-            <p className="bp-subtle">Không có trạm phù hợp với bộ lọc</p>
+            <p className="bp-subtle">Không có trạm phù hợp với điều kiện</p>
           ) : (
             <div className="bp-left-col mapListLayout">
               <div className="bp-panel stations-map-panel">
@@ -103,7 +104,7 @@ export default function StationList() {
                     className="stationListItemWrapper station-card-clickable"
                     role="button"
                     tabIndex={0}
-                    onClick={() => navigate(`/stations/${st.id}`)}               // ⬅️ click thẳng card
+                    onClick={() => navigate(`/stations/${st.id}`)}
                     onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && navigate(`/stations/${st.id}`)}
                     aria-label={`Xem chi tiết trạm ${st.name}`}
                   >
