@@ -9,26 +9,94 @@ import PaymentFailure from "./pages/payment/PaymentFailure";
 import ChargingProgress from "./components/charging/ChargingProgress";
 import PaymentCharging from "./components/charging/PaymentCharging";
 import PaymentInvoice from "./components/charging/PaymentInvoice";
-
-
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import { AuthProvider } from "./context/AuthContext"; 
+import Login from "./components/login/Login";
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Navigate to="/stations" replace />} />
-        <Route path="/stations" element={<StationList />} />
-        <Route path="/stations/:id" element={<StationDetail />} />
-        <Route path="/stations/:id/chargers/:cid/book" element={<BookingPorts />} />
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* PUBLIC */}
+          <Route path="/" element={<Navigate to="/stations" replace />} />
+          <Route path="/login" element={<Login/>} />
 
-        {/* Thanh toán */}
-        <Route path="/payment" element={<PaymentPage/>} />
-        <Route path="/payment/success" element={<PaymentSuccess/>} />
-        <Route path="/charging" element={<ChargingProgress/>} />  {/* ✅ thêm */}
-        <Route path="/payment/failure" element={<PaymentFailure/>} />
-        <Route path="/payment/charging" element={<PaymentCharging/>} />
-        <Route path="/payment/invoice" element={<PaymentInvoice/>} />
-      </Routes>
-    </BrowserRouter>
+          {/* PROTECTED */}
+          <Route
+            path="/stations"
+            element={
+              <ProtectedRoute>
+                <StationList />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/stations/:id"
+            element={
+              <ProtectedRoute>
+                <StationDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/stations/:id/chargers/:cid/book"
+            element={
+              <ProtectedRoute>
+                <BookingPorts />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payment"
+            element={
+              <ProtectedRoute>
+                <PaymentPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payment/success"
+            element={
+              <ProtectedRoute>
+                <PaymentSuccess />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payment/failure"
+            element={
+              <ProtectedRoute>
+                <PaymentFailure />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payment/charging"
+            element={
+              <ProtectedRoute>
+                <PaymentCharging />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/payment/invoice"
+            element={
+              <ProtectedRoute>
+                <PaymentInvoice />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/charging"
+            element={
+              <ProtectedRoute>
+                <ChargingProgress />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

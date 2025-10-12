@@ -1,7 +1,7 @@
 import React from "react";
 import { Layout, Card } from "antd";
-import Head from "../components/header/header";
-import Foot from "../components/footer/footer";
+import Head from "../components/head/header";
+import Foot from "../components/foot/footer";
 import InfoDriver from "../pages/EnterInfo/InfoDriver";
 import InfoEnterprise from "../pages/EnterInfo/InfoEnterprise";
 import "./RegisterInfo.css";

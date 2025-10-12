@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useState } from "react";
 import { useLocation, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { CheckCircleFilled, ArrowLeftOutlined } from "@ant-design/icons";
 import MainLayout from "../../layouts/MainLayout";
-import "./PaymentSuccess.css";
+import "./style/PaymentSuccess.css";
 
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
 const HOLD_MINUTES_DEFAULT = 15; // ⬅️ fallback nếu totalMinutes không có/<=0

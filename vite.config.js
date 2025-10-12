@@ -7,4 +7,9 @@ export default defineConfig({
     host: '0.0.0.0',  // Cho phép truy cập từ thiết bị khác
     port: 5173,        // Giữ nguyên port mặc định
   },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src')
+    }
+  }
 });

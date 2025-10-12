@@ -8,7 +8,7 @@ import MainLayout from "../../layouts/MainLayout";
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " VND";
 
 const GRACE_SECONDS = 5 * 60;   // 5 phút miễn phí
-const PENALTY_PER_MIN = 5000;   // 5.000 VND mỗi phút sau thời gian miễn phí
+const PENALTY_PER_MIN = 10000;   // 10.000 VND mỗi phút sau thời gian miễn phí
 
 const ChargingProgress = () => {
   const navigate = useNavigate();
@@ -121,7 +121,7 @@ const ChargingProgress = () => {
     if (battery < 100 || !isCharging) return;
     penaltyInterval.current = setInterval(() => {
       setOverTimeSecs((prev) => prev + 1);
-    }, 1000); // ✅ mỗi giây
+    }, 10); // ✅ mỗi giây
     return () => clearInterval(penaltyInterval.current);
   }, [battery, isCharging]);
 

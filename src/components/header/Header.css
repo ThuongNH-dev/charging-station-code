@@ -1,0 +1,126 @@
+:root {
+  --head-main: #006d32;
+  --head-main-strong: #009e44;
+  --head-text: #0f172a;
+  --head-muted: #475569;
+  --border: #f0f0f0;
+}
+
+/* Header wrapper */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff !important;
+  height: 64px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+/* Left cluster (logo + nav) */
+.left {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+/* Logo vừa với header 64px */
+.logo {
+  height: 100px;
+  width: auto;
+  cursor: pointer;
+  display: block;
+}
+
+/* Nav */
+.nav {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 28px;
+  font-size: 16px;
+}
+
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 64px;
+  padding: 0 4px;
+  color: var(--head-text);
+  font-weight: 500;
+  cursor: pointer;
+  transition: color .22s ease;
+}
+
+.nav-item::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 0;
+  height: 2px;
+  background-color: var(--head-main);
+  border-radius: 2px;
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform .22s ease;
+}
+
+.nav-item:hover {
+  color: var(--head-main);
+}
+.nav-item:hover::after {
+  transform: scaleX(1);
+}
+.nav-item.active {
+  color: var(--head-main);
+  font-weight: 600;
+}
+.nav-item.active::after {
+  transform: scaleX(1);
+}
+
+/* Right cluster */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Outline button style (không phá antd, chỉ override nhẹ) */
+.btn-outline {
+  border: 1px solid var(--head-main) !important;
+  color: var(--head-main) !important;
+  background: #fff !important;
+  border-radius: 6px !important;
+  padding: 6px 18px !important;
+  font-weight: 500 !important;
+  transition: all .25s ease !important;
+}
+
+.btn-outline:hover {
+  background: var(--head-main) !important;
+  color: #fff !important;
+  border-color: var(--head-main) !important;
+}
+
+/* User chip */
+.user-chip {
+  color: var(--head-text);
+  font-weight: 500;
+}
+
+/* Responsive nhỏ gọn */
+@media (max-width: 768px) {
+  .nav { gap: 18px; font-size: 15px; }
+  .logo { height: 30px; }
+}
+
+@media (max-width: 560px) {
+  .nav { display: none; } /* Ẩn menu khi quá hẹp, có thể thay bằng Drawer sau */
+}
