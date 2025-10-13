@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import MainLayout from "../../layouts/MainLayout";
 import StationFilters from "../../components/station/StationFilters";
 import StationListItem from "../../components/station/StationListItem";
 import StationMap from "../../components/station/StationMap";
 import "./style/StationList.css";
+import { fetchStations } from "../../api/station";
 
-const API_URL = "http://127.0.0.1:4000/stations";
-
+const API_URL = "https://localhost:7268/api/Stations";
 export default function StationList() {
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -21,12 +22,8 @@ export default function StationList() {
   const itemRefs = useRef({});
 
   useEffect(() => {
-    fetch(API_URL)
-      .then((r) => {
-        if (!r.ok) throw new Error("Lỗi khi tải dữ liệu!");
-        return r.json();
-      })
-      .then((data) => setStations(Array.isArray(data) ? data : []))
+    fetchStations()
+      .then((list) => setStations(list))
       .catch((err) => setError(err.message || "Đã có lỗi xảy ra"))
       .finally(() => setLoading(false));
   }, []);

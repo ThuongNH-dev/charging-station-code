@@ -5,17 +5,83 @@ import GoongMiniMap from "../../components/map/GoongMiniMap";
 import StationFilters from "../../components/station/StationFilters";
 import "./style/StationDetail.css";
 
-const API_URL = "http://127.0.0.1:4000/stations";
+// API base (ưu tiên .env)
+const API_BASE =
+  (typeof import.meta !== "undefined" ? import.meta.env.VITE_API_URL : process.env.REACT_APP_API_URL)
+  ?? "https://localhost:7268/api";
 
+// ---------- Helpers ----------
+function normalizeStation(s = {}) {
+  return {
+    id: s.id ?? s.stationId ?? s.StationId,
+    name: s.name ?? s.stationName ?? s.StationName ?? "",
+    address: s.address ?? s.Address ?? "",
+    city: s.city ?? s.City ?? "",
+    lat: parseFloat(s.lat ?? s.latitude ?? s.Latitude),
+    lng: parseFloat(s.lng ?? s.longitude ?? s.Longitude),
+    imageUrl: s.imageUrl ?? s.ImageUrl ?? "",
+    status: s.status ?? s.Status ?? "Active",
+  };
+}
+
+function normalizeCharger(c = {}) {
+  return {
+    id: c.chargerId ?? c.ChargerId,
+    stationId: c.stationId ?? c.StationId,
+    title: c.code ?? c.Code ?? `Trụ #${c.ChargerId}`,
+    connector: c.type ?? c.Type ?? "",
+    power: c.powerKw ?? c.PowerKW ? `${c.powerKw ?? c.PowerKW} kW` : "",
+    status: (c.status ?? c.Status ?? "").toLowerCase(),
+    imageUrl: c.imageUrl ?? c.ImageUrl ?? "",
+  };
+}
+
+
+function getAuthHeaders() {
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("jwt") ||
+    localStorage.getItem("id_token") ||
+    "";
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function fetchJSON(url, init = {}) {
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const err = new Error(text || `HTTP ${res.status} ${res.statusText}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
+
+async function fetchJSONAuth(url) {
+  // Gửi kèm Bearer (nếu có) và cookie (credentials)
+  return fetchJSON(url, {
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...getAuthHeaders(),
+    },
+    credentials: "include",
+  });
+}
+
+// ---------- Component ----------
 export default function StationDetail() {
   const { id } = useParams();
   const nav = useNavigate();
 
   const [station, setStation] = useState(null);
+  const [chargers, setChargers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [authNeeded, setAuthNeeded] = useState(false);
 
-  // 🔎 Search + các filter (TRỪ địa điểm)
+  // Filters
   const [q, setQ] = useState("");
   const [connector, setConnector] = useState("");
   const [minPower, setMinPower] = useState("");
@@ -25,14 +91,76 @@ export default function StationDetail() {
 
   useEffect(() => {
     let alive = true;
-    fetch(`${API_URL}/${id}`)
-      .then((r) => {
-        if (!r.ok) throw new Error("Không tìm thấy trạm!");
-        return r.json();
-      })
-      .then((data) => alive && setStation(data))
-      .catch((e) => setError(e.message || "Đã có lỗi xảy ra"))
-      .finally(() => alive && setLoading(false));
+
+    async function load() {
+      try {
+        setLoading(true);
+        setError("");
+        setAuthNeeded(false);
+
+        // 1) Lấy trạm
+        const stationRaw = await fetchJSON(`${API_BASE}/Stations/${id}`);
+        const st = normalizeStation(stationRaw);
+        if (!alive) return;
+
+        // 2) Lấy trụ — thử lần lượt các route, có auth
+        let list = [];
+        let lastErr = null;
+
+        const tryRoutes = [
+          `${API_BASE}/Chargers?stationId=${st.id}`,
+          `${API_BASE}/Stations/${st.id}/chargers`,
+          `${API_BASE}/Chargers/by-station/${st.id}`,
+        ];
+
+        for (const url of tryRoutes) {
+          try {
+            const data = await fetchJSONAuth(url);
+            // Một số API có thể trả { items: [...] }
+            let arr = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+            if (!arr.length) continue;
+
+            // Lọc chặt theo stationId của trạm hiện tại (ép cùng kiểu để so sánh “mềm”)
+            const sameId = (a, b) => String(a) === String(b);
+            arr = arr.filter(c => sameId(c.stationId ?? c.StationId, st.id));
+
+            // Nếu route trả tất cả trụ nhưng không có trụ thuộc trạm này, thử route sau
+            if (!arr.length) continue;
+
+            list = arr.map(normalizeCharger);
+            break;
+          } catch (e) {
+            lastErr = e;
+            if (e?.status === 401) {
+              setAuthNeeded(true);
+              // vẫn tiếp tục thử route khác phòng khi route khác mở ẩn danh
+              continue;
+            }
+            // 404/500 thì cứ thử route sau
+          }
+        }
+
+        if (alive) {
+          setStation(st);
+          setChargers(list);
+          if (!list.length && lastErr && lastErr.status && lastErr.status !== 404) {
+            // Ghi chú lỗi để dev biết (không chặn UI)
+            console.warn("Chargers fetch last error:", lastErr);
+          }
+        }
+      } catch (e) {
+        if (alive) {
+          const msg = /404|không tìm/i.test(String(e?.message))
+            ? "Không tìm thấy trạm!"
+            : `Không tải được dữ liệu trạm. ${e?.message ?? ""}`;
+          setError(msg);
+        }
+      } finally {
+        if (alive) setLoading(false);
+      }
+    }
+
+    load();
     return () => { alive = false; };
   }, [id]);
 
@@ -40,19 +168,17 @@ export default function StationDetail() {
     nav(`/stations/${id}/chargers/${chargerId}/book`);
   };
 
-  // toạ độ (đảm bảo là số)
   const lat = Number(station?.lat);
   const lng = Number(station?.lng);
   const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
 
-  // ===== Options filter lấy từ chargers =====
+  // Options for filters
   const {
     connectorOptions,
     powerOptions,
     statusOptions,
     speedOptions,
   } = useMemo(() => {
-    const chargers = Array.isArray(station?.chargers) ? station.chargers : [];
     const connectors = Array.from(new Set(chargers.map(c => (c.connector || "").trim()).filter(Boolean)));
     const powers = Array.from(new Set(chargers.map(c => (c.power || "").trim()).filter(Boolean)));
     const statuses = Array.from(new Set(chargers.map(c => (c.status || "").trim()).filter(Boolean)));
@@ -63,11 +189,10 @@ export default function StationDetail() {
       statusOptions: statuses.length ? statuses : ["available", "busy", "maintenance"],
       speedOptions: speeds.length ? speeds : ["Chậm", "Nhanh"],
     };
-  }, [station]);
+  }, [chargers]);
 
-  // ===== Lọc + sắp xếp danh sách TRỤ SẠC (luôn có grid) =====
+  // Filtered list
   const filteredChargers = useMemo(() => {
-    const chargers = Array.isArray(station?.chargers) ? station.chargers : [];
     const kw = q.trim().toLowerCase();
     const minKW = parseFloat(minPower) || 0;
 
@@ -82,9 +207,9 @@ export default function StationDetail() {
 
     let list = chargers.filter((c) => {
       const title = String(c.title || c.id || "").toLowerCase();
-      const conn  = String(c.connector || "").toLowerCase();
-      const stt   = String(c.status || "").toLowerCase();
-      const spd   = String(c.speed || "").toLowerCase();
+      const conn = String(c.connector || "").toLowerCase();
+      const stt = String(c.status || "").toLowerCase();
+      const spd = String(c.speed || "").toLowerCase();
 
       const hitKW = !kw || title.includes(kw) || conn.includes(kw);
       const hitConnector = !connector || conn === connector.toLowerCase();
@@ -102,8 +227,15 @@ export default function StationDetail() {
     }
 
     return list;
-  }, [station, q, connector, minPower, status, speed, sortPrice]);
+  }, [chargers, q, connector, minPower, status, speed, sortPrice]);
 
+  const hasAnyFilter =
+    (q && q.trim() !== "") ||
+    !!connector || !!minPower || !!status || !!speed || !!sortPrice;
+
+  const displayChargers = hasAnyFilter ? filteredChargers : chargers;
+
+  // ---------- Render ----------
   if (loading) {
     return (
       <MainLayout>
@@ -136,40 +268,32 @@ export default function StationDetail() {
           <div className="sd-address">{station.address}</div>
         </div>
 
-        {/* ⬆️ FILTER LUÔN HIỂN THỊ (trước map) */}
+        {/* Filter */}
         <div className="bp-panel sd-filter-sticky" style={{ marginTop: 16 }}>
           <StationFilters
             context="detail"
-            // search
             q={q} onQChange={setQ}
-            // filters (trừ city)
             connector={connector} onConnectorChange={setConnector}
             power={minPower} onPowerChange={setMinPower}
             status={status} onStatusChange={setStatus}
             sortPrice={sortPrice} onSortPriceChange={setSortPrice}
             speed={speed} onSpeedChange={setSpeed}
-            // options
             connectorOptions={connectorOptions}
             powerOptions={powerOptions}
             statusOptions={statusOptions}
             speedOptions={speedOptions}
-            // ẩn city, bật các filter khác
-            visible={{
-              search: true,
-              connector: true,
-              power: true,
-              status: true,
-              sortPrice: true,
-              speed: true,
-              city: false,
-            }}
+            visible={{ search: true, connector: true, power: true, status: true, sortPrice: true, speed: true, city: false }}
           />
-          {/* <div className="bp-subtle" style={{ marginTop: 8 }}>
-            {filteredChargers.length} / {(station.chargers || []).length} trụ hiển thị
-          </div> */}
+
+          {/* Thông báo cần đăng nhập nếu 401 */}
+          {authNeeded && (
+            <div className="bp-alert warn" style={{ marginTop: 8 }}>
+              Cần đăng nhập để xem danh sách trụ. Hãy đăng nhập rồi tải lại trang.
+            </div>
+          )}
         </div>
 
-        {/* MAP */}
+        {/* Map */}
         {hasCoords && (
           <div className="bp-panel sd-map-panel">
             <div className="sd-map-canvas">
@@ -178,17 +302,16 @@ export default function StationDetail() {
           </div>
         )}
 
-        {/* DANH SÁCH TRỤ — luôn render grid, không thay thế bằng thông điệp */}
+        {/* Chargers */}
         <h2 className="bp-title with-mb">Các trụ sạc</h2>
 
-        {/* Nếu không khớp filter, hiển thị note NHƯNG vẫn giữ grid phía dưới */}
-        {filteredChargers.length === 0 && (
+        {hasAnyFilter && filteredChargers.length === 0 && (
           <p className="bp-subtle">Không có trụ phù hợp với bộ lọc</p>
         )}
 
         <div className="sd-grid">
-          {filteredChargers.length > 0 ? (
-            filteredChargers.map((ch) => {
+          {displayChargers.length > 0 ? (
+            displayChargers.map((ch) => {
               const statusClass = ch.status || "unknown";
               const connectorText =
                 (/type\s*2/i.test(ch.connector || "") && "AC") ||
@@ -224,7 +347,8 @@ export default function StationDetail() {
                       <span className={`statusBadge ${statusClass}`}>
                         {statusClass === "available" ? "Trống"
                           : statusClass === "busy" ? "Đang dùng"
-                          : statusClass}
+                            : statusClass === "maintenance" ? "Bảo trì"
+                              : statusClass || "—"}
                       </span>
                     </div>
 
@@ -248,14 +372,17 @@ export default function StationDetail() {
               );
             })
           ) : (
-            // Giữ grid có 1 thẻ “empty state” để layout không nhảy
             <div className="chargerItem empty">
               <div className="thumb" />
               <div className="chargerBody">
-                <div className="chargerTitle">Không có trụ hiển thị</div>
+                <div className="chargerTitle">
+                  {authNeeded ? "Cần đăng nhập để xem trụ" : "Trạm chưa có trụ sạc"}
+                </div>
                 <div className="row">
                   <span className="label">Gợi ý:</span>
-                  <span>Thử bỏ bớt bộ lọc hoặc xoá từ khóa.</span>
+                  <span>
+                    {authNeeded ? "Vui lòng đăng nhập rồi tải lại trang." : "Thêm dữ liệu trụ sạc cho trạm này trong hệ thống."}
+                  </span>
                 </div>
               </div>
             </div>

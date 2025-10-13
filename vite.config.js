@@ -4,7 +4,12 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '0.0.0.0',  // Cho phép truy cập từ thiết bị khác
-    port: 5173,        // Giữ nguyên port mặc định
+    proxy: {
+      '/api': {
+        target: 'https://localhost:7268', // backend của bạn
+        changeOrigin: true,
+        secure: false, // backend https dev cert tự ký
+      }
+    }
   }
-});
+})
