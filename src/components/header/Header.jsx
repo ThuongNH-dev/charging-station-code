@@ -7,7 +7,7 @@ import "./Header.css";
 
 const { Header } = Layout;
 
-export default function AppHeader() {
+export default function Head() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, userRole, userName, logout } = useAuth();

@@ -1,30 +1,67 @@
 import React, { useMemo, useEffect, useState } from "react";
-import { useLocation, useNavigate, Link, useSearchParams } from "react-router-dom";
+import {
+  useLocation,
+  useNavigate,
+  Link,
+  useSearchParams,
+} from "react-router-dom";
 import { CheckCircleFilled, ArrowLeftOutlined } from "@ant-design/icons";
 import MainLayout from "../../layouts/MainLayout";
 import "./style/PaymentSuccess.css";
 
+// ---------------- Constants ----------------
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
-const HOLD_MINUTES_DEFAULT = 15; // ⬅️ fallback nếu totalMinutes không có/<=0
+const HOLD_MINUTES_DEFAULT = 15;
+const PAYMENT_API_URL = "https://localhost:7268/api/Ports"; // Thay URL BE
 
 export default function PaymentSuccess() {
   const { state } = useLocation();
   const [search] = useSearchParams();
   const navigate = useNavigate();
 
-  const data = useMemo(() => {
-    if (state) return state;
+  // ---------------- State ----------------
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
+
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [idInput, setIdInput] = useState("");
+  const [idError, setIdError] = useState("");
+
+  // ---------------- 1. Lấy dữ liệu từ state hoặc API BE ----------------
+  useEffect(() => {
+    if (state) {
+      setData(state);
+      setLoading(false);
+      return;
+    }
+
     const order = search.get("order");
-    if (!order) return null;
-    const cached = sessionStorage.getItem(`pay:${order}`);
-    return cached ? JSON.parse(cached) : null;
+    if (!order) {
+      setLoading(false);
+      return;
+    }
+
+    fetch(`${PAYMENT_API_URL}?orderId=${order}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("Không thể lấy dữ liệu thanh toán");
+        return res.json();
+      })
+      .then((json) => {
+        setData(json);
+        sessionStorage.setItem(`pay:${order}`, JSON.stringify(json));
+      })
+      .catch((err) => {
+        console.error(err);
+        setFetchError("Không lấy được thông tin đơn. Vui lòng thử lại.");
+      })
+      .finally(() => setLoading(false));
   }, [state, search]);
 
-  // 🚫 Cấm quay lại trang này khi đã start/done
+  // ---------------- 2. Điều hướng nếu đã start/done ----------------
   useEffect(() => {
     if (!data) return;
     const { orderId } = data;
-    // ghi nhớ booking hiện tại (để PaymentPage có thể chặn)
     sessionStorage.setItem("currentBookingOrderId", orderId);
 
     const lock = sessionStorage.getItem(`bookingLocked:${orderId}`);
@@ -35,83 +72,79 @@ export default function PaymentSuccess() {
       if (last) {
         const cached = sessionStorage.getItem(`chargepay:${last}`);
         const toState = cached ? JSON.parse(cached) : undefined;
-        navigate(`/payment/charging?order=${last}`, { state: toState, replace: true });
+        navigate(`/payment/charging?order=${last}`, {
+          state: toState,
+          replace: true,
+        });
       } else {
         navigate("/stations", { replace: true });
       }
     }
   }, [data, navigate]);
 
-  if (!data) {
-    return (
-      <MainLayout>
-        <div className="ps-root">
-          <div className="ps-empty">
-            <h2>Đơn đặt trước</h2>
-            <p>Không tìm thấy thông tin đơn — có thể bạn đã tải lại trang.</p>
-            <Link className="ps-link is-back" to="/stations">
-              <ArrowLeftOutlined /> Về danh sách trạm
-            </Link>
-          </div>
-        </div>
-      </MainLayout>
-    );
-  }
-
-  const { orderId, station, charger, gun, bookingFee, paidAt, totalMinutes: totalMinutesRaw = 0 } = data;
-
-  // 🕒 Đếm ngược (mặc định 15' nếu không có totalMinutes)
-  const holdMinutes = totalMinutesRaw > 0 ? totalMinutesRaw : HOLD_MINUTES_DEFAULT;
+  // ---------------- 3. Countdown thời gian giữ chỗ ----------------
+  const holdMinutes =
+    data?.totalMinutes && data.totalMinutes > 0
+      ? data.totalMinutes
+      : HOLD_MINUTES_DEFAULT;
   const totalSeconds = Math.max(0, Math.floor(holdMinutes * 60));
+
   const calcRemaining = () => {
-    const elapsed = Math.floor((Date.now() - (paidAt || Date.now())) / 1000);
+    const elapsed = Math.floor(
+      (Date.now() - (data?.paidAt || Date.now())) / 1000
+    );
     return Math.max(0, totalSeconds - elapsed);
   };
-  const [timeLeft, setTimeLeft] = useState(calcRemaining());
+
   useEffect(() => {
-    const t = setInterval(() => {
-      const left = calcRemaining();
-      setTimeLeft(left);
-      if (left <= 0) clearInterval(t);
+    if (!data) return;
+    setTimeLeft(calcRemaining());
+    const timer = setInterval(() => {
+      setTimeLeft(calcRemaining());
     }, 1000);
-    return () => clearInterval(t);
-  }, [paidAt, totalSeconds]);
+    return () => clearInterval(timer);
+  }, [data, totalSeconds]);
 
   const fmt = (s) => {
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
     const sec = s % 60;
-    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+    return `${h.toString().padStart(2, "0")}:${m
+      .toString()
+      .padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
   };
 
-  // ===== VERIFY ID (hỗ trợ chargerId, gunId, và chuỗi ghép chargerId-gunId) =====
-  const [idInput, setIdInput] = useState("");
-  const [idError, setIdError] = useState("");
-
+  // ---------------- 4. Verify ID trụ / súng ----------------
   const norm = (s) =>
     (s || "").toString().trim().toLowerCase().replace(/\s+/g, "");
 
   const allowedIds = useMemo(() => {
+    if (!data) return [];
     const raw = [];
-    if (gun?.id) raw.push(String(gun.id));
-    if (gun?.name) raw.push(String(gun.name));
-    if (charger?.id) raw.push(String(charger.id));
-    if (charger?.title) raw.push(String(charger.title));
-    if (charger?.id && gun?.id) raw.push(`${charger.id}-${gun.id}`);
-    if (charger?.id && gun?.name) raw.push(`${charger.id}-${gun.name}`);
+    if (data.gun?.id) raw.push(String(data.gun.id));
+    if (data.gun?.name) raw.push(String(data.gun.name));
+    if (data.charger?.id) raw.push(String(data.charger.id));
+    if (data.charger?.title) raw.push(String(data.charger.title));
+    if (data.charger?.id && data.gun?.id)
+      raw.push(`${data.charger.id}-${data.gun.id}`);
+    if (data.charger?.id && data.gun?.name)
+      raw.push(`${data.charger.id}-${data.gun.name}`);
     return Array.from(new Set(raw.filter(Boolean).map(norm)));
-  }, [gun, charger]);
+  }, [data]);
 
   const displayHints = useMemo(() => {
+    if (!data) return [];
     const hints = [];
-    if (gun?.id) hints.push(String(gun.id));
-    if (gun?.name) hints.push(String(gun.name));
-    if (charger?.id) hints.push(String(charger.id));
-    if (charger?.title) hints.push(String(charger.title));
-    if (charger?.id && gun?.id) hints.push(`${charger.id}-${gun.id}`);
-    if (charger?.id && gun?.name) hints.push(`${charger.id}-${gun.name}`);
+    if (data.gun?.id) hints.push(String(data.gun.id));
+    if (data.gun?.name) hints.push(String(data.gun.name));
+    if (data.charger?.id) hints.push(String(data.charger.id));
+    if (data.charger?.title) hints.push(String(data.charger.title));
+    if (data.charger?.id && data.gun?.id)
+      hints.push(`${data.charger.id}-${data.gun.id}`);
+    if (data.charger?.id && data.gun?.name)
+      hints.push(`${data.charger.id}-${data.gun.name}`);
     return Array.from(new Set(hints));
-  }, [gun, charger]);
+  }, [data]);
 
   const handleStart = () => {
     if (timeLeft <= 0) {
@@ -128,19 +161,43 @@ export default function PaymentSuccess() {
       return;
     }
 
-    // 🔒 Khoá PaymentSuccess cho order này & ghi nhớ booking hiện tại
-    sessionStorage.setItem(`bookingLocked:${orderId}`, "started");
-    sessionStorage.setItem("currentBookingOrderId", orderId);
-
+    sessionStorage.setItem(`bookingLocked:${data.orderId}`, "started");
+    sessionStorage.setItem("currentBookingOrderId", data.orderId);
     setIdError("");
     navigate("/charging", {
-      state: { orderId, station, charger, gun, bookingFee, paidAt, totalMinutes: holdMinutes, fromPayment: true },
+      state: { ...data, fromPayment: true, totalMinutes: holdMinutes },
       replace: true,
     });
   };
 
   const onEnter = (e) => e.key === "Enter" && handleStart();
 
+  // ---------------- 5. Hiển thị loading / lỗi ----------------
+  if (loading) {
+    return (
+      <MainLayout>
+        <div style={{ padding: 24 }}>Đang tải dữ liệu...</div>
+      </MainLayout>
+    );
+  }
+
+  if (!data) {
+    return (
+      <MainLayout>
+        <div className="ps-root">
+          <div className="ps-empty">
+            <h2>Đơn đặt trước</h2>
+            <p>{fetchError || "Không tìm thấy thông tin đơn."}</p>
+            <Link className="ps-link is-back" to="/stations">
+              <ArrowLeftOutlined /> Về danh sách trạm
+            </Link>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // ---------------- 6. JSX hiển thị ----------------
   return (
     <MainLayout>
       <div className="ps-root">
@@ -153,44 +210,55 @@ export default function PaymentSuccess() {
         <div className="ps-grid">
           <section className="ps-panel ps-pane-left">
             <div className="ps-success-block">
-              <div className="ps-success-icon"><CheckCircleFilled /></div>
-              <h2 className="ps-success-title">Đơn đặt trước đã được xác nhận</h2>
+              <div className="ps-success-icon">
+                <CheckCircleFilled />
+              </div>
+              <h2 className="ps-success-title">
+                Đơn đặt trước đã được xác nhận
+              </h2>
               <p className="ps-success-time">
-                {new Date(paidAt).toLocaleTimeString("vi-VN")} {new Date(paidAt).toLocaleDateString("vi-VN")}
+                {new Date(data.paidAt).toLocaleTimeString("vi-VN")}{" "}
+                {new Date(data.paidAt).toLocaleDateString("vi-VN")}
               </p>
             </div>
 
             <div className="ps-timer">{fmt(timeLeft)}</div>
 
             <div className="ps-form">
-              <label className="ps-label">Nhập ID trụ hoặc súng để bắt đầu phiên sạc</label>
+              <label className="ps-label">
+                Nhập ID trụ hoặc súng để bắt đầu phiên sạc
+              </label>
               <div className="ps-row">
                 <input
                   className="ps-input"
                   placeholder={
-                    charger?.id && gun?.id
-                      ? `VD: ${charger.id}-${gun.id}`
-                      : gun?.id
-                      ? `VD: ${gun.id}`
+                    data.charger?.id && data.gun?.id
+                      ? `VD: ${data.charger.id}-${data.gun.id}`
+                      : data.gun?.id
+                      ? `VD: ${data.gun.id}`
                       : "VD: EVS-12A-PORT1"
                   }
                   value={idInput}
                   onChange={(e) => setIdInput(e.target.value)}
                   onKeyDown={onEnter}
                 />
-                <button className="ps-btn" onClick={handleStart} disabled={timeLeft <= 0}>
+                <button
+                  className="ps-btn"
+                  onClick={handleStart}
+                  disabled={timeLeft <= 0}
+                >
                   Bắt đầu sạc
                 </button>
               </div>
 
               {!!displayHints.length && (
-                <p className="ps-hint" style={{ marginTop: 8 }}>
+                <p className="ps-hint">
                   Gợi ý hợp lệ: {displayHints.join(" hoặc ")}
                 </p>
               )}
               {!!idError && <p className="ps-error">{idError}</p>}
               {timeLeft === 0 && (
-                <p className="ps-error" style={{ marginTop: 8 }}>
+                <p className="ps-error">
                   Hết thời gian giữ chỗ. Vui lòng đặt lại.
                 </p>
               )}
@@ -201,20 +269,42 @@ export default function PaymentSuccess() {
             <h3 className="ps-pane-title">Thông tin đặt chỗ</h3>
             <div className="ps-block">
               <div className="ps-block-head">Trụ sạc</div>
-              <div className="ps-kv"><span className="ps-k">Trạm</span><span className="ps-v">{station?.name ?? "—"}</span></div>
-              <div className="ps-kv"><span className="ps-k">Công suất</span><span className="ps-v">{charger?.power ?? "—"}</span></div>
-              <div className="ps-kv"><span className="ps-k">Đầu nối</span><span className="ps-v">{charger?.connector ?? "—"}</span></div>
+              <div className="ps-kv">
+                <span className="ps-k">Trạm</span>
+                <span className="ps-v">{data.station?.name ?? "—"}</span>
+              </div>
+              <div className="ps-kv">
+                <span className="ps-k">Công suất</span>
+                <span className="ps-v">{data.charger?.power ?? "—"}</span>
+              </div>
+              <div className="ps-kv">
+                <span className="ps-k">Đầu nối</span>
+                <span className="ps-v">{data.charger?.connector ?? "—"}</span>
+              </div>
               <div className="ps-kv">
                 <span className="ps-k">Súng/Cổng đã đặt</span>
-                <span className="ps-v">{[gun?.name, gun?.id].filter(Boolean).join(" — ") || "—"}</span>
+                <span className="ps-v">
+                  {[data.gun?.name, data.gun?.id].filter(Boolean).join(" — ") ||
+                    "—"}
+                </span>
               </div>
             </div>
 
             <div className="ps-block">
               <div className="ps-block-head">Chi phí</div>
-              <div className="ps-kv"><span className="ps-k">Phí đặt chỗ</span><span className="ps-v">{vnd(bookingFee)}</span></div>
+              <div className="ps-kv">
+                <span className="ps-k">Phí đặt chỗ</span>
+                <span className="ps-v">{vnd(data.bookingFee)}</span>
+              </div>
               <div className="ps-sep" />
-              <div className="ps-kv ps-total"><span className="ps-k"><b>Tổng</b></span><span className="ps-v"><b>{vnd(bookingFee)}</b></span></div>
+              <div className="ps-kv ps-total">
+                <span className="ps-k">
+                  <b>Tổng</b>
+                </span>
+                <span className="ps-v">
+                  <b>{vnd(data.bookingFee)}</b>
+                </span>
+              </div>
             </div>
           </aside>
         </div>

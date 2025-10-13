@@ -3,15 +3,15 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 export default function ProtectedRoute({ children, allowedRoles }) {
-  const { isAuthenticated, token, userRole } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const location = useLocation();
 
-  if (!isAuthenticated || !token) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (allowedRoles?.length && !allowedRoles.includes(userRole)) {
-    // Không đủ quyền -> điều hướng trang mặc định
+  // Kiểm tra role dựa vào user?.role
+  if (allowedRoles?.length && !allowedRoles.includes(user?.role)) {
     return <Navigate to="/stations" replace />;
   }
 

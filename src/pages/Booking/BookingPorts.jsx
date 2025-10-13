@@ -4,23 +4,8 @@ import MainLayout from "../../layouts/MainLayout";
 import ChargersCard from "../../components/station/ChargersCard";
 import ChargersGun from "../../components/station/ChargersGun";
 import "./BookingPorts.css";
-
-// ===== API base (ưu tiên .env) =====
-const API_BASE =
-  (typeof import.meta !== "undefined" ? import.meta.env.VITE_API_URL : process.env.REACT_APP_API_URL)
-  ?? "https://localhost:7268/api";
-
-// ===== Helpers =====
-async function fetchJSON(url, init = {}) {
-  const res = await fetch(url, init);
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    const err = new Error(text || `HTTP ${res.status} ${res.statusText}`);
-    err.status = res.status;
-    throw err;
-  }
-  return res.json();
-}
+import { fetchJSON, fetchAuthJSON, getToken, getApiBase } from "../../utils/api";
+const API_BASE = getApiBase();
 
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
 
@@ -45,9 +30,9 @@ function normalizeCharger(c = {}) {
   const rawStatus = (c.status ?? c.Status ?? "").toString().toLowerCase();
   const status =
     rawStatus.includes("available") ? "available" :
-    rawStatus.includes("busy")      ? "busy" :
-    rawStatus.includes("maint")     ? "maintenance" :
-    rawStatus || "unknown";
+      rawStatus.includes("busy") ? "busy" :
+        rawStatus.includes("maint") ? "maintenance" :
+          rawStatus || "unknown";
 
   return {
     id,
@@ -71,10 +56,10 @@ function normalizePort(p = {}) {
   const rawStatus = (p.status ?? p.Status ?? "").toString().toLowerCase();
   const status =
     rawStatus.includes("available") || rawStatus === "1" ? "available" :
-    rawStatus.includes("busy")      || rawStatus === "2" ? "busy" :
-    rawStatus.includes("inactive")  || rawStatus === "0" ? "inactive" :
-    rawStatus.includes("maint")                         ? "maintenance" :
-    "unknown";
+      rawStatus.includes("busy") || rawStatus === "2" ? "busy" :
+        rawStatus.includes("inactive") || rawStatus === "0" ? "inactive" :
+          rawStatus.includes("maint") ? "maintenance" :
+            "unknown";
 
   return {
     id,
@@ -89,6 +74,10 @@ function normalizePort(p = {}) {
 
 // ===== Component =====
 export default function BookingPorts() {
+  // === User/Vehicle (THÊM MỚI) ===
+  const [me, setMe] = useState(null);          // { customerId: ... }
+  const [myVehicleId, setMyVehicleId] = useState(null);
+  const [authError, setAuthError] = useState("");
   const { id, cid } = useParams(); // stationId & chargerId
   const navigate = useNavigate();
 
@@ -130,7 +119,7 @@ export default function BookingPorts() {
 
   // Cho phép tới 23:59
   const LAST_ABS_MIN = 23 * 60 + 59;
-  const canBookToday = minSelAbsMin <= LAST_ABS_MIN;
+  const canBookToday = (minSelAbsMin <= LAST_ABS_MIN);
 
   const [startHour, setStartHour] = useState(() => Math.min(minSelHour, 23));
   const [startMinute, setStartMinute] = useState(() => minSelMinute);
@@ -157,20 +146,17 @@ export default function BookingPorts() {
     return all.filter((m) => m >= minSelMinute);
   };
 
-  const totalMinutes = useMemo(() => {
-    if (!canBookToday) return 0;
-    const selAbs = startHour * 60 + startMinute;
-    const diff = Math.max(0, selAbs - baselineAbsMin);
-    if (diff === 0) return 0;
-    return Math.max(60, diff);
-  }, [startHour, startMinute, baselineAbsMin, canBookToday]);
+  // ⏱️ Thời lượng cố định 60 phút
+  const FIXED_MINUTES = 60;
 
-  const totalHoursFloat = useMemo(() => totalMinutes / 60, [totalMinutes]);
+  const totalMinutes = useMemo(() => (canBookToday ? FIXED_MINUTES : 0), [canBookToday]);
+  const totalHoursFloat = 1; // 60 phút = 1 giờ
 
-  // ====== PHÍ ======
+  // 💰 Phí (theo giờ)
   const [parkingFee, setParkingFee] = useState(20000); // đ/giờ
   const perMinute = useMemo(() => parkingFee / 60, [parkingFee]);
-  const bookingFee = useMemo(() => Math.round(totalMinutes * perMinute), [totalMinutes, perMinute]);
+  const bookingFee = useMemo(() => parkingFee /* 1 giờ cố định */, [parkingFee]);
+
 
   // ====== LOAD STATION + CHARGER ======
   useEffect(() => {
@@ -212,13 +198,7 @@ export default function BookingPorts() {
         setPortsError("");
 
         // Thử route REST trước
-        let data;
-        try {
-          data = await fetchJSON(`${API_BASE}/Chargers/${encodeURIComponent(cid)}/Ports`);
-        } catch {
-          // fallback query
-          data = await fetchJSON(`${API_BASE}/Ports?chargerId=${encodeURIComponent(cid)}`);
-        }
+        const data = await fetchJSON(`${API_BASE}/Ports?chargerId=${encodeURIComponent(cid)}`);
 
         if (!alive) return;
         let arr = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
@@ -249,38 +229,154 @@ export default function BookingPorts() {
     setSelectedGun(firstAvail);
   }, [ports, selectedGun]);
 
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function fmtLocal(dt) {
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
+      + `T${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+  }
+
+  // Nếu BE muốn kèm offset +07:00 thì dùng hàm này thay cho fmtLocal:
+  function fmtLocalWithOffset(dt) {
+    const base = fmtLocal(dt);
+    const off = -dt.getTimezoneOffset(); // minutes
+    const sign = off >= 0 ? "+" : "-";
+    const hh = pad(Math.floor(Math.abs(off) / 60));
+    const mm = pad(Math.abs(off) % 60);
+    return `${base}${sign}${hh}:${mm}`; // ví dụ ...+07:00
+  }
+
+
   // ====== BOOK ======
-  const handleBook = () => {
+  const handleBook = async () => {
     if (!selectedGun || totalMinutes <= 0) return;
 
-    const hh = String(startHour).padStart(2, "0");
-    const mm = String(startMinute).padStart(2, "0");
+    if (!me?.customerId) { alert("Chưa đăng nhập hoặc không lấy được customerId."); return; }
+    if (!myVehicleId) { alert("Tài khoản chưa có xe. Hãy thêm xe trước khi đặt."); return; }
 
-    const payload = {
-      station: {
-        id,
-        name: station?.name,
-        address: station?.address,
-      },
-      charger: {
-        id: cid,
-        connector: selectedGun?.connector || charger?.connector,
-        power: selectedGun?.power || charger?.power,
-        price: charger?.price,
-      },
-      gun: {
-        id: selectedGun?.id,
-        name: selectedGun?.name || `Súng ${selectedGun?.id}`,
-      },
-      startTime: `${hh}:${mm}`,
-      baseline: `${String(baseline.h).padStart(2, "0")}:${String(baseline.m).padStart(2, "0")}`,
-      totalMinutes,
-      perMinute,
-      bookingFee,
+    // Tạo thời gian ISO (UTC) theo giờ bạn đã chọn hôm nay
+    const today = new Date();
+    const startLocal = new Date(
+      today.getFullYear(), today.getMonth(), today.getDate(),
+      startHour, startMinute, 0, 0
+    );
+    const endLocal = new Date(startLocal.getTime() + 60 * 60_000); // +60 phút cố định
+
+    const bookingDto = {
+      customerId: me.customerId,
+      vehicleId: myVehicleId,
+      portId: selectedGun.id,
+      startTime: fmtLocal(startLocal),   // hoặc fmtLocalWithOffset(startLocal)
+      endTime: fmtLocal(endLocal),     // hoặc fmtLocalWithOffset(endLocal)
+      status: "Confirmed",
     };
 
-    navigate("/payment", { state: payload });
+    try {
+      // GỬI BOOKING VỀ API
+      const created = await fetchAuthJSON("/Booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bookingDto),
+      });
+
+      // Thành công -> sang payment, mang theo booking vừa tạo
+      navigate("/payment", {
+        state: {
+          bookingId: created.id ?? created.bookingId,
+          booking: created,
+          station: { id, name: station?.name, address: station?.address },
+          charger: {
+            id: cid,
+            connector: selectedGun?.connector || charger?.connector,
+            power: selectedGun?.power || charger?.power,
+            price: charger?.price,
+          },
+          gun: { id: selectedGun?.id, name: selectedGun?.name || `Súng ${selectedGun?.id}` },
+          totalMinutes, perMinute, bookingFee,
+        },
+      });
+    } catch (e) {
+      alert(`Tạo booking thất bại: ${e.message}`);
+    }
   };
+
+
+  // === NẠP USER & VEHICLE (sửa để dùng /Vehicles) ===
+  useEffect(() => {
+    if (!getToken()) { navigate("/login", { replace: true }); return; }
+    let alive = true;
+
+    const decodeJwtPayload = (t) => {
+      try {
+        const base64 = t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+        return JSON.parse(
+          decodeURIComponent(
+            atob(base64).split("").map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")
+          )
+        );
+      } catch { return null; }
+    };
+
+    (async () => {
+      try {
+        setAuthError("");
+
+        // 1) Lấy user hiện tại
+        const meRes = await fetchAuthJSON("/Auth");
+
+        // 2) Lấy customerId từ /Auth hoặc token
+        let customerId =
+          meRes?.customerId ??
+          meRes?.id ??
+          meRes?.userId ??
+          meRes?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+
+        if (!customerId) {
+          const p = decodeJwtPayload(getToken());
+          customerId =
+            p?.customerId ??
+            p?.sub ??
+            p?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+        }
+
+        if (!alive) return;
+        if (!customerId) throw new Error("Không tìm thấy customerId trong /Auth hoặc token");
+        setMe({ ...(meRes || {}), customerId });
+
+        // 3) ✅ Lấy danh sách xe từ API /Vehicles (đúng link bạn muốn)
+        const vehicles = await fetchAuthJSON("/Vehicles");
+
+        // 4) Lọc xe thuộc user hiện tại (nếu backend trả nhiều xe)
+        const myVehicles = (Array.isArray(vehicles) ? vehicles : (vehicles?.items || []))
+          .filter(v =>
+            String(v.customerId ?? v.CustomerId ?? v.userId ?? v.UserId) === String(customerId)
+          );
+
+        if (!alive) return;
+
+        if (myVehicles.length === 0) {
+          throw new Error("Không tìm thấy xe nào thuộc tài khoản của bạn.");
+        }
+
+        // 5) Lưu vehicleId để tạo booking
+        const first = myVehicles[0];
+        const vid = first?.id ?? first?.vehicleId ?? null;
+        setMyVehicleId(vid);
+
+        // (tùy chọn) nếu bạn cần VehicleType
+        // const myVehicleType = first?.vehicleType ?? first?.vehicleTypeName ?? first?.type;
+        // console.log("My vehicle type:", myVehicleType);
+
+      } catch (e) {
+        if (!alive) return;
+        setAuthError(e?.message || "Không thể nạp người dùng/xe.");
+      }
+    })();
+
+    return () => { alive = false; };
+  }, [navigate]);
+
+
+
 
   // ====== RENDER ======
   if (loading) {
@@ -437,9 +533,10 @@ export default function BookingPorts() {
                 </div>
 
                 <div className="bp-hint">
-                  Mốc nhỏ nhất: {String(minSelHour).padStart(2,"0")}:{String(minSelMinute).padStart(2,"0")}.
-                  Phí tính từ {String(baseline.h).padStart(2,"0")}:{String(baseline.m).padStart(2,"0")} → giờ đã chọn, tối thiểu 60 phút.
+                  Mốc nhỏ nhất: {String(minSelHour).padStart(2, "0")}:{String(minSelMinute).padStart(2, "0")} (đặt sau thời điểm hiện tại ít nhất 1 giờ).
+                  Thời lượng đặt chỗ cố định: 60 phút.
                 </div>
+
               </div>
 
               <div className="bp-section">

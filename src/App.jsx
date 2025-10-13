@@ -1,5 +1,9 @@
 // src/App.jsx
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+
 import StationList from "./pages/c-station/StationList";
 import StationDetail from "./pages/c-station/StationDetail";
 import BookingPorts from "./pages/Booking/BookingPorts";
@@ -9,18 +13,34 @@ import PaymentFailure from "./pages/payment/PaymentFailure";
 import ChargingProgress from "./components/charging/ChargingProgress";
 import PaymentCharging from "./components/charging/PaymentCharging";
 import PaymentInvoice from "./components/charging/PaymentInvoice";
-import ProtectedRoute from "./components/auth/ProtectedRoute";
-import { AuthProvider } from "./context/AuthContext"; 
 import Login from "./components/login/Login";
+
+function GuestRoute({ children }) {
+  const { user } = useAuth();
+  const location = useLocation();
+  if (user) {
+    const back = location.state?.from?.pathname || "/stations";
+    return <Navigate to={back} replace />;
+  }
+  return children;
+}
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* PUBLIC */}
           <Route path="/" element={<Navigate to="/stations" replace />} />
-          <Route path="/login" element={<Login/>} />
+
+          {/* PUBLIC */}
+          <Route
+            path="/login"
+            element={
+              <GuestRoute>
+                <Login/>
+              </GuestRoute>
+            }
+          />
 
           {/* PROTECTED */}
           <Route
@@ -95,6 +115,9 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* FALLBACK nên về /login hoặc 404 */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
