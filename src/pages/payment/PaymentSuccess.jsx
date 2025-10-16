@@ -12,7 +12,7 @@ import "./style/PaymentSuccess.css";
 // ---------------- Constants ----------------
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
 const HOLD_MINUTES_DEFAULT = 15;
-const PAYMENT_API_URL = "https://localhost:7268/api/Ports"; // Thay URL BE
+const VERIFY_URL = "https://localhost:7268/api/payment/vnpay-callback"; // Thay URL BE
 
 export default function PaymentSuccess() {
   const { state } = useLocation();
@@ -29,34 +29,88 @@ export default function PaymentSuccess() {
   const [idError, setIdError] = useState("");
 
   // ---------------- 1. Lấy dữ liệu từ state hoặc API BE ----------------
+  // ---------------- 1. Lấy dữ liệu từ state hoặc API BE ----------------
   useEffect(() => {
+    // Trường hợp đi từ ví/card: có state => hiển thị luôn
     if (state) {
       setData(state);
       setLoading(false);
       return;
     }
 
+    // Trường hợp quay về từ VNPAY: không có state => đọc query
     const order = search.get("order");
     if (!order) {
       setLoading(false);
       return;
     }
 
-    fetch(`${PAYMENT_API_URL}?orderId=${order}`)
+    // Gửi nguyên query (chứa vnp_*) lên BE để verify
+    const qs = window.location.search; // ?vnp_Amount=...&...&order=...
+
+    fetch(`${VERIFY_URL}${qs}`, { credentials: "include" })
       .then((res) => {
-        if (!res.ok) throw new Error("Không thể lấy dữ liệu thanh toán");
-        return res.json();
+        if (!res.ok) throw new Error("Không thể xác minh thanh toán");
+        // BE của bạn có thể trả JSON hoặc text "OK"
+        return res
+          .json()
+          .catch(() => ({})); // nếu không parse JSON được, coi như {}
       })
       .then((json) => {
+        // Nếu BE trả success=false -> điều hướng sang Failure
+        if (json?.success === false) {
+          navigate(`/payment/failure?order=${order}`, {
+            state: { message: json?.message || "Thanh toán thất bại hoặc bị hủy." },
+            replace: true,
+          });
+          return;
+        }
+
+        // Nếu BE không trả JSON chi tiết (hoặc là {}), fallback session/local
+        if (!json || Object.keys(json).length === 0) {
+          const local = sessionStorage.getItem(`pay:${order}`);
+          if (local) {
+            try {
+              const parsed = JSON.parse(local);
+              setData(parsed);
+              setFetchError("Đang hiển thị dữ liệu tạm (BE không trả chi tiết).");
+              return;
+            } catch { }
+          }
+          // Tối thiểu dựng data cơ bản từ query để hiển thị
+          setData({
+            orderId: order,
+            bookingFee: Number(search.get("vnp_Amount") || 0) / 100, // VNPay trả số tiền * 100
+            paidAt: Date.now(),
+            station: {},
+            charger: {},
+            gun: {},
+            paymentMethod: "vnpay",
+          });
+          return;
+        }
+
+        // Có JSON chi tiết từ BE
         setData(json);
         sessionStorage.setItem(`pay:${order}`, JSON.stringify(json));
       })
       .catch((err) => {
         console.error(err);
-        setFetchError("Không lấy được thông tin đơn. Vui lòng thử lại.");
+        // Fallback session nếu có
+        const local = sessionStorage.getItem(`pay:${order}`);
+        if (local) {
+          setData(JSON.parse(local));
+          setFetchError("Đang hiển thị dữ liệu tạm. Không xác minh được từ máy chủ.");
+        } else {
+          setFetchError(err?.message || "Không lấy được thông tin đơn. Vui lòng thử lại.");
+        }
       })
-      .finally(() => setLoading(false));
-  }, [state, search]);
+      .finally(() => {
+        setLoading(false);
+        sessionStorage.removeItem(`pay:${order}:pending`); // xoá cờ pending nếu có
+      });
+  }, [state, search, navigate]);
+
 
   // ---------------- 2. Điều hướng nếu đã start/done ----------------
   useEffect(() => {
@@ -235,8 +289,8 @@ export default function PaymentSuccess() {
                     data.charger?.id && data.gun?.id
                       ? `VD: ${data.charger.id}-${data.gun.id}`
                       : data.gun?.id
-                      ? `VD: ${data.gun.id}`
-                      : "VD: EVS-12A-PORT1"
+                        ? `VD: ${data.gun.id}`
+                        : "VD: EVS-12A-PORT1"
                   }
                   value={idInput}
                   onChange={(e) => setIdInput(e.target.value)}

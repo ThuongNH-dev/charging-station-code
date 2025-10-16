@@ -145,17 +145,26 @@ export default function BookingPorts() {
     if (h > minSelHour) return all;
     return all.filter((m) => m >= minSelMinute);
   };
+  
+// ⏱️ Thời lượng cố định 60 phút
+const FIXED_MINUTES = 60;
 
-  // ⏱️ Thời lượng cố định 60 phút
-  const FIXED_MINUTES = 60;
+const totalMinutes = useMemo(() => (canBookToday ? FIXED_MINUTES : 0), [canBookToday]);
+// trước đây là 1 cố định; giờ tính theo tổng phút để hiển thị chuẩn
+const totalHoursFloat = useMemo(() => totalMinutes / 60, [totalMinutes]);
 
-  const totalMinutes = useMemo(() => (canBookToday ? FIXED_MINUTES : 0), [canBookToday]);
-  const totalHoursFloat = 1; // 60 phút = 1 giờ
+// 💰 Phí (theo giờ)
+const [parkingFee, setParkingFee] = useState(20000); // đ/giờ
 
-  // 💰 Phí (theo giờ)
-  const [parkingFee, setParkingFee] = useState(20000); // đ/giờ
-  const perMinute = useMemo(() => parkingFee / 60, [parkingFee]);
-  const bookingFee = useMemo(() => parkingFee /* 1 giờ cố định */, [parkingFee]);
+// đơn giá theo phút (có thể ra số lẻ, ví dụ 20000/60 = 333.333…)
+const perMinute = useMemo(() => parkingFee / 60, [parkingFee]);
+
+// ✅ TÍNH THEO PHÚT: tổng phí = đơn giá/phút * tổng phút (làm tròn tiền về đồng)
+const bookingFee = useMemo(
+  () => Math.round(perMinute * totalMinutes),
+  [perMinute, totalMinutes]
+);
+
 
 
   // ====== LOAD STATION + CHARGER ======

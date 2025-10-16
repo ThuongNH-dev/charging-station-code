@@ -11,7 +11,7 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import DashboardCustomizeRoundedIcon from "@mui/icons-material/DashboardCustomizeRounded";
 import { useAuth } from "../../context/AuthContext";
 
-const ME_URL = "https://localhost:7268/api/users/me";
+const ME_URL = "https://localhost:7268/api/Auth";
 
 function getInitials(name = "") {
   return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join("");
@@ -35,37 +35,70 @@ export default function AccountMenu() {
     async function fetchMe() {
       if (!token) return;
 
-      // nếu đã có userName thì ưu tiên dùng luôn
+      // nếu đã có userName từ context thì ưu tiên dùng
       if (userName) {
         setDisplayName(userName);
         return;
       }
+
       try {
         const res = await fetch(ME_URL, {
-          headers: { Authorization: `Bearer ${token}` },
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
         });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!ignore) {
-          const name =
-            data?.fullName ||
-            data?.name ||
-            data?.user?.fullName ||
-            data?.user?.name ||
-            "";
-          const avatar =
-            data?.avatarUrl || data?.user?.avatarUrl || data?.avatar || "";
-          if (name) setDisplayName(name);
-          if (avatar) setAvatarUrl(avatar);
+
+        if (!res.ok) {
+          console.warn("ME fetch failed:", res.status);
+          return;
         }
-      } catch {
-        // im lặng nếu lỗi
+
+        // an toàn với 204/empty/body không phải JSON
+        let data = null;
+        const ct = res.headers.get("content-type") || "";
+        if (ct.includes("application/json")) {
+          data = await res.json();
+        } else {
+          const text = await res.text();
+          try { data = JSON.parse(text); } catch { /* để data = null */ }
+        }
+
+        if (ignore) return;
+
+        // gom đủ kiểu envelope phổ biến: data, result, user, payload...
+        const src =
+          data?.data || data?.result || data?.user || data?.payload || data || {};
+
+        const name =
+          src.fullName || src.name || src.userName || src.displayName ||
+          src.profile?.fullName || src.profile?.name || "";
+
+        const avatar =
+          src.avatarUrl || src.avatar || src.user?.avatarUrl || src.profile?.avatarUrl || "";
+
+        if (name) setDisplayName(name);
+        if (avatar) setAvatarUrl(avatar);
+
+        // fallback cuối cùng: lấy từ JWT nếu BE không trả tên
+        if (!name && token) {
+          try {
+            const [, payload] = token.split(".");
+            const obj = JSON.parse(atob(payload));
+            const jwtName = obj.name || obj.unique_name || obj.given_name || obj.preferred_username || "";
+            if (jwtName) setDisplayName(jwtName);
+          } catch { /* ignore */ }
+        }
+      } catch (e) {
+        console.warn("ME fetch error:", e);
       }
     }
 
     fetchMe();
     return () => { ignore = true; };
-  }, [token, userName]); // 🧠 dependency đúng
+  }, [token, userName]);
+
 
   const handleClick = (e) => setAnchorEl(e.currentTarget);
   const handleClose = () => setAnchorEl(null);
@@ -155,9 +188,11 @@ export default function AccountMenu() {
         <Divider sx={{ my: 0.5 }} />
 
         <MenuItem onClick={() => { handleClose(); logout(); navigate("/"); }}
-          sx={{ borderRadius: "10px", mx: 0.5, color: "error.main",
+          sx={{
+            borderRadius: "10px", mx: 0.5, color: "error.main",
             "& .MuiSvgIcon-root": { color: "error.main" },
-            "&:hover": { backgroundColor: "#fff2f2" } }}>
+            "&:hover": { backgroundColor: "#fff2f2" }
+          }}>
           <ListItemIcon><LogoutRoundedIcon fontSize="small" /></ListItemIcon>
           Đăng xuất
         </MenuItem>
