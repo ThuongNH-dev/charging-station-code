@@ -1,0 +1,185 @@
+/* ===== LAYOUT (dựa trên bp tokens) ===== */
+.payment-page {
+  padding: 24px;
+  display: flex;
+  justify-content: center;
+  color: var(--bp-text);
+}
+
+.payment-container {
+  width: 100%;
+  max-width: 1200px;             /* khớp bp-container */
+  display: flex;
+  gap: 16px;                      /* khớp bp-grid gap */
+  flex-wrap: wrap;
+  align-items: flex-start;        /* 2 cột cao độc lập */
+}
+
+/* ===== OPTIONAL WRAPPER for back link ===== */
+.left-col {
+  flex: 1 1 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ===== PANELS (khớp tone bp-panel) ===== */
+.left-panel,
+.right-panel {
+  background: var(--bp-surface);
+  border: 1px solid var(--bp-border);
+  border-radius: var(--bp-radius-lg);
+  box-shadow: var(--bp-shadow);
+  padding: 30px;
+  flex: 1 1 520px;               /* gần “1.4fr | 1fr” */
+}
+
+/* Lưu ý: comment cũ bị ngược — trái phải sửa như dưới */
+.left-panel {
+  flex: 1.3 1 600px;   /* ⬅️ rộng hơn */
+}
+
+.right-panel {
+  flex: 0.9 1 380px;  /* ⬅️ hẹp hơn */
+}
+
+/* ===== TITLES ===== */
+.section-title,
+.os-title {
+  display: flex;
+  justify-content: center;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: var(--bp-primary-strong);
+}
+
+/* ===== ORDER SUMMARY (cột phải) ===== */
+.os-block h3 {
+  margin: 12px 0;
+  color: var(--bp-text);
+}
+
+.os-station-line {
+  margin: 6px 0 8px;
+  color: var(--bp-text-subtle);
+}
+
+.os-station-list {
+  line-height: 1.6;
+  margin-left: 16px;
+  color: var(--bp-text);
+}
+
+/* Bảng chi phí khớp bp-table */
+.os-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+.os-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-top: 1px solid var(--bp-border);
+  color: var(--bp-text);
+}
+.os-table tr:first-child td { border-top: none; }
+.os-right { text-align: right; }
+.os-total td {
+  padding-top: 10px;
+  font-weight: 700;
+}
+
+/* QR Box */
+.os-qr {
+  margin-top: 16px;
+  display: flex;                 /* cần có để justify-content hoạt động */
+  flex-direction: column;        /* để chữ nằm dưới mã QR */
+  justify-content: center;       /* căn giữa ngang */
+  align-items: center;           /* căn giữa dọc */
+  text-align: center;
+}
+.os-qr-hint {
+  font-size: 13px;
+  color: var(--bp-muted);
+  margin-top: 8px;
+}
+
+/* Actions (nút) – khớp bp buttons */
+.os-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.primary-btn {
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: var(--bp-radius-md);
+  background: var(--bp-primary);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color .15s ease, transform .05s ease;
+}
+.primary-btn:hover { background: var(--bp-primary-strong); }
+.primary-btn:active { transform: translateY(1px); }
+.primary-btn.disabled,
+.primary-btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.secondary-btn {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--bp-border);
+  border-radius: var(--bp-radius-md);
+  background: var(--bp-surface);
+  color: var(--bp-text);
+  cursor: pointer;
+  transition: border-color .15s ease;
+}
+.secondary-btn:hover { border-color: var(--bp-primary); }
+
+/* Fallback khi thiếu state */
+.page-fallback {
+  padding: 24px;
+}
+
+.bp-back {
+  display: inline-block;
+  margin-bottom: 4px;
+  text-decoration: none;
+  color: var(--bp-primary);
+  cursor: pointer;
+}
+.bp-back:hover { color: var(--bp-primary-strong); }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .left-col { flex: 1 1 100%; }
+  .left-panel, .right-panel { flex: 1 1 100%; }
+}
+/* ===== Nút quay về (trên panel trái) ===== */
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--bp-border);
+  border-radius: var(--bp-radius-md);
+  background: var(--bp-surface);
+  color: var(--bp-primary);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.back-btn:hover {
+  background: #f8fafc;
+  border-color: var(--bp-primary);
+  color: var(--bp-primary-strong);
+}

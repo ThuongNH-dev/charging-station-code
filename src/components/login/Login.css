@@ -1,0 +1,203 @@
+/* ====== BACKGROUND TOÀN MÀN HÌNH ====== */
+.login-wrapper {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  isolation: isolate; /* để z-index hoạt động đúng */
+}
+
+/* Ảnh nền phủ mờ phía sau */
+.login-wrapper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: 
+    linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)),
+    url("/Parking_lotV4.png") center / cover no-repeat;
+  filter: brightness(0.9);
+  transform: scale(1.05);
+}
+
+/* ====== FORM CARD ====== */
+.login-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  padding: 40px;
+  width: 100%;
+  max-width: 420px;
+  backdrop-filter: blur(6px);
+  animation: fadeInUp 0.5s ease-out;
+}
+
+/* Hiệu ứng nhẹ khi load */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ====== TIÊU ĐỀ ====== */
+.login-title {
+  text-align: center;
+  font-size: 28px;
+  margin-bottom: 20px;
+  color: #0f172a;
+}
+
+/* ====== INPUT ====== */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #475569;
+  font-weight: 500;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  outline: none;
+  background-color: #fff;
+  transition: all 0.2s ease;
+}
+.form-input:focus {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.2);
+}
+
+/* ====== BUTTON LOGIN ====== */
+.submit-btn {
+  width: 100%;
+  background-color: #0f766e;
+  color: white;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 12px;
+  cursor: pointer;
+  transition: background-color 0.25s ease;
+}
+.submit-btn:hover {
+  background-color: #0b615a;
+}
+
+/* ====== REMEMBER ME / FORGOT ====== */
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.forgot-link {
+  color: #0f766e;
+  text-decoration: none;
+}
+.forgot-link:hover {
+  text-decoration: underline;
+}
+
+/* ====== ERROR ====== */
+.error-message {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+/* ====== DIVIDER ====== */
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: #64748b;
+  margin: 20px 0;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #e2e8f0;
+}
+.divider:not(:empty)::before {
+  margin-right: 8px;
+}
+.divider:not(:empty)::after {
+  margin-left: 8px;
+}
+
+/* ====== SOCIAL LOGIN ====== */
+.social-login {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.social-btn {
+  flex: 1;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+.social-btn:hover {
+  background: #f1f5f9;
+  transform: translateY(-1px);
+}
+
+.social-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.google-btn {
+  color: #4285f4;
+}
+.facebook-btn {
+  color: #1877f2;
+}
+
+/* ====== NOTE + SIGNUP ====== */
+.info-note {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 10px;
+  text-align: center;
+}
+.signup-link {
+  text-align: center;
+  margin-top: 12px;
+}
+.signup-link a {
+  color: #0f766e;
+  font-weight: 600;
+  cursor: pointer;
+}
+.signup-link a:hover {
+  text-decoration: underline;
+}

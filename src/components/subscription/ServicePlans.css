@@ -1,0 +1,150 @@
+/* ======================== */
+/* 🌐 Toàn trang dịch vụ */
+/* ======================== */
+.service-page {
+  padding: 40px 80px; /* Khoảng cách lề trong (top/bottom: 40px, left/right: 80px) */
+  font-family: "Segoe UI", sans-serif; /* Font chữ chính cho toàn trang */
+  color: #1f1f1f; /* Màu chữ mặc định */
+  background-color: #fff; /* Nền trắng cho toàn trang */
+  text-align: center; /* Căn giữa toàn bộ nội dung văn bản */
+}
+
+/* ======================== */
+/* 🏷️ Tiêu đề chính và phụ */
+/* ======================== */
+.title {
+  font-size: 30px; /* Kích thước chữ tiêu đề chính */
+  font-weight: 700; /* In đậm tiêu đề */
+  margin-bottom: 8px; /* Khoảng cách dưới tiêu đề */
+}
+
+.subtitle {
+  color: #555; /* Màu xám nhẹ cho phụ đề */
+  font-size: 16px; /* Kích thước chữ phụ đề */
+  margin-bottom: 40px; /* Tạo khoảng trống giữa phụ đề và phần kế tiếp */
+}
+
+/* ======================== */
+/* 📦 Các phần (section) */
+/* ======================== */
+.section {
+  margin-bottom: 60px; /* Cách nhau giữa các phần */
+}
+
+/* Tiêu đề của từng phần (VD: “Gói doanh nghiệp”) */
+.section-title {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 16px; /* Tạo khoảng trống phía dưới */
+}
+
+/* Tiêu đề con (VD: “Gói hội viên”) */
+.subsection-title {
+  font-size: 22px;
+  font-weight: 600;
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+.card-container h4 {
+  font-size: 25px;
+  font-weight: bold;
+}
+
+/* ======================== */
+/* 🔘 Nút chuyển đổi Tháng/Năm */
+/* ======================== */
+.toggle {
+  display: flex; /* Sắp xếp các nút nằm ngang */
+  justify-content: center; /* Căn giữa các nút */
+  gap: 10px; /* Khoảng cách giữa các nút */
+  margin-bottom: 30px; /* Khoảng cách phía dưới nhóm nút */
+}
+
+/* Nút toggle cơ bản */
+.toggle-btn {
+  background-color: transparent; /* Nền trong suốt */
+  border: 1px solid #ddd; /* Viền xám nhạt */
+  padding: 6px 16px; /* Khoảng đệm trong nút */
+  border-radius: 20px; /* Bo tròn nút */
+  font-size: 14px;
+  cursor: pointer; /* Biểu tượng con trỏ tay */
+}
+
+/* Nút toggle đang được chọn */
+.toggle-btn.active {
+  background-color: #0b702e; /* Nền xanh dương */
+  color: #fff; /* Chữ trắng */
+  border-color: #0b702e; /* Viền cùng màu nền */
+}
+
+/* ======================== */
+/* 💳 Thẻ hiển thị gói dịch vụ */
+/* ======================== */
+.card-container {
+  display: flex; /* Hiển thị các thẻ nằm cạnh nhau */
+  justify-content: center; /* Căn giữa cả nhóm thẻ */
+  gap: 70px; /* Khoảng cách giữa các thẻ */
+  flex-wrap: wrap; /* Cho phép xuống hàng nếu màn hình nhỏ */
+}
+
+/* Một thẻ gói dịch vụ */
+.card {
+  background-color: #fff; /* Nền trắng */
+  border: 1px solid #e0e0e0; /* Viền mảnh xám nhạt */
+  border-radius: 16px; /* Bo góc mềm mại */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05); /* Đổ bóng nhẹ */
+  width: 280px;
+  height: 370px; /* Độ rộng cố định mỗi thẻ */
+  padding: 35px 24px 16px; /* Khoảng cách nội dung bên trong */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* Trên cùng - giữa - dưới cùng */
+  align-items: center;
+  text-align: center; /* Căn giữa nội dung */
+  transition: transform 0.25s ease, box-shadow 0.25s ease; /* Hiệu ứng hover mượt */
+}
+
+.card p {
+  margin: 4px 0; /* 🔹 Giảm khoảng cách giữa các dòng */
+  line-height: 1.4;
+}
+
+/* Hiệu ứng khi rê chuột lên thẻ */
+.card:hover {
+  transform: translateY(-4px); /* Nhấc thẻ lên nhẹ */
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1); /* Bóng đậm hơn */
+}
+
+/* ======================== */
+/* 💰 Phần hiển thị giá tiền */
+/* ======================== */
+.price {
+  font-size: 26px; /* Kích thước giá */
+  font-weight: 700; /* In đậm giá */
+  color: #16ca55; /* Màu xanh nổi bật */
+  margin-bottom: 8px; /* Cách dưới */
+}
+.name {
+  font-size: 25px;
+  font-weight: bold;
+}
+
+/* ======================== */
+/* ⬆️ Nút nâng cấp gói */
+/* ======================== */
+.upgrade-btn {
+  margin-top: 4px;
+  margin-bottom: 10px; /* Cách phần nội dung trên */
+  background-color: #006d32; /* Màu nền xanh dương */
+  color: white; /* Chữ trắng */
+  border: none; /* Xóa viền mặc định */
+  border-radius: 8px; /* Bo góc mềm mại */
+  padding: 8px 18px; /* Khoảng đệm trong nút */
+  cursor: pointer; /* Con trỏ tay khi hover */
+  transition: background-color 0.2s ease; /* Hiệu ứng chuyển màu */
+}
+
+/* Khi rê chuột vào nút */
+.upgrade-btn:hover {
+  background-color: #009e44; /* Đậm hơn để phản hồi hành động */
+}

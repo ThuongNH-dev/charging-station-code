@@ -1,27 +1,98 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
 import ChargersCard from "../../components/station/ChargersCard";
-import "./BookingPorts.css";
-// ⬇️ Sửa: dùng đúng tên component đã import
 import ChargersGun from "../../components/station/ChargersGun";
+import "./BookingPorts.css";
+import { fetchJSON, fetchAuthJSON, getToken, getApiBase } from "../../utils/api";
+const API_BASE = getApiBase();
 
-const API_URL = "http://127.0.0.1:4000/stations";
-
-// helper định dạng tiền
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
 
+function normalizeStation(s = {}) {
+  return {
+    id: s.id ?? s.stationId ?? s.StationId,
+    name: s.name ?? s.stationName ?? s.StationName ?? "",
+    address: s.address ?? s.Address ?? "",
+    city: s.city ?? s.City ?? "",
+    lat: parseFloat(s.lat ?? s.latitude ?? s.Latitude),
+    lng: parseFloat(s.lng ?? s.longitude ?? s.Longitude),
+    imageUrl: s.imageUrl ?? s.ImageUrl ?? "",
+    status: s.status ?? s.Status ?? "Active",
+  };
+}
+
+function normalizeCharger(c = {}) {
+  const id = c.id ?? c.chargerId ?? c.ChargerId;
+  const p = c.powerKw ?? c.PowerKW ?? c.power ?? c.Power;
+  const powerText = (p !== undefined && p !== null && String(p) !== "") ? `${p} kW` : "";
+
+  const rawStatus = (c.status ?? c.Status ?? "").toString().toLowerCase();
+  const status =
+    rawStatus.includes("available") ? "available" :
+      rawStatus.includes("busy") ? "busy" :
+        rawStatus.includes("maint") ? "maintenance" :
+          rawStatus || "unknown";
+
+  return {
+    id,
+    stationId: c.stationId ?? c.StationId,
+    title: c.code ?? c.Code ?? `Trụ #${id}`,
+    connector: c.type ?? c.Type ?? "",   // "Type 2" | "CCS2" | "CHAdeMO" ...
+    power: powerText,                    // "60 kW"
+    status,
+    price: c.price ?? c.Price ?? "",
+    imageUrl: c.imageUrl ?? c.ImageUrl ?? "",
+  };
+}
+
+function normalizePort(p = {}) {
+  const id = p.id ?? p.PortId ?? p.portId;
+  const code = p.code ?? p.Code ?? `P-${id}`;
+  const connector = p.connector ?? p.connectorType ?? p.ConnectorType ?? p.Connector ?? "-";
+  const pw = p.power ?? p.maxPowerKW ?? p.MaxPowerKW;
+  const powerText = (pw !== undefined && pw !== null && String(pw) !== "") ? `${pw} kW` : "";
+
+  const rawStatus = (p.status ?? p.Status ?? "").toString().toLowerCase();
+  const status =
+    rawStatus.includes("available") || rawStatus === "1" ? "available" :
+      rawStatus.includes("busy") || rawStatus === "2" ? "busy" :
+        rawStatus.includes("inactive") || rawStatus === "0" ? "inactive" :
+          rawStatus.includes("maint") ? "maintenance" :
+            "unknown";
+
+  return {
+    id,
+    name: code,             // ChargersGun hiển thị name
+    connector,
+    power: powerText,
+    status,
+    chargerId: p.chargerId ?? p.ChargerId, // để lọc/đối chiếu
+    _raw: p,
+  };
+}
+
+// ===== Component =====
 export default function BookingPorts() {
-  const { id, cid } = useParams(); // station id & charger id
+  // === User/Vehicle (THÊM MỚI) ===
+  const [me, setMe] = useState(null);          // { customerId: ... }
+  const [myVehicleId, setMyVehicleId] = useState(null);
+  const [authError, setAuthError] = useState("");
+  const { id, cid } = useParams(); // stationId & chargerId
+  const navigate = useNavigate();
+
   const [station, setStation] = useState(null);
-  const [selectedGun, setSelectedGun] = useState(null);
+  const [charger, setCharger] = useState(null);
+  const [ports, setPorts] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [portsLoading, setPortsLoading] = useState(true);
+  const [portsError, setPortsError] = useState("");
 
-  // ================== PHẦN THỜI GIAN (đúng theo mô tả) ==================
-  const MINUTE_STEPS = [0, 10, 20, 30, 40, 50];
+  const [selectedGun, setSelectedGun] = useState(null);
 
-  // "Bây giờ" cập nhật mỗi phút để luôn thời gian thực
+  // ====== THỜI GIAN (từng phút) ======
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000);
@@ -30,46 +101,39 @@ export default function BookingPorts() {
   const nowHour = now.getHours();
   const nowMinute = now.getMinutes();
 
-  // Ceil "bây giờ" lên mốc 10 phút kế tiếp (baseline)
-  const ceilNowToNext10 = () => {
+  const ceilNowToNextMinute = () => {
     let h = nowHour;
-    let next10 = Math.ceil((nowMinute + 1) / 10) * 10; // +1 để chắc chắn > hiện tại
-    if (next10 >= 60) {
+    let m = nowMinute + 1;
+    if (m >= 60) {
       h = nowHour + 1;
-      next10 = 0;
+      m = 0;
     }
-    return { h, m: next10 };
+    return { h, m };
   };
+  const baseline = ceilNowToNextMinute();
 
-  const baseline = ceilNowToNext10(); // ví dụ 3:47 -> baseline 3:50
-  // Min selectable = baseline + 60' (tối thiểu 1 giờ)
-  const minSelAbsMin = (baseline.h * 60 + baseline.m) + 60;
+  // Tối thiểu cách baseline 60 phút
+  const minSelAbsMin = baseline.h * 60 + baseline.m + 60;
   const minSelHour = Math.floor(minSelAbsMin / 60);
   const minSelMinute = minSelAbsMin % 60;
 
-  // Còn đặt trong hôm nay không? (tối đa tới 23:50)
-  const LAST_ABS_MIN = 23 * 60 + 50;
-  const canBookToday = minSelAbsMin <= LAST_ABS_MIN;
+  // Cho phép tới 23:59
+  const LAST_ABS_MIN = 23 * 60 + 59;
+  const canBookToday = (minSelAbsMin <= LAST_ABS_MIN);
 
-  // Khởi tạo giờ/phút chọn = mốc nhỏ nhất hợp lệ (từng 10')
   const [startHour, setStartHour] = useState(() => Math.min(minSelHour, 23));
   const [startMinute, setStartMinute] = useState(() => minSelMinute);
 
-  // Nếu "bây giờ" trôi khiến min chọn tăng → đẩy selection lên cho hợp lệ
   useEffect(() => {
     if (!canBookToday) return;
     if (startHour < minSelHour || (startHour === minSelHour && startMinute < minSelMinute)) {
       setStartHour(minSelHour);
       setStartMinute(minSelMinute);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nowHour, nowMinute, minSelHour, minSelMinute, canBookToday]);
 
-  // Minutes abs
-  const nowAbsMin = nowHour * 60 + nowMinute;
   const baselineAbsMin = baseline.h * 60 + baseline.m;
 
-  // Options: giờ từ minSelHour..23, phút theo bước 10' (giờ min thì phút >= minSelMinute)
   const hourOptions = useMemo(() => {
     const arr = [];
     for (let h = minSelHour; h <= 23; h++) arr.push(h);
@@ -77,127 +141,321 @@ export default function BookingPorts() {
   }, [minSelHour]);
 
   const minuteOptionsForHour = (h) => {
-    if (h > minSelHour) return MINUTE_STEPS;
-    // h === minSelHour -> chỉ những phút >= minSelMinute
-    return MINUTE_STEPS.filter((m) => m >= minSelMinute);
+    const all = Array.from({ length: 60 }, (_, i) => i);
+    if (h > minSelHour) return all;
+    return all.filter((m) => m >= minSelMinute);
   };
+  
+// ⏱️ Thời lượng cố định 60 phút
+const FIXED_MINUTES = 60;
 
-  // Tổng phút tính phí = max(60, selected - baseline)
-  // -> đúng ví dụ: 3:47 (baseline 3:50) chọn 5:00 -> (300 - 230) = 70' (1h10)
-  const totalMinutes = useMemo(() => {
-    if (!canBookToday) return 0;
-    const selAbs = startHour * 60 + startMinute;
-    const diff = Math.max(0, selAbs - baselineAbsMin);
-    if (diff === 0) return 0;
-    return Math.max(60, diff);
-  }, [startHour, startMinute, baselineAbsMin, canBookToday]);
+const totalMinutes = useMemo(() => (canBookToday ? FIXED_MINUTES : 0), [canBookToday]);
+// trước đây là 1 cố định; giờ tính theo tổng phút để hiển thị chuẩn
+const totalHoursFloat = useMemo(() => totalMinutes / 60, [totalMinutes]);
 
-  const totalHoursFloat = useMemo(() => (totalMinutes / 60), [totalMinutes]);
-  // ================== HẾT PHẦN THỜI GIAN =================================
+// 💰 Phí (theo giờ)
+const [parkingFee, setParkingFee] = useState(20000); // đ/giờ
 
-  // ================== TÍNH PHÍ (đơn giá theo phút) =======================
-  const [parkingFee, setParkingFee] = useState(20000); // đ/giờ
-  const perMinute = useMemo(() => parkingFee / 60, [parkingFee]);
-  const bookingFee = useMemo(() => Math.round(totalMinutes * perMinute), [totalMinutes, perMinute]);
-  // =======================================================================
+// đơn giá theo phút (có thể ra số lẻ, ví dụ 20000/60 = 333.333…)
+const perMinute = useMemo(() => parkingFee / 60, [parkingFee]);
 
-  // load trạm
+// ✅ TÍNH THEO PHÚT: tổng phí = đơn giá/phút * tổng phút (làm tròn tiền về đồng)
+const bookingFee = useMemo(
+  () => Math.round(perMinute * totalMinutes),
+  [perMinute, totalMinutes]
+);
+
+
+
+  // ====== LOAD STATION + CHARGER ======
   useEffect(() => {
+    let alive = true;
     (async () => {
       try {
-        const res = await fetch(`${API_URL}/${id}`);
-        if (!res.ok) throw new Error("Không tìm thấy trạm!");
-        const data = await res.json();
-        setStation(data);
+        setLoading(true);
+        setError("");
+
+        // Station
+        const stationRaw = await fetchJSON(`${API_BASE}/Stations/${id}`);
+        if (!alive) return;
+        setStation(normalizeStation(stationRaw));
+
+        // Charger theo cid
+        const chRaw = await fetchJSON(`${API_BASE}/Chargers/${cid}`);
+        if (!alive) return;
+        setCharger(normalizeCharger(chRaw));
       } catch (e) {
-        setError(e.message || "Đã có lỗi xảy ra");
+        if (!alive) return;
+        const msg = /404|không tìm/i.test(String(e?.message))
+          ? "Không tìm thấy trạm hoặc trụ!"
+          : `Không tải được dữ liệu. ${e?.message ?? ""}`;
+        setError(msg);
       } finally {
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     })();
-  }, [id]);
+    return () => { alive = false; };
+  }, [id, cid]);
 
-  // lấy trụ theo cid
-  const charger = useMemo(() => {
-    return station?.chargers?.find((c) => String(c.id) === String(cid));
-  }, [station, cid]);
-
-  // Auto-chọn súng rảnh (và giữ nguyên nếu lựa chọn cũ vẫn còn rảnh)
+  // ====== LOAD PORTS THEO CHARGER (chỉ của đúng cid) ======
   useEffect(() => {
-    const guns = charger?.guns || [];
-    if (!guns.length) {
-      setSelectedGun(null);
-      return;
-    }
-    if (selectedGun && guns.some(g => g.id === selectedGun.id && g.status === "available")) {
-      return;
-    }
-    const firstAvail = guns.find(g => g.status === "available") || null;
-    setSelectedGun(firstAvail);
-  }, [charger, selectedGun]);
+    let alive = true;
+    if (!cid) return;
+    (async () => {
+      try {
+        setPortsLoading(true);
+        setPortsError("");
 
-  // Action đặt chỗ (demo)
+        // Thử route REST trước
+        const data = await fetchJSON(`${API_BASE}/Ports?chargerId=${encodeURIComponent(cid)}`);
+
+        if (!alive) return;
+        let arr = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+
+        // 🔒 Lọc chặt theo chargerId đề phòng BE trả toàn bộ
+        const same = (a, b) => String(a) === String(b);
+        arr = arr.filter(p => same(p.chargerId ?? p.ChargerId, cid));
+
+        setPorts(arr.map(normalizePort));
+        if (arr.length === 0 && Array.isArray(data) && data.length > 0) {
+          console.warn("[Ports] API trả rộng, FE đã lọc client-side theo chargerId =", cid);
+        }
+      } catch (e) {
+        setPortsError(e?.message || "Lỗi tải cổng.");
+        setPorts([]);
+      } finally {
+        if (alive) setPortsLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, [cid]);
+
+  // Auto-chọn cổng khả dụng đầu tiên
+  useEffect(() => {
+    if (!ports.length) { setSelectedGun(null); return; }
+    if (selectedGun && ports.some(p => p.id === selectedGun.id && p.status === "available")) return;
+    const firstAvail = ports.find(p => p.status === "available") || null;
+    setSelectedGun(firstAvail);
+  }, [ports, selectedGun]);
+
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function fmtLocal(dt) {
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
+      + `T${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+  }
+
+  // Nếu BE muốn kèm offset +07:00 thì dùng hàm này thay cho fmtLocal:
+  function fmtLocalWithOffset(dt) {
+    const base = fmtLocal(dt);
+    const off = -dt.getTimezoneOffset(); // minutes
+    const sign = off >= 0 ? "+" : "-";
+    const hh = pad(Math.floor(Math.abs(off) / 60));
+    const mm = pad(Math.abs(off) % 60);
+    return `${base}${sign}${hh}:${mm}`; // ví dụ ...+07:00
+  }
+
+
+  // ====== BOOK ======
   const handleBook = async () => {
     if (!selectedGun || totalMinutes <= 0) return;
+
+    if (!me?.customerId) { alert("Chưa đăng nhập hoặc không lấy được customerId."); return; }
+    if (!myVehicleId) { alert("Tài khoản chưa có xe. Hãy thêm xe trước khi đặt."); return; }
+
+    // Tạo thời gian ISO (UTC) theo giờ bạn đã chọn hôm nay
+    const today = new Date();
+    const startLocal = new Date(
+      today.getFullYear(), today.getMonth(), today.getDate(),
+      startHour, startMinute, 0, 0
+    );
+    const endLocal = new Date(startLocal.getTime() + 60 * 60_000); // +60 phút cố định
+
+    const bookingDto = {
+      customerId: me.customerId,
+      vehicleId: myVehicleId,
+      portId: selectedGun.id,
+      startTime: fmtLocal(startLocal),   // hoặc fmtLocalWithOffset(startLocal)
+      endTime: fmtLocal(endLocal),     // hoặc fmtLocalWithOffset(endLocal)
+      status: "Confirmed",
+    };
+
     try {
-      const hh = String(startHour).padStart(2, "0");
-      const mm = String(startMinute).padStart(2, "0");
-      const hoursPretty = Math.floor(totalMinutes / 60);
-      const minsPretty = totalMinutes % 60;
-      alert(
-        `Đặt chỗ thành công!\n` +
-        `Giờ bắt đầu: ${hh}:${mm} hôm nay\n` +
-        `Súng: ${selectedGun.name || selectedGun.id}\n` +
-        `Thời lượng tính phí: ${hoursPretty} giờ ${minsPretty} phút\n` +
-        `Tổng phí: ${vnd(bookingFee)}`
-      );
+      // GỬI BOOKING VỀ API
+      const created = await fetchAuthJSON("/Booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bookingDto),
+      });
+
+      // Thành công -> sang payment, mang theo booking vừa tạo
+      navigate("/payment", {
+        state: {
+          bookingId: created.id ?? created.bookingId,
+          booking: created,
+          station: { id, name: station?.name, address: station?.address },
+          charger: {
+            id: cid,
+            connector: selectedGun?.connector || charger?.connector,
+            power: selectedGun?.power || charger?.power,
+            price: charger?.price,
+          },
+          gun: { id: selectedGun?.id, name: selectedGun?.name || `Súng ${selectedGun?.id}` },
+          totalMinutes, perMinute, bookingFee,
+        },
+      });
     } catch (e) {
-      alert("Có lỗi khi đặt chỗ!");
+      alert(`Tạo booking thất bại: ${e.message}`);
     }
   };
 
-  if (loading) return <MainLayout><div>Đang tải dữ liệu...</div></MainLayout>;
-  if (error) return <MainLayout><div className="error-text">Lỗi: {error}</div></MainLayout>;
-  if (!station) return <MainLayout><div>Không có dữ liệu trạm.</div></MainLayout>;
-  if (!charger) return <MainLayout><div>Không tìm thấy trụ để đặt.</div></MainLayout>;
+
+  // === NẠP USER & VEHICLE (sửa để dùng /Vehicles) ===
+  useEffect(() => {
+    if (!getToken()) { navigate("/login", { replace: true }); return; }
+    let alive = true;
+
+    const decodeJwtPayload = (t) => {
+      try {
+        const base64 = t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+        return JSON.parse(
+          decodeURIComponent(
+            atob(base64).split("").map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")
+          )
+        );
+      } catch { return null; }
+    };
+
+    (async () => {
+      try {
+        setAuthError("");
+
+        // 1) Lấy user hiện tại
+        const meRes = await fetchAuthJSON("/Auth");
+
+        // 2) Lấy customerId từ /Auth hoặc token
+        let customerId =
+          meRes?.customerId ??
+          meRes?.id ??
+          meRes?.userId ??
+          meRes?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+
+        if (!customerId) {
+          const p = decodeJwtPayload(getToken());
+          customerId =
+            p?.customerId ??
+            p?.sub ??
+            p?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+        }
+
+        if (!alive) return;
+        if (!customerId) throw new Error("Không tìm thấy customerId trong /Auth hoặc token");
+        setMe({ ...(meRes || {}), customerId });
+
+        // 3) ✅ Lấy danh sách xe từ API /Vehicles (đúng link bạn muốn)
+        const vehicles = await fetchAuthJSON("/Vehicles");
+
+        // 4) Lọc xe thuộc user hiện tại (nếu backend trả nhiều xe)
+        const myVehicles = (Array.isArray(vehicles) ? vehicles : (vehicles?.items || []))
+          .filter(v =>
+            String(v.customerId ?? v.CustomerId ?? v.userId ?? v.UserId) === String(customerId)
+          );
+
+        if (!alive) return;
+
+        if (myVehicles.length === 0) {
+          throw new Error("Không tìm thấy xe nào thuộc tài khoản của bạn.");
+        }
+
+        // 5) Lưu vehicleId để tạo booking
+        const first = myVehicles[0];
+        const vid = first?.id ?? first?.vehicleId ?? null;
+        setMyVehicleId(vid);
+
+        // (tùy chọn) nếu bạn cần VehicleType
+        // const myVehicleType = first?.vehicleType ?? first?.vehicleTypeName ?? first?.type;
+        // console.log("My vehicle type:", myVehicleType);
+
+      } catch (e) {
+        if (!alive) return;
+        setAuthError(e?.message || "Không thể nạp người dùng/xe.");
+      }
+    })();
+
+    return () => { alive = false; };
+  }, [navigate]);
+
+
+
+
+  // ====== RENDER ======
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="bp-container"><div>Đang tải dữ liệu...</div></div>
+      </MainLayout>
+    );
+  }
+  if (error) {
+    return (
+      <MainLayout>
+        <div className="bp-container"><div className="error-text">Lỗi: {error}</div></div>
+      </MainLayout>
+    );
+  }
+  if (!station) {
+    return (
+      <MainLayout>
+        <div className="bp-container"><div>Không có dữ liệu trạm.</div></div>
+      </MainLayout>
+    );
+  }
+  if (!charger) {
+    return (
+      <MainLayout>
+        <div className="bp-container"><div>Không tìm thấy trụ để đặt.</div></div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
       <div className="bp-container">
-        <Link to="/" className="bp-back">← Quay về</Link>
         <Link to={`/stations/${id}`} className="bp-back">← Quay về trạm</Link>
 
         <div className="bp-grid">
           {/* Cột trái */}
           <div className="bp-left-col">
-            {/* Tóm tắt trạm */}
             <div className="bp-panel">
               <div className="bp-title">{station.name}</div>
               <div className="bp-subtle">{station.address}</div>
             </div>
 
-            {/* Trụ đã chọn + biểu giá */}
             <div className="bp-panel-chargers">
               <ChargersCard charger={charger} />
               <div className="bp-charger-grid">
                 <div className="bp-panel-note">
                   <div className="bp-note">Biểu giá dịch vụ sạc điện</div>
                   <div className="bp-price">{charger.price || "—"}</div>
-                  <div className="bp-footnote">
-                    © Biểu giá có thể thay đổi theo từng trạm và khung giờ.
-                  </div>
+                  <div className="bp-footnote">© Biểu giá có thể thay đổi theo từng trạm và khung giờ.</div>
                 </div>
 
-                {/* Chọn súng sạc */}
                 <div className="bp-section">
                   <div className="bp-label">Chọn súng sạc</div>
-                  <ChargersGun
-                    guns={charger?.guns || []}
-                    value={selectedGun}
-                    onChange={setSelectedGun}
-                    autoSelect={true}
-                  />
-                  {!selectedGun && (
+
+                  {portsLoading ? (
+                    <div className="bp-hint">Đang tải cổng…</div>
+                  ) : portsError ? (
+                    <div className="error-text">Lỗi: {portsError}</div>
+                  ) : (
+                    <ChargersGun
+                      guns={ports}
+                      value={selectedGun}
+                      onChange={setSelectedGun}
+                      autoSelect={true}
+                    />
+                  )}
+
+                  {!selectedGun && !portsLoading && (
                     <div className="bp-hint" style={{ marginTop: 8 }}>
                       Hiện không còn súng rảnh để đặt.
                     </div>
@@ -206,7 +464,6 @@ export default function BookingPorts() {
               </div>
             </div>
 
-            {/* Khung giá demo */}
             <div className="bp-panel">
               <div className="bp-title">Khung giá</div>
               <div className="bp-table-wrapper">
@@ -230,7 +487,6 @@ export default function BookingPorts() {
             <div className="bp-panel">
               <div className="bp-title">Đặt trước trụ sạc</div>
 
-              {/* Chọn giờ bắt đầu (bước 10', sau 4:50 nếu now=3:47) */}
               <div className="bp-section">
                 <div className="bp-label">Giờ bắt đầu hôm nay</div>
 
@@ -248,7 +504,6 @@ export default function BookingPorts() {
                       value={startHour}
                       onChange={(e) => {
                         let h = Number(e.target.value) || minSelHour;
-                        // nếu chọn đúng giờ min, đảm bảo phút >= minSelMinute
                         const mins = minuteOptionsForHour(h);
                         let m = startMinute;
                         if (!mins.includes(m)) m = mins[0] ?? 0;
@@ -287,12 +542,12 @@ export default function BookingPorts() {
                 </div>
 
                 <div className="bp-hint">
-                  Mốc nhỏ nhất: {String(minSelHour).padStart(2,"0")}:{String(minSelMinute).padStart(2,"0")}.
-                  Phí tính từ {String(baseline.h).padStart(2,"0")}:{String(baseline.m).padStart(2,"0")} → giờ đã chọn, tối thiểu 60 phút.
+                  Mốc nhỏ nhất: {String(minSelHour).padStart(2, "0")}:{String(minSelMinute).padStart(2, "0")} (đặt sau thời điểm hiện tại ít nhất 1 giờ).
+                  Thời lượng đặt chỗ cố định: 60 phút.
                 </div>
+
               </div>
 
-              {/* Phí đặt chỗ (đ/giờ) */}
               <div className="bp-section">
                 <div className="bp-label">Phí đặt chỗ</div>
                 <select
@@ -305,9 +560,11 @@ export default function BookingPorts() {
                 </select>
               </div>
 
-              {/* Tổng phí */}
               <div className="bp-summary">
-                <RowKV k="Cổng sạc" v={`${charger?.connector || "—"} • ${charger?.power || "—"}`} />
+                <RowKV
+                  k="Cổng sạc"
+                  v={`${selectedGun?.connector || charger?.connector || "—"} • ${(selectedGun?.power || charger?.power || "—")}`}
+                />
                 <RowKV k="Súng" v={selectedGun ? (selectedGun.name || `Súng ${selectedGun.id}`) : "—"} />
                 <RowKV k="Phí đặt chỗ / phút" v={vnd(perMinute)} />
                 <RowKV
@@ -326,7 +583,6 @@ export default function BookingPorts() {
               </button>
             </div>
 
-            {/* Đánh giá demo */}
             <div className="bp-panel">
               <div className="bp-title with-mb">Đánh giá</div>
               <Review name="N***n" text="Nhân viên hỗ trợ tốt. Dịch vụ okie." />
