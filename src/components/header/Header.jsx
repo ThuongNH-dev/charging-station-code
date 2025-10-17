@@ -21,7 +21,7 @@ export default function Head() {
   // ===== MENU TRÁI =====
   const items = isStaff
     ? [
-        { key: "s1", label: "Trụ sạc", path: "/staff/stations" },
+        { key: "s1", label: "Quản lý trụ sạc", path: "/staff/stations" },
         { key: "s2", label: "Phiên sạc", path: "/staff/sessions" },
         { key: "s3", label: "Thanh toán", path: "/staff/payments" },
         { key: "s4", label: "Báo cáo", path: "/staff/reports" },
