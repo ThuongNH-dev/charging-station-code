@@ -17,13 +17,15 @@ import Login from "./components/login/Login";
 import Homepage from "./pages/homepage/homepage";
 import ServicePlans from "./components/subscription/ServicePlans";
 import Unauthorized from "./pages/Unauthorized"; // ✅ thêm trang này (mục 2)
+import ChargerManager from "./pages/staff/ChargerManager";
+import SessionManager from "./pages/staff/SessionManager";
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
     case "customer": return "/stations";
-    case "admin":    return "/homepage";
-    case "staff":    return "/homepage";
-    default:         return "/homepage";
+    case "admin": return "/homepage";
+    case "staff": return "/homepage";
+    default: return "/homepage";
   }
 }
 
@@ -137,6 +139,25 @@ export default function App() {
         element={
           <ProtectedRoute allowedRoles={["Customer"]}>
             <ChargingProgress />
+          </ProtectedRoute>
+        }
+      />
+
+      {/*Staff */}
+      <Route
+        path="/staff/stations"
+        element={
+          <ProtectedRoute allowedRoles={["Staff", "Admin"]}>
+            <ChargerManager />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/staff/sessions"
+        element={
+          <ProtectedRoute allowedRoles={["Staff", "Admin"]}>
+          <SessionManager/>
           </ProtectedRoute>
         }
       />
