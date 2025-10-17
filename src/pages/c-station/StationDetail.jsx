@@ -186,7 +186,7 @@ export default function StationDetail() {
     return {
       connectorOptions: connectors.length ? connectors : ["Type 2", "CCS", "CHAdeMO"],
       powerOptions: powers.length ? powers : ["7 kW", "22 kW", "60 kW", "120 kW"],
-      statusOptions: statuses.length ? statuses : ["available", "busy", "maintenance"],
+      statusOptions: statuses.length ? statuses : ["Online", "Offline", "OutOfOrder"],
       speedOptions: speeds.length ? speeds : ["Chậm", "Nhanh"],
     };
   }, [chargers]);
@@ -208,7 +208,7 @@ export default function StationDetail() {
     let list = chargers.filter((c) => {
       const title = String(c.title || c.id || "").toLowerCase();
       const conn = String(c.connector || "").toLowerCase();
-      const stt = String(c.status || "").toLowerCase();
+      const stt = String(c.status || "");
       const spd = String(c.speed || "").toLowerCase();
 
       const hitKW = !kw || title.includes(kw) || conn.includes(kw);
@@ -345,9 +345,9 @@ export default function StationDetail() {
                     <div className="row">
                       <span className="label">Tình trạng trụ:</span>
                       <span className={`statusBadge ${statusClass}`}>
-                        {statusClass === "available" ? "Trống"
-                          : statusClass === "busy" ? "Đang dùng"
-                            : statusClass === "maintenance" ? "Bảo trì"
+                        {statusClass === "online" ? "Trống"
+                          : statusClass === "outoforder" ? "Hết chỗ"
+                            : statusClass === "offline" ? "Bảo trì"
                               : statusClass || "—"}
                       </span>
                     </div>

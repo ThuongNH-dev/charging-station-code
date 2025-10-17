@@ -1,23 +1,24 @@
-// src/components/AccountMenu.jsx
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Button, Menu, MenuItem, ListItemIcon, Divider, Avatar, Typography, Box,
 } from "@mui/material";
+
+// ✅ icon hiện đại, màu mềm
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
-import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
+import AccountCircleRoundedIcon from "@mui/icons-material/AccountCircleRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
-import DashboardCustomizeRoundedIcon from "@mui/icons-material/DashboardCustomizeRounded";
+
 import { useAuth } from "../../context/AuthContext";
 
-const ME_URL = "https://localhost:7268/api/Auth"; // đổi thành endpoint /me nếu BE yêu cầu
+const ME_URL = "https://localhost:7268/api/Auth";
 
 function getInitials(name = "") {
   return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join("");
 }
 
-// ===== Helpers: lấy name/role an toàn từ nhiều nguồn =====
 function pickName(obj = {}) {
   return (
     obj.fullName ||
@@ -62,15 +63,12 @@ export default function AccountMenu() {
   const [anchorEl, setAnchorEl] = React.useState(null);
   const open = Boolean(anchorEl);
   const navigate = useNavigate();
-
-  // Lấy cả user gốc để có thêm field
   const { user, userName, userRole, token, logout } = useAuth();
 
   const [displayName, setDisplayName] = React.useState(userName || pickName(user) || "");
   const [roleText, setRoleText] = React.useState(userRole || user?.role || "");
   const [avatarUrl, setAvatarUrl] = React.useState("");
 
-  // 1) Ưu tiên context: nếu context thay đổi, cập nhật ngay
   React.useEffect(() => {
     if (userName && !displayName) setDisplayName(userName);
     if (userRole && !roleText) setRoleText(userRole);
@@ -81,61 +79,44 @@ export default function AccountMenu() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, userName, userRole]);
 
-  // 2) Nếu vẫn thiếu => gọi /me
   React.useEffect(() => {
     let ignore = false;
     async function fetchMe() {
       if (!token) return;
-
-      // đã có đủ thì bỏ qua
       if (displayName && roleText) return;
 
       try {
         const res = await fetch(ME_URL, {
           method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
         });
         if (!res.ok) return;
 
         let data = null;
         const ct = res.headers.get("content-type") || "";
-        if (ct.includes("application/json")) {
-          data = await res.json();
-        } else {
+        if (ct.includes("application/json")) data = await res.json();
+        else {
           const text = await res.text();
           try { data = JSON.parse(text); } catch { data = null; }
         }
         if (ignore || !data) return;
 
-        // gỡ các lớp envelope phổ biến: data / result / user / payload
         const src = data.data || data.result || data.user || data.payload || data || {};
-
         const apiName = pickName(src) || pickName(src.profile || {});
         const apiRole = pickRole(src) || pickRole(src.profile || {});
-
         if (apiName && !displayName) setDisplayName(apiName);
         if (apiRole && !roleText) setRoleText(apiRole);
-
-        const apiAvatar =
-          src.avatarUrl || src.avatar || src.user?.avatarUrl || src.profile?.avatarUrl || "";
+        const apiAvatar = src.avatarUrl || src.avatar || src.profile?.avatarUrl || "";
         if (apiAvatar) setAvatarUrl(apiAvatar);
-      } catch {
-        // im lặng
-      }
+      } catch { /* ignore */ }
     }
     fetchMe();
     return () => { ignore = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, displayName, roleText]);
 
-  // 3) Cuối cùng => decode JWT để lấy name/role
   React.useEffect(() => {
     if (!token) return;
     if (displayName && roleText) return;
-
     const claims = decodeJwtClaims(token);
     if (!displayName) {
       const jwtName = pickName(claims);
@@ -198,7 +179,7 @@ export default function AccountMenu() {
           },
         }}
       >
-        <Box sx={{ px: 2, py: 1.5, display: "flex", alignItems: "center", gap: 1.2 }}>
+        <Box sx={{ px: 1.5, py: 1.5, display: "flex", alignItems: "center", gap: 1.2 }}>
           <Avatar alt={displayName || "User"} src={avatarUrl} sx={{ width: 38, height: 38, bgcolor: "primary.main" }}>
             {getInitials(displayName) || "U"}
           </Avatar>
@@ -215,20 +196,17 @@ export default function AccountMenu() {
         <Divider />
 
         <MenuItem onClick={() => { handleClose(); navigate("/profile"); }}
-          sx={{ borderRadius: "10px", mx: 0.5, "&:hover": { background: "#f5f7fa" } }}>
-          <ListItemIcon><PersonOutlineRoundedIcon fontSize="small" /></ListItemIcon>
+          sx={{ borderRadius: "10px", mx: 0.5, margin: "5px 0px", "&:hover": { background: "#f5f7fa" } }}>
           Quản lý tài khoản
         </MenuItem>
 
         <MenuItem onClick={() => { handleClose(); navigate("/settings"); }}
-          sx={{ borderRadius: "10px", mx: 0.5, "&:hover": { background: "#f5f7fa" } }}>
-          <ListItemIcon><ManageAccountsRoundedIcon fontSize="small" /></ListItemIcon>
+          sx={{ borderRadius: "10px", mx: 0.5, margin: "5px 0px", "&:hover": { background: "#f5f7fa" } }}>
           Cài đặt tài khoản
         </MenuItem>
 
         <MenuItem onClick={() => { handleClose(); navigate("/dashboard"); }}
-          sx={{ borderRadius: "10px", mx: 0.5, "&:hover": { background: "#f5f7fa" } }}>
-          <ListItemIcon><DashboardCustomizeRoundedIcon fontSize="small" /></ListItemIcon>
+          sx={{ borderRadius: "10px", mx: 0.5, margin: "5px 0px", "&:hover": { background: "#f5f7fa" } }}>
           Bảng điều khiển
         </MenuItem>
 
