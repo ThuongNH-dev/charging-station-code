@@ -1,0 +1,366 @@
+/* ============ Tokens ============ */
+:root {
+    --max-w: 1200px;
+    --gap: 24px;
+    --radius: 16px;
+    --shadow: 0 8px 24px rgba(0, 0, 0, .08);
+    --primary: #020202;
+    --primary-600: #1677ff;
+    --text: #111827;
+    --muted: #6b7280;
+    --bg: #f7f8fa;
+    --card: #ffffff;
+}
+
+/* ============ Page shell ============ */
+.homepage-container {
+    background: var(--bg);
+    min-height: 100dvh;
+}
+
+.homepage-content {
+    width: min(100%, var(--max-w));
+    height: 1800px;
+    margin: 0 auto;
+    padding: 24px 16px 64px;
+}
+
+/* ============ HERO ============ */
+.hero {
+    padding: clamp(32px, 6vw, 72px) 0;
+}
+
+.hero--split {
+    display: grid;
+    grid-template-columns: 1fr minmax(360px, 460px);
+    align-items: center;
+    gap: clamp(24px, 6vw, 64px);
+}
+
+.hero-title {
+    width: 650px;
+    margin: 0 0 12px 0 !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+    font-size: clamp(32px, 6vw, 56px) !important;
+    color: #014c24 !important;
+}
+
+.hero-sub {
+    margin: 0 0 22px 0;
+    color: var(--muted);
+    font-size: clamp(16px, 2vw, 18px);
+    line-height: 1.7;
+    max-width: 44ch;
+}
+
+.btn-hero {
+    border: 0;
+    background: #005b2a;
+    color: #fff;
+    padding: 18px 30px;
+    font-size: 16px;
+    border-radius: 6px;
+    font-weight: 650;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, .08);
+    transition: transform .06s ease, filter .15s ease;
+}
+
+.btn-hero:hover {
+    filter: brightness(1.05);
+}
+
+.btn-hero:active {
+    transform: translateY(1px);
+}
+
+/* Hero image bleed to right edge */
+.hero--bleed {
+    overflow: visible;
+}
+
+.hero-media {
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.hero-media--bleed {
+    justify-self: end;
+    aspect-ratio: 4/5;
+    /* khung đứng giống mock */
+}
+
+/* ============ Banner (full-bleed) ============ */
+.banner--bleed {
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+    background: #000;
+}
+
+.banner--bleed img {
+    width: 100vw;
+    height: clamp(320px, 42vw, 460px);
+    object-fit: cover;
+    display: block;
+    opacity: .9;
+}
+
+.banner-caption {
+    color: #fff;
+    position: absolute;
+    /* border: 0.1px solid #ffffff47; */
+    left: 100px;
+    right: auto;
+    bottom: 24px;
+    /* backdrop-filter: blur(4px); */
+    padding: 20px 50px;
+    /* border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .08); */
+    max-width: 520px;
+}
+.banner-caption .ant-typography{
+    color: #fff;
+}
+
+.banner-caption p{
+    font-size: 18px;
+    width: 900px;
+}
+
+.banner-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.btn-primary {
+    background: var(--primary);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.711);
+    padding: 15px 28px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid #cbd5e1;
+    color: #111827;
+    padding: 9px 16px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-left: 15px;
+}
+
+/* ============ Map card ============ */
+.mapCard {
+    display: grid;
+    gap: var(--gap);
+    margin-top: 80px;
+}
+
+.mapPanel {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 0;
+}
+
+.stations-map-canvas {
+    height: 420px;
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.note {
+    padding: 12px;
+    color: var(--muted);
+}
+
+.error {
+    padding: 12px;
+    color: #b91c1c;
+}
+
+/* Marker highlight */
+.highlight-card {
+    animation: flash .9s ease;
+}
+
+@keyframes flash {
+    0% {
+        box-shadow: 0 0 0 0 rgba(30, 144, 255, .6);
+    }
+
+    40% {
+        box-shadow: 0 0 0 6px rgba(30, 144, 255, .25);
+    }
+
+    100% {
+        box-shadow: none;
+    }
+}
+
+/* ============ CTA block ============ */
+.find {
+    margin-top: 10px;
+    padding: 24px;
+}
+.find p{
+    font-size: 16px;
+}
+
+.btn-row {
+    display: flex;
+    gap: 10px;
+}
+
+/* ============ Newsletter (full-bleed) ============ */
+.newsletter--bleed {
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    position: relative;
+    overflow: hidden;
+    margin-top: 32px;
+}
+
+.newsletter--bleed>img {
+    
+    width: 100vw;
+    margin-top: 20px;
+    margin-bottom: 40px;
+    height: clamp(320px, 42vw, 460px);
+    object-fit: cover;
+    filter: grayscale(8%) contrast(105%);
+    display: block;
+}
+
+.nl-overlay {
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, .35), rgba(0, 0, 0, .55));
+    display: grid;
+    place-items: center;
+    margin-top: 20px;
+    margin-bottom: 40px;
+}
+
+.nl-content {
+    text-align: center;
+    justify-content: center;
+    color: #fff;
+    max-width: 720px;
+    padding: 10px 16px;
+}
+
+.nl-content .ant-typography{
+    color: #fff;
+}
+
+.nl-content p{
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.nl-content .detail{
+    font-size: 14px;
+    width: 720px;
+    color: white;
+    margin-top: 20px;
+}
+
+
+.newsletter-input input {
+    flex: 1;
+    border: 1px solid #ffffff91;
+    border-radius: 6px;
+    padding: 10px 225px;
+    margin-bottom: 20px;
+    background: rgba(255, 255, 255, 0.325);
+    color: #000;
+}
+
+.btn-black {
+    background: #000000;
+    color: #fff;
+    border: 0;
+    padding: 12px 280px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* ============ Responsive ============ */
+@media (max-width: 992px) {
+    .hero--split {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-media--bleed {
+        margin-right: 0;
+        width: min(100%, 460px);
+    }
+}
+
+@media (max-width: 768px) {
+    .homepage-content {
+        padding: 16px 12px 48px;
+    }
+
+    .banner-caption {
+        left: 12px;
+        bottom: 12px;
+        width: 70px;
+    }
+}
+
+@media (max-width: 480px) {
+    :root {
+        --gap: 16px;
+    }
+
+    .stations-map-canvas {
+        height: 320px;
+    }
+
+    .newsletter-input {
+        flex-direction: column;
+    }
+
+    .newsletter-input input,
+    .newsletter-input button {
+        width: 100%;
+    }
+}
+.banner--bleed {
+  position: relative;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.banner--bleed img {
+  width: 100%;
+  height: 480px;
+  object-fit: cover;
+  display: block;
+}
+
+/* 🖤 lớp phủ đen mờ */
+.banner--bleed .overlay-dark {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35); /* độ mờ: 0.3–0.5 tùy thích */
+  pointer-events: none; /* không chặn tương tác */
+}
+

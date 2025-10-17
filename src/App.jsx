@@ -1,12 +1,6 @@
 // src/App.jsx
 import React from "react";
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  useLocation,
-} from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
@@ -20,8 +14,8 @@ import ChargingProgress from "./components/charging/ChargingProgress";
 import PaymentCharging from "./components/charging/PaymentCharging";
 import PaymentInvoice from "./components/charging/PaymentInvoice";
 import Login from "./components/login/Login";
+import Homepage from "./pages/homepage/homepage";
 import ServicePlans from "./components/subscription/ServicePlans";
-import Head from "./components/header/header";
 
 function GuestRoute({ children }) {
   const { user } = useAuth();
@@ -38,14 +32,32 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to="/stations" replace />} />
+          <Route path="/" element={<Navigate to="/homepage" replace />} />
 
           {/* PUBLIC */}
           <Route
             path="/login"
             element={
               <GuestRoute>
-                <Login />
+                <Login/>
+              </GuestRoute>
+            }
+          />
+
+          <Route
+            path="/homepage"
+            element={
+              <GuestRoute>
+                <Homepage/>
+              </GuestRoute>
+            }
+          />
+
+           <Route
+            path="/services"
+            element={
+              <GuestRoute>
+                <ServicePlans/>
               </GuestRoute>
             }
           />
@@ -120,15 +132,6 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ChargingProgress />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/services"
-            element={
-              <ProtectedRoute>
-                <ServicePlans />
               </ProtectedRoute>
             }
           />

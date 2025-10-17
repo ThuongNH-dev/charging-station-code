@@ -2,7 +2,7 @@ import React from "react";
 import { Layout, Button } from "antd";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import AccountMenu from "../dropdown/Menu";
+import AccountMenu from "../others/Menu";
 import "./Header.css";
 
 const { Header } = Layout;
@@ -44,25 +44,25 @@ export default function Head() {
     }
 
     switch (userRole) {
-      // case "Admin":
-      //   return (
-      //     <>
-      //       <span className="user-chip">🛡️ Admin: {userName || "Quản trị"}</span>
-      //       <Button className="btn-outline" type="text" onClick={() => navigate("/admin")}>
-      //         Bảng điều khiển
-      //       </Button>
-      //       <Button
-      //         className="btn-outline"
-      //         type="text"
-      //         onClick={() => {
-      //           logout();
-      //           navigate("/");
-      //         }}
-      //       >
-      //         Đăng xuất
-      //       </Button>
-      //     </>
-      //   );
+      case "Staff":
+        return (
+          <>
+            <span className="user-chip">🛡️ Admin: {userName || "Staff"}</span>
+            <Button className="btn-outline" type="text" onClick={() => navigate("/staff")}>
+              Bảng điều khiển
+            </Button>
+            <Button
+              className="btn-outline"
+              type="text"
+              onClick={() => {
+                logout();
+                navigate("/");
+              }}
+            >
+              Đăng xuất
+            </Button>
+          </>
+        );
 
       case "Customer":
       default:
