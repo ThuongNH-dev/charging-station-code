@@ -1,4 +1,3 @@
-// Header.jsx
 import React from "react";
 import { Layout, Button } from "antd";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -11,17 +10,18 @@ const { Header } = Layout;
 export default function Head() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, user, logout, userRole: ctxRole, userName: ctxName } = useAuth();
+  const { isAuthenticated, user, userRole: ctxRole, userName: ctxName } = useAuth();
 
-  // Lấy role/name an toàn
+  // ===== ROLE =====
   const role = (user?.role || ctxRole || "").toLowerCase();
   const isStaff = role === "staff";
+  const isAdmin = role === "admin";
   const userName = user?.name || user?.userName || ctxName || "User";
 
   // ===== MENU TRÁI =====
   const items = isStaff
     ? [
-        { key: "s1", label: "Trụ sạc", path: "/staff/stations" },
+        { key: "s1", label: "Quản lý trụ sạc", path: "/staff/stations" },
         { key: "s2", label: "Phiên sạc", path: "/staff/sessions" },
         { key: "s3", label: "Thanh toán", path: "/staff/payments" },
         { key: "s4", label: "Báo cáo", path: "/staff/reports" },
@@ -33,6 +33,7 @@ export default function Head() {
         { key: "4", label: "Liên hệ", path: "/contact" },
       ];
 
+  // ===== ACTIVE MENU =====
   const path = location.pathname;
   let activeKey = isStaff ? "s1" : "1";
 
@@ -48,7 +49,7 @@ export default function Head() {
     else if (path === "/") activeKey = "1";
   }
 
-  // ===== PHẦN PHẢI: dùng menu cũ (AccountMenu) cho Staff như yêu cầu =====
+  // ===== PHẦN PHẢI =====
   const renderRight = () => {
     if (!isAuthenticated) {
       return (
@@ -62,33 +63,36 @@ export default function Head() {
         </>
       );
     }
-    // Dùng đúng menu cũ cho cả Staff (và Customer nếu bạn muốn)
     return <AccountMenu />;
   };
 
   return (
     <Layout>
       <Header className="app-header">
-        {/* ===== BÊN TRÁI: Logo + Menu (đổi theo role) ===== */}
+        {/* ===== BÊN TRÁI ===== */}
         <div className="left">
           <img
             src="/logoV2.png"
             alt="logo"
             className="logo"
-            onClick={() => navigate(isStaff ? "/staff/stations" : "/")}
+            onClick={() => navigate(isStaff ? "/staff/stations" : "/homepage")}
           />
-          <ul className="nav">
-            {items.map((item) => (
-              <li key={item.key}>
-                <div
-                  className={`nav-item ${activeKey === item.key ? "active" : ""}`}
-                  onClick={() => navigate(item.path)}
-                >
-                  {item.label}
-                </div>
-              </li>
-            ))}
-          </ul>
+
+          {/* ❗Nếu là ADMIN thì ẩn menu trái, chỉ hiện logo */}
+          {!isAdmin && (
+            <ul className="nav">
+              {items.map((item) => (
+                <li key={item.key}>
+                  <div
+                    className={`nav-item ${activeKey === item.key ? "active" : ""}`}
+                    onClick={() => navigate(item.path)}
+                  >
+                    {item.label}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* ===== BÊN PHẢI ===== */}

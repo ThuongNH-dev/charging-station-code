@@ -1,15 +1,19 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+// vite.config.js
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': {
-        target: 'https://localhost:7268', // backend của bạn
-        changeOrigin: true,
-        secure: false, // backend https dev cert tự ký
-      }
-    }
-  }
-})
+      // Mọi request bắt đầu bằng /api sẽ được proxy sang BE
+      "/api": {
+        target: "https://localhost:7268", // URL BE của bạn
+        changeOrigin: true,               // sửa Origin cho hợp lệ
+        secure: false,                    // BE dùng HTTPS self-signed → cần false
+        // nếu BE KHÔNG có tiền tố /api, bỏ ghi chú dòng rewrite:
+        // rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+    },
+  },
+});
