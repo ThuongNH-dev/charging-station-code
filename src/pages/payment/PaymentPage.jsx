@@ -212,7 +212,10 @@ export default function PaymentPage() {
   const [bookingId, setBookingId] = useState(state?.bookingId ?? null);
   const [bookingLoad] = useState(false);
   const [bookingPrice, setBookingPrice] = useState(null); // giá thật từ BE
-  
+
+  console.log("PaymentPage state =", state);
+  console.log("PaymentPage bookingId =", bookingId);
+
 
   // 1) Lấy hồ sơ user + customerId (PATCH: thêm fallback claims & /Customers/me)
   const [currentCustomerId, setCurrentCustomerId] = useState(null);
@@ -411,7 +414,8 @@ export default function PaymentPage() {
   // Giá hiển thị cuối cùng (ưu tiên giá booking từ BE)
   const pricePerHour = feePerHourFallback; // giữ cho bảng hiển thị
   const roundedHours = roundedHoursFallback;
-  const amount = amountFallback;
+  // const amount = amountFallback;
+  const amount = (bookingPrice != null && bookingPrice > 0) ? bookingPrice : amountFallback;
 
   const onInputChange = (e) => {
     const { name, value } = e.target;

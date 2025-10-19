@@ -30,9 +30,9 @@ function normalizeCharger(c = {}) {
   const rawStatus = (c.status ?? c.Status ?? "").toString().toLowerCase();
   const status =
     rawStatus.includes("available") ? "available" :
-      rawStatus.includes("busy") ? "busy" :
-        rawStatus.includes("maint") ? "maintenance" :
-          rawStatus || "unknown";
+    rawStatus.includes("busy") ? "busy" :
+    rawStatus.includes("maint") ? "maintenance" :
+    rawStatus || "unknown";
 
   return {
     id,
@@ -56,10 +56,10 @@ function normalizePort(p = {}) {
   const rawStatus = (p.status ?? p.Status ?? "").toString().toLowerCase();
   const status =
     rawStatus.includes("available") || rawStatus === "1" ? "available" :
-      rawStatus.includes("busy") || rawStatus === "2" ? "busy" :
-        rawStatus.includes("inactive") || rawStatus === "0" ? "inactive" :
-          rawStatus.includes("maint") ? "maintenance" :
-            "unknown";
+    rawStatus.includes("busy") || rawStatus === "2" ? "busy" :
+    rawStatus.includes("inactive") || rawStatus === "0" ? "inactive" :
+    rawStatus.includes("maint") ? "maintenance" :
+    "unknown";
 
   return {
     id,
@@ -311,206 +311,151 @@ export default function BookingPorts() {
   }
 
   // ====== BOOK (đÃ SỬA: dùng ${API_BASE}/Booking + pickBookingId) ======
-  // ===== Helpers lấy items / chọn booking vừa tạo =====
-  function extractItems(obj) {
-    if (!obj) return [];
-    if (Array.isArray(obj)) return obj;
-    if (Array.isArray(obj.items)) return obj.items;
-    if (obj.data && Array.isArray(obj.data.items)) return obj.data.items;
-    return [];
+ // ===== Helpers lấy items / chọn booking vừa tạo =====
+function extractItems(obj) {
+  if (!obj) return [];
+  if (Array.isArray(obj)) return obj;
+  if (Array.isArray(obj.items)) return obj.items;
+  if (obj.data && Array.isArray(obj.data.items)) return obj.data.items;
+  return [];
+}
+
+function pickJustCreatedFromList(items, { customerId, portId, startLocal }) {
+  if (!Array.isArray(items) || !items.length) return null;
+  const wantStartMs = +startLocal;
+
+  // Lọc theo customerId & portId (string-safe)
+  const candidates = items.filter(b =>
+    String(b.customerId ?? b.CustomerId) === String(customerId) &&
+    String(b.portId ?? b.PortId) === String(portId)
+  );
+
+  if (!candidates.length) return null;
+
+  // Chọn item có startTime gần nhất
+  let best = null, bestDiff = Infinity;
+  for (const b of candidates) {
+    const st = b.startTime ?? b.StartTime ?? b.start ?? b.Start ?? "";
+    const t = st ? Date.parse(st) : NaN;
+    const diff = Number.isFinite(t) ? Math.abs(t - wantStartMs) : 1e15;
+    if (diff < bestDiff) { best = b; bestDiff = diff; }
   }
+  // Chấp nhận nếu lệch <= 5 phút
+  return (best && bestDiff <= 5 * 60 * 1000) ? best : null;
+}
 
-  function pickJustCreatedFromList(items, { customerId, portId, startLocal }) {
-    if (!Array.isArray(items) || !items.length) return null;
-    const wantStartMs = +startLocal;
+const idFromItem = (b) => (b?.bookingId ?? b?.BookingId ?? b?.id ?? b?.Id ?? null);
 
-    // Lọc theo customerId & portId (string-safe)
-    const candidates = items.filter(b =>
-      String(b.customerId ?? b.CustomerId) === String(customerId) &&
-      String(b.portId ?? b.PortId) === String(portId)
-    );
+// ====== BOOK (bản vá: xử lý body paged + fallback GET) ======
+const handleBook = async () => {
+  if (!selectedGun || totalMinutes < MIN_GAP_MINUTES) return;
 
-    if (!candidates.length) return null;
+  if (!me?.customerId) { alert("Chưa đăng nhập hoặc không lấy được customerId."); return; }
+  if (!myVehicleId) { alert("Tài khoản chưa có xe. Hãy thêm xe trước khi đặt."); return; }
 
-    // Chọn item có startTime gần nhất
-    let best = null, bestDiff = Infinity;
-    for (const b of candidates) {
-      const st = b.startTime ?? b.StartTime ?? b.start ?? b.Start ?? "";
-      const t = st ? Date.parse(st) : NaN;
-      const diff = Number.isFinite(t) ? Math.abs(t - wantStartMs) : 1e15;
-      if (diff < bestDiff) { best = b; bestDiff = diff; }
+  const today = new Date();
+  const startLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), startHour, startMinute, 0, 0);
+  const endLocal   = new Date(today.getFullYear(), today.getMonth(), today.getDate(), endHour,   endMinute,   0, 0);
+
+  const bookingDto = {
+    CustomerId: me.customerId,
+    VehicleId: myVehicleId,
+    PortId: selectedGun.id,
+    StartTime: fmtLocal(startLocal),
+    EndTime: fmtLocal(endLocal),
+    Status: "Confirmed",
+  };
+
+  try {
+    // 1) POST tạo booking (dùng fetchAuthJSON như utils của bạn)
+    const created = await fetchAuthJSON(`${API_BASE}/Booking`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(bookingDto),
+    });
+
+    // 2) Cố lấy bookingId trực tiếp
+    let bookingId = idFromItem(created);
+
+    // 3) Nếu BE trả paged -> lấy items và tìm item khớp
+    if (!bookingId) {
+      const list = extractItems(created);
+      if (list.length) {
+        const matched = pickJustCreatedFromList(list, {
+          customerId: me.customerId,
+          portId: selectedGun.id,
+          startLocal,
+        });
+        bookingId = idFromItem(matched) || idFromItem(list[0]);
+      }
     }
-    // Chấp nhận nếu lệch <= 5 phút
-    return (best && bestDiff <= 5 * 60 * 1000) ? best : null;
-  }
 
-  const idFromItem = (b) => (b?.bookingId ?? b?.BookingId ?? b?.id ?? b?.Id ?? null);
+    // 4) Fallback: gọi GET /Booking?customerId=... để dò lại nếu chưa có
+    if (!bookingId) {
+      const url = `${API_BASE}/Booking?customerId=${encodeURIComponent(me.customerId)}&page=1&pageSize=10`;
+      try {
+        const latest = await fetchAuthJSON(url, { method: "GET" });
+        const items = extractItems(latest);
+        const matched = pickJustCreatedFromList(items, {
+          customerId: me.customerId,
+          portId: selectedGun.id,
+          startLocal,
+        });
+        bookingId = idFromItem(matched) || idFromItem(items[0]);
+      } catch (e) {
+        // ignore; sẽ ném lỗi phía dưới nếu vẫn không có bookingId
+      }
+    }
 
-  // ====== BOOK (bản vá: xử lý body paged + fallback GET) ======
-  const handleBook = async () => {
-    if (!selectedGun || totalMinutes < MIN_GAP_MINUTES) return;
+    if (!bookingId) {
+      console.error("[Booking] API response không có bookingId:", created);
+      throw new Error("Tạo booking xong nhưng không có bookingId.");
+    }
 
-    if (!me?.customerId) { alert("Chưa đăng nhập hoặc không lấy được customerId."); return; }
-    if (!myVehicleId) { alert("Tài khoản chưa có xe. Hãy thêm xe trước khi đặt."); return; }
-
-    const today = new Date();
-    const startLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), startHour, startMinute, 0, 0);
-    const endLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), endHour, endMinute, 0, 0);
-
-    const bookingDto = {
-      CustomerId: me.customerId,
-      VehicleId: myVehicleId,
-      PortId: selectedGun.id,
-      StartTime: fmtLocal(startLocal),
-      EndTime: fmtLocal(endLocal),
-      Status: "Confirmed",
+    // 5) Tạo phiên VNPAY với bookingId
+    const orderId = "ORD" + Date.now();
+    const payload = {
+      bookingId,
+      orderId,
+      returnUrl: `${window.location.origin}/vnpay-bridge.html?order=${orderId}`,
+      minutes: totalMinutes,
+      roundedHours: Math.max(1, Math.ceil(totalMinutes / 60)),
     };
 
-    try {
-      // 1) POST tạo booking (dùng fetchAuthJSON như utils của bạn)
-      // --- POST tạo booking (dùng fetch để đọc body lỗi từ BE) ---
-      const token = getToken();
-      const res = await fetch(`${API_BASE}/Booking`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          CustomerId: me.customerId,
-          VehicleId: myVehicleId,
-          PortId: selectedGun.id,
-          StartTime: fmtLocal(startLocal),
-          EndTime: fmtLocal(endLocal),
-          // Nên để Pending khi tạo mới
-          Status: "Pending",
-        }),
-      });
+    const payRes = await fetchAuthJSON(`${API_BASE}/Payment/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-      let created = null;
-      if (!res.ok) {
-        // đọc text/json lỗi để biết lý do BE từ chối
-        let errText = "";
-        try { errText = await res.text(); } catch { }
-        console.error("[Booking] POST failed:", res.status, errText);
-        alert(`Tạo booking thất bại (${res.status}). ${errText || "Bad Request"}`);
-        return; // dừng luôn, tránh chạy phần lấy bookingId
-      }
-
-      try { created = await res.json(); } catch {
-        created = null; // có thể BE trả 201 + body rỗng
-      }
-
-
-      // 2) Cố lấy bookingId trực tiếp
-      let bookingId = idFromItem(created);
-
-      // 3) Nếu BE trả paged -> lấy items và tìm item khớp
-      if (!bookingId) {
-        const list = extractItems(created);
-        if (list.length) {
-          const matched = pickJustCreatedFromList(list, {
-            customerId: me.customerId,
-            portId: selectedGun.id,
-            startLocal,
-          });
-          bookingId = idFromItem(matched) || idFromItem(list[0]);
-        }
-      }
-
-      // 4) Fallback: gọi GET /Booking?customerId=... để dò lại nếu chưa có
-      if (!bookingId) {
-        const url = `${API_BASE}/Booking?customerId=${encodeURIComponent(me.customerId)}&page=1&pageSize=10`;
-        try {
-          const latest = await fetchAuthJSON(url, { method: "GET" });
-          const items = extractItems(latest);
-          const matched = pickJustCreatedFromList(items, {
-            customerId: me.customerId,
-            portId: selectedGun.id,
-            startLocal,
-          });
-          bookingId = idFromItem(matched) || idFromItem(items[0]);
-        } catch (e) {
-          // ignore; sẽ ném lỗi phía dưới nếu vẫn không có bookingId
-        }
-      }
-
-      if (!bookingId) {
-        console.error("[Booking] API response không có bookingId:", created);
-        throw new Error("Tạo booking xong nhưng không có bookingId.");
-      }
-      console.log("✅ BookingPorts handleBook bookingId =", bookingId);
-
-      // 5) Tạo phiên VNPAY với bookingId
-      const orderId = "ORD" + Date.now();
-      const payload = {
-        bookingId,
-        orderId,
-        returnUrl: `${window.location.origin}/vnpay-bridge.html?order=${orderId}`,
-        minutes: totalMinutes,
-        roundedHours: Math.max(1, Math.ceil(totalMinutes / 60)),
-      };
-
-      const payRes = await fetchAuthJSON(`${API_BASE}/Payment/create`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!payRes?.success || !payRes?.paymentUrl) {
-        throw new Error(payRes?.message || "API /Payment/create không trả về paymentUrl.");
-      }
-
-      // LƯU CONTEXT để PaymentPage đọc lại nếu người dùng refresh
-      try {
-        sessionStorage.setItem(
-          `pay:${orderId}:ctx`,
-          JSON.stringify({
-            bookingId,
-            vnpayUrl: payRes.paymentUrl,
-            orderId,
-            station: { id, name: station?.name, address: station?.address },
-            charger: {
-              id: cid,
-              connector: selectedGun?.connector || charger?.connector,
-              power: selectedGun?.power || charger?.power,
-              price: charger?.price,
-            },
-            gun: { id: selectedGun?.id, name: selectedGun?.name || `Súng ${selectedGun?.id}` },
-            totalMinutes,
-            perMinute,
-            bookingFee,
-          })
-        );
-        sessionStorage.setItem("pay:lastOrderId", orderId);
-      } catch { }
-
-
-      // 6) Điều hướng sang PaymentPage, truyền bookingId + vnpayUrl
-      navigate("/payment", {
-        state: {
-          orderId,
-          bookingId,
-          booking: created,
-          vnpayUrl: payRes.paymentUrl,
-          station: { id, name: station?.name, address: station?.address },
-          charger: {
-            id: cid,
-            connector: selectedGun?.connector || charger?.connector,
-            power: selectedGun?.power || charger?.power,
-            price: charger?.price,
-          },
-          gun: { id: selectedGun?.id, name: selectedGun?.name || `Súng ${selectedGun?.id}` },
-          totalMinutes,
-          perMinute,
-          bookingFee,
-        },
-      });
-    } catch (e) {
-      alert(`Tạo booking hoặc phiên thanh toán thất bại: ${e.message}`);
+    if (!payRes?.success || !payRes?.paymentUrl) {
+      throw new Error(payRes?.message || "API /Payment/create không trả về paymentUrl.");
     }
-  };
+
+    // 6) Điều hướng sang PaymentPage, truyền bookingId + vnpayUrl
+    navigate("/payment", {
+      state: {
+        orderId,
+        bookingId,
+        booking: created,
+        vnpayUrl: payRes.paymentUrl,
+        station: { id, name: station?.name, address: station?.address },
+        charger: {
+          id: cid,
+          connector: selectedGun?.connector || charger?.connector,
+          power: selectedGun?.power || charger?.power,
+          price: charger?.price,
+        },
+        gun: { id: selectedGun?.id, name: selectedGun?.name || `Súng ${selectedGun?.id}` },
+        totalMinutes,
+        perMinute,
+        bookingFee,
+      },
+    });
+  } catch (e) {
+    alert(`Tạo booking hoặc phiên thanh toán thất bại: ${e.message}`);
+  }
+};
 
 
   // === NẠP USER & VEHICLE ===
@@ -609,7 +554,6 @@ export default function BookingPorts() {
 
   const startDisabled = !canBookToday;
   const endDisabled = !canBookToday;
-
 
   return (
     <MainLayout>
