@@ -30,9 +30,9 @@ function normalizeCharger(c = {}) {
   const rawStatus = (c.status ?? c.Status ?? "").toString().toLowerCase();
   const status =
     rawStatus.includes("available") ? "available" :
-      rawStatus.includes("busy") ? "busy" :
-        rawStatus.includes("maint") ? "maintenance" :
-          rawStatus || "unknown";
+    rawStatus.includes("busy") ? "busy" :
+    rawStatus.includes("maint") ? "maintenance" :
+    rawStatus || "unknown";
 
   return {
     id,
@@ -56,26 +56,25 @@ function normalizePort(p = {}) {
   const rawStatus = (p.status ?? p.Status ?? "").toString().toLowerCase();
   const status =
     rawStatus.includes("available") || rawStatus === "1" ? "available" :
-      rawStatus.includes("busy") || rawStatus === "2" ? "busy" :
-        rawStatus.includes("inactive") || rawStatus === "0" ? "inactive" :
-          rawStatus.includes("maint") ? "maintenance" :
-            "unknown";
+    rawStatus.includes("busy") || rawStatus === "2" ? "busy" :
+    rawStatus.includes("inactive") || rawStatus === "0" ? "inactive" :
+    rawStatus.includes("maint") ? "maintenance" :
+    "unknown";
 
   return {
     id,
-    name: code,             // ChargersGun hiển thị name
+    name: code,
     connector,
     power: powerText,
     status,
-    chargerId: p.chargerId ?? p.ChargerId, // để lọc/đối chiếu
+    chargerId: p.chargerId ?? p.ChargerId,
     _raw: p,
   };
 }
 
-// ===== Component =====
 export default function BookingPorts() {
-  // === User/Vehicle (THÊM MỚI) ===
-  const [me, setMe] = useState(null);          // { customerId: ... }
+  // === User/Vehicle ===
+  const [me, setMe] = useState(null);
   const [myVehicleId, setMyVehicleId] = useState(null);
   const [authError, setAuthError] = useState("");
   const { id, cid } = useParams(); // stationId & chargerId
@@ -92,7 +91,7 @@ export default function BookingPorts() {
 
   const [selectedGun, setSelectedGun] = useState(null);
 
-  // ====== THỜI GIAN (từng phút) ======
+  // ====== THỜI GIAN (cập nhật từng phút) ======
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60_000);
@@ -101,6 +100,7 @@ export default function BookingPorts() {
   const nowHour = now.getHours();
   const nowMinute = now.getMinutes();
 
+  // Làm tròn lên phút kế tiếp
   const ceilNowToNextMinute = () => {
     let h = nowHour;
     let m = nowMinute + 1;
@@ -112,60 +112,104 @@ export default function BookingPorts() {
   };
   const baseline = ceilNowToNextMinute();
 
-  // Tối thiểu cách baseline 60 phút
-  const minSelAbsMin = baseline.h * 60 + baseline.m + 60;
-  const minSelHour = Math.floor(minSelAbsMin / 60);
-  const minSelMinute = minSelAbsMin % 60;
-
-  // Cho phép tới 23:59
+  // Tối thiểu start cách "hiện tại" 60 phút
+  const MIN_GAP_MINUTES = 60;
   const LAST_ABS_MIN = 23 * 60 + 59;
-  const canBookToday = (minSelAbsMin <= LAST_ABS_MIN);
 
-  const [startHour, setStartHour] = useState(() => Math.min(minSelHour, 23));
-  const [startMinute, setStartMinute] = useState(() => minSelMinute);
+  const minStartAbsMin = (baseline.h * 60 + baseline.m) + MIN_GAP_MINUTES;
+  const minStartHour = Math.min(Math.floor(minStartAbsMin / 60), 23);
+  const minStartMinute = minStartAbsMin % 60;
 
+  const canBookToday = minStartAbsMin <= LAST_ABS_MIN;
+
+  // State chọn thời điểm bắt đầu
+  const [startHour, setStartHour] = useState(() => minStartHour);
+  const [startMinute, setStartMinute] = useState(() => minStartMinute);
+
+  // Khi thời gian hiện tại dịch chuyển, đảm bảo start không < minStart
   useEffect(() => {
     if (!canBookToday) return;
-    if (startHour < minSelHour || (startHour === minSelHour && startMinute < minSelMinute)) {
-      setStartHour(minSelHour);
-      setStartMinute(minSelMinute);
+    const startAbs = startHour * 60 + startMinute;
+    if (startAbs < minStartAbsMin) {
+      setStartHour(minStartHour);
+      setStartMinute(minStartMinute);
     }
-  }, [nowHour, nowMinute, minSelHour, minSelMinute, canBookToday]);
+  }, [nowHour, nowMinute, minStartHour, minStartMinute, canBookToday]); // cập nhật theo thời gian
 
-  const baselineAbsMin = baseline.h * 60 + baseline.m;
-
-  const hourOptions = useMemo(() => {
+  // ==== TÙY CHỌN GIỜ/PHÚT BẮT ĐẦU ====
+  const startHourOptions = useMemo(() => {
     const arr = [];
-    for (let h = minSelHour; h <= 23; h++) arr.push(h);
+    for (let h = minStartHour; h <= 23; h++) arr.push(h);
     return arr;
-  }, [minSelHour]);
+  }, [minStartHour]);
 
-  const minuteOptionsForHour = (h) => {
+  const startMinuteOptionsForHour = (h) => {
     const all = Array.from({ length: 60 }, (_, i) => i);
-    if (h > minSelHour) return all;
-    return all.filter((m) => m >= minSelMinute);
+    if (h > minStartHour) return all;
+    return all.filter((m) => m >= minStartMinute);
   };
-  
-// ⏱️ Thời lượng cố định 60 phút
-const FIXED_MINUTES = 60;
 
-const totalMinutes = useMemo(() => (canBookToday ? FIXED_MINUTES : 0), [canBookToday]);
-// trước đây là 1 cố định; giờ tính theo tổng phút để hiển thị chuẩn
-const totalHoursFloat = useMemo(() => totalMinutes / 60, [totalMinutes]);
+  // ====== CHỌN GIỜ KẾT THÚC (>= start + 60 phút) ======
+  const startAbsMin = useMemo(() => startHour * 60 + startMinute, [startHour, startMinute]);
+  const minEndAbsMin = startAbsMin + MIN_GAP_MINUTES;
 
-// 💰 Phí (theo giờ)
-const [parkingFee, setParkingFee] = useState(20000); // đ/giờ
+  // Nếu vượt 23:59 thì không book được
+  const endCapAbsMin = LAST_ABS_MIN;
 
-// đơn giá theo phút (có thể ra số lẻ, ví dụ 20000/60 = 333.333…)
-const perMinute = useMemo(() => parkingFee / 60, [parkingFee]);
+  // State chọn kết thúc — mặc định = start + 60 phút (ghim cùng phút)
+  const defEnd = useMemo(() => {
+    const abs = Math.min(minEndAbsMin, endCapAbsMin);
+    return { h: Math.floor(abs / 60), m: abs % 60 };
+  }, [minEndAbsMin]);
 
-// ✅ TÍNH THEO PHÚT: tổng phí = đơn giá/phút * tổng phút (làm tròn tiền về đồng)
-const bookingFee = useMemo(
-  () => Math.round(perMinute * totalMinutes),
-  [perMinute, totalMinutes]
-);
+  const [endHour, setEndHour] = useState(defEnd.h);
+  const [endMinute, setEndMinute] = useState(defEnd.m);
 
+  // Giữ end luôn hợp lệ khi start đổi
+  useEffect(() => {
+    const curEndAbs = endHour * 60 + endMinute;
+    if (curEndAbs < minEndAbsMin) {
+      setEndHour(defEnd.h);
+      setEndMinute(defEnd.m);
+    } else if (curEndAbs > endCapAbsMin) {
+      setEndHour(Math.floor(endCapAbsMin / 60));
+      setEndMinute(endCapAbsMin % 60);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minEndAbsMin, endCapAbsMin, defEnd.h, defEnd.m]);
 
+  // Tùy chọn giờ/phút cho kết thúc
+  const endHourOptions = useMemo(() => {
+    const minH = Math.floor(minEndAbsMin / 60);
+    const arr = [];
+    for (let h = minH; h <= 23; h++) arr.push(h);
+    return arr;
+  }, [minEndAbsMin]);
+
+  const endMinuteOptionsForHour = (h) => {
+    const minH = Math.floor(minEndAbsMin / 60);
+    const minM = minEndAbsMin % 60;
+
+    const all = Array.from({ length: 60 }, (_, i) => i);
+    if (h > minH) return all;
+
+    // cùng giờ với min => phút phải >= minM
+    return all.filter((m) => m >= minM);
+  };
+
+  // ====== TÍNH TỔNG PHÚT & PHÍ ======
+  const totalMinutes = useMemo(() => {
+    const endAbs = endHour * 60 + endMinute;
+    const gap = endAbs - startAbsMin;
+    return Math.max(0, gap);
+  }, [startAbsMin, endHour, endMinute]);
+
+  const totalHoursFloat = useMemo(() => totalMinutes / 60, [totalMinutes]);
+
+  // 💰 Phí (theo giờ)
+  const [parkingFee, setParkingFee] = useState(20000); // đ/giờ
+  const perMinute = useMemo(() => parkingFee / 60, [parkingFee]);
+  const bookingFee = useMemo(() => Math.round(perMinute * totalMinutes), [perMinute, totalMinutes]);
 
   // ====== LOAD STATION + CHARGER ======
   useEffect(() => {
@@ -175,12 +219,10 @@ const bookingFee = useMemo(
         setLoading(true);
         setError("");
 
-        // Station
         const stationRaw = await fetchJSON(`${API_BASE}/Stations/${id}`);
         if (!alive) return;
         setStation(normalizeStation(stationRaw));
 
-        // Charger theo cid
         const chRaw = await fetchJSON(`${API_BASE}/Chargers/${cid}`);
         if (!alive) return;
         setCharger(normalizeCharger(chRaw));
@@ -197,7 +239,7 @@ const bookingFee = useMemo(
     return () => { alive = false; };
   }, [id, cid]);
 
-  // ====== LOAD PORTS THEO CHARGER (chỉ của đúng cid) ======
+  // ====== LOAD PORTS THEO CHARGER ======
   useEffect(() => {
     let alive = true;
     if (!cid) return;
@@ -206,17 +248,16 @@ const bookingFee = useMemo(
         setPortsLoading(true);
         setPortsError("");
 
-        // Thử route REST trước
         const data = await fetchJSON(`${API_BASE}/Ports?chargerId=${encodeURIComponent(cid)}`);
-
         if (!alive) return;
-        let arr = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
 
-        // 🔒 Lọc chặt theo chargerId đề phòng BE trả toàn bộ
+        let arr = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
         const same = (a, b) => String(a) === String(b);
         arr = arr.filter(p => same(p.chargerId ?? p.ChargerId, cid));
 
-        setPorts(arr.map(normalizePort));
+        const mapped = arr.map(normalizePort);
+        setPorts(mapped);
+
         if (arr.length === 0 && Array.isArray(data) && data.length > 0) {
           console.warn("[Ports] API trả rộng, FE đã lọc client-side theo chargerId =", cid);
         }
@@ -243,51 +284,48 @@ const bookingFee = useMemo(
     return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
       + `T${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
   }
-
-  // Nếu BE muốn kèm offset +07:00 thì dùng hàm này thay cho fmtLocal:
   function fmtLocalWithOffset(dt) {
     const base = fmtLocal(dt);
-    const off = -dt.getTimezoneOffset(); // minutes
+    const off = -dt.getTimezoneOffset();
     const sign = off >= 0 ? "+" : "-";
     const hh = pad(Math.floor(Math.abs(off) / 60));
     const mm = pad(Math.abs(off) % 60);
-    return `${base}${sign}${hh}:${mm}`; // ví dụ ...+07:00
+    return `${base}${sign}${hh}:${mm}`;
   }
-
 
   // ====== BOOK ======
   const handleBook = async () => {
-    if (!selectedGun || totalMinutes <= 0) return;
+    if (!selectedGun || totalMinutes < MIN_GAP_MINUTES) return;
 
     if (!me?.customerId) { alert("Chưa đăng nhập hoặc không lấy được customerId."); return; }
     if (!myVehicleId) { alert("Tài khoản chưa có xe. Hãy thêm xe trước khi đặt."); return; }
 
-    // Tạo thời gian ISO (UTC) theo giờ bạn đã chọn hôm nay
     const today = new Date();
     const startLocal = new Date(
       today.getFullYear(), today.getMonth(), today.getDate(),
       startHour, startMinute, 0, 0
     );
-    const endLocal = new Date(startLocal.getTime() + 60 * 60_000); // +60 phút cố định
+    const endLocal = new Date(
+      today.getFullYear(), today.getMonth(), today.getDate(),
+      endHour, endMinute, 0, 0
+    );
 
     const bookingDto = {
       customerId: me.customerId,
       vehicleId: myVehicleId,
       portId: selectedGun.id,
-      startTime: fmtLocal(startLocal),   // hoặc fmtLocalWithOffset(startLocal)
-      endTime: fmtLocal(endLocal),     // hoặc fmtLocalWithOffset(endLocal)
+      startTime: fmtLocal(startLocal),      // hoặc fmtLocalWithOffset(startLocal)
+      endTime: fmtLocal(endLocal),          // hoặc fmtLocalWithOffset(endLocal)
       status: "Confirmed",
     };
 
     try {
-      // GỬI BOOKING VỀ API
       const created = await fetchAuthJSON("/Booking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(bookingDto),
       });
 
-      // Thành công -> sang payment, mang theo booking vừa tạo
       navigate("/payment", {
         state: {
           bookingId: created.id ?? created.bookingId,
@@ -308,8 +346,7 @@ const bookingFee = useMemo(
     }
   };
 
-
-  // === NẠP USER & VEHICLE (sửa để dùng /Vehicles) ===
+  // === NẠP USER & VEHICLE ===
   useEffect(() => {
     if (!getToken()) { navigate("/login", { replace: true }); return; }
     let alive = true;
@@ -329,10 +366,8 @@ const bookingFee = useMemo(
       try {
         setAuthError("");
 
-        // 1) Lấy user hiện tại
         const meRes = await fetchAuthJSON("/Auth");
 
-        // 2) Lấy customerId từ /Auth hoặc token
         let customerId =
           meRes?.customerId ??
           meRes?.id ??
@@ -351,10 +386,7 @@ const bookingFee = useMemo(
         if (!customerId) throw new Error("Không tìm thấy customerId trong /Auth hoặc token");
         setMe({ ...(meRes || {}), customerId });
 
-        // 3) ✅ Lấy danh sách xe từ API /Vehicles (đúng link bạn muốn)
         const vehicles = await fetchAuthJSON("/Vehicles");
-
-        // 4) Lọc xe thuộc user hiện tại (nếu backend trả nhiều xe)
         const myVehicles = (Array.isArray(vehicles) ? vehicles : (vehicles?.items || []))
           .filter(v =>
             String(v.customerId ?? v.CustomerId ?? v.userId ?? v.UserId) === String(customerId)
@@ -366,15 +398,9 @@ const bookingFee = useMemo(
           throw new Error("Không tìm thấy xe nào thuộc tài khoản của bạn.");
         }
 
-        // 5) Lưu vehicleId để tạo booking
         const first = myVehicles[0];
         const vid = first?.id ?? first?.vehicleId ?? null;
         setMyVehicleId(vid);
-
-        // (tùy chọn) nếu bạn cần VehicleType
-        // const myVehicleType = first?.vehicleType ?? first?.vehicleTypeName ?? first?.type;
-        // console.log("My vehicle type:", myVehicleType);
-
       } catch (e) {
         if (!alive) return;
         setAuthError(e?.message || "Không thể nạp người dùng/xe.");
@@ -383,9 +409,6 @@ const bookingFee = useMemo(
 
     return () => { alive = false; };
   }, [navigate]);
-
-
-
 
   // ====== RENDER ======
   if (loading) {
@@ -416,6 +439,9 @@ const bookingFee = useMemo(
       </MainLayout>
     );
   }
+
+  const startDisabled = !canBookToday;
+  const endDisabled = !canBookToday;
 
   return (
     <MainLayout>
@@ -487,6 +513,7 @@ const bookingFee = useMemo(
             <div className="bp-panel">
               <div className="bp-title">Đặt trước trụ sạc</div>
 
+              {/* Bắt đầu */}
               <div className="bp-section">
                 <div className="bp-label">Giờ bắt đầu hôm nay</div>
 
@@ -503,19 +530,17 @@ const bookingFee = useMemo(
                       className="bp-input-select"
                       value={startHour}
                       onChange={(e) => {
-                        let h = Number(e.target.value) || minSelHour;
-                        const mins = minuteOptionsForHour(h);
+                        let h = Number(e.target.value) || minStartHour;
+                        const mins = startMinuteOptionsForHour(h);
                         let m = startMinute;
                         if (!mins.includes(m)) m = mins[0] ?? 0;
                         setStartHour(h);
                         setStartMinute(m);
                       }}
-                      disabled={!canBookToday}
+                      disabled={startDisabled}
                     >
-                      {hourOptions.map(h => (
-                        <option key={h} value={h}>
-                          {String(h).padStart(2, "0")}
-                        </option>
+                      {startHourOptions.map(h => (
+                        <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
                       ))}
                     </select>
                   </div>
@@ -527,27 +552,77 @@ const bookingFee = useMemo(
                       value={startMinute}
                       onChange={(e) => {
                         const m = Number(e.target.value) || 0;
-                        const mins = minuteOptionsForHour(startHour);
+                        const mins = startMinuteOptionsForHour(startHour);
                         setStartMinute(mins.includes(m) ? m : (mins[0] ?? 0));
                       }}
-                      disabled={!canBookToday}
+                      disabled={startDisabled}
                     >
-                      {minuteOptionsForHour(startHour).map(m => (
-                        <option key={m} value={m}>
-                          {String(m).padStart(2, "0")}
-                        </option>
+                      {startMinuteOptionsForHour(startHour).map(m => (
+                        <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
                       ))}
                     </select>
                   </div>
                 </div>
 
                 <div className="bp-hint">
-                  Mốc nhỏ nhất: {String(minSelHour).padStart(2, "0")}:{String(minSelMinute).padStart(2, "0")} (đặt sau thời điểm hiện tại ít nhất 1 giờ).
-                  Thời lượng đặt chỗ cố định: 60 phút.
+                  Mốc nhỏ nhất: {String(minStartHour).padStart(2, "0")}:
+                  {String(minStartMinute).padStart(2, "0")} (đặt sau thời điểm hiện tại ít nhất 1 giờ).
                 </div>
-
               </div>
 
+              {/* Kết thúc */}
+              <div className="bp-section">
+                <div className="bp-label">Giờ kết thúc hôm nay</div>
+
+                <div className="bp-time-row">
+                  <div className="bp-time-col">
+                    <div className="bp-subtle" style={{ marginBottom: 6 }}>Giờ</div>
+                    <select
+                      className="bp-input-select"
+                      value={endHour}
+                      onChange={(e) => {
+                        let h = Number(e.target.value) || Math.floor(minEndAbsMin / 60);
+                        const mins = endMinuteOptionsForHour(h);
+                        let m = endMinute;
+                        if (!mins.includes(m)) m = mins[0] ?? 0;
+                        setEndHour(h);
+                        setEndMinute(m);
+                      }}
+                      disabled={endDisabled}
+                    >
+                      {endHourOptions.map(h => (
+                        <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="bp-time-col">
+                    <div className="bp-subtle" style={{ marginBottom: 6 }}>Phút</div>
+                    <select
+                      className="bp-input-select"
+                      value={endMinute}
+                      onChange={(e) => {
+                        const m = Number(e.target.value) || 0;
+                        const mins = endMinuteOptionsForHour(endHour);
+                        setEndMinute(mins.includes(m) ? m : (mins[0] ?? 0));
+                      }}
+                      disabled={endDisabled}
+                    >
+                      {endMinuteOptionsForHour(endHour).map(m => (
+                        <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="bp-hint">
+                  Thời lượng phải ≥ 60 phút. Kết thúc hợp lệ từ&nbsp;
+                  {String(Math.floor(minEndAbsMin / 60)).padStart(2, "0")}:
+                  {String(minEndAbsMin % 60).padStart(2, "0")} trở đi.
+                </div>
+              </div>
+
+              {/* Phí */}
               <div className="bp-section">
                 <div className="bp-label">Phí đặt chỗ</div>
                 <select
@@ -560,6 +635,7 @@ const bookingFee = useMemo(
                 </select>
               </div>
 
+              {/* Tổng hợp */}
               <div className="bp-summary">
                 <RowKV
                   k="Cổng sạc"
@@ -576,11 +652,17 @@ const bookingFee = useMemo(
 
               <button
                 className="bp-btn-primary"
-                disabled={!canBookToday || totalMinutes <= 0 || !selectedGun}
+                disabled={!canBookToday || totalMinutes < MIN_GAP_MINUTES || !selectedGun}
                 onClick={handleBook}
               >
                 Đặt ngay
               </button>
+
+              {totalMinutes < MIN_GAP_MINUTES && (
+                <div className="bp-hint" style={{ marginTop: 8 }}>
+                  Vui lòng chọn giờ kết thúc muộn hơn ít nhất 60 phút so với giờ bắt đầu.
+                </div>
+              )}
             </div>
 
             <div className="bp-panel">

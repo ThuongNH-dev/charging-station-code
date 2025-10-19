@@ -5,12 +5,29 @@ import GoongMiniMap from "../../components/map/GoongMiniMap";
 import StationFilters from "../../components/station/StationFilters";
 import "./style/StationDetail.css";
 
-// API base (ưu tiên .env)
+// ================= API base (ưu tiên .env) =================
 const API_BASE =
   (typeof import.meta !== "undefined" ? import.meta.env.VITE_API_URL : process.env.REACT_APP_API_URL)
-  ?? "https://localhost:7268/api";
+  ?? "https://localhost:7268/api"; // dùng /api
 
-// ---------- Helpers ----------
+// ====== VI MAPPERS (chỉ speed & charger status) ======
+const VI_SPEED = {
+  // slow: "Chậm",
+  normal: "Thông thường",
+  fast: "Nhanh",
+  // rapid: "Rất nhanh",
+  // ultra: "Siêu nhanh",
+};
+const VI_CHARGER_STATUS = {
+  online: "Hoạt động",
+  offline: "Bảo trì",
+  outoforder: "Hết chỗ",
+};
+const toLow = (v) => String(v ?? "").trim().toLowerCase();
+const viSpeed = (s) => VI_SPEED[toLow(s)] || s || "—";
+const viChargerStatus = (s) => VI_CHARGER_STATUS[toLow(s)] || s || "—";
+
+// ================= Helpers: Normalizers =================
 function normalizeStation(s = {}) {
   return {
     id: s.id ?? s.stationId ?? s.StationId,
@@ -24,19 +41,67 @@ function normalizeStation(s = {}) {
   };
 }
 
+// Charger từ /api/Chargers
 function normalizeCharger(c = {}) {
+  const powerNumber =
+    (c.powerKw ?? c.PowerKW ?? c.powerkw ?? c.power) != null
+      ? Number(c.powerKw ?? c.PowerKW ?? c.powerkw ?? c.power)
+      : undefined;
+
+  const price =
+    c.price ?? c.Price ?? c.priceText ?? c.PriceText ?? c.tariffText ?? c.TariffText ?? null;
+
+  const rawStatus = (c.status ?? c.Status ?? "").toString();
+  const rawSpeed  = c.type ?? c.Type ?? c.speed ?? c.Speed ?? "";
+
   return {
-    id: c.chargerId ?? c.ChargerId,
+    id: c.chargerId ?? c.ChargerId ?? c.id ?? c.Id,
     stationId: c.stationId ?? c.StationId,
-    title: c.code ?? c.Code ?? `Trụ #${c.ChargerId}`,
-    connector: c.type ?? c.Type ?? "",
-    power: c.powerKw ?? c.PowerKW ? `${c.powerKw ?? c.PowerKW} kW` : "",
-    status: (c.status ?? c.Status ?? "").toLowerCase(),
+    title: c.code ?? c.Code ?? c.title ?? c.Title ?? `Charger ${c.chargerId ?? c.ChargerId ?? ""}`,
+
+    // speed (BE: field "type")
+    speed: rawSpeed,
+    speedLabel: viSpeed(rawSpeed), // VI
+
+    // connector sẽ được merge từ Ports (nhiều port → mảng)
+    connector: "",
+    connectorLabel: "",  // giữ nguyên raw (không dịch)
+    connectorTypes: [],  // mảng từ Ports.connectorType (raw)
+
+    // power
+    powerKw: powerNumber,
+    power: powerNumber != null ? `${powerNumber} kW` : (c.power ?? c.Power ?? ""),
+
+    // status
+    status: rawStatus.toLowerCase(),               // dùng cho CSS/filter
+    statusLabel: viChargerStatus(rawStatus),       // VI cho hiển thị
+
+    // price
+    priceText: typeof price === "string" ? price : "",
+    priceValue: typeof price === "number" ? price : (c.priceValue ?? c.PriceValue),
+    priceUnit: c.priceUnit ?? c.PriceUnit ?? c.unit ?? c.Unit ?? "",
+
+    bullets: Array.isArray(c.bullets ?? c.Bullets ?? c.notes ?? c.Notes)
+      ? (c.bullets ?? c.Bullets ?? c.notes ?? c.Notes)
+      : [],
+
     imageUrl: c.imageUrl ?? c.ImageUrl ?? "",
   };
 }
 
+// Port từ /api/Ports
+function normalizePort(p = {}) {
+  return {
+    portId: p.portId ?? p.PortId ?? p.id ?? p.Id,
+    chargerId: p.chargerId ?? p.ChargerId,
+    connectorType: p.connectorType ?? p.ConnectorType ?? p.type ?? p.Type ?? "", // ví dụ: CCS2, Type2 (raw)
+    maxPowerKw: p.maxPowerKw ?? p.MaxPowerKw ?? p.powerKw ?? p.PowerKW,
+    status: p.status ?? p.Status,
+    imageUrl: p.imageUrl ?? p.ImageUrl ?? null,
+  };
+}
 
+// ================= Helpers: Fetch =================
 function getAuthHeaders() {
   const token =
     localStorage.getItem("token") ||
@@ -59,7 +124,6 @@ async function fetchJSON(url, init = {}) {
 }
 
 async function fetchJSONAuth(url) {
-  // Gửi kèm Bearer (nếu có) và cookie (credentials)
   return fetchJSON(url, {
     headers: {
       Accept: "application/json",
@@ -70,7 +134,21 @@ async function fetchJSONAuth(url) {
   });
 }
 
-// ---------- Component ----------
+// ================= Helpers: Format =================
+const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
+function formatPrice(ch) {
+  if (ch.priceText) return ch.priceText;
+  if (ch.priceValue != null) {
+    const unit = (ch.priceUnit || "").toLowerCase();
+    if (unit === "kwh") return `${vnd(ch.priceValue)} / kWh`;
+    if (unit === "hour") return `${vnd(ch.priceValue)} / giờ`;
+    if (unit === "session" || unit === "time") return `${vnd(ch.priceValue)} / lượt`;
+    return vnd(ch.priceValue);
+  }
+  return "—";
+}
+
+// ================= Component =================
 export default function StationDetail() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -98,53 +176,113 @@ export default function StationDetail() {
         setError("");
         setAuthNeeded(false);
 
-        // 1) Lấy trạm
+        // 1) station
         const stationRaw = await fetchJSON(`${API_BASE}/Stations/${id}`);
         const st = normalizeStation(stationRaw);
         if (!alive) return;
 
-        // 2) Lấy trụ — thử lần lượt các route, có auth
-        let list = [];
+        // 2) chargers (theo station)
+        let chargersList = [];
         let lastErr = null;
-
-        const tryRoutes = [
+        const chargerRoutes = [
           `${API_BASE}/Chargers?stationId=${st.id}`,
           `${API_BASE}/Stations/${st.id}/chargers`,
           `${API_BASE}/Chargers/by-station/${st.id}`,
         ];
-
-        for (const url of tryRoutes) {
+        for (const url of chargerRoutes) {
           try {
             const data = await fetchJSONAuth(url);
-            // Một số API có thể trả { items: [...] }
             let arr = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
             if (!arr.length) continue;
-
-            // Lọc chặt theo stationId của trạm hiện tại (ép cùng kiểu để so sánh “mềm”)
             const sameId = (a, b) => String(a) === String(b);
             arr = arr.filter(c => sameId(c.stationId ?? c.StationId, st.id));
-
-            // Nếu route trả tất cả trụ nhưng không có trụ thuộc trạm này, thử route sau
             if (!arr.length) continue;
 
-            list = arr.map(normalizeCharger);
+            chargersList = arr.map(normalizeCharger);
             break;
           } catch (e) {
             lastErr = e;
-            if (e?.status === 401) {
-              setAuthNeeded(true);
-              // vẫn tiếp tục thử route khác phòng khi route khác mở ẩn danh
-              continue;
+            if (e?.status === 401) setAuthNeeded(true);
+          }
+        }
+
+        // 3) ports → collect connectors per charger (raw)
+        let ports = [];
+        if (chargersList.length) {
+          const chargerIds = chargersList.map(c => c.id);
+          const portsRoutes = [
+            `${API_BASE}/Ports/by-station/${st.id}`,
+            `${API_BASE}/Stations/${st.id}/ports`,
+            `${API_BASE}/Ports`, // fallback: lấy tất cả rồi lọc
+          ];
+          for (const url of portsRoutes) {
+            try {
+              const data = await fetchJSONAuth(url);
+              const arr = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+              if (!arr.length) continue;
+
+              let normalized = arr.map(normalizePort);
+
+              // fallback /Ports: lọc theo danh sách chargerIds
+              if (url.endsWith("/Ports")) {
+                const idset = new Set(chargerIds.map(String));
+                normalized = normalized.filter(p => idset.has(String(p.chargerId)));
+              }
+              ports = normalized;
+              break;
+            } catch {
+              // thử route tiếp
             }
-            // 404/500 thì cứ thử route sau
+          }
+        }
+
+        // 4) merge: gộp connectorTypes (raw) theo chargerId
+        if (ports.length) {
+          const mapTypes = new Map(); // chargerId -> Set(connectorType)
+          ports.forEach(p => {
+            const key = String(p.chargerId);
+            if (!mapTypes.has(key)) mapTypes.set(key, new Set());
+            if (p.connectorType) mapTypes.get(key).add(String(p.connectorType));
+          });
+
+          chargersList = chargersList.map(ch => {
+            const typesSet = mapTypes.get(String(ch.id));
+            const typesArr = typesSet ? Array.from(typesSet) : [];
+            const label = typesArr.join(", "); // giữ nguyên raw
+            return {
+              ...ch,
+              connectorTypes: typesArr,
+              connectorLabel: label,
+              connector: typesArr.length === 1 ? typesArr[0] : label,
+            };
+          });
+        }
+
+        // 5) (optional) merge pricing theo station
+        if (chargersList.length) {
+          try {
+            const priceUrl = `${API_BASE}/Pricing/by-station/${st.id}`;
+            const pricing = await fetchJSONAuth(priceUrl).catch(() => null);
+            const rows = Array.isArray(pricing?.items) ? pricing.items : (Array.isArray(pricing) ? pricing : []);
+            if (rows?.length) {
+              const map = new Map(rows.map(r => [String(r.chargerId ?? r.ChargerId), r]));
+              chargersList = chargersList.map(ch => {
+                const m = map.get(String(ch.id));
+                if (!m) return ch;
+                const merged = normalizeCharger({ ...ch, ...m });
+                // giữ lại connectors (raw) đã merge từ ports
+                return { ...merged, connectorTypes: ch.connectorTypes, connectorLabel: ch.connectorLabel, connector: ch.connector };
+              });
+            }
+          } catch {
+            // im lặng nếu không có endpoint này
           }
         }
 
         if (alive) {
           setStation(st);
-          setChargers(list);
-          if (!list.length && lastErr && lastErr.status && lastErr.status !== 404) {
-            // Ghi chú lỗi để dev biết (không chặn UI)
+          setChargers(chargersList);
+          if (!chargersList.length && lastErr && lastErr.status && lastErr.status !== 404) {
             console.warn("Chargers fetch last error:", lastErr);
           }
         }
@@ -164,6 +302,7 @@ export default function StationDetail() {
     return () => { alive = false; };
   }, [id]);
 
+  // ===== UI helpers =====
   const handleOpenBook = (chargerId) => {
     nav(`/stations/${id}/chargers/${chargerId}/book`);
   };
@@ -172,58 +311,71 @@ export default function StationDetail() {
   const lng = Number(station?.lng);
   const hasCoords = Number.isFinite(lat) && Number.isFinite(lng);
 
-  // Options for filters
-  const {
-    connectorOptions,
-    powerOptions,
-    statusOptions,
-    speedOptions,
-  } = useMemo(() => {
-    const connectors = Array.from(new Set(chargers.map(c => (c.connector || "").trim()).filter(Boolean)));
-    const powers = Array.from(new Set(chargers.map(c => (c.power || "").trim()).filter(Boolean)));
-    const statuses = Array.from(new Set(chargers.map(c => (c.status || "").trim()).filter(Boolean)));
-    const speeds = Array.from(new Set(chargers.map(c => (c.speed || "").trim()).filter(Boolean)));
+  // ===== Filter options (connector raw, speed/status VI) =====
+  const { connectorOptions, powerOptions, statusOptions, speedOptions } = useMemo(() => {
+    const uniq = (arr) => Array.from(new Set(arr.filter(Boolean)));
     return {
-      connectorOptions: connectors.length ? connectors : ["Type 2", "CCS", "CHAdeMO"],
-      powerOptions: powers.length ? powers : ["7 kW", "22 kW", "60 kW", "120 kW"],
-      statusOptions: statuses.length ? statuses : ["Online", "Offline", "OutOfOrder"],
-      speedOptions: speeds.length ? speeds : ["Chậm", "Nhanh"],
+      connectorOptions: uniq(
+        chargers.flatMap(c =>
+          (c.connectorTypes?.length ? c.connectorTypes : [c.connectorLabel || c.connector])
+        )
+      ), // raw
+      powerOptions: uniq(chargers.map(c => c.power).filter(Boolean)),
+      statusOptions: uniq(chargers.map(c => c.statusLabel || c.status)), // VI label
+      speedOptions: uniq(chargers.map(c => c.speedLabel || c.speed)),    // VI label
     };
   }, [chargers]);
 
-  // Filtered list
+  // ===== Filtering =====
   const filteredChargers = useMemo(() => {
-    const kw = q.trim().toLowerCase();
+    const kw = toLow(q);
     const minKW = parseFloat(minPower) || 0;
 
     const parsePower = (p) => {
       const m = String(p || "").match(/([\d.]+)/);
       return m ? parseFloat(m[1]) : 0;
     };
-    const parsePrice = (p) => {
-      const m = String(p || "").replace(/,/g, "").match(/([\d.]+)/);
-      return m ? parseFloat(m[1]) : Number.POSITIVE_INFINITY;
+
+    const matchConnector = (c) => {
+      if (!connector) return true;
+      const wanted = toLow(connector);
+      // so khớp theo mảng raw
+      if (Array.isArray(c.connectorTypes) && c.connectorTypes.length) {
+        if (c.connectorTypes.some(t => toLow(t) === wanted)) return true;
+      }
+      // fallback theo text đã gộp (raw)
+      if (toLow(c.connectorLabel) === wanted) return true;
+      return toLow(c.connector) === wanted;
+    };
+
+    const matchStatus = (c) =>
+      !status || toLow(c.statusLabel || c.status) === toLow(status);
+
+    const matchSpeed = (c) =>
+      !speed || toLow(c.speedLabel || c.speed) === toLow(speed);
+
+    const matchKW = (c) => {
+      if (!kw) return true;
+      const title = toLow(c.title || c.id);
+      const conn  = toLow(c.connectorLabel || c.connector); // raw
+      const spd   = toLow(c.speedLabel || c.speed);         // VI label
+      return title.includes(kw) || conn.includes(kw) || spd.includes(kw);
     };
 
     let list = chargers.filter((c) => {
-      const title = String(c.title || c.id || "").toLowerCase();
-      const conn = String(c.connector || "").toLowerCase();
-      const stt = String(c.status || "");
-      const spd = String(c.speed || "").toLowerCase();
-
-      const hitKW = !kw || title.includes(kw) || conn.includes(kw);
-      const hitConnector = !connector || conn === connector.toLowerCase();
-      const hitStatus = !status || stt === status.toLowerCase();
-      const hitSpeed = !speed || spd === speed.toLowerCase();
-      const hitPower = !minKW || parsePower(c.power) >= minKW;
-
-      return hitKW && hitConnector && hitStatus && hitSpeed && hitPower;
+      const passText   = matchKW(c);
+      const passConn   = matchConnector(c);
+      const passStatus = matchStatus(c);
+      const passSpeed  = matchSpeed(c);
+      const passPower  = !minKW || parsePower(c.power) >= minKW;
+      return passText && passConn && passStatus && passSpeed && passPower;
     });
 
+    const getPriceValue = (c) => (c.priceValue != null ? Number(c.priceValue) : Number.POSITIVE_INFINITY);
     if (sortPrice === "asc") {
-      list = [...list].sort((a, b) => parsePrice(a.price) - parsePrice(b.price));
+      list = [...list].sort((a, b) => getPriceValue(a) - getPriceValue(b));
     } else if (sortPrice === "desc") {
-      list = [...list].sort((a, b) => parsePrice(b.price) - parsePrice(a.price));
+      list = [...list].sort((a, b) => getPriceValue(b) - getPriceValue(a));
     }
 
     return list;
@@ -235,7 +387,7 @@ export default function StationDetail() {
 
   const displayChargers = hasAnyFilter ? filteredChargers : chargers;
 
-  // ---------- Render ----------
+  // ===== Render =====
   if (loading) {
     return (
       <MainLayout>
@@ -285,7 +437,6 @@ export default function StationDetail() {
             visible={{ search: true, connector: true, power: true, status: true, sortPrice: true, speed: true, city: false }}
           />
 
-          {/* Thông báo cần đăng nhập nếu 401 */}
           {authNeeded && (
             <div className="bp-alert warn" style={{ marginTop: 8 }}>
               Cần đăng nhập để xem danh sách trụ. Hãy đăng nhập rồi tải lại trang.
@@ -305,18 +456,17 @@ export default function StationDetail() {
         {/* Chargers */}
         <h2 className="bp-title with-mb">Các trụ sạc</h2>
 
-        {hasAnyFilter && filteredChargers.length === 0 && (
+        {hasAnyFilter && displayChargers.length === 0 && (
           <p className="bp-subtle">Không có trụ phù hợp với bộ lọc</p>
         )}
 
         <div className="sd-grid">
           {displayChargers.length > 0 ? (
             displayChargers.map((ch) => {
-              const statusClass = ch.status || "unknown";
-              const connectorText =
-                (/type\s*2/i.test(ch.connector || "") && "AC") ||
-                (/(ccs|chademo)/i.test(ch.connector || "") && "DC") ||
-                ch.connector || "—";
+              const statusClass = (ch.status || "unknown").toLowerCase(); // dùng raw cho class
+              const connectorText = ch.connectorLabel || ch.connector || "—"; // raw
+              const speedText = ch.speedLabel || ch.speed || "—";            // VI
+              const priceText = formatPrice(ch);
 
               return (
                 <div
@@ -345,27 +495,32 @@ export default function StationDetail() {
                     <div className="row">
                       <span className="label">Tình trạng trụ:</span>
                       <span className={`statusBadge ${statusClass}`}>
-                        {statusClass === "online" ? "Trống"
-                          : statusClass === "outoforder" ? "Hết chỗ"
-                            : statusClass === "offline" ? "Bảo trì"
-                              : statusClass || "—"}
+                        {ch.statusLabel || ch.status || "—" /* VI */}
                       </span>
                     </div>
 
                     <div className="row">
                       <span className="label">Loại cổng sạc:</span>
-                      <span>{connectorText}</span>
+                      <span>{connectorText /* raw */}</span>
                     </div>
 
-                    <div className="groupTitle">Tốc độ sạc:</div>
-                    <ul className="bullets">
-                      <li>8 – 12 tiếng cho ô tô</li>
-                      <li>4 – 6 tiếng cho xe máy điện</li>
-                    </ul>
+                    <div className="row">
+                      <span className="label">Tốc độ sạc:</span>
+                      <span>{speedText /* VI */}</span>
+                    </div>
+
+                    {!!ch.bullets?.length && (
+                      <>
+                        <div className="groupTitle">Thông tin thêm:</div>
+                        <ul className="bullets">
+                          {ch.bullets.map((t, i) => <li key={i}>{t}</li>)}
+                        </ul>
+                      </>
+                    )}
 
                     <div className="row priceRow">
                       <span className="label">Giá cả:</span>
-                      <span className="price">{ch.price || "—"}</span>
+                      <span className="price">{priceText}</span>
                     </div>
                   </div>
                 </div>

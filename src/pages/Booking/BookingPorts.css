@@ -121,7 +121,7 @@
 
 /* ===== FORM / INPUTS ===== */
 .bp-section { margin-top: 12px; }
-.bp-label { font-size: 14px; color: var(--bp-muted); margin-bottom: 6px; }
+.bp-label { font-size: 14px; color: var(--bp-muted); margin-bottom: 6px; font-weight: bold;}
 
 .bp-time-row {
   display: flex;
