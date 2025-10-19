@@ -20,12 +20,22 @@ import Unauthorized from "./pages/Unauthorized"; // ✅ thêm trang này (mục 
 import ChargerManager from "./pages/staff/ChargerManager";
 import SessionManager from "./pages/staff/SessionManager";
 
+import UpdateInfo from "./components/updateProfilePerson/UpdateInfo";
+import VehicleInfo from "./components/updateProfilePerson/VehicleInfo";
+import PaymentMethods from "./components/updateProfilePerson/PaymentMethods";
+import ChangePassword from "./components/updateProfilePerson/ChangePassword";
+import EnterpriseInfo from "./components/updateProfileBusiness/EnterpriseInfo";
+
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
-    case "customer": return "/stations";
-    case "admin": return "/homepage";
-    case "staff": return "/homepage";
-    default: return "/homepage";
+    case "customer":
+      return "/stations";
+    case "admin":
+      return "/homepage";
+    case "staff":
+      return "/homepage";
+    default:
+      return "/homepage";
   }
 }
 
@@ -48,9 +58,9 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/homepage" replace />} />
-
       {/* PUBLIC */}
-      <Route path="/homepage" element={<Homepage />} /> {/* ✅ KHÔNG bọc GuestRoute */}
+      <Route path="/homepage" element={<Homepage />} />{" "}
+      {/* ✅ KHÔNG bọc GuestRoute */}
       <Route
         path="/login"
         element={
@@ -68,7 +78,6 @@ export default function App() {
         }
       />
       <Route path="/unauthorized" element={<Unauthorized />} /> {/* ✅ */}
-
       {/* PROTECTED (Customer) */}
       <Route
         path="/stations"
@@ -142,7 +151,6 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-
       {/*Staff */}
       <Route
         path="/staff/stations"
@@ -152,18 +160,25 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-
       <Route
         path="/staff/sessions"
         element={
           <ProtectedRoute allowedRoles={["Staff", "Admin"]}>
-          <SessionManager/>
+            <SessionManager />
           </ProtectedRoute>
         }
       />
-
+      <Route>
+        <Route path="/profile/update-info" element={<UpdateInfo />} />
+        {/* ✅ Dòng này sửa lại: gọi VehicleInfo thay vì CarField */}
+        <Route path="/profile/vehicle-info" element={<VehicleInfo />} />
+        <Route path="/profile/payment-info" element={<PaymentMethods />} />
+        {/* ✅ Xóa dấu cách thừa ở cuối */}
+        <Route path="/profile/change-password" element={<ChangePassword />} />
+      </Route>
       {/* FALLBACK */}
-      <Route path="*" element={<Navigate to="/homepage" replace />} /> {/* ✅ */}
+      <Route path="*" element={<Navigate to="/homepage" replace />} />{" "}
+      {/* ✅ */}
     </Routes>
   );
 }
