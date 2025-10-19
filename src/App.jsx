@@ -1,6 +1,8 @@
 // src/App.jsx
 import React from "react";
+// Thêm BrowserRouter vào import
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+
 import { useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
@@ -22,6 +24,7 @@ import UpdateInfo from "./components/updateProfilePerson/UpdateInfo";
 import VehicleInfo from "./components/updateProfilePerson/VehicleInfo";
 import PaymentMethods from "./components/updateProfilePerson/PaymentMethods";
 import ChangePassword from "./components/updateProfilePerson/ChangePassword";
+import EnterpriseInfo from "./components/updateProfileBusiness/EnterpriseInfo";
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
@@ -148,16 +151,14 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/"
-        element={<Navigate to="/profile/update-info" replace />}
-      />
-      <Route path="/profile/update-info" element={<UpdateInfo />} />
-      {/* ✅ Dòng này sửa lại: gọi VehicleInfo thay vì CarField */}
-      <Route path="/profile/vehicle-info" element={<VehicleInfo />} />
-      <Route path="/profile/payment-info" element={<PaymentMethods />} />
-      {/* ✅ Xóa dấu cách thừa ở cuối */}
-      <Route path="/profile/change-password" element={<ChangePassword />} />
+      <Route>
+        <Route path="/profile/update-info" element={<UpdateInfo />} />
+        {/* ✅ Dòng này sửa lại: gọi VehicleInfo thay vì CarField */}
+        <Route path="/profile/vehicle-info" element={<VehicleInfo />} />
+        <Route path="/profile/payment-info" element={<PaymentMethods />} />
+        {/* ✅ Xóa dấu cách thừa ở cuối */}
+        <Route path="/profile/change-password" element={<ChangePassword />} />
+      </Route>
       {/* FALLBACK */}
       <Route path="*" element={<Navigate to="/homepage" replace />} />{" "}
       {/* ✅ */}

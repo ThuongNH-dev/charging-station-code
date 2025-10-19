@@ -229,7 +229,11 @@ export default function AccountMenu() {
         <MenuItem
           onClick={() => {
             handleClose();
-            navigate("/profile/update-info");
+            if (userRole === "Enterprise" || userRole === "Business") {
+              navigate("/profile/enterprise-info");
+            } else {
+              navigate("/profile/update-info");
+            }
           }}
           sx={{
             borderRadius: "10px",
@@ -240,7 +244,9 @@ export default function AccountMenu() {
           <ListItemIcon>
             <PersonOutlineRoundedIcon fontSize="small" />
           </ListItemIcon>
-          Hồ sơ cá nhân
+          {userRole === "Enterprise" || userRole === "Business"
+            ? "Hồ sơ doanh nghiệp"
+            : "Hồ sơ cá nhân"}
         </MenuItem>
 
         <MenuItem
