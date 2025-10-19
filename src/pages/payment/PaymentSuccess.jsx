@@ -6,21 +6,8 @@ import "./style/PaymentSuccess.css";
 
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
 const HOLD_MINUTES_DEFAULT = 15;
-// Nếu BE reverse proxy ở cùng domain: để như dưới. Nếu khác domain, đổi sang origin của BE.
-const VERIFY_URL = "/api/payment/vnpay-callback";
 
-// Parse vnp_PayDate (yyyyMMddHHmmss) -> timestamp (ms, GMT+7)
-function parseVnpPayDate(s) {
-  if (!s) return null;
-  const m = String(s).match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
-  if (!m) return null;
-  const [, y, mo, d, h, mi, se] = m;
-  const iso = `${y}-${mo}-${d}T${h}:${mi}:${se}+07:00`;
-  const t = Date.parse(iso);
-  return Number.isFinite(t) ? t : null;
-}
-
-// Dual read/write
+// Dual read/write helpers
 function dualRead(key) {
   let s = null;
   try { s = sessionStorage.getItem(key); } catch { }
@@ -36,6 +23,17 @@ function dualRemove(key) {
   try { localStorage.removeItem(key); } catch { }
 }
 
+// Parse VNPay datetime (yyyyMMddHHmmss) safely
+function parseVnpPayDate(s) {
+  if (!s) return null;
+  const m = String(s).match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})$/);
+  if (!m) return null;
+  const [, y, mo, d, h, mi, se] = m;
+  const iso = `${y}-${mo}-${d}T${h}:${mi}:${se}`; // no +07:00 to avoid double offset
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? t : null;
+}
+
 export default function PaymentSuccess() {
   const { state } = useLocation();
   const [search] = useSearchParams();
@@ -49,108 +47,49 @@ export default function PaymentSuccess() {
   const [idInput, setIdInput] = useState("");
   const [idError, setIdError] = useState("");
 
-  // ===== 1) Nạp STUB ngay (nếu có) rồi mới verify từ BE =====
+  // ✅ NEW: Simplified logic (no backend fetch, no CORS)
   useEffect(() => {
-    // a) Card/Wallet: có state chuyển thẳng
-    if (state) {
-      setData(state);
-      setLoading(false);
-      return;
-    }
+    // Nếu BE redirect thì VNPay đã xong — chỉ đọc query
+    const order = search.get("order");
+    const txnRef = search.get("txnRef");
+    const success = search.get("success") === "true";
+    const amount = Number(search.get("vnp_Amount") || 0) / 100;
+    const payDate = parseVnpPayDate(search.get("vnp_PayDate"));
 
-    // b) QR: lấy orderId từ query hoặc từ storage (cứu hộ)
-    const orderId = search.get("order") ||
-      (dualRead("pay:lastOrderId")) ||
-      undefined;
-
-    if (!orderId) {
-      setLoading(false);
-      return;
-    }
-
-    // NẠP STUB NGAY để có dữ liệu hiển thị liền
-    const localStr = dualRead(`pay:${orderId}`);
+    // Lấy local stub nếu có
+    const localStr = dualRead(`pay:${order}`);
+    let stub = {};
     if (localStr) {
-      try {
-        const stub = JSON.parse(localStr);
-        setData(stub);
-        setLoading(false);
-      } catch { }
+      try { stub = JSON.parse(localStr); } catch { }
     }
 
-    // Verify từ BE (nếu có JSON thì merge, nếu không giữ STUB)
-    const qs = window.location.search; // ?vnp_...&order=...
-    fetch(`${VERIFY_URL}${qs}`, { credentials: "include" })
-      .then((res) => {
-        if (res.redirected && res.url.includes("/payment/failure")) {
-          navigate(res.url.replace(window.location.origin, ""), { replace: true });
-          return null;
-        }
-        if (!res.ok) throw new Error("Không thể xác minh thanh toán");
-        return res.json().catch(() => ({})); // HTML -> {}
-      })
-      .then((json) => {
-        if (json === null) return; // đã điều hướng failure
-        const paidAtFromVnp = parseVnpPayDate(search.get("vnp_PayDate"));
-        const stub = localStr ? JSON.parse(localStr) : {};
+    // Gộp dữ liệu
+    const merged = {
+      ...stub,
+      orderId: order,
+      txnRef,
+      success,
+      bookingFee: stub.bookingFee ?? amount,
+      paidAt: payDate ?? Date.now(),
+    };
 
-        const merged = {
-          ...stub,
-          ...(json && typeof json === "object" ? json : {}),
-          orderId: orderId || stub.orderId,
-          paidAt: paidAtFromVnp ?? json?.paidAt ?? stub?.paidAt ?? Date.now(),
-        };
+    if (!order && !stub) {
+      setFetchError("Không tìm thấy thông tin thanh toán.");
+    }
 
-        // Nếu BE không trả bookingFee -> lấy từ vnp_Amount (*100 về VND)
-        if (merged.bookingFee == null) {
-          const amt = Number(search.get("vnp_Amount") || 0);
-          if (Number.isFinite(amt) && amt > 0) merged.bookingFee = Math.round(amt / 100);
-        }
+    setData(merged);
+    setLoading(false);
 
-        // Nếu vẫn chưa có bookingFee mà có bookingId -> kéo giá từ BE
-        if (merged.bookingFee == null && merged.bookingId) {
-          fetch(`/api/Booking/${merged.bookingId}`, { credentials: "include" })
-            .then(r => r.ok ? r.json() : null)
-            .then(b => {
-              const price = Number(b?.price ?? b?.Price ?? 0);
-              if (price > 0) {
-                const next = { ...merged, bookingFee: price };
-                setData(next);
-                dualWrite(`pay:${orderId}`, JSON.stringify(next));
-              } else {
-                setData(merged);
-              }
-            })
-            .catch(() => setData(merged));
-          return; // tránh setData(merged) lần nữa bên dưới
-        }
-
-        setData(merged);
-        dualWrite(`pay:${orderId}`, JSON.stringify(merged));
-      })
-      .catch((err) => {
-        console.error(err);
-        if (!localStr) {
-          setFetchError(err?.message || "Không lấy được thông tin đơn. Vui lòng thử lại.");
-        } else {
-          setFetchError("Đang hiển thị dữ liệu tạm. Không xác minh được từ máy chủ.");
-        }
-      })
-      .finally(() => {
-        const orderId = search.get("order") || (dualRead("pay:lastOrderId")) || undefined;
-        if (orderId) {
-          dualRemove(`pay:${orderId}:pending`);
-        }
-      });
-  }, [state, search, navigate]);
+    // cleanup pending flag
+    if (order) dualRemove(`pay:${order}:pending`);
+  }, [search]);
 
   // ===== 2) Điều hướng nếu phiên đã start/done =====
   useEffect(() => {
     if (!data) return;
     const { orderId } = data;
     dualWrite("currentBookingOrderId", orderId);
-
-    const lock = dualRead(`bookingLocked:${orderId}`);
+const lock = dualRead(`bookingLocked:${orderId}`);
     if (lock === "started") {
       navigate("/charging", { state: data, replace: true });
     } else if (lock === "done") {
@@ -165,7 +104,7 @@ export default function PaymentSuccess() {
     }
   }, [data, navigate]);
 
-  // ===== 3) Count down đúng totalMinutes =====
+  // ===== 3) Count down =====
   const holdMinutes =
     data?.totalMinutes && data.totalMinutes > 0 ? data.totalMinutes : HOLD_MINUTES_DEFAULT;
   const totalSeconds = Math.max(0, Math.floor(holdMinutes * 60));
@@ -191,7 +130,7 @@ export default function PaymentSuccess() {
       .padStart(2, "0")}`;
   };
 
-  // ===== 4) Xác thực ID trụ/súng để bắt đầu sạc =====
+  // ===== 4) Xác thực ID trụ/súng =====
   const norm = (s) => (s || "").toString().trim().toLowerCase().replace(/\s+/g, "");
 
   const allowedIds = useMemo(() => {
@@ -225,7 +164,7 @@ export default function PaymentSuccess() {
     }
     const candidate = norm(idInput);
     if (!candidate) {
-      setIdError("Vui lòng nhập ID trụ hoặc súng.");
+setIdError("Vui lòng nhập ID trụ hoặc súng.");
       return;
     }
     if (!allowedIds.includes(candidate)) {
@@ -269,7 +208,7 @@ export default function PaymentSuccess() {
     );
   }
 
-  // ===== 6) JSX =====
+  // ===== 6) JSX UI =====
   return (
     <MainLayout>
       <div className="ps-root">
@@ -285,7 +224,9 @@ export default function PaymentSuccess() {
               <div className="ps-success-icon">
                 <CheckCircleFilled />
               </div>
-              <h2 className="ps-success-title">Đơn đặt trước đã được xác nhận</h2>
+              <h2 className="ps-success-title">
+                {data.success ? "Đơn đặt trước đã được xác nhận" : "Thanh toán thất bại"}
+              </h2>
               <p className="ps-success-time">
                 {new Date(data.paidAt).toLocaleTimeString("vi-VN")}{" "}
                 {new Date(data.paidAt).toLocaleDateString("vi-VN")}
@@ -299,13 +240,7 @@ export default function PaymentSuccess() {
               <div className="ps-row">
                 <input
                   className="ps-input"
-                  placeholder={
-                    data.charger?.id && data.gun?.id
-                      ? `VD: ${data.charger.id}-${data.gun.id}`
-                      : data.gun?.id
-                        ? `VD: ${data.gun.id}`
-                        : "VD: EVS-12A-PORT1"
-                  }
+                  placeholder="VD: EVS-12A-PORT1"
                   value={idInput}
                   onChange={(e) => setIdInput(e.target.value)}
                   onKeyDown={onEnter}
@@ -319,7 +254,7 @@ export default function PaymentSuccess() {
                 <p className="ps-hint">Gợi ý hợp lệ: {displayHints.join(" hoặc ")}</p>
               )}
               {!!idError && <p className="ps-error">{idError}</p>}
-              {timeLeft === 0 && <p className="ps-error">Hết thời gian giữ chỗ. Vui lòng đặt lại.</p>}
+{timeLeft === 0 && <p className="ps-error">Hết thời gian giữ chỗ. Vui lòng đặt lại.</p>}
             </div>
           </section>
 
@@ -363,21 +298,6 @@ export default function PaymentSuccess() {
                 </span>
               </div>
             </div>
-
-            {(() => {
-              const fromUrl = Number(search.get("vnp_Amount") || 0) / 100 || null;
-              const fromStub = data?.bookingFee ?? null;
-              if (!fromUrl || !fromStub) return null;
-              if (Math.abs(fromUrl - fromStub) < 1) return null;
-              return (
-                <div className="ps-block" style={{ marginTop: 8 }}>
-                  <div className="ps-block-head">Chẩn đoán nhanh</div>
-                  <div className="ps-kv"><span className="ps-k">VNPAY amount</span><span className="ps-v">{vnd(fromUrl)}</span></div>
-                  <div className="ps-kv"><span className="ps-k">Stub/FE amount</span><span className="ps-v">{vnd(fromStub)}</span></div>
-                  <div className="ps-hint">Hai bên lệch. Hãy kiểm tra BE: phép nhân x100 khi build <code>vnp_Amount</code> và cách tính giá booking.</div>
-                </div>
-              );
-            })()}
 
             {(data?.contact?.fullName || data?.vehiclePlate) && (
               <div className="ps-block">

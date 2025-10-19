@@ -1,26 +1,19 @@
+<!-- vnpay-bridge.html -->
 <!doctype html>
 <html lang="en">
-
 <head>
-  <script type="module">import { injectIntoGlobalHook } from "/@react-refresh";
-injectIntoGlobalHook(window);
-window.$RefreshReg$ = () => {};
-window.$RefreshSig$ = () => (type) => type;</script>
-
-  <script type="module" src="/@vite/client"></script>
-
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>charging-station</title>
-  <link href="https://cdn.jsdelivr.net/npm/@goongmaps/goong-js/dist/goong-js.css" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/@goongmaps/goong-js/dist/goong-js.js"></script>
 
+  <script>
+    // Giữ nguyên tất cả query vnp_* và order, chuyển vào SPA
+    (function () {
+      var qs = window.location.search || "";
+      // đổi đường dẫn nếu trang success của bạn khác
+      window.location.replace("/payment/success" + qs);
+    })();
+  </script>
 </head>
-
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.jsx?t=1760853599851"></script>
-</body>
-
+<body></body>
 </html>

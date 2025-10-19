@@ -9,6 +9,16 @@ const API_BASE = getApiBase();
 
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
 
+// ---------- Helpers nhận diện loại xe ----------
+function isCarType(t = "") {
+  const s = String(t).toLowerCase();
+  return ["car", "oto", "ô tô", "ôto", "auto", "four-wheeler"].some(k => s.includes(k));
+}
+function isBikeType(t = "") {
+  const s = String(t).toLowerCase();
+  return ["bike", "xe máy", "xemay", "motor", "scooter", "moped", "two-wheeler"].some(k => s.includes(k));
+}
+
 function normalizeStation(s = {}) {
   return {
     id: s.id ?? s.stationId ?? s.StationId,
@@ -30,9 +40,9 @@ function normalizeCharger(c = {}) {
   const rawStatus = (c.status ?? c.Status ?? "").toString().toLowerCase();
   const status =
     rawStatus.includes("available") ? "available" :
-    rawStatus.includes("busy") ? "busy" :
-    rawStatus.includes("maint") ? "maintenance" :
-    rawStatus || "unknown";
+      rawStatus.includes("busy") ? "busy" :
+        rawStatus.includes("maint") ? "maintenance" :
+          rawStatus || "unknown";
 
   return {
     id,
@@ -56,10 +66,10 @@ function normalizePort(p = {}) {
   const rawStatus = (p.status ?? p.Status ?? "").toString().toLowerCase();
   const status =
     rawStatus.includes("available") || rawStatus === "1" ? "available" :
-    rawStatus.includes("busy") || rawStatus === "2" ? "busy" :
-    rawStatus.includes("inactive") || rawStatus === "0" ? "inactive" :
-    rawStatus.includes("maint") ? "maintenance" :
-    "unknown";
+      rawStatus.includes("busy") || rawStatus === "2" ? "busy" :
+        rawStatus.includes("inactive") || rawStatus === "0" ? "inactive" :
+          rawStatus.includes("maint") ? "maintenance" :
+            "unknown";
 
   return {
     id,
@@ -104,10 +114,43 @@ function pickBookingId(created) {
   return null;
 }
 
+// ===== Helpers lấy items / chọn booking vừa tạo =====
+function extractItems(obj) {
+  if (!obj) return [];
+  if (Array.isArray(obj)) return obj;
+  if (Array.isArray(obj.items)) return obj.items;
+  if (obj.data && Array.isArray(obj.data.items)) return obj.data.items;
+  return [];
+}
+
+function pickJustCreatedFromList(items, { customerId, portId, startLocal }) {
+  if (!Array.isArray(items) || !items.length) return null;
+  const wantStartMs = +startLocal;
+
+  const candidates = items.filter(b =>
+    String(b.customerId ?? b.CustomerId) === String(customerId) &&
+    String(b.portId ?? b.PortId) === String(portId)
+  );
+
+  if (!candidates.length) return null;
+
+  let best = null, bestDiff = Infinity;
+  for (const b of candidates) {
+    const st = b.startTime ?? b.StartTime ?? b.start ?? b.Start ?? "";
+    const t = st ? Date.parse(st) : NaN;
+    const diff = Number.isFinite(t) ? Math.abs(t - wantStartMs) : 1e15;
+    if (diff < bestDiff) { best = b; bestDiff = diff; }
+  }
+  return (best && bestDiff <= 5 * 60 * 1000) ? best : null;
+}
+
+const idFromItem = (b) => (b?.bookingId ?? b?.BookingId ?? b?.id ?? b?.Id ?? null);
+
 export default function BookingPorts() {
   // === User/Vehicle ===
   const [me, setMe] = useState(null);
   const [myVehicleId, setMyVehicleId] = useState(null);
+  const [myVehicleType, setMyVehicleType] = useState(""); // << thêm
   const [authError, setAuthError] = useState("");
   const { id, cid } = useParams(); // stationId & chargerId
   const navigate = useNavigate();
@@ -132,7 +175,6 @@ export default function BookingPorts() {
   const nowHour = now.getHours();
   const nowMinute = now.getMinutes();
 
-  // Làm tròn lên phút kế tiếp
   const ceilNowToNextMinute = () => {
     let h = nowHour;
     let m = nowMinute + 1;
@@ -144,7 +186,6 @@ export default function BookingPorts() {
   };
   const baseline = ceilNowToNextMinute();
 
-  // Tối thiểu start cách "hiện tại" 60 phút
   const MIN_GAP_MINUTES = 60;
   const LAST_ABS_MIN = 23 * 60 + 59;
 
@@ -158,7 +199,6 @@ export default function BookingPorts() {
   const [startHour, setStartHour] = useState(() => minStartHour);
   const [startMinute, setStartMinute] = useState(() => minStartMinute);
 
-  // Khi thời gian hiện tại dịch chuyển, đảm bảo start không < minStart
   useEffect(() => {
     if (!canBookToday) return;
     const startAbs = startHour * 60 + startMinute;
@@ -222,18 +262,12 @@ export default function BookingPorts() {
     return all.filter((m) => m >= minM);
   };
 
-  // ====== TÍNH TỔNG PHÚT & PHÍ ======
+  // ====== TÍNH TỔNG PHÚT (chỉ để kiểm tra hợp lệ)
   const totalMinutes = useMemo(() => {
     const endAbs = endHour * 60 + endMinute;
     const gap = endAbs - (startHour * 60 + startMinute);
     return Math.max(0, gap);
   }, [startHour, startMinute, endHour, endMinute]);
-
-  const totalHoursFloat = useMemo(() => totalMinutes / 60, [totalMinutes]);
-
-  const [parkingFee, setParkingFee] = useState(20000); // đ/giờ
-  const perMinute = useMemo(() => parkingFee / 60, [parkingFee]);
-  const bookingFee = useMemo(() => Math.round(perMinute * totalMinutes), [perMinute, totalMinutes]);
 
   // ====== LOAD STATION + CHARGER ======
   useEffect(() => {
@@ -310,153 +344,103 @@ export default function BookingPorts() {
       + `T${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
   }
 
-  // ====== BOOK (đÃ SỬA: dùng ${API_BASE}/Booking + pickBookingId) ======
- // ===== Helpers lấy items / chọn booking vừa tạo =====
-function extractItems(obj) {
-  if (!obj) return [];
-  if (Array.isArray(obj)) return obj;
-  if (Array.isArray(obj.items)) return obj.items;
-  if (obj.data && Array.isArray(obj.data.items)) return obj.data.items;
-  return [];
-}
+  // ====== BOOK (để BE tính phí; FE không gửi amount)
+  const handleBook = async () => {
+    const MIN_GAP_MINUTES = 60;
+    if (!selectedGun || totalMinutes < MIN_GAP_MINUTES) return;
 
-function pickJustCreatedFromList(items, { customerId, portId, startLocal }) {
-  if (!Array.isArray(items) || !items.length) return null;
-  const wantStartMs = +startLocal;
+    if (!me?.customerId) { alert("Chưa đăng nhập hoặc không lấy được customerId."); return; }
+    if (!myVehicleId) { alert("Tài khoản chưa có xe. Hãy thêm xe trước khi đặt."); return; }
 
-  // Lọc theo customerId & portId (string-safe)
-  const candidates = items.filter(b =>
-    String(b.customerId ?? b.CustomerId) === String(customerId) &&
-    String(b.portId ?? b.PortId) === String(portId)
-  );
+    const today = new Date();
+    const startLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), startHour, startMinute, 0, 0);
+    const endLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), endHour, endMinute, 0, 0);
 
-  if (!candidates.length) return null;
-
-  // Chọn item có startTime gần nhất
-  let best = null, bestDiff = Infinity;
-  for (const b of candidates) {
-    const st = b.startTime ?? b.StartTime ?? b.start ?? b.Start ?? "";
-    const t = st ? Date.parse(st) : NaN;
-    const diff = Number.isFinite(t) ? Math.abs(t - wantStartMs) : 1e15;
-    if (diff < bestDiff) { best = b; bestDiff = diff; }
-  }
-  // Chấp nhận nếu lệch <= 5 phút
-  return (best && bestDiff <= 5 * 60 * 1000) ? best : null;
-}
-
-const idFromItem = (b) => (b?.bookingId ?? b?.BookingId ?? b?.id ?? b?.Id ?? null);
-
-// ====== BOOK (bản vá: xử lý body paged + fallback GET) ======
-const handleBook = async () => {
-  if (!selectedGun || totalMinutes < MIN_GAP_MINUTES) return;
-
-  if (!me?.customerId) { alert("Chưa đăng nhập hoặc không lấy được customerId."); return; }
-  if (!myVehicleId) { alert("Tài khoản chưa có xe. Hãy thêm xe trước khi đặt."); return; }
-
-  const today = new Date();
-  const startLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), startHour, startMinute, 0, 0);
-  const endLocal   = new Date(today.getFullYear(), today.getMonth(), today.getDate(), endHour,   endMinute,   0, 0);
-
-  const bookingDto = {
-    CustomerId: me.customerId,
-    VehicleId: myVehicleId,
-    PortId: selectedGun.id,
-    StartTime: fmtLocal(startLocal),
-    EndTime: fmtLocal(endLocal),
-    Status: "Confirmed",
-  };
-
-  try {
-    // 1) POST tạo booking (dùng fetchAuthJSON như utils của bạn)
-    const created = await fetchAuthJSON(`${API_BASE}/Booking`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(bookingDto),
-    });
-
-    // 2) Cố lấy bookingId trực tiếp
-    let bookingId = idFromItem(created);
-
-    // 3) Nếu BE trả paged -> lấy items và tìm item khớp
-    if (!bookingId) {
-      const list = extractItems(created);
-      if (list.length) {
-        const matched = pickJustCreatedFromList(list, {
-          customerId: me.customerId,
-          portId: selectedGun.id,
-          startLocal,
-        });
-        bookingId = idFromItem(matched) || idFromItem(list[0]);
-      }
-    }
-
-    // 4) Fallback: gọi GET /Booking?customerId=... để dò lại nếu chưa có
-    if (!bookingId) {
-      const url = `${API_BASE}/Booking?customerId=${encodeURIComponent(me.customerId)}&page=1&pageSize=10`;
-      try {
-        const latest = await fetchAuthJSON(url, { method: "GET" });
-        const items = extractItems(latest);
-        const matched = pickJustCreatedFromList(items, {
-          customerId: me.customerId,
-          portId: selectedGun.id,
-          startLocal,
-        });
-        bookingId = idFromItem(matched) || idFromItem(items[0]);
-      } catch (e) {
-        // ignore; sẽ ném lỗi phía dưới nếu vẫn không có bookingId
-      }
-    }
-
-    if (!bookingId) {
-      console.error("[Booking] API response không có bookingId:", created);
-      throw new Error("Tạo booking xong nhưng không có bookingId.");
-    }
-
-    // 5) Tạo phiên VNPAY với bookingId
-    const orderId = "ORD" + Date.now();
-    const payload = {
-      bookingId,
-      orderId,
-      returnUrl: `${window.location.origin}/vnpay-bridge.html?order=${orderId}`,
-      minutes: totalMinutes,
-      roundedHours: Math.max(1, Math.ceil(totalMinutes / 60)),
+    const bookingDto = {
+      CustomerId: me.customerId,
+      VehicleId: myVehicleId,
+      PortId: selectedGun.id,
+      StartTime: fmtLocal(startLocal),
+      EndTime: fmtLocal(endLocal),
+      Status: "Confirmed",
     };
 
-    const payRes = await fetchAuthJSON(`${API_BASE}/Payment/create`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const created = await fetchAuthJSON(`${API_BASE}/Booking`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bookingDto),
+      });
 
-    if (!payRes?.success || !payRes?.paymentUrl) {
-      throw new Error(payRes?.message || "API /Payment/create không trả về paymentUrl.");
-    }
+      let bookingId = idFromItem(created);
+      if (!bookingId) {
+        const list = extractItems(created);
+        if (list.length) {
+          const matched = pickJustCreatedFromList(list, {
+            customerId: me.customerId,
+            portId: selectedGun.id,
+            startLocal,
+          });
+          bookingId = idFromItem(matched) || idFromItem(list[0]);
+        }
+      }
+      if (!bookingId) {
+        try {
+          const url = `${API_BASE}/Booking?customerId=${encodeURIComponent(me.customerId)}&page=1&pageSize=10`;
+          const latest = await fetchAuthJSON(url, { method: "GET" });
+          const items = extractItems(latest);
+          const matched = pickJustCreatedFromList(items, {
+            customerId: me.customerId,
+            portId: selectedGun.id,
+            startLocal,
+          });
+          bookingId = idFromItem(matched) || idFromItem(items[0]);
+        } catch { }
+      }
+      if (!bookingId) throw new Error("Tạo booking xong nhưng không có bookingId.");
 
-    // 6) Điều hướng sang PaymentPage, truyền bookingId + vnpayUrl
-    navigate("/payment", {
-      state: {
-        orderId,
+      const orderId = "ORD" + Date.now();
+      const payload = {
         bookingId,
-        booking: created,
-        vnpayUrl: payRes.paymentUrl,
-        station: { id, name: station?.name, address: station?.address },
-        charger: {
-          id: cid,
-          connector: selectedGun?.connector || charger?.connector,
-          power: selectedGun?.power || charger?.power,
-          price: charger?.price,
-        },
-        gun: { id: selectedGun?.id, name: selectedGun?.name || `Súng ${selectedGun?.id}` },
-        totalMinutes,
-        perMinute,
-        bookingFee,
-      },
-    });
-  } catch (e) {
-    alert(`Tạo booking hoặc phiên thanh toán thất bại: ${e.message}`);
-  }
-};
+        orderId,
+        returnUrl: `${window.location.origin}/vnpay-bridge.html?order=${orderId}`,
+        minutes: totalMinutes,
+        roundedHours: Math.max(1, Math.ceil(totalMinutes / 60)),
+      };
 
+      const payRes = await fetchAuthJSON(`${API_BASE}/Payment/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!payRes?.success || !payRes?.paymentUrl) {
+        throw new Error(payRes?.message || "API /Payment/create không trả về paymentUrl.");
+      }
+
+      navigate("/payment", {
+        state: {
+          orderId,
+          bookingId,
+          booking: created,
+          vnpayUrl: payRes.paymentUrl,
+          station: { id, name: station?.name, address: station?.address },
+          charger: {
+            id: cid,
+            connector: selectedGun?.connector || charger?.connector,
+            power: selectedGun?.power || charger?.power,
+            price: charger?.price,
+            title: charger?.title,
+            status: charger?.status,
+          },
+          gun: { id: selectedGun?.id, name: selectedGun?.name || `Súng ${selectedGun?.id}` },
+          totalMinutes,
+        },
+      });
+    } catch (e) {
+      alert(`Tạo booking hoặc phiên thanh toán thất bại: ${e.message}`);
+    }
+  };
 
   // === NẠP USER & VEHICLE ===
   useEffect(() => {
@@ -513,6 +497,13 @@ const handleBook = async () => {
         const first = myVehicles[0];
         const vid = first?.id ?? first?.vehicleId ?? null;
         setMyVehicleId(vid);
+
+        // Lấy loại xe & lưu
+        const vtype =
+          first?.vehicleType ?? first?.VehicleType ??
+          first?.type ?? first?.Type ??
+          first?.category ?? first?.Category ?? "";
+        setMyVehicleType(String(vtype || "").trim());
       } catch (e) {
         if (!alive) return;
         setAuthError(e?.message || "Không thể nạp người dùng/xe.");
@@ -554,6 +545,11 @@ const handleBook = async () => {
 
   const startDisabled = !canBookToday;
   const endDisabled = !canBookToday;
+
+  // --- Biểu giá theo loại xe (hiển thị) ---
+  const CAR_RATE = 40000;
+  const BIKE_RATE = 20000;
+  const appliedRate = isCarType(myVehicleType) ? CAR_RATE : BIKE_RATE;
 
   return (
     <MainLayout>
@@ -734,32 +730,39 @@ const handleBook = async () => {
                 </div>
               </div>
 
-              {/* Phí */}
+              {/* Phương tiện + Biểu giá */}
               <div className="bp-section">
-                <div className="bp-label">Phí đặt chỗ</div>
-                <select
-                  value={parkingFee}
-                  onChange={e => setParkingFee(Number(e.target.value))}
-                  className="bp-input-select"
-                >
-                  <option value={20000}>20,000 đ/giờ (xe máy)</option>
-                  <option value={40000}>40,000 đ/giờ (ô tô)</option>
-                </select>
+                <div className="bp-label">Phương tiện</div>
+                <div className="bp-vehicle-box">
+                  {myVehicleType ? (
+                    <>
+                      <div className="bp-subtle" style={{ marginTop: 6 }}>
+                        Biểu giá: <br />
+                        <b>{vnd(CAR_RATE)}/h</b> (xe hơi) <br />
+                        <b>{vnd(BIKE_RATE)}/h</b> (xe máy)
+                      </div>
+                      <div className="bp-applied">
+                        Mức áp dụng cho bạn: <b>{vnd(appliedRate)}/h</b>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="bp-vehicle-display">⏳ Đang xác định phương tiện...</div>
+                  )}
+                </div>
               </div>
 
-              {/* Tổng hợp */}
+              {/* Tổng hợp (không hiển thị tiền FE tính) */}
               <div className="bp-summary">
                 <RowKV
                   k="Cổng sạc"
                   v={`${selectedGun?.connector || charger?.connector || "—"} • ${(selectedGun?.power || charger?.power || "—")}`}
                 />
                 <RowKV k="Súng" v={selectedGun ? (selectedGun.name || `Súng ${selectedGun.id}`) : "—"} />
-                <RowKV k="Phí đặt chỗ / phút" v={vnd(perMinute)} />
                 <RowKV
                   k="Tổng thời gian (phút)"
-                  v={`${totalMinutes} phút (${totalHoursFloat.toFixed(2)} giờ)`}
+                  v={`${totalMinutes} phút (${(totalMinutes / 60).toFixed(2)} giờ)`}
                 />
-                <RowKV k="Tổng chi phí" v={<b>{vnd(bookingFee)}</b>} />
+                <RowKV k="Chi phí" v={<i>Sẽ tính và hiển thị ở bước thanh toán</i>} />
               </div>
 
               <button

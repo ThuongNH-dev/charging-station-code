@@ -1,4 +1,3 @@
-// src/pages/payment/PaymentPage.jsx
 import React, { useState, useMemo, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import PaymentForm from "../../components/paymentCard/PaymentForm";
@@ -56,28 +55,12 @@ function getClaimsFromToken() {
 
   const email = p.email ?? p[EMAIL_CLAIM] ?? null;
 
-  // Một số hệ thống đẩy thẳng customerId vào token
   const customerId =
     p.customerId ??
     p.CustomerId ??
     null;
 
   return { accountId, username, email, customerId };
-}
-
-/** Chuẩn hoá object booking trả từ BE */
-function normalizeBooking(b = {}) {
-  const id = b.id ?? b.bookingId ?? b.BookingId ?? b.Id;
-  const customerId = b.customerId ?? b.CustomerId ?? b.userId ?? b.UserId;
-  const price = Number(b.price ?? b.Price ?? b.totalAmount ?? b.TotalAmount ?? 0);
-  const status = (b.status ?? b.Status ?? "").toString().toLowerCase();
-  const createdAt =
-    b.createdAt ?? b.CreatedAt ?? b.createDate ?? b.CreateDate ?? b.createdTime ?? null;
-  const start = b.startTime ?? b.StartTime ?? b.start ?? b.Start ?? null;
-  const stationId = b.stationId ?? b.StationId ?? b.station?.id ?? b.station?.StationId;
-  const chargerId = b.chargerId ?? b.ChargerId ?? b.charger?.id ?? b.charger?.ChargerId;
-  const gunId = b.gunId ?? b.GunId ?? b.gun?.id ?? b.gun?.GunId ?? b.portId ?? b.PortId;
-  return { id, customerId, price, status, createdAt, start, stationId, chargerId, gunId };
 }
 
 /** ===== Helper: làm tròn giờ từ phút (min 1h, luôn tròn lên) ===== */
@@ -177,47 +160,47 @@ function readOrderBlob(orderId) {
 
 export default function PaymentPage() {
   const { state } = useLocation();
-  // Fallback: nếu thiếu state/bookingId, cố lấy lại từ sessionStorage
-  const stateRef = React.useRef(state);
-  if (!stateRef.current) {
-    try {
-      const lastOrder = sessionStorage.getItem("pay:lastOrderId");
-      if (lastOrder) {
-        const s = sessionStorage.getItem(`pay:${lastOrder}:ctx`);
-        if (s) stateRef.current = JSON.parse(s);
-      }
-    } catch { }
-  }
 
   const navigate = useNavigate();
 
   // ===== Local states
   const [loading, setLoading] = useState(false);
   const [creatingVnpay, setCreatingVnpay] = useState(false);
-  const [vnpayUrl, setVnpayUrl] = useState(state?.vnpayUrl || ""); // ưu tiên URL từ BookingPorts
+  const [vnpayUrl, setVnpayUrl] = useState(state?.vnpayUrl || "");
   const [paymentRef, setPaymentRef] = useState("");
   const [payError, setPayError] = useState("");
 
-  // ===== Contact đúng user đang đăng nhập
   const [contact, setContact] = useState({ fullName: "", email: "", phone: "" });
   const [contactLoad, setContactLoad] = useState(true);
   const [contactErr, setContactErr] = useState("");
 
-  // ===== Vehicle (biển số)
   const [vehiclePlate, setVehiclePlate] = useState("");
   const [vehicleLoad, setVehicleLoad] = useState(false);
   const [vehicleErr, setVehicleErr] = useState("");
 
-  // ===== Đồng bộ số tiền với booking
+  // ===== Đồng bộ số tiền với booking (BE là source of truth)
   const [bookingId, setBookingId] = useState(state?.bookingId ?? null);
-  const [bookingLoad] = useState(false);
   const [bookingPrice, setBookingPrice] = useState(null); // giá thật từ BE
 
-  console.log("PaymentPage state =", state);
-  console.log("PaymentPage bookingId =", bookingId);
+  // Early guard
+  if (!state) {
+    return (
+      <div className="page-fallback">
+        <h2>Thiếu thông tin đơn hàng</h2>
+        <p>Vui lòng đặt lại từ trang danh sách trạm.</p>
+        <button className="secondary-btn" onClick={() => navigate("/stations")}>
+          <ArrowLeftOutlined /> Về danh sách trạm
+        </button>
+      </div>
+    );
+  }
 
+  const { station, charger, gun, totalMinutes, startTime, baseline } = state || {};
 
-  // 1) Lấy hồ sơ user + customerId (PATCH: thêm fallback claims & /Customers/me)
+  // ===== Order display info (FE)
+  const orderId = useMemo(() => state?.orderId || "ORD" + Date.now(), [state?.orderId]);
+
+  // ===== Lấy hồ sơ user + customerId
   const [currentCustomerId, setCurrentCustomerId] = useState(null);
   useEffect(() => {
     let mounted = true;
@@ -226,7 +209,6 @@ export default function PaymentPage() {
       setContactLoad(true);
       setContactErr("");
 
-      // Điền nhanh từ token để UI có tên/email trước
       const claims = getClaimsFromToken();
       if (claims?.username || claims?.email) {
         setContact((p) => ({
@@ -237,33 +219,24 @@ export default function PaymentPage() {
       }
 
       try {
-        // Thử nhiều đường lấy hồ sơ
         let authRes = null;
-        try {
-          authRes = await fetchAuthJSON(`/Auth`, { method: "GET" });
-        } catch {
-          try { authRes = await fetchAuthJSON(`${API_BASE}/Auth`, { method: "GET" }); } catch { }
-        }
+        try { authRes = await fetchAuthJSON(`/Auth`, { method: "GET" }); }
+        catch { try { authRes = await fetchAuthJSON(`${API_BASE}/Auth`, { method: "GET" }); } catch { } }
 
         let record = pickCurrentUserRecord(authRes, claims);
 
         if (!record && claims?.accountId != null) {
-          try {
-            record = await fetchAuthJSON(`${API_BASE}/Account/${claims.accountId}`, { method: "GET" });
-          } catch { }
+          try { record = await fetchAuthJSON(`${API_BASE}/Account/${claims.accountId}`, { method: "GET" }); }
+          catch { }
         }
 
         if (!record) {
-          record = {
-            userName: claims?.username || "",
-            email: claims?.email || "",
-            customers: [],
-          };
+          record = { userName: claims?.username || "", email: claims?.email || "", customers: [] };
         }
 
         const normalized = normalizeAccount(record);
 
-        // Rút customerId ưu tiên trong profile; nếu không có -> từ token; cuối cùng thử /Customers/me
+        // Rút customerId
         let cid =
           record?.customers?.[0]?.customerId ??
           record?.customerId ??
@@ -292,7 +265,7 @@ export default function PaymentPage() {
     return () => { mounted = false; };
   }, [API_BASE]);
 
-  // 2) Lấy vehicle theo customerId -> licensePlate (có fallback /Customers/me ở trên)
+  // 2) Lấy vehicle theo customerId -> licensePlate
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -312,10 +285,7 @@ export default function PaymentPage() {
           try {
             const res = await fetchAuthJSON(`${API_BASE}${p}`, { method: "GET" });
             const list = extractVehicleItems(res);
-            if (list.length) {
-              items = list;
-              break;
-            }
+            if (list.length) { items = list; break; }
           } catch { }
         }
 
@@ -344,7 +314,50 @@ export default function PaymentPage() {
     return () => { mounted = false; };
   }, [currentCustomerId, API_BASE]);
 
-  // Demo ví
+  // ===== Ưu tiên giá từ BE /Booking/{id}
+  useEffect(() => {
+    if (!bookingId) return;
+    (async () => {
+      try {
+        const b = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
+        const price = Number(b?.price ?? b?.Price ?? 0);
+        if (price > 0) setBookingPrice(price);
+      } catch {
+        // dùng fallback bên dưới
+      }
+    })();
+  }, [bookingId, API_BASE]);
+
+  // ===== Fallback 1: parse vnp_Amount từ URL (VND*100)
+  const amountFromVnpUrl = useMemo(() => {
+    try {
+      if (!vnpayUrl) return null;
+      const u = new URL(vnpayUrl);
+      const raw = u.searchParams.get("vnp_Amount");
+      if (!raw) return null;
+      const scaled = Number(raw);
+      if (!Number.isFinite(scaled)) return null;
+      return Math.round(scaled / 100);
+    } catch { return null; }
+  }, [vnpayUrl]);
+
+  // ===== Fallback 2: tính tạm (theo tham số FE, chỉ hiển thị nếu BE chưa có)
+  const feePerHourFallback = 0; // không dùng FE tính phí nữa
+  const roundedHoursFallback = useMemo(
+    () => ceilHoursFromMinutes(totalMinutes || 0),
+    [totalMinutes]
+  );
+  const amountFallback = useMemo(
+    () => Math.max(0, Math.round(feePerHourFallback * roundedHoursFallback)),
+    [feePerHourFallback, roundedHoursFallback]
+  );
+
+  // ===== Số tiền cuối cùng để hiển thị & thanh toán =====
+  const amount = (bookingPrice != null && bookingPrice > 0)
+    ? bookingPrice
+    : (amountFromVnpUrl ?? amountFallback);
+
+  // ===== Payment method UI
   const [walletBalance, setWalletBalance] = useState(0);
   useEffect(() => {
     const saved = Number(localStorage.getItem("demo:walletBalance"));
@@ -362,60 +375,6 @@ export default function PaymentPage() {
     expiryDate: "",
     cvv: "",
   });
-
-  const { station, charger, gun, totalMinutes, perMinute, startTime, baseline } = state || {};
-  if (!state) {
-    return (
-      <div className="page-fallback">
-        <h2>Thiếu thông tin đơn hàng</h2>
-        <p>Vui lòng đặt lại từ trang danh sách trạm.</p>
-        <button className="secondary-btn" onClick={() => navigate("/stations")}>
-          <ArrowLeftOutlined /> Về danh sách trạm
-        </button>
-      </div>
-    );
-  }
-
-  // ===== Order display info (FE)
-  const orderId = useMemo(() => state?.orderId || "ORD" + Date.now(), [state?.orderId]);
-
-  // ---- Tham số đầu vào và cách tính phí đặt chỗ (fallback) ----
-  const feePerHourFallback = useMemo(() => {
-    const direct = state.feePerHour ?? state.bookingFeePerHour ?? null;
-    if (direct != null) return Number(direct) || 0;
-    const pm = Number(perMinute) || 0;
-    return pm * 60;
-  }, [state?.feePerHour, state?.bookingFeePerHour, perMinute]);
-
-  const roundedHoursFallback = useMemo(
-    () => ceilHoursFromMinutes(totalMinutes || 0),
-    [totalMinutes]
-  );
-
-  const amountFallback = useMemo(
-    () => Math.max(0, Math.round(feePerHourFallback * roundedHoursFallback)),
-    [feePerHourFallback, roundedHoursFallback]
-  );
-
-  // ==== Đồng bộ số tiền với Booking (quan trọng để khớp VNPAY) ====
-  useEffect(() => {
-    if (!bookingId) return;
-    (async () => {
-      try {
-        const b = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
-        const price = Number(b?.price ?? b?.Price ?? 0);
-        if (price > 0) setBookingPrice(price);
-      } catch {
-        // Không chặn, vẫn dùng fallback nếu lỗi
-      }
-    })();
-  }, [bookingId, API_BASE]);
-
-  // Giá hiển thị cuối cùng (ưu tiên giá booking từ BE)
-  const pricePerHour = feePerHourFallback; // giữ cho bảng hiển thị
-  const roundedHours = roundedHoursFallback;
-  // const amount = amountFallback;
-  const amount = (bookingPrice != null && bookingPrice > 0) ? bookingPrice : amountFallback;
 
   const onInputChange = (e) => {
     const { name, value } = e.target;
@@ -439,9 +398,9 @@ export default function PaymentPage() {
       startTime: startTime || "",
       baseline: baseline || "",
       totalMinutes: totalMinutes || 0,
-      bookingFee: amount,
-      roundedHours,
-      pricePerHour,
+      bookingFee: amount, // hiển thị theo BE
+      roundedHours: roundedHoursFallback,
+      pricePerHour: 0,
       paidAt: Date.now(),
       paymentMethod: selectedPayment,
       contact,
@@ -475,10 +434,9 @@ export default function PaymentPage() {
     setPayError("");
 
     try {
-      if (!bookingId) {
-        throw new Error("Thiếu bookingId. Vui lòng tạo/chọn booking trước khi thanh toán.");
-      }
+      if (!bookingId) throw new Error("Thiếu bookingId. Vui lòng tạo/chọn booking trước khi thanh toán.");
 
+      // Bắt buộc booking phải có giá để tạo URL
       let bePrice = null;
       try {
         const check = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
@@ -492,10 +450,10 @@ export default function PaymentPage() {
 
       const payload = {
         bookingId,
-        expectedAmount: bePrice || amount,
+        expectedAmount: bePrice, // gửi để BE tự kiểm tra
         orderId,
         minutes: totalMinutes,
-        roundedHours,
+        roundedHours: roundedHoursFallback,
         returnUrl: `${window.location.origin}/vnpay-bridge.html?order=${orderId}`,
       };
 
@@ -517,11 +475,10 @@ export default function PaymentPage() {
         if (raw) vnpAmount = Number(raw);
       } catch { }
 
-      const expected = (bePrice || amount);
-      const expectedScaled = Math.round(expected * 100);
+      const expectedScaled = Math.round(bePrice * 100);
       if (!vnpAmount || Math.abs(vnpAmount - expectedScaled) >= 1) {
         throw new Error(
-          `BE đang gửi sai số tiền cho VNPAY. expected=${expected.toLocaleString("vi-VN")}đ `
+          `BE đang gửi sai số tiền cho VNPAY. expected=${bePrice.toLocaleString("vi-VN")}đ `
           + `→ vnp_Amount=${expectedScaled}, nhưng URL có vnp_Amount=${vnpAmount || "∅"}`
         );
       }
@@ -591,7 +548,6 @@ export default function PaymentPage() {
           return;
         }
 
-        // Nếu state đã có vnpayUrl sẵn thì dùng luôn; nếu chưa có thì tạo.
         let url = vnpayUrl;
         if (!url) {
           const created = await createVnpayPayment();
@@ -599,7 +555,6 @@ export default function PaymentPage() {
           url = created.url;
         }
 
-        // Lưu stub để PaymentSuccess dùng ngay khi quay về
         const stub = {
           orderId,
           bookingId,
@@ -610,14 +565,22 @@ export default function PaymentPage() {
           baseline: baseline || "",
           totalMinutes: totalMinutes || 0,
           bookingFee: amount,
-          roundedHours,
-          pricePerHour,
+          roundedHours: roundedHoursFallback,
+          pricePerHour: 0,
           paymentMethod: "vnpay",
           contact,
           vehiclePlate,
           paidAt: Date.now(),
         };
+        // saveOrderBlob(orderId, stub);
+        // Lưu theo orderId
         saveOrderBlob(orderId, stub);
+        // Nếu đã biết vnp_TxnRef trong URL, lưu thêm bản sao theo txnRef
+        try {
+          const u = new URL(url);
+          const ref = u.searchParams.get("vnp_TxnRef");
+          if (ref) saveOrderBlob(ref, stub);
+        } catch { }
         try { sessionStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }
         try { localStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }
 
@@ -742,24 +705,8 @@ export default function PaymentPage() {
               <table className="os-table">
                 <tbody>
                   <tr>
-                    <td>Đơn giá đặt chỗ theo giờ</td>
-                    <td className="os-right">{vnd(pricePerHour)}</td>
-                  </tr>
-                  <tr>
-                    <td>Số giờ đặt (làm tròn lên, tối thiểu 1h)</td>
-                    <td className="os-right">{roundedHours} giờ</td>
-                  </tr>
-                  <tr>
-                    <td>Phí đặt chỗ</td>
+                    <td>Phí đặt chỗ (theo BE)</td>
                     <td className="os-right">{vnd(amount)}</td>
-                  </tr>
-                  <tr>
-                    <td>Tạm tính</td>
-                    <td className="os-right">{vnd(amount)}</td>
-                  </tr>
-                  <tr>
-                    <td>Giảm giá</td>
-                    <td className="os-right">0%</td>
                   </tr>
                   <tr className="os-total">
                     <td><b>Tổng</b></td>
