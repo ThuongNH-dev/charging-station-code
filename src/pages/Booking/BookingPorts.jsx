@@ -30,16 +30,16 @@ function normalizeCharger(c = {}) {
   const rawStatus = (c.status ?? c.Status ?? "").toString().toLowerCase();
   const status =
     rawStatus.includes("available") ? "available" :
-    rawStatus.includes("busy") ? "busy" :
-    rawStatus.includes("maint") ? "maintenance" :
-    rawStatus || "unknown";
+      rawStatus.includes("busy") ? "busy" :
+        rawStatus.includes("maint") ? "maintenance" :
+          rawStatus || "unknown";
 
   return {
     id,
     stationId: c.stationId ?? c.StationId,
     title: c.code ?? c.Code ?? `Trụ #${id}`,
-    connector: c.type ?? c.Type ?? "",   // "Type 2" | "CCS2" | "CHAdeMO" ...
-    power: powerText,                    // "60 kW"
+    connector: c.type ?? c.Type ?? "",
+    power: powerText,
     status,
     price: c.price ?? c.Price ?? "",
     imageUrl: c.imageUrl ?? c.ImageUrl ?? "",
@@ -56,10 +56,10 @@ function normalizePort(p = {}) {
   const rawStatus = (p.status ?? p.Status ?? "").toString().toLowerCase();
   const status =
     rawStatus.includes("available") || rawStatus === "1" ? "available" :
-    rawStatus.includes("busy") || rawStatus === "2" ? "busy" :
-    rawStatus.includes("inactive") || rawStatus === "0" ? "inactive" :
-    rawStatus.includes("maint") ? "maintenance" :
-    "unknown";
+      rawStatus.includes("busy") || rawStatus === "2" ? "busy" :
+        rawStatus.includes("inactive") || rawStatus === "0" ? "inactive" :
+          rawStatus.includes("maint") ? "maintenance" :
+            "unknown";
 
   return {
     id,
@@ -70,6 +70,38 @@ function normalizePort(p = {}) {
     chargerId: p.chargerId ?? p.ChargerId,
     _raw: p,
   };
+}
+
+// ===== Helper: chọn bookingId từ nhiều kiểu response khác nhau
+function pickBookingId(created) {
+  if (!created) return null;
+
+  const keys = ["bookingId", "BookingId", "bookingID", "BookingID", "id", "Id", "ID"];
+
+  for (const k of keys) {
+    if (created?.[k] != null && created?.[k] !== "") return created[k];
+  }
+
+  const nests = ["data", "result", "value", "item", "payload", "booking"];
+  for (const n of nests) {
+    const obj = created?.[n];
+    if (obj && typeof obj === "object") {
+      for (const k of keys) {
+        if (obj?.[k] != null && obj?.[k] !== "") return obj[k];
+      }
+    }
+  }
+
+  if (Array.isArray(created) && created.length) {
+    const first = created[0];
+    for (const k of keys) {
+      if (first?.[k] != null && first?.[k] !== "") return first[k];
+    }
+  }
+
+  if (typeof created === "string" && created.trim()) return created.trim();
+
+  return null;
 }
 
 export default function BookingPorts() {
@@ -134,7 +166,7 @@ export default function BookingPorts() {
       setStartHour(minStartHour);
       setStartMinute(minStartMinute);
     }
-  }, [nowHour, nowMinute, minStartHour, minStartMinute, canBookToday]); // cập nhật theo thời gian
+  }, [nowHour, nowMinute, minStartHour, minStartMinute, canBookToday]);
 
   // ==== TÙY CHỌN GIỜ/PHÚT BẮT ĐẦU ====
   const startHourOptions = useMemo(() => {
@@ -152,11 +184,8 @@ export default function BookingPorts() {
   // ====== CHỌN GIỜ KẾT THÚC (>= start + 60 phút) ======
   const startAbsMin = useMemo(() => startHour * 60 + startMinute, [startHour, startMinute]);
   const minEndAbsMin = startAbsMin + MIN_GAP_MINUTES;
-
-  // Nếu vượt 23:59 thì không book được
   const endCapAbsMin = LAST_ABS_MIN;
 
-  // State chọn kết thúc — mặc định = start + 60 phút (ghim cùng phút)
   const defEnd = useMemo(() => {
     const abs = Math.min(minEndAbsMin, endCapAbsMin);
     return { h: Math.floor(abs / 60), m: abs % 60 };
@@ -165,7 +194,6 @@ export default function BookingPorts() {
   const [endHour, setEndHour] = useState(defEnd.h);
   const [endMinute, setEndMinute] = useState(defEnd.m);
 
-  // Giữ end luôn hợp lệ khi start đổi
   useEffect(() => {
     const curEndAbs = endHour * 60 + endMinute;
     if (curEndAbs < minEndAbsMin) {
@@ -178,7 +206,6 @@ export default function BookingPorts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [minEndAbsMin, endCapAbsMin, defEnd.h, defEnd.m]);
 
-  // Tùy chọn giờ/phút cho kết thúc
   const endHourOptions = useMemo(() => {
     const minH = Math.floor(minEndAbsMin / 60);
     const arr = [];
@@ -192,21 +219,18 @@ export default function BookingPorts() {
 
     const all = Array.from({ length: 60 }, (_, i) => i);
     if (h > minH) return all;
-
-    // cùng giờ với min => phút phải >= minM
     return all.filter((m) => m >= minM);
   };
 
   // ====== TÍNH TỔNG PHÚT & PHÍ ======
   const totalMinutes = useMemo(() => {
     const endAbs = endHour * 60 + endMinute;
-    const gap = endAbs - startAbsMin;
+    const gap = endAbs - (startHour * 60 + startMinute);
     return Math.max(0, gap);
-  }, [startAbsMin, endHour, endMinute]);
+  }, [startHour, startMinute, endHour, endMinute]);
 
   const totalHoursFloat = useMemo(() => totalMinutes / 60, [totalMinutes]);
 
-  // 💰 Phí (theo giờ)
   const [parkingFee, setParkingFee] = useState(20000); // đ/giờ
   const perMinute = useMemo(() => parkingFee / 60, [parkingFee]);
   const bookingFee = useMemo(() => Math.round(perMinute * totalMinutes), [perMinute, totalMinutes]);
@@ -279,21 +303,50 @@ export default function BookingPorts() {
     setSelectedGun(firstAvail);
   }, [ports, selectedGun]);
 
+  // ====== Utils format datetime local ======
   function pad(n) { return String(n).padStart(2, "0"); }
   function fmtLocal(dt) {
     return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
       + `T${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
   }
-  function fmtLocalWithOffset(dt) {
-    const base = fmtLocal(dt);
-    const off = -dt.getTimezoneOffset();
-    const sign = off >= 0 ? "+" : "-";
-    const hh = pad(Math.floor(Math.abs(off) / 60));
-    const mm = pad(Math.abs(off) % 60);
-    return `${base}${sign}${hh}:${mm}`;
+
+  // ====== BOOK (đÃ SỬA: dùng ${API_BASE}/Booking + pickBookingId) ======
+  // ===== Helpers lấy items / chọn booking vừa tạo =====
+  function extractItems(obj) {
+    if (!obj) return [];
+    if (Array.isArray(obj)) return obj;
+    if (Array.isArray(obj.items)) return obj.items;
+    if (obj.data && Array.isArray(obj.data.items)) return obj.data.items;
+    return [];
   }
 
-  // ====== BOOK ======
+  function pickJustCreatedFromList(items, { customerId, portId, startLocal }) {
+    if (!Array.isArray(items) || !items.length) return null;
+    const wantStartMs = +startLocal;
+
+    // Lọc theo customerId & portId (string-safe)
+    const candidates = items.filter(b =>
+      String(b.customerId ?? b.CustomerId) === String(customerId) &&
+      String(b.portId ?? b.PortId) === String(portId)
+    );
+
+    if (!candidates.length) return null;
+
+    // Chọn item có startTime gần nhất
+    let best = null, bestDiff = Infinity;
+    for (const b of candidates) {
+      const st = b.startTime ?? b.StartTime ?? b.start ?? b.Start ?? "";
+      const t = st ? Date.parse(st) : NaN;
+      const diff = Number.isFinite(t) ? Math.abs(t - wantStartMs) : 1e15;
+      if (diff < bestDiff) { best = b; bestDiff = diff; }
+    }
+    // Chấp nhận nếu lệch <= 5 phút
+    return (best && bestDiff <= 5 * 60 * 1000) ? best : null;
+  }
+
+  const idFromItem = (b) => (b?.bookingId ?? b?.BookingId ?? b?.id ?? b?.Id ?? null);
+
+  // ====== BOOK (bản vá: xử lý body paged + fallback GET) ======
   const handleBook = async () => {
     if (!selectedGun || totalMinutes < MIN_GAP_MINUTES) return;
 
@@ -301,35 +354,146 @@ export default function BookingPorts() {
     if (!myVehicleId) { alert("Tài khoản chưa có xe. Hãy thêm xe trước khi đặt."); return; }
 
     const today = new Date();
-    const startLocal = new Date(
-      today.getFullYear(), today.getMonth(), today.getDate(),
-      startHour, startMinute, 0, 0
-    );
-    const endLocal = new Date(
-      today.getFullYear(), today.getMonth(), today.getDate(),
-      endHour, endMinute, 0, 0
-    );
+    const startLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), startHour, startMinute, 0, 0);
+    const endLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), endHour, endMinute, 0, 0);
 
     const bookingDto = {
-      customerId: me.customerId,
-      vehicleId: myVehicleId,
-      portId: selectedGun.id,
-      startTime: fmtLocal(startLocal),      // hoặc fmtLocalWithOffset(startLocal)
-      endTime: fmtLocal(endLocal),          // hoặc fmtLocalWithOffset(endLocal)
-      status: "Confirmed",
+      CustomerId: me.customerId,
+      VehicleId: myVehicleId,
+      PortId: selectedGun.id,
+      StartTime: fmtLocal(startLocal),
+      EndTime: fmtLocal(endLocal),
+      Status: "Confirmed",
     };
 
     try {
-      const created = await fetchAuthJSON("/Booking", {
+      // 1) POST tạo booking (dùng fetchAuthJSON như utils của bạn)
+      // --- POST tạo booking (dùng fetch để đọc body lỗi từ BE) ---
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/Booking`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bookingDto),
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          CustomerId: me.customerId,
+          VehicleId: myVehicleId,
+          PortId: selectedGun.id,
+          StartTime: fmtLocal(startLocal),
+          EndTime: fmtLocal(endLocal),
+          // Nên để Pending khi tạo mới
+          Status: "Pending",
+        }),
       });
 
+      let created = null;
+      if (!res.ok) {
+        // đọc text/json lỗi để biết lý do BE từ chối
+        let errText = "";
+        try { errText = await res.text(); } catch { }
+        console.error("[Booking] POST failed:", res.status, errText);
+        alert(`Tạo booking thất bại (${res.status}). ${errText || "Bad Request"}`);
+        return; // dừng luôn, tránh chạy phần lấy bookingId
+      }
+
+      try { created = await res.json(); } catch {
+        created = null; // có thể BE trả 201 + body rỗng
+      }
+
+
+      // 2) Cố lấy bookingId trực tiếp
+      let bookingId = idFromItem(created);
+
+      // 3) Nếu BE trả paged -> lấy items và tìm item khớp
+      if (!bookingId) {
+        const list = extractItems(created);
+        if (list.length) {
+          const matched = pickJustCreatedFromList(list, {
+            customerId: me.customerId,
+            portId: selectedGun.id,
+            startLocal,
+          });
+          bookingId = idFromItem(matched) || idFromItem(list[0]);
+        }
+      }
+
+      // 4) Fallback: gọi GET /Booking?customerId=... để dò lại nếu chưa có
+      if (!bookingId) {
+        const url = `${API_BASE}/Booking?customerId=${encodeURIComponent(me.customerId)}&page=1&pageSize=10`;
+        try {
+          const latest = await fetchAuthJSON(url, { method: "GET" });
+          const items = extractItems(latest);
+          const matched = pickJustCreatedFromList(items, {
+            customerId: me.customerId,
+            portId: selectedGun.id,
+            startLocal,
+          });
+          bookingId = idFromItem(matched) || idFromItem(items[0]);
+        } catch (e) {
+          // ignore; sẽ ném lỗi phía dưới nếu vẫn không có bookingId
+        }
+      }
+
+      if (!bookingId) {
+        console.error("[Booking] API response không có bookingId:", created);
+        throw new Error("Tạo booking xong nhưng không có bookingId.");
+      }
+      console.log("✅ BookingPorts handleBook bookingId =", bookingId);
+
+      // 5) Tạo phiên VNPAY với bookingId
+      const orderId = "ORD" + Date.now();
+      const payload = {
+        bookingId,
+        orderId,
+        returnUrl: `${window.location.origin}/vnpay-bridge.html?order=${orderId}`,
+        minutes: totalMinutes,
+        roundedHours: Math.max(1, Math.ceil(totalMinutes / 60)),
+      };
+
+      const payRes = await fetchAuthJSON(`${API_BASE}/Payment/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!payRes?.success || !payRes?.paymentUrl) {
+        throw new Error(payRes?.message || "API /Payment/create không trả về paymentUrl.");
+      }
+
+      // LƯU CONTEXT để PaymentPage đọc lại nếu người dùng refresh
+      try {
+        sessionStorage.setItem(
+          `pay:${orderId}:ctx`,
+          JSON.stringify({
+            bookingId,
+            vnpayUrl: payRes.paymentUrl,
+            orderId,
+            station: { id, name: station?.name, address: station?.address },
+            charger: {
+              id: cid,
+              connector: selectedGun?.connector || charger?.connector,
+              power: selectedGun?.power || charger?.power,
+              price: charger?.price,
+            },
+            gun: { id: selectedGun?.id, name: selectedGun?.name || `Súng ${selectedGun?.id}` },
+            totalMinutes,
+            perMinute,
+            bookingFee,
+          })
+        );
+        sessionStorage.setItem("pay:lastOrderId", orderId);
+      } catch { }
+
+
+      // 6) Điều hướng sang PaymentPage, truyền bookingId + vnpayUrl
       navigate("/payment", {
         state: {
-          bookingId: created.id ?? created.bookingId,
+          orderId,
+          bookingId,
           booking: created,
+          vnpayUrl: payRes.paymentUrl,
           station: { id, name: station?.name, address: station?.address },
           charger: {
             id: cid,
@@ -338,13 +502,16 @@ export default function BookingPorts() {
             price: charger?.price,
           },
           gun: { id: selectedGun?.id, name: selectedGun?.name || `Súng ${selectedGun?.id}` },
-          totalMinutes, perMinute, bookingFee,
+          totalMinutes,
+          perMinute,
+          bookingFee,
         },
       });
     } catch (e) {
-      alert(`Tạo booking thất bại: ${e.message}`);
+      alert(`Tạo booking hoặc phiên thanh toán thất bại: ${e.message}`);
     }
   };
+
 
   // === NẠP USER & VEHICLE ===
   useEffect(() => {
@@ -442,6 +609,7 @@ export default function BookingPorts() {
 
   const startDisabled = !canBookToday;
   const endDisabled = !canBookToday;
+
 
   return (
     <MainLayout>

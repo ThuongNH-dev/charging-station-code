@@ -1,4 +1,3 @@
-// src/pages/payment/PaymentSuccess.jsx
 import React, { useMemo, useEffect, useState } from "react";
 import { useLocation, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { CheckCircleFilled, ArrowLeftOutlined } from "@ant-design/icons";
@@ -380,8 +379,6 @@ export default function PaymentSuccess() {
               );
             })()}
 
-
-            {/* Hiển thị người liên hệ + biển số nếu có */}
             {(data?.contact?.fullName || data?.vehiclePlate) && (
               <div className="ps-block">
                 <div className="ps-block-head">Khách hàng</div>
