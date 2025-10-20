@@ -19,6 +19,10 @@ import ServicePlans from "./components/subscription/ServicePlans";
 import Unauthorized from "./pages/Unauthorized"; // ✅ thêm trang này (mục 2)
 import ChargerManager from "./pages/staff/ChargerManager";
 import SessionManager from "./pages/staff/SessionManager";
+import PaymentManager from "./pages/staff/PaymentManager";
+import ReportPage from "./pages/staff/ReportPage";
+import StaffLayout from "./layouts/StaffLayout";
+
 
 import UpdateInfo from "./components/updateProfilePerson/UpdateInfo";
 import VehicleInfo from "./components/updateProfilePerson/VehicleInfo";
@@ -153,18 +157,10 @@ export default function App() {
       />
       {/*Staff */}
       <Route
-        path="/staff/stations"
+        path="/staff/*"
         element={
           <ProtectedRoute allowedRoles={["Staff", "Admin"]}>
-            <ChargerManager />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/staff/sessions"
-        element={
-          <ProtectedRoute allowedRoles={["Staff", "Admin"]}>
-            <SessionManager />
+            <StaffLayout />
           </ProtectedRoute>
         }
       />

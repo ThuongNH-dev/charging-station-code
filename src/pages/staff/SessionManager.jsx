@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import MainLayout from "../../layouts/MainLayout";
 import "./SessionManager.css";
 
 /** ================= Helpers (định dạng) ================= */
@@ -70,67 +69,65 @@ export default function SessionManager() {
   };
 
   return (
-    <MainLayout>
-      <div className="sess-wrap">
-        <div className="sess-card">
-          <div className="sess-head">
-            <h3>Phiên sạc (đang chạy / lịch sử)</h3>
-          </div>
-
-          <div className="sess-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Mã phiên</th>
-                  <th>Trụ</th>
-                  <th>Khách hàng</th>
-                  <th>Bắt đầu</th>
-                  <th>Kết thúc</th>
-                  <th>kWh</th>
-                  <th>Chi phí</th>
-                  <th>TT</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {loading && (
-                  <tr><td colSpan={9} className="center muted">Đang tải…</td></tr>
-                )}
-                {err && !loading && (
-                  <tr><td colSpan={9} className="center error">{err}</td></tr>
-                )}
-                {!loading && !err && rows.length === 0 && (
-                  <tr><td colSpan={9} className="center muted">Chưa có phiên nào.</td></tr>
-                )}
-
-                {!loading && !err && rows.map((r, i) => (
-                  <tr key={r.sessionCode || i}>
-                    <td className="strong">{r.sessionCode}</td>
-                    <td>{r.chargerCode || "—"}</td>
-                    <td>{r.customerCode || "—"}</td>
-                    <td>{fmtTime(r.startTime)}</td>
-                    <td>{fmtTime(r.endTime)}</td>
-                    <td>{r.energyKwh != null ? r.energyKwh : "—"}</td>
-                    <td>{r.cost != null ? vnd(r.cost) : "—"}</td>
-                    <td>
-                      <span className={`pill ${String(r.status).toLowerCase()}`}>
-                        {String(r.status).toUpperCase() || "—"}
-                      </span>
-                    </td>
-                    <td>
-                      <button className="btn-ghost" onClick={() => onStop(r)}>
-                        Dừng
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
+    <div className="sess-wrap">
+      <div className="sess-card">
+        <div className="sess-head">
+          <h3>Phiên sạc (đang chạy / lịch sử)</h3>
         </div>
+
+        <div className="sess-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Mã phiên</th>
+                <th>Trụ</th>
+                <th>Khách hàng</th>
+                <th>Bắt đầu</th>
+                <th>Kết thúc</th>
+                <th>kWh</th>
+                <th>Chi phí</th>
+                <th>TT</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {loading && (
+                <tr><td colSpan={9} className="center muted">Đang tải…</td></tr>
+              )}
+              {err && !loading && (
+                <tr><td colSpan={9} className="center error">{err}</td></tr>
+              )}
+              {!loading && !err && rows.length === 0 && (
+                <tr><td colSpan={9} className="center muted">Chưa có phiên nào.</td></tr>
+              )}
+
+              {!loading && !err && rows.map((r, i) => (
+                <tr key={r.sessionCode || i}>
+                  <td className="strong">{r.sessionCode}</td>
+                  <td>{r.chargerCode || "—"}</td>
+                  <td>{r.customerCode || "—"}</td>
+                  <td>{fmtTime(r.startTime)}</td>
+                  <td>{fmtTime(r.endTime)}</td>
+                  <td>{r.energyKwh != null ? r.energyKwh : "—"}</td>
+                  <td>{r.cost != null ? vnd(r.cost) : "—"}</td>
+                  <td>
+                    <span className={`pill ${String(r.status).toLowerCase()}`}>
+                      {String(r.status).toUpperCase() || "—"}
+                    </span>
+                  </td>
+                  <td>
+                    <button className="btn-ghost" onClick={() => onStop(r)}>
+                      Dừng
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
       </div>
-    </MainLayout>
+    </div>
   );
 }

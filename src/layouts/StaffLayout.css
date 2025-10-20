@@ -1,0 +1,96 @@
+/* Override CSS variables */
+.staff-layout {
+  --max-w: 100% !important;
+  background: #f8fafc;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Reset padding/margin của Ant Design Layout */
+.staff-layout .ant-layout-content {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Reset Layout mặc định của Ant Design */
+.staff-layout.ant-layout {
+  background: #f8fafc;
+}
+
+.staff-layout .ant-layout-header,
+.staff-layout .ant-layout-footer {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Thanh điều hướng - STICKY DƯỚI HEADER (64px) */
+.staff-nav {
+  position: sticky;
+  top: 64px; /* Chiều cao header = 64px */
+  z-index: 999; /* Thấp hơn header (1000) */
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 20px;
+  margin: 0;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  width: 100%;
+}
+
+.staff-nav a {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #0f172a;
+  padding: 6px 14px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.staff-nav a:hover {
+  background: #e2e8f0;
+}
+
+.staff-nav a.active {
+  background: #111827;
+  color: #fff;
+  border-color: #111827;
+}
+
+/* Nội dung - PADDING NHẤT QUÁN cho tất cả trang */
+.staff-content {
+  flex: 1;
+  padding: 20px; /* Padding cố định */
+  margin: 0; /* Không có margin */
+  background: #f8fafc;
+}
+
+/* Reset margin cho tất cả các wrapper bên trong */
+.staff-content > div {
+  margin: 0;
+}
+
+/* Trang chưa có */
+.staff-stub {
+  text-align: center;
+  padding: 40px;
+  margin: 0;
+}
+
+.staff-stub h2 {
+  margin-bottom: 8px;
+  color: #111827;
+}
+
+.staff-stub p {
+  color: #6b7280;
+  margin: 0;
+}
