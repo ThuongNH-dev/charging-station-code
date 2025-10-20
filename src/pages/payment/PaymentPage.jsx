@@ -160,7 +160,6 @@ function readOrderBlob(orderId) {
 
 export default function PaymentPage() {
   const { state } = useLocation();
-
   const navigate = useNavigate();
 
   // ===== Local states
@@ -328,6 +327,24 @@ export default function PaymentPage() {
     })();
   }, [bookingId, API_BASE]);
 
+  // Nếu vào trang mà giá vẫn = null -> poll thêm vài lần (tối đa 10s)
+  useEffect(() => {
+    if (!bookingId || (bookingPrice != null && bookingPrice > 0)) return;
+    let alive = true;
+    const started = Date.now();
+    (async function loop() {
+      while (alive && Date.now() - started < 10000) {
+        try {
+          const b = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
+          const price = Number(b?.price ?? b?.Price ?? 0);
+          if (price > 0) { setBookingPrice(price); break; }
+        } catch {}
+        await new Promise(r => setTimeout(r, 800));
+      }
+    })();
+    return () => { alive = false; };
+  }, [bookingId, bookingPrice, API_BASE]);
+
   // ===== Fallback 1: parse vnp_Amount từ URL (VND*100)
   const amountFromVnpUrl = useMemo(() => {
     try {
@@ -341,21 +358,16 @@ export default function PaymentPage() {
     } catch { return null; }
   }, [vnpayUrl]);
 
-  // ===== Fallback 2: tính tạm (theo tham số FE, chỉ hiển thị nếu BE chưa có)
-  const feePerHourFallback = 0; // không dùng FE tính phí nữa
+  // ===== Fallback 2: tính tạm (không dùng nữa, luôn 0)
   const roundedHoursFallback = useMemo(
     () => ceilHoursFromMinutes(totalMinutes || 0),
     [totalMinutes]
-  );
-  const amountFallback = useMemo(
-    () => Math.max(0, Math.round(feePerHourFallback * roundedHoursFallback)),
-    [feePerHourFallback, roundedHoursFallback]
   );
 
   // ===== Số tiền cuối cùng để hiển thị & thanh toán =====
   const amount = (bookingPrice != null && bookingPrice > 0)
     ? bookingPrice
-    : (amountFromVnpUrl ?? amountFallback);
+    : (amountFromVnpUrl != null ? amountFromVnpUrl : null);
 
   // ===== Payment method UI
   const [walletBalance, setWalletBalance] = useState(0);
@@ -398,9 +410,10 @@ export default function PaymentPage() {
       startTime: startTime || "",
       baseline: baseline || "",
       totalMinutes: totalMinutes || 0,
-      bookingFee: amount, // hiển thị theo BE
-      roundedHours: roundedHoursFallback,
+      bookingFee: amount, // giá từ BE
+      roundedHours: Math.max(1, Math.ceil((totalMinutes || 0) / 60)), // chỉ để note, không tính tiền
       pricePerHour: 0,
+
       paidAt: Date.now(),
       paymentMethod: selectedPayment,
       contact,
@@ -450,11 +463,9 @@ export default function PaymentPage() {
 
       const payload = {
         bookingId,
-        expectedAmount: bePrice, // gửi để BE tự kiểm tra
         orderId,
-        minutes: totalMinutes,
-        roundedHours: roundedHoursFallback,
-        returnUrl: `${window.location.origin}/vnpay-bridge.html?order=${orderId}`,
+        // returnUrl có thể cần tùy BE
+        // returnUrl: `${window.location.origin}/vnpay-bridge.html?order=${orderId}`,
       };
 
       const res = await fetchAuthJSON(`${API_BASE}/Payment/create`, {
@@ -466,22 +477,6 @@ export default function PaymentPage() {
       if (!res?.success) throw new Error(res?.message || "Không tạo được URL thanh toán.");
       const url = res?.paymentUrl;
       if (!url) throw new Error("Backend không trả về paymentUrl.");
-
-      // Kiểm tra số tiền gửi tới VNPAY
-      let vnpAmount = null;
-      try {
-        const u = new URL(url);
-        const raw = u.searchParams.get("vnp_Amount"); // VND*100
-        if (raw) vnpAmount = Number(raw);
-      } catch { }
-
-      const expectedScaled = Math.round(bePrice * 100);
-      if (!vnpAmount || Math.abs(vnpAmount - expectedScaled) >= 1) {
-        throw new Error(
-          `BE đang gửi sai số tiền cho VNPAY. expected=${bePrice.toLocaleString("vi-VN")}đ `
-          + `→ vnp_Amount=${expectedScaled}, nhưng URL có vnp_Amount=${vnpAmount || "∅"}`
-        );
-      }
 
       let ref = "";
       try {
@@ -509,12 +504,13 @@ export default function PaymentPage() {
     }
   }, [selectedPayment, bookingId, orderId, vnpayUrl]); // đã thêm vnpayUrl để tránh lặp
 
-  const canPayByWallet = selectedPayment === "wallet" ? walletBalance >= amount : true;
+  const canPayByWallet = selectedPayment === "wallet" ? walletBalance >= (amount || 0) : true;
   const payDisabled =
     loading ||
     !selectedPayment ||
     (selectedPayment === "wallet" && !canPayByWallet) ||
-    (selectedPayment === "qr" && (!bookingId || creatingVnpay));
+    (selectedPayment === "qr" && (!bookingId || creatingVnpay || !vnpayUrl)) ||
+    (amount == null); // cần có giá từ BE (hoặc từ URL) để enable
 
   const handlePay = async () => {
     if (!selectedPayment) return;
@@ -523,22 +519,8 @@ export default function PaymentPage() {
     setLoading(true);
     setPayError("");
     try {
-      const baseExtra = { contact };
-
       if (selectedPayment === "wallet") {
-        const before = walletBalance;
-        const after = before - amount;
-        localStorage.setItem("demo:walletBalance", String(after));
-        setWalletBalance(after);
-
-        const payload = buildSuccessPayload({
-          ...baseExtra,
-          walletBalanceBefore: before,
-          walletBalanceAfter: after,
-          paymentRef: `WAL-${orderId}`,
-          vehiclePlate,
-        });
-        navigate(`/payment/success?order=${orderId}`, { state: payload, replace: true });
+        setPayError("Hiện tại hệ thống chỉ hỗ trợ thanh toán qua VNPAY-QR.");
         return;
       }
 
@@ -564,15 +546,14 @@ export default function PaymentPage() {
           startTime: startTime || "",
           baseline: baseline || "",
           totalMinutes: totalMinutes || 0,
-          bookingFee: amount,
-          roundedHours: roundedHoursFallback,
+          bookingFee: amount, // BE quyết định
+          roundedHours: Math.max(1, Math.ceil((totalMinutes || 0) / 60)),
           pricePerHour: 0,
           paymentMethod: "vnpay",
           contact,
           vehiclePlate,
           paidAt: Date.now(),
         };
-        // saveOrderBlob(orderId, stub);
         // Lưu theo orderId
         saveOrderBlob(orderId, stub);
         // Nếu đã biết vnp_TxnRef trong URL, lưu thêm bản sao theo txnRef
@@ -588,23 +569,17 @@ export default function PaymentPage() {
         return;
       }
 
-      const payload = buildSuccessPayload({
-        ...baseExtra,
-        paymentRef: `${selectedPayment.toUpperCase()}-${orderId}`,
-        vehiclePlate,
-      });
-      navigate(`/payment/success?order=${orderId}`, { state: payload, replace: true });
+      setPayError("Hiện tại hệ thống chỉ hỗ trợ thanh toán qua VNPAY-QR.");
+      return;
     } finally {
       setLoading(false);
     }
   };
 
-  // Nếu đã có vnpayUrl từ state => auto chọn "qr" & hiển thị QR ngay
+  // Nếu chỉ hỗ trợ QR, auto chọn QR khi vào trang (UX mượt hơn)
   useEffect(() => {
-    if (state?.vnpayUrl) {
-      setSelectedPayment("qr");
-    }
-  }, [state?.vnpayUrl]);
+    if (!state?.vnpayUrl && !selectedPayment) setSelectedPayment("qr");
+  }, [selectedPayment, state?.vnpayUrl]);
 
   return (
     <MainLayout>
@@ -702,18 +677,23 @@ export default function PaymentPage() {
 
             <div className="os-block">
               <h3>2. Chi phí (phí đặt chỗ, không phải tiền sạc)</h3>
-              <table className="os-table">
-                <tbody>
-                  <tr>
-                    <td>Phí đặt chỗ (theo BE)</td>
-                    <td className="os-right">{vnd(amount)}</td>
-                  </tr>
-                  <tr className="os-total">
-                    <td><b>Tổng</b></td>
-                    <td className="os-right"><b>{vnd(amount)}</b></td>
-                  </tr>
-                </tbody>
-              </table>
+              {amount == null ? (
+                <p className="os-warning">Đang chờ hệ thống tính phí từ booking...</p>
+              ) : (
+                <table className="os-table">
+                  <tbody>
+                    <tr>
+                      <td>Phí đặt chỗ (theo hệ thống)</td>
+                      <td className="os-right">{vnd(amount)}</td>
+                    </tr>
+                    <tr className="os-total">
+                      <td><b>Tổng</b></td>
+                      <td className="os-right"><b>{vnd(amount)}</b></td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+
               <p className="os-note">
                 Lưu ý: Đây là <b>phí đặt chỗ</b> cho khoảng thời gian bạn giữ trụ, không phải tiền điện sạc.
               </p>

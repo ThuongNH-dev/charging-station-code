@@ -124,3 +124,22 @@
 @media (max-width: 560px) {
   .nav { display: none; } /* Ẩn menu khi quá hẹp, có thể thay bằng Drawer sau */
 }
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.history-icon {
+  font-size: 30px;
+  color: rgb(0, 0, 0);
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.15s ease;
+}
+
+.history-icon:hover {
+  color: #006d32;
+  transform: scale(1.1);
+}
+

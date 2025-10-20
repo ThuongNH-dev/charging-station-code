@@ -6,9 +6,9 @@ import StationFilters from "../../components/station/StationFilters";
 import StationListItem from "../../components/station/StationListItem";
 import StationMap from "../../components/station/StationMap";
 import "./style/StationList.css";
+
 import { fetchStations } from "../../api/station";
 
-const API_URL = "https://localhost:7268/api/Stations";
 export default function StationList() {
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,10 +22,18 @@ export default function StationList() {
   const itemRefs = useRef({});
 
   useEffect(() => {
-    fetchStations()
-      .then((list) => setStations(list))
-      .catch((err) => setError(err.message || "Đã có lỗi xảy ra"))
-      .finally(() => setLoading(false));
+    let mounted = true;
+    (async () => {
+      try {
+        const list = await fetchStations(); // có thể truyền {page, pageSize, keyword}
+        if (mounted) setStations(list || []);
+      } catch (err) {
+        if (mounted) setError(err?.message || "Đã có lỗi xảy ra");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const cityOptions = useMemo(() => {
@@ -68,8 +76,8 @@ export default function StationList() {
             city={city} onCityChange={setCity}
             cityOptions={cityOptions}
             visible={{
-              search: true,  // ⬅️ bật lại thanh search
-              city: true,    // ⬅️ giữ dropdown địa điểm
+              search: true,
+              city: true,
               power: false,
               status: false,
               sortPrice: false,
@@ -96,8 +104,8 @@ export default function StationList() {
               <div className="stationListGrid">
                 {filtered.map((st) => (
                   <div
-                    key={st.id}
-                    ref={(el) => { if (el) itemRefs.current[st.id] = el; }}
+                    key={st.id ?? `${st.name}-${st.city}`}
+                    ref={(el) => { if (el && st.id != null) itemRefs.current[st.id] = el; }}
                     className="stationListItemWrapper station-card-clickable"
                     role="button"
                     tabIndex={0}

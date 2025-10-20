@@ -1,8 +1,9 @@
 import React from "react";
-import { Layout, Button } from "antd";
+import { Layout, Button, Tooltip } from "antd";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import AccountMenu from "../others/Menu";
+import { FileSearchOutlined } from "@ant-design/icons"; // ✅ icon bạn muốn
 import "./Header.css";
 
 const { Header } = Layout;
@@ -16,6 +17,7 @@ export default function Head() {
   const role = (user?.role || ctxRole || "").toLowerCase();
   const isStaff = role === "staff";
   const isAdmin = role === "admin";
+  const isCustomer = role === "customer";
   const userName = user?.name || user?.userName || ctxName || "User";
 
   // ===== MENU TRÁI =====
@@ -63,7 +65,21 @@ export default function Head() {
         </>
       );
     }
-    return <AccountMenu />;
+
+    return (
+      <div className="header-right">
+        {/* ✅ Icon chỉ hiện nếu là Customer */}
+        {isCustomer && (
+          <Tooltip title="Lịch sử đặt chỗ">
+            <FileSearchOutlined
+              className="history-icon"
+              onClick={() => navigate("/user/history")}
+            />
+          </Tooltip>
+        )}
+        <AccountMenu />
+      </div>
+    );
   };
 
   return (

@@ -28,6 +28,21 @@ const viSpeed = (s) => VI_SPEED[toLow(s)] || s || "—";
 const viChargerStatus = (s) => VI_CHARGER_STATUS[toLow(s)] || s || "—";
 
 // ================= Helpers: Normalizers =================
+
+function normalizePricingRule(r = {}) {
+  return {
+    id: r.pricingRuleId ?? r.PricingRuleId ?? r.id ?? r.Id,
+    chargerType: String(r.chargerType ?? r.ChargerType ?? "").trim(), // "AC" | "DC"
+    powerKw: Number(r.powerKw ?? r.PowerKW ?? r.power ?? 0),
+    timeRange: String(r.timeRange ?? r.TimeRange ?? "").trim(),       // "Normal" | "Peak"
+    pricePerKwh: Number(r.pricePerKwh ?? r.PricePerKwh ?? 0),
+    idleFeePerMin: Number(r.idleFeePerMin ?? r.IdleFeePerMin ?? 0),
+    status: r.status ?? r.Status ?? "Active",
+  };
+}
+
+const _low = (s) => String(s ?? "").trim().toLowerCase();
+const _mkKey = (typeRaw, powerKw) => `${_low(typeRaw)}|${Number(powerKw) || 0}`;
 function normalizeStation(s = {}) {
   return {
     id: s.id ?? s.stationId ?? s.StationId,
@@ -52,7 +67,7 @@ function normalizeCharger(c = {}) {
     c.price ?? c.Price ?? c.priceText ?? c.PriceText ?? c.tariffText ?? c.TariffText ?? null;
 
   const rawStatus = (c.status ?? c.Status ?? "").toString();
-  const rawSpeed  = c.type ?? c.Type ?? c.speed ?? c.Speed ?? "";
+  const rawSpeed = c.type ?? c.Type ?? c.speed ?? c.Speed ?? "";
 
   return {
     id: c.chargerId ?? c.ChargerId ?? c.id ?? c.Id,
@@ -257,6 +272,76 @@ export default function StationDetail() {
             };
           });
         }
+        // 5) PRICING RULES: lấy từ BE và ghép vào chargers theo (type, powerKw)
+        let pricingRules = [];
+        try {
+          // Thử nhiều route cho chắc (tùy BE đặt)
+          const ruleRoutes = [
+            `${API_BASE}/PricingRules`,
+            `${API_BASE}/Pricing/rules`,
+            `${API_BASE}/PricingRule`,
+          ];
+          for (const url of ruleRoutes) {
+            try {
+              const data = await fetchJSONAuth(url);
+              const arr = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+              if (arr?.length) { pricingRules = arr.map(normalizePricingRule); break; }
+            } catch { /* thử route tiếp */ }
+          }
+        } catch { /* im lặng nếu không có */ }
+
+        if (pricingRules.length) {
+          // Gom rule theo key (type|powerKw) và theo timeRange (normal/peak)
+          const byKey = new Map();
+          for (const r of pricingRules) {
+            if (_low(r.status) !== "active") continue;
+            const key = _mkKey(r.chargerType, r.powerKw);
+            const bucket = byKey.get(key) || {};
+            bucket[_low(r.timeRange)] = r; // bucket.normal / bucket.peak
+            byKey.set(key, bucket);
+          }
+
+          // merge rule vào từng charger
+          chargersList = chargersList.map(ch => {
+            // Lấy raw type: trong normalizeCharger bạn đang để ở ch.speed (raw từ c.type)
+            // Nếu BE của bạn trả "type" là AC/DC thì ch.speed chính là raw đó
+            const typeRaw = ch.speed || ch.type || "";
+            let power = ch.powerKw;
+            if (power == null) {
+              // fallback tách số từ "120 kW"
+              const m = String(ch.power || "").match(/([\d.]+)/);
+              power = m ? Number(m[1]) : undefined;
+            }
+            const key = _mkKey(typeRaw, power);
+            const rr = byKey.get(key);
+            if (!rr) return ch;
+
+            const normal = rr.normal;
+            const peak = rr.peak;
+
+            let priceText = "";
+            if (normal && peak) {
+              priceText = `${vnd(normal.pricePerKwh)} / kWh (thường) — ${vnd(peak.pricePerKwh)} / kWh (cao điểm)`;
+            } else if (normal) {
+              priceText = `${vnd(normal.pricePerKwh)} / kWh`;
+            } else if (peak) {
+              priceText = `${vnd(peak.pricePerKwh)} / kWh (cao điểm)`;
+            }
+
+            const priceValue = (normal?.pricePerKwh ?? peak?.pricePerKwh ?? ch.priceValue);
+            const priceUnit = "kWh";
+            const idleFeePerMin = normal?.idleFeePerMin ?? peak?.idleFeePerMin ?? ch.idleFeePerMin;
+
+            return {
+              ...ch,
+              priceText: priceText || ch.priceText || "",
+              priceValue,
+              priceUnit,
+              idleFeePerMin,
+            };
+          });
+        }
+
 
         // 5) (optional) merge pricing theo station
         if (chargersList.length) {
@@ -357,17 +442,17 @@ export default function StationDetail() {
     const matchKW = (c) => {
       if (!kw) return true;
       const title = toLow(c.title || c.id);
-      const conn  = toLow(c.connectorLabel || c.connector); // raw
-      const spd   = toLow(c.speedLabel || c.speed);         // VI label
+      const conn = toLow(c.connectorLabel || c.connector); // raw
+      const spd = toLow(c.speedLabel || c.speed);         // VI label
       return title.includes(kw) || conn.includes(kw) || spd.includes(kw);
     };
 
     let list = chargers.filter((c) => {
-      const passText   = matchKW(c);
-      const passConn   = matchConnector(c);
+      const passText = matchKW(c);
+      const passConn = matchConnector(c);
       const passStatus = matchStatus(c);
-      const passSpeed  = matchSpeed(c);
-      const passPower  = !minKW || parsePower(c.power) >= minKW;
+      const passSpeed = matchSpeed(c);
+      const passPower = !minKW || parsePower(c.power) >= minKW;
       return passText && passConn && passStatus && passSpeed && passPower;
     });
 
@@ -522,6 +607,14 @@ export default function StationDetail() {
                       <span className="label">Giá cả:</span>
                       <span className="price">{priceText}</span>
                     </div>
+
+                    {Number.isFinite(ch.idleFeePerMin) && ch.idleFeePerMin > 0 && (
+                      <div className="row">
+                        <span className="label">Phí chờ:</span>
+                        <span>{vnd(ch.idleFeePerMin)} / phút</span>
+                      </div>
+                    )}
+
                   </div>
                 </div>
               );

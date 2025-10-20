@@ -19,6 +19,8 @@ import ServicePlans from "./components/subscription/ServicePlans";
 import Unauthorized from "./pages/Unauthorized"; // ✅ thêm trang này (mục 2)
 import ChargerManager from "./pages/staff/ChargerManager";
 import SessionManager from "./pages/staff/SessionManager";
+import BookingHistory from "./pages/booking/BookingHisory"; // ✅ thêm trang lịch sử đặt chỗ
+import InvoicePage from "./components/charging/Invoice";
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
@@ -143,11 +145,28 @@ export default function App() {
         }
       />
 
+      <Route
+        path="/user/history"
+        element={
+          <ProtectedRoute allowedRoles={["Customer"]}>
+            <BookingHistory />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/invoice" element={
+          <ProtectedRoute allowedRoles={["Customer"]}>
+            <InvoicePage/>
+          </ProtectedRoute>
+        }
+      />
+
       {/*Staff */}
       <Route
         path="/staff/stations"
         element={
-          <ProtectedRoute allowedRoles={["Staff", "Admin"]}>
+          <ProtectedRoute allowedRoles={["Staff"]}>
             <ChargerManager />
           </ProtectedRoute>
         }
@@ -156,8 +175,8 @@ export default function App() {
       <Route
         path="/staff/sessions"
         element={
-          <ProtectedRoute allowedRoles={["Staff", "Admin"]}>
-          <SessionManager/>
+          <ProtectedRoute allowedRoles={["Staff"]}>
+            <SessionManager />
           </ProtectedRoute>
         }
       />
