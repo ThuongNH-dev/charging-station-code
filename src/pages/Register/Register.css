@@ -1,0 +1,93 @@
+/* Background chung cho tất cả trang register */
+.register-bg {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-image: url("./background.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+
+  overflow: hidden;
+}
+/* lớp phủ mờ tối trên background (nếu cần) */
+.register-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5); /* lớp phủ mờ tối */
+  z-index: 1;
+}
+
+/* Card chung cho các form và card chọn vai trò */
+.register-card {
+  position: relative;
+  z-index: 2; /* nổi lên trên lớp phủ */
+  background: rgba(252, 252, 252, 0);
+  /* backdrop-filter: blur(12px); */
+  padding: 2rem 3rem;
+  border-radius: 20px;
+  box-shadow: 0 0 4px 4px rgba(255, 255, 255, 0.322);
+  text-align: center;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.89); /* viền mềm */
+  max-width: 900px;
+
+  width: 100%; /* responsive */
+}
+
+/* Trong file Register.css */
+
+/* Chỉnh màu chữ của các label trong form */
+.register-card .ant-form-item-label > label {
+  color: white; /* Đổi màu chữ của label thành trắng */
+}
+
+/* Chỉ áp dụng cho trang lựa chọn vai trò */
+.register-card-select {
+  max-width: 650px; /* bự hơn */
+
+  padding: 4rem 7rem; /* padding rộng hơn */
+}
+
+/* Container cho 2 button */
+.register-options {
+  display: flex; /* hiển thị theo hàng */
+  justify-content: center; /* căn giữa */
+  gap: 2rem; /* khoảng cách 2 thẻ */
+  flex-wrap: wrap; /* xuống dòng nếu màn hình nhỏ */
+  padding-top: 1rem;
+}
+/* Card chọn vai trò (Cá nhân / Doanh nghiệp) */
+.register-option {
+  cursor: pointer;
+  padding: 1.5rem;
+  border-radius: 16px;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center; /* Thêm để căn giữa icon và text */
+
+  width: 180px; /* Thêm chiều rộng để hai thẻ bằng nhau */
+  height: 180px; /* Thêm chiều cao để tạo hình vuông */
+
+  /* Tạo hiệu ứng mờ và nền trong suốt */
+  background: rgba(255, 255, 255, 0.1);
+  /* backdrop-filter: blur(8px); */
+  box-shadow: 0 4px 6px rgb(0, 0, 0);
+  border: 1px solid rgb(255, 255, 255); /* viền mềm */
+  box-shadow: 0 0 4px 4px rgba(255, 255, 255, 0.322);
+}
+
+.register-option:hover {
+  background: rgba(179, 176, 176, 0);
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
+}
+
+.register-option-icon {
+  font-size: 90px; /* Tăng kích thước icon */
+  color: rgb(255, 255, 255); /* Icon phải có màu trắng để nổi bật */
+}
