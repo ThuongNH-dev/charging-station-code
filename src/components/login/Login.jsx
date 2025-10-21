@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import MainLayout from "../../layouts/MainLayout";
 import { setToken as storeToken, getApiBase } from "../../utils/api";
 import "./Login.css";
+import { roleToPath } from "../../utils/roleRedirect";
 
 const API_BASE = getApiBase();
 const LOGIN_URL = `${API_BASE}/Auth/login`;
@@ -53,12 +54,18 @@ export default function Login() {
     setError("");
 
     if (!userName.trim()) return setError("Vui lòng nhập username!");
-    if (!password || password.length < 6) return setError("Mật khẩu phải từ 6 ký tự!");
+    if (!password || password.length < 6)
+      return setError("Mật khẩu phải từ 6 ký tự!");
 
     setLoading(true);
     try {
       // Nhiều BE nhận username/email → gửi cả 3 key
-      const payload = { userName, username: userName, email: userName, password };
+      const payload = {
+        userName,
+        username: userName,
+        email: userName,
+        password,
+      };
 
       const res = await fetch(LOGIN_URL, {
         method: "POST",
@@ -79,7 +86,8 @@ export default function Login() {
             if (t) msg = `${msg}: ${t}`;
           }
         } catch {}
-        if (res.status === 404) msg += " — Kiểm tra lại API_BASE và route /Auth/login.";
+        if (res.status === 404)
+          msg += " — Kiểm tra lại API_BASE và route /Auth/login.";
         setError(msg);
         setLoading(false);
         return;
@@ -89,7 +97,10 @@ export default function Login() {
       const data = ct.includes("application/json") ? await res.json() : null;
 
       const token = data?.message?.token || data?.token;
-      const success = data?.message?.success === true || data?.success === true || Boolean(token);
+      const success =
+        data?.message?.success === true ||
+        data?.success === true ||
+        Boolean(token);
 
       if (!success || !token) {
         setError("Login response missing token!");
@@ -104,7 +115,8 @@ export default function Login() {
       const msg = data?.message ?? data ?? {};
       const user = {
         id: msg?.userId ?? msg?.user?.id ?? null,
-        name: msg?.fullName || msg?.user?.fullName || msg?.user?.name || userName,
+        name:
+          msg?.fullName || msg?.user?.fullName || msg?.user?.name || userName,
         email: msg?.email || msg?.user?.email || null,
         role,
         token,
@@ -112,11 +124,14 @@ export default function Login() {
 
       // ✅ Lưu user vào context + localStorage
       login(user, rememberMe);
-      console.log("[LOGIN OK]", { user, tokenSnippet: token.slice(0, 12) + "..." });
+      console.log("[LOGIN OK]", {
+        user,
+        tokenSnippet: token.slice(0, 12) + "...",
+      });
 
       // ✅ Điều hướng (tránh race với guard)
       const from = location.state?.from?.pathname;
-      const target = from || "/stations";
+      const target = from || roleToPath(role);
       setTimeout(() => navigate(target, { replace: true }), 0);
       // Fallback cứng nếu guard cứ kéo về login:
       // setTimeout(() => window.location.assign(target), 50);
@@ -130,7 +145,8 @@ export default function Login() {
           "\n• Có thể lỗi CORS/HTTPS. Hãy:\n" +
           "  - Bật CORS cho http://localhost:5173 (hoặc port dev của bạn)\n" +
           "  - Trust dev cert:  `dotnet dev-certs https --trust`\n" +
-          "  - Kiểm tra API_BASE: " + API_BASE;
+          "  - Kiểm tra API_BASE: " +
+          API_BASE;
       }
       setError("Không thể kết nối đến server." + hint);
     } finally {
@@ -140,7 +156,8 @@ export default function Login() {
 
   // Social placeholders
   const handleGoogleLogin = () => alert("🔵 Google login đang phát triển");
-  const handleFacebookLogin = () => alert("🔵 Facebook login đang phát triển (chỉ dành cho tài khoản cá nhân)");
+  const handleFacebookLogin = () =>
+    alert("🔵 Facebook login đang phát triển (chỉ dành cho tài khoản cá nhân)");
 
   return (
     <MainLayout>
@@ -185,26 +202,48 @@ export default function Login() {
                 />
                 <span>Ghi nhớ tài khoản</span>
               </label>
-              <a href="/forgot-password" className="forgot-link">Quên mật khẩu ?</a>
+              <a href="/forgot-password" className="forgot-link">
+                Quên mật khẩu ?
+              </a>
             </div>
 
             <button type="submit" className="submit-btn" disabled={loading}>
               {loading ? "Đang đăng nhập..." : "Đăng nhập"}
             </button>
 
-            <div className="divider"><span>Hoặc đăng nhập bằng</span></div>
+            <div className="divider">
+              <span>Hoặc đăng nhập bằng</span>
+            </div>
 
             <div className="social-login">
-              <button type="button" onClick={handleGoogleLogin} className="social-btn google-btn" disabled={loading}>Google</button>
-              <button type="button" onClick={handleFacebookLogin} className="social-btn facebook-btn" disabled={loading}>Facebook</button>
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                className="social-btn google-btn"
+                disabled={loading}
+              >
+                Google
+              </button>
+              <button
+                type="button"
+                onClick={handleFacebookLogin}
+                className="social-btn facebook-btn"
+                disabled={loading}
+              >
+                Facebook
+              </button>
             </div>
 
             <div className="info-note">
-              <small>💡 <strong>Ghi chú:</strong> Facebook login chỉ dành cho tài khoản cá nhân</small>
+              <small>
+                💡 <strong>Ghi chú:</strong> Facebook login chỉ dành cho tài
+                khoản cá nhân
+              </small>
             </div>
 
             <div className="signup-link">
-              Chưa có tài khoản? <a onClick={() => navigate("/register")}>Đăng kí ngay</a>
+              Chưa có tài khoản?{" "}
+              <a onClick={() => navigate("/register")}>Đăng kí ngay</a>
             </div>
           </form>
         </div>

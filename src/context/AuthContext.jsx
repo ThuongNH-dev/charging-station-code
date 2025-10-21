@@ -1,19 +1,10 @@
 // src/context/AuthContext.js
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { setToken as storeToken, clearToken as wipeToken } from "../utils/api";
+import { roleToPath } from "../utils/roleRedirect";
 
 const AuthContext = createContext(null);
-
-// Ánh xạ role => route đích
-function roleToPath(role) {
-  switch ((role || "").toLowerCase()) {
-    case "customer": return "/stations";        // ✅ có trong App.jsx
-    case "admin":    return "/homepage";        // tạm thời chưa có trang admin
-    case "staff":    return "/homepage";        // tạm thời chưa có trang staff
-    default:         return "/homepage";
-  }
-}
 
 // Helper: lấy user đã lưu
 function getStoredUser() {
@@ -31,6 +22,14 @@ export function AuthProvider({ children }) {
   const location = useLocation();
 
   const [user, setUser] = useState(() => getStoredUser());
+  useEffect(() => {
+    if (user?.role) {
+      const target = roleToPath(user.role);
+      if (location.pathname === "/homepage" || location.pathname === "/login") {
+        navigate(target, { replace: true });
+      }
+    }
+  }, [user, navigate, location.pathname]);
 
   const value = useMemo(
     () => ({
