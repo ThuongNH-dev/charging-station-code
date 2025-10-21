@@ -1,0 +1,102 @@
+/* ✅ src/components/updateProfilePerson/VehicleInfo.css */
+
+/* Layout tổng thể */
+.vehicle-page-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 40px 0;
+  background: #f6f8f7;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.vehicle-wrapper {
+  display: flex;
+  gap: 40px;
+  width: 90%;
+  max-width: 1100px;
+}
+
+/* Sidebar bên trái */
+.vehicle-sidebar {
+  flex: 0 0 320px;
+}
+
+/* Form bên phải */
+.vehicle-form-section {
+  flex: 1;
+  background: #fff;
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  box-sizing: border-box;
+}
+
+.vehicle-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0b702e;
+  margin-bottom: 28px;
+}
+
+/* Style cho form */
+.vehicle-info-form .ant-form-item-label > label {
+  font-weight: 600;
+  color: #333;
+}
+
+.vehicle-info-form input,
+.vehicle-info-form select {
+  border-radius: 8px;
+  border-color: #d9d9d9;
+}
+
+.vehicle-info-form input:focus,
+.vehicle-info-form select:focus {
+  border-color: #0b702e !important;
+  box-shadow: 0 0 0 2px rgba(11, 112, 46, 0.1);
+}
+
+/* Nút hành động */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.save-btn {
+  background: #0b702e !important;
+  border: none;
+}
+
+.save-btn:hover {
+  background: #0f8d3c !important;
+}
+
+.cancel-btn {
+  border-color: #ccc;
+  color: #555;
+}
+
+.cancel-btn:hover {
+  color: #0b702e;
+  border-color: #0b702e;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .vehicle-wrapper {
+    flex-direction: column;
+    width: 95%;
+  }
+
+  .vehicle-sidebar {
+    flex: 1;
+  }
+
+  .vehicle-form-section {
+    padding: 24px;
+  }
+}
