@@ -1,11 +1,18 @@
+/* StationManagement.css */
+
+/* --- CÁC THÀNH PHẦN CHUNG --- */
 .station-page {
   padding: 24px;
+  background-color: #f4f7f9; /* Nền xám nhạt */
 }
 
 .admin-title {
-  font-size: 22px;
+  color: #333; /* Chữ đen đậm */
+  margin-bottom: 25px;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 10px;
+  font-size: 24px;
   font-weight: 600;
-  margin-bottom: 20px;
 }
 
 /* Thanh công cụ */
@@ -17,107 +24,224 @@
   margin-bottom: 24px;
 }
 
-.station-actions select,
-.station-actions input {
-  padding: 8px 12px;
-  border-radius: 8px;
+.input-field {
+  padding: 10px 12px;
   border: 1px solid #ccc;
+  border-radius: 6px; /* Bo tròn hơn */
+  flex-grow: 1;
   font-size: 14px;
 }
 
-.station-actions .btn {
+/* --- BUTTONS --- */
+
+.btn {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s, box-shadow 0.2s;
   display: flex;
   align-items: center;
   gap: 6px;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 14px;
-  cursor: pointer;
   font-size: 14px;
-  transition: 0.25s;
+  text-transform: uppercase;
 }
 
 .btn.primary {
-  background: #1677ff;
-  color: #fff;
+  background-color: #1677ff; /* Xanh dương chủ đạo */
+  color: white;
 }
-
 .btn.primary:hover {
-  background: #4096ff;
+  background-color: #0056b3;
 }
 
 .btn.secondary {
-  background: #eee;
-  color: #333;
+  background-color: #6c757d; /* Xám */
+  color: white;
 }
-
 .btn.secondary:hover {
-  background: #ddd;
+  background-color: #5a6268;
 }
 
-/* Danh sách trạm */
+.btn.small {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.btn.green {
+  background-color: #52c41a; /* Xanh lá (Sẵn sàng/Bắt đầu) */
+  color: white;
+}
+.btn.red {
+  background-color: #ff4d4f; /* Đỏ (Nguy hiểm/Tổng kết) */
+  color: white;
+}
+.btn.blue {
+  background-color: #1677ff;
+  color: white;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999; /* Xám nhẹ */
+  font-size: 18px;
+  margin-left: 5px;
+  padding: 5px;
+  transition: color 0.2s;
+}
+.icon-btn:hover {
+  color: #1677ff; /* Xanh chủ đạo khi hover */
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: #1677ff;
+  cursor: pointer;
+  text-decoration: none; /* Bỏ gạch chân */
+  font-weight: 500;
+  margin-top: 10px;
+  display: block;
+  text-align: right;
+  font-size: 14px;
+}
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+/* --- STATION CARD & BADGES --- */
+
 .station-list {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
 .station-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  background: white;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Đổ bóng nhẹ hơn */
 }
 
 .station-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 10px;
 }
 
-.status-badge {
-  padding: 6px 12px;
-  border-radius: 12px;
-  font-size: 13px;
+.station-header h3 {
+  margin: 0 0 5px 0;
+  color: #1677ff; /* Xanh dương */
+  font-size: 20px;
   font-weight: 600;
 }
 
+.station-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.5;
+}
+
+/* ---------------------------------- */
+/* --- TRẠNG THÁI TRẠM (STATUS BADGE) --- */
+/* ---------------------------------- */
+
+.status-badge {
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  color: white;
+  margin-right: 15px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.status-badge.online {
+  background-color: #52c41a; /* Xanh lá */
+}
+
 .status-badge.offline {
-  background: #ffeaea;
-  color: #d32f2f;
+  background-color: #999; /* Xám trung tính */
 }
 
-/* Trụ */
+.status-badge.maintenance {
+  background-color: #faad14; /* Vàng/Cam đậm */
+  color: #333;
+}
+
+.station-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* --- POLE & PORT SECTIONS --- */
+
 .pole-section {
-  margin-bottom: 18px;
+  border-left: 3px solid #d9d9d9; /* Viền xám nhạt */
+  padding-left: 20px;
+  margin-bottom: 15px;
 }
 
-.pole-section h4 {
-  font-size: 16px;
-  margin-bottom: 10px;
-  color: #222;
-}
-
-/* Cổng sạc */
-.port-card {
-  background: #f9f9f9;
-  border-radius: 10px;
-  padding: 10px 14px;
-  margin-bottom: 10px;
+.pole-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 10px;
 }
 
-.port-card b {
-  font-size: 15px;
+.pole-header h4 {
+  margin: 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
 }
 
-.port-card p {
+.port-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #fcfcfc;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  border: 1px solid #f0f0f0;
+}
+
+.port-details p {
+  margin: 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.port-extra-info {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-top: 3px !important;
+}
+
+/* Thông tin công suất cố định (chỉ đọc) trong modal */
+.read-only-info {
+  color: #1677ff;
   font-size: 13px;
-  color: #555;
-  margin-top: 2px;
+  margin-bottom: 15px !important;
+  font-weight: 500;
+  padding: 8px 0;
+  border-bottom: 1px dotted #ccc;
 }
 
 .status-row {
@@ -126,160 +250,114 @@
   gap: 8px;
 }
 
+/* ---------------------------------- */
+/* --- TRẠNG THÁI CỔNG (PORT BADGE) --- */
+/* ---------------------------------- */
+
 .badge {
   padding: 4px 10px;
-  border-radius: 10px;
-  font-size: 12px;
+  border-radius: 4px;
+  font-size: 11px;
   font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .badge.ready {
-  background: #e8f8ec;
-  color: #1a7f37;
+  background-color: #52c41a; /* Sẵn sàng - Xanh lá */
 }
-
+.badge.busy {
+  background-color: #ff4d4f; /* Đang bận - Đỏ */
+}
 .badge.maintenance {
-  background: #fff6e6;
-  color: #d47b00;
+  background-color: #faad14; /* Bảo trì - Vàng/Cam */
+  color: #333;
 }
 
-.icon-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  color: #555;
-  transition: 0.25s;
-}
+/* --- MODAL --- */
 
-.icon-btn:hover {
-  color: #1677ff;
-}
-
-/* Nút thêm */
-.link-btn {
-  background: none;
-  border: none;
-  color: #1677ff;
-  font-weight: 500;
-  cursor: pointer;
-  margin-top: 4px;
-}
-
-.link-btn:hover {
-  text-decoration: underline;
-}
-
-/* Footer của mỗi trạm */
-.station-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-/* ===== MODAL ===== */
 .modal-overlay {
   position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 999;
+  z-index: 1000;
 }
 
 .modal-box {
-  background: #0f172a;
-  color: #f1f5f9;
-  padding: 20px;
-  border-radius: 12px;
-  width: 320px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  background: white;
+  padding: 30px;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 400px; /* Nhỏ hơn một chút */
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 }
 
 .modal-box h3 {
-  margin-bottom: 12px;
-  font-size: 16px;
-  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: #1677ff;
+  font-size: 20px;
+}
+
+.modal-box p {
+  font-size: 14px;
+  color: #595959;
+  margin-bottom: 15px;
 }
 
 .modal-box input,
 .modal-box select {
   width: 100%;
-  background: #1e293b;
-  border: 1px solid #475569;
-  border-radius: 6px;
-  color: #f1f5f9;
-  padding: 8px;
-  margin-bottom: 10px;
-  outline: none;
+  padding: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  box-sizing: border-box;
+  font-size: 14px;
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 10px;
+  margin-top: 25px;
 }
 
 .modal-actions button {
-  border: none;
-  border-radius: 6px;
-  padding: 6px 12px;
+  padding: 10px 18px;
+  border-radius: 4px;
   cursor: pointer;
-}
-
-.modal-actions .save {
-  background: #1677ff;
-  color: #fff;
-}
-
-.modal-actions .delete {
-  background: #dc2626;
-  color: #fff;
-}
-
-.modal-actions button:hover {
-  opacity: 0.9;
-}
-
-/* === Tiêu đề trụ và nút hành động === */
-.pole-header {
-  display: flex;
-  align-items: center; /* canh giữa theo chiều dọc */
-  justify-content: space-between; /* đưa chữ và nút về hai bên */
-  margin-bottom: 10px;
-}
-
-.pole-header h4 {
-  margin: 0;
-  font-size: 16px;
   font-weight: 600;
-  color: #222;
-}
-
-/* Nhóm nút sửa / xóa trụ */
-.pole-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.pole-actions .icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  background: #fff;
+  border: 1px solid #d9d9d9;
+  background-color: white;
   color: #333;
-  cursor: pointer;
-  transition: all 0.25s ease;
+  transition: all 0.2s;
+}
+.modal-actions button:hover {
+  border-color: #1677ff;
 }
 
-.pole-actions .icon-btn:hover {
-  background: #1677ff;
-  color: #fff;
+.modal-actions button.save {
+  background-color: #1677ff;
+  color: white;
   border-color: #1677ff;
+}
+.modal-actions button.save:hover {
+  background-color: #0056b3;
+}
+
+.modal-actions button.delete {
+  background-color: #ff4d4f;
+  color: white;
+  border-color: #ff4d4f;
+}
+.modal-actions button.delete:hover {
+  background-color: #cf1322;
 }
