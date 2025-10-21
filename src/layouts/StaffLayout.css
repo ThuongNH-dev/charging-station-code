@@ -1,0 +1,100 @@
+/* ===== Tổng thể ===== */
+.staff-layout {
+  background: #f8fafc;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== THANH ĐIỀU HƯỚNG ===== */
+.staff-nav {
+  position: relative;
+  top: 0;
+  height: 50px;
+  background-color: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+
+/* 🔥 Khi người dùng cuộn xuống → chuyển thành cố định */
+.staff-nav.fixed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  border-color: #e5e7eb;
+  animation: slideUp 0.25s ease forwards;
+}
+
+/* Hiệu ứng trượt mượt */
+@keyframes slideUp {
+  from {
+    transform: translateY(64px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* ===== Liên kết điều hướng ===== */
+.staff-nav a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  color: #334155;
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 7px 14px;
+  transition: all 0.2s ease;
+}
+
+.staff-nav a:hover {
+  background-color: #e2e8f0;
+  color: #111827;
+}
+
+.staff-nav a.active {
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #111827;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* ===== Nội dung ===== */
+.staff-content {
+  flex: 1;
+  background: #f8fafc;
+  padding: 20px;
+  margin-top: 30px;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .staff-nav {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px;
+  }
+
+  .staff-nav a {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  .staff-content {
+    margin-top: 40px;
+  }
+}

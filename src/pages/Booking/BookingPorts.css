@@ -290,4 +290,16 @@
   margin-top: 16px; /* chỉnh 16/20/24 tuỳ bạn */
 }
 
+.bp-vehicle-box {
+  background: #f5f7fa;
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 8px;
+  /* text-align: center; */
+  line-height: 1.4;
+  color: #333;
+}
+.bp-vehicle-display { font-weight: 600; }
+.bp-applied { margin-top: 6px; }
+
 

@@ -1,4 +1,3 @@
-// src/pages/payment/PaymentPage.jsx
 import React, { useState, useMemo, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import PaymentForm from "../../components/paymentCard/PaymentForm";
@@ -56,22 +55,12 @@ function getClaimsFromToken() {
 
   const email = p.email ?? p[EMAIL_CLAIM] ?? null;
 
-  return { accountId, username, email };
-}
+  const customerId =
+    p.customerId ??
+    p.CustomerId ??
+    null;
 
-/** Chuẩn hoá object booking trả từ BE */
-function normalizeBooking(b = {}) {
-  const id = b.id ?? b.bookingId ?? b.BookingId ?? b.Id;
-  const customerId = b.customerId ?? b.CustomerId ?? b.userId ?? b.UserId;
-  const price = Number(b.price ?? b.Price ?? b.totalAmount ?? b.TotalAmount ?? 0);
-  const status = (b.status ?? b.Status ?? "").toString().toLowerCase();
-  const createdAt =
-    b.createdAt ?? b.CreatedAt ?? b.createDate ?? b.CreateDate ?? b.createdTime ?? null;
-  const start = b.startTime ?? b.StartTime ?? b.start ?? b.Start ?? null;
-  const stationId = b.stationId ?? b.StationId ?? b.station?.id ?? b.station?.StationId;
-  const chargerId = b.chargerId ?? b.ChargerId ?? b.charger?.id ?? b.charger?.ChargerId;
-  const gunId = b.gunId ?? b.GunId ?? b.gun?.id ?? b.gun?.GunId ?? b.portId ?? b.PortId;
-  return { id, customerId, price, status, createdAt, start, stationId, chargerId, gunId };
+  return { accountId, username, email, customerId };
 }
 
 /** ===== Helper: làm tròn giờ từ phút (min 1h, luôn tròn lên) ===== */
@@ -169,69 +158,6 @@ function readOrderBlob(orderId) {
   try { return JSON.parse(s); } catch { return null; }
 }
 
-/** ===== fetch helper với retry ngắn ===== */
-async function fetchJSONwithRetry(url, init = {}, retries = 2, delayMs = 600) {
-  let lastErr;
-  for (let i = 0; i <= retries; i++) {
-    try {
-      const res = await fetch(url, init);
-      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-      return await res.json();
-    } catch (e) {
-      lastErr = e;
-      if (i < retries) {
-        await new Promise((r) => setTimeout(r, delayMs * (i + 1)));
-      }
-    }
-  }
-  throw lastErr;
-}
-
-/** ===== Tạo VNPAY Payment (robust) ===== */
-async function robustCreateVnpay({ bookingId, orderId, minutes, roundedHours, expectedAmount, returnUrl }) {
-  const token = localStorage.getItem("token");
-  const headers = {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-
-  const res = await fetchJSONwithRetry(
-    `${API_BASE}/Payment/create`,
-    {
-      method: "POST",
-      headers,
-      credentials: "include",
-      body: JSON.stringify({
-        bookingId,
-        orderId,
-        minutes,
-        roundedHours,
-        expectedAmount, // VND
-        returnUrl,
-      }),
-    },
-    2,
-    700
-  );
-
-  if (!res?.success || !res?.paymentUrl) {
-    throw new Error(res?.message || "Không tạo được URL thanh toán.");
-  }
-
-  let vnpAmount = null; let txnRef = "";
-  try {
-    const u = new URL(res.paymentUrl);
-    vnpAmount = Number(u.searchParams.get("vnp_Amount"));
-    txnRef = u.searchParams.get("vnp_TxnRef") || "";
-  } catch { /* ignore */ }
-
-  if (!Number.isFinite(vnpAmount) || vnpAmount <= 0) {
-    throw new Error("URL trả về thiếu hoặc sai vnp_Amount.");
-  }
-
-  return { url: res.paymentUrl, vnpAmount, txnRef };
-}
-
 export default function PaymentPage() {
   const { state } = useLocation();
   const navigate = useNavigate();
@@ -239,61 +165,94 @@ export default function PaymentPage() {
   // ===== Local states
   const [loading, setLoading] = useState(false);
   const [creatingVnpay, setCreatingVnpay] = useState(false);
-  const [vnpayUrl, setVnpayUrl] = useState("");
+  const [vnpayUrl, setVnpayUrl] = useState(state?.vnpayUrl || "");
   const [paymentRef, setPaymentRef] = useState("");
   const [payError, setPayError] = useState("");
 
-  // ===== Contact đúng user đang đăng nhập
   const [contact, setContact] = useState({ fullName: "", email: "", phone: "" });
   const [contactLoad, setContactLoad] = useState(true);
   const [contactErr, setContactErr] = useState("");
 
-  // ===== Vehicle (biển số)
   const [vehiclePlate, setVehiclePlate] = useState("");
   const [vehicleLoad, setVehicleLoad] = useState(false);
   const [vehicleErr, setVehicleErr] = useState("");
 
-  // ===== Đồng bộ số tiền với booking
+  // ===== Đồng bộ số tiền với booking (BE là source of truth)
   const [bookingId, setBookingId] = useState(state?.bookingId ?? null);
-  const [bookingLoad, setBookingLoad] = useState(false);
   const [bookingPrice, setBookingPrice] = useState(null); // giá thật từ BE
 
-  // 1) Lấy hồ sơ user + customerId
+  // Early guard
+  if (!state) {
+    return (
+      <div className="page-fallback">
+        <h2>Thiếu thông tin đơn hàng</h2>
+        <p>Vui lòng đặt lại từ trang danh sách trạm.</p>
+        <button className="secondary-btn" onClick={() => navigate("/stations")}>
+          <ArrowLeftOutlined /> Về danh sách trạm
+        </button>
+      </div>
+    );
+  }
+
+  const { station, charger, gun, totalMinutes, startTime, baseline } = state || {};
+
+  // ===== Order display info (FE)
+  const orderId = useMemo(() => state?.orderId || "ORD" + Date.now(), [state?.orderId]);
+
+  // ===== Lấy hồ sơ user + customerId
   const [currentCustomerId, setCurrentCustomerId] = useState(null);
   useEffect(() => {
     let mounted = true;
+
     (async () => {
       setContactLoad(true);
       setContactErr("");
+
+      const claims = getClaimsFromToken();
+      if (claims?.username || claims?.email) {
+        setContact((p) => ({
+          fullName: p.fullName || String(claims.username || "").trim(),
+          email: p.email || String(claims.email || "").trim(),
+          phone: p.phone || "",
+        }));
+      }
+
       try {
-        const claims = getClaimsFromToken();
+        let authRes = null;
+        try { authRes = await fetchAuthJSON(`/Auth`, { method: "GET" }); }
+        catch { try { authRes = await fetchAuthJSON(`${API_BASE}/Auth`, { method: "GET" }); } catch { } }
 
-        const raw = await fetchAuthJSON(`${API_BASE}/Auth`, { method: "GET" });
-        let record = pickCurrentUserRecord(raw, claims);
+        let record = pickCurrentUserRecord(authRes, claims);
 
-        if (!record && claims.accountId != null) {
-          try {
-            const r2 = await fetchAuthJSON(`${API_BASE}/Account/${claims.accountId}`, {
-              method: "GET",
-            });
-            if (r2) record = r2;
-          } catch { }
+        if (!record && claims?.accountId != null) {
+          try { record = await fetchAuthJSON(`${API_BASE}/Account/${claims.accountId}`, { method: "GET" }); }
+          catch { }
         }
 
-        if (!record) throw new Error("Không tìm thấy hồ sơ trùng với người đang đăng nhập.");
+        if (!record) {
+          record = { userName: claims?.username || "", email: claims?.email || "", customers: [] };
+        }
 
         const normalized = normalizeAccount(record);
 
-        // Lấy customerId để fetch vehicle
-        const cid =
+        // Rút customerId
+        let cid =
           record?.customers?.[0]?.customerId ??
           record?.customerId ??
           record?.Customers?.[0]?.CustomerId ??
+          claims?.customerId ??
           null;
+
+        if (!cid) {
+          try {
+            const meCus = await fetchAuthJSON(`${API_BASE}/Customers/me`, { method: "GET" });
+            cid = meCus?.customerId ?? meCus?.CustomerId ?? null;
+          } catch { }
+        }
 
         if (mounted) {
           setContact(normalized);
-          setCurrentCustomerId(cid);
+          setCurrentCustomerId(cid || null);
         }
       } catch (e) {
         if (mounted) setContactErr(e?.message || "Không tải được thông tin liên hệ.");
@@ -301,8 +260,9 @@ export default function PaymentPage() {
         if (mounted) setContactLoad(false);
       }
     })();
+
     return () => { mounted = false; };
-  }, []);
+  }, [API_BASE]);
 
   // 2) Lấy vehicle theo customerId -> licensePlate
   useEffect(() => {
@@ -324,10 +284,7 @@ export default function PaymentPage() {
           try {
             const res = await fetchAuthJSON(`${API_BASE}${p}`, { method: "GET" });
             const list = extractVehicleItems(res);
-            if (list.length) {
-              items = list;
-              break;
-            }
+            if (list.length) { items = list; break; }
           } catch { }
         }
 
@@ -354,9 +311,65 @@ export default function PaymentPage() {
       }
     })();
     return () => { mounted = false; };
-  }, [currentCustomerId]);
+  }, [currentCustomerId, API_BASE]);
 
-  // Demo ví
+  // ===== Ưu tiên giá từ BE /Booking/{id}
+  useEffect(() => {
+    if (!bookingId) return;
+    (async () => {
+      try {
+        const b = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
+        const price = Number(b?.price ?? b?.Price ?? 0);
+        if (price > 0) setBookingPrice(price);
+      } catch {
+        // dùng fallback bên dưới
+      }
+    })();
+  }, [bookingId, API_BASE]);
+
+  // Nếu vào trang mà giá vẫn = null -> poll thêm vài lần (tối đa 10s)
+  useEffect(() => {
+    if (!bookingId || (bookingPrice != null && bookingPrice > 0)) return;
+    let alive = true;
+    const started = Date.now();
+    (async function loop() {
+      while (alive && Date.now() - started < 10000) {
+        try {
+          const b = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
+          const price = Number(b?.price ?? b?.Price ?? 0);
+          if (price > 0) { setBookingPrice(price); break; }
+        } catch {}
+        await new Promise(r => setTimeout(r, 800));
+      }
+    })();
+    return () => { alive = false; };
+  }, [bookingId, bookingPrice, API_BASE]);
+
+  // ===== Fallback 1: parse vnp_Amount từ URL (VND*100)
+  const amountFromVnpUrl = useMemo(() => {
+    try {
+      if (!vnpayUrl) return null;
+      const u = new URL(vnpayUrl);
+      const raw = u.searchParams.get("vnp_Amount");
+      if (!raw) return null;
+      const scaled = Number(raw);
+      if (!Number.isFinite(scaled)) return null;
+      return Math.round(scaled / 100);
+    } catch { return null; }
+  }, [vnpayUrl]);
+
+  // ===== Fallback 2: tính tạm (không dùng nữa, luôn 0)
+  const roundedHoursFallback = useMemo(
+    () => ceilHoursFromMinutes(totalMinutes || 0),
+    [totalMinutes]
+  );
+
+  // ===== Số tiền cuối cùng để hiển thị & thanh toán =====
+  const amount = (bookingPrice != null && bookingPrice > 0)
+    ? bookingPrice
+    : (amountFromVnpUrl != null ? amountFromVnpUrl : null);
+
+  // ===== Payment method UI
   const [walletBalance, setWalletBalance] = useState(0);
   useEffect(() => {
     const saved = Number(localStorage.getItem("demo:walletBalance"));
@@ -374,59 +387,6 @@ export default function PaymentPage() {
     expiryDate: "",
     cvv: "",
   });
-
-  const { station, charger, gun, totalMinutes, perMinute, startTime, baseline } = state || {};
-  if (!state) {
-    return (
-      <div className="page-fallback">
-        <h2>Thiếu thông tin đơn hàng</h2>
-        <p>Vui lòng đặt lại từ trang danh sách trạm.</p>
-        <button className="secondary-btn" onClick={() => navigate("/stations")}>
-          <ArrowLeftOutlined /> Về danh sách trạm
-        </button>
-      </div>
-    );
-  }
-
-  // ===== Order display info (FE)
-  const orderId = useMemo(() => state.orderId || "ORD" + Date.now(), [state.orderId]);
-
-  // ---- Tham số đầu vào và cách tính phí đặt chỗ (fallback) ----
-  const feePerHourFallback = useMemo(() => {
-    const direct = state.feePerHour ?? state.bookingFeePerHour ?? null;
-    if (direct != null) return Number(direct) || 0;
-    const pm = Number(perMinute) || 0;
-    return pm * 60;
-  }, [state?.feePerHour, state?.bookingFeePerHour, perMinute]);
-
-  const roundedHoursFallback = useMemo(
-    () => ceilHoursFromMinutes(totalMinutes || 0),
-    [totalMinutes]
-  );
-
-  const amountFallback = useMemo(
-    () => Math.max(0, Math.round(feePerHourFallback * roundedHoursFallback)),
-    [feePerHourFallback, roundedHoursFallback]
-  );
-
-  // ==== Đồng bộ số tiền với Booking (quan trọng để khớp VNPAY) ====
-  useEffect(() => {
-    if (!bookingId) return;
-    (async () => {
-      try {
-        const b = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
-        const price = Number(b?.price ?? b?.Price ?? 0);
-        if (price > 0) setBookingPrice(price);
-      } catch {
-        // Không chặn, vẫn dùng fallback nếu lỗi
-      }
-    })();
-  }, [bookingId]);
-
-  // Giá hiển thị cuối cùng (ưu tiên giá booking từ BE)
-  const pricePerHour = feePerHourFallback; // giữ cho bảng hiển thị
-  const roundedHours = roundedHoursFallback;
-  const amount = bookingPrice != null ? bookingPrice : amountFallback;
 
   const onInputChange = (e) => {
     const { name, value } = e.target;
@@ -450,9 +410,10 @@ export default function PaymentPage() {
       startTime: startTime || "",
       baseline: baseline || "",
       totalMinutes: totalMinutes || 0,
-      bookingFee: amount,
-      roundedHours,
-      pricePerHour,
+      bookingFee: amount, // giá từ BE
+      roundedHours: Math.max(1, Math.ceil((totalMinutes || 0) / 60)), // chỉ để note, không tính tiền
+      pricePerHour: 0,
+
       paidAt: Date.now(),
       paymentMethod: selectedPayment,
       contact,
@@ -463,81 +424,32 @@ export default function PaymentPage() {
     return payload;
   };
 
-  // ===== Tự tìm bookingId nếu thiếu
+  // Nếu đã có vnpayUrl từ BookingPorts, auto chọn QR và rút mã tham chiếu
   useEffect(() => {
-    if (bookingId) return;
-
-    const fetchLatestBooking = async () => {
-      setBookingLoad(true);
+    if (state?.vnpayUrl) {
+      setSelectedPayment("qr");
+      setVnpayUrl(state.vnpayUrl);
       try {
-        const currentUserId = getClaimsFromToken().accountId;
-
-        const res = await fetchAuthJSON(`${API_BASE}/Booking`, { method: "GET" });
-        const list = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
-        if (!list.length) throw new Error("Không tìm thấy booking nào của bạn.");
-
-        const desired = {
-          stationId: station?.id ?? station?.StationId,
-          chargerId: charger?.id ?? charger?.ChargerId,
-          gunId: gun?.id ?? gun?.GunId ?? gun?.portId ?? gun?.PortId,
-        };
-
-        const norm = list.map(normalizeBooking).filter((x) => x.id);
-        let candidates = norm.filter(
-          (x) =>
-            (!currentUserId || x.customerId == currentUserId) &&
-            Number(x.price) > 0 &&
-            (!desired.stationId || x.stationId == desired.stationId) &&
-            (!desired.chargerId || x.chargerId == desired.chargerId) &&
-            (!desired.gunId || x.gunId == desired.gunId)
-        );
-
-        if (!candidates.length) {
-          candidates = norm.filter(
-            (x) => (!currentUserId || x.customerId == currentUserId) && Number(x.price) > 0
-          );
-        }
-
-        if (!candidates.length) {
-          throw new Error("Không có booking hợp lệ thuộc tài khoản hiện tại (hoặc booking chưa có giá).");
-        }
-
-        const okStatuses = new Set(["pending", "reserved", "booked", "active"]);
-        let filtered = candidates.filter((x) => okStatuses.has(x.status));
-        if (!filtered.length) filtered = candidates;
-
-        filtered.sort(
-          (a, b) =>
-            new Date(b.createdAt || b.start || 0) - new Date(a.createdAt || a.start || 0)
-        );
-
-        const pick = filtered[0];
-        if (!pick?.id) throw new Error("Không xác định được booking hợp lệ.");
-        setBookingId(pick.id);
-        if (Number(pick.price) > 0) setBookingPrice(Number(pick.price));
-      } catch (e) {
-        setPayError(e?.message || "Không lấy được bookingId từ /Booking.");
-      } finally {
-        setBookingLoad(false);
+        const u = new URL(state.vnpayUrl);
+        const ref = u.searchParams.get("vnp_TxnRef") || "";
+        setPaymentRef(ref || String(state?.bookingId || orderId));
+      } catch {
+        setPaymentRef(String(state?.bookingId || orderId));
       }
-    };
-
-    fetchLatestBooking();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingId]);
+  }, []);
 
-  // ===== Create VNPAY URL with bookingId (robust) =====
+  // ===== Create VNPAY URL (chỉ khi chưa có URL từ state)
   const createVnpayPayment = async () => {
     if (creatingVnpay) return null;
     setCreatingVnpay(true);
     setPayError("");
 
     try {
-      if (!bookingId) {
-        throw new Error("Thiếu bookingId. Vui lòng tạo/chọn booking trước khi thanh toán.");
-      }
+      if (!bookingId) throw new Error("Thiếu bookingId. Vui lòng tạo/chọn booking trước khi thanh toán.");
 
-      // Đồng bộ giá từ BE
+      // Bắt buộc booking phải có giá để tạo URL
       let bePrice = null;
       try {
         const check = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
@@ -549,49 +461,32 @@ export default function PaymentPage() {
         throw new Error(e?.message || "Không kiểm tra được giá của booking.");
       }
 
-      const { url, vnpAmount, txnRef } = await robustCreateVnpay({
+      const payload = {
         bookingId,
         orderId,
-        minutes: totalMinutes,
-        roundedHours,
-        expectedAmount: bePrice || amount,
-        returnUrl: `${window.location.origin}/vnpay-bridge.html?order=${orderId}`,
+        // returnUrl có thể cần tùy BE
+        // returnUrl: `${window.location.origin}/vnpay-bridge.html?order=${orderId}`,
+      };
+
+      const res = await fetchAuthJSON(`${API_BASE}/Payment/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
-      // Kiểm tra số tiền (VND*100) đối chiếu FE
-      const expectedScaled = Math.round((bePrice || amount) * 100);
-      if (Math.abs(vnpAmount - expectedScaled) >= 1) {
-        throw new Error(
-          `BE đang gửi sai số tiền cho VNPAY. expected=${(bePrice || amount).toLocaleString("vi-VN")}đ ` +
-          `→ vnp_Amount=${expectedScaled}, nhưng URL có vnp_Amount=${vnpAmount}`
-        );
-      }
+      if (!res?.success) throw new Error(res?.message || "Không tạo được URL thanh toán.");
+      const url = res?.paymentUrl;
+      if (!url) throw new Error("Backend không trả về paymentUrl.");
 
-      // LƯU STUB để PaymentSuccess dùng ngay khi quay về
-      const stub = {
-        orderId,
-        bookingId,
-        station,
-        charger,
-        gun,
-        startTime: startTime || "",
-        baseline: baseline || "",
-        totalMinutes: totalMinutes || 0,
-        bookingFee: bePrice || amount,
-        roundedHours,
-        pricePerHour,
-        paymentMethod: "vnpay",
-        contact,
-        vehiclePlate,
-        paidAt: Date.now(),
-      };
-      saveOrderBlob(orderId, stub);
-      try { sessionStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }
-      try { localStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }
+      let ref = "";
+      try {
+        const u = new URL(url);
+        ref = u.searchParams.get("vnp_TxnRef") || "";
+      } catch { }
 
       setVnpayUrl(url);
-      setPaymentRef(txnRef || String(bookingId));
-      return { url, ref: txnRef || String(bookingId) };
+      setPaymentRef(ref || String(bookingId));
+      return { url, ref: ref || String(bookingId) };
     } catch (err) {
       setPayError(err?.message || "Không tạo được phiên thanh toán VNPAY. Vui lòng thử lại.");
       setVnpayUrl("");
@@ -602,20 +497,20 @@ export default function PaymentPage() {
     }
   };
 
-  // Auto-create VNPAY URL khi chọn QR và đã xác định bookingId
+  // Auto-create VNPAY URL khi chọn QR và đã xác định bookingId — nhưng chỉ khi CHƯA có url
   useEffect(() => {
     if (selectedPayment === "qr" && bookingId && !vnpayUrl) {
       createVnpayPayment();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPayment, bookingId, orderId]);
+  }, [selectedPayment, bookingId, orderId, vnpayUrl]); // đã thêm vnpayUrl để tránh lặp
 
-  const canPayByWallet = selectedPayment === "wallet" ? walletBalance >= amount : true;
+  const canPayByWallet = selectedPayment === "wallet" ? walletBalance >= (amount || 0) : true;
   const payDisabled =
     loading ||
     !selectedPayment ||
     (selectedPayment === "wallet" && !canPayByWallet) ||
-    (selectedPayment === "qr" && (!bookingId || creatingVnpay));
+    (selectedPayment === "qr" && (!bookingId || creatingVnpay || !vnpayUrl)) ||
+    (amount == null); // cần có giá từ BE (hoặc từ URL) để enable
 
   const handlePay = async () => {
     if (!selectedPayment) return;
@@ -624,22 +519,8 @@ export default function PaymentPage() {
     setLoading(true);
     setPayError("");
     try {
-      const baseExtra = { contact };
-
       if (selectedPayment === "wallet") {
-        const before = walletBalance;
-        const after = before - amount;
-        localStorage.setItem("demo:walletBalance", String(after));
-        setWalletBalance(after);
-
-        const payload = buildSuccessPayload({
-          ...baseExtra,
-          walletBalanceBefore: before,
-          walletBalanceAfter: after,
-          paymentRef: `WAL-${orderId}`,
-          vehiclePlate,
-        });
-        navigate(`/payment/success?order=${orderId}`, { state: payload, replace: true });
+        setPayError("Hiện tại hệ thống chỉ hỗ trợ thanh toán qua VNPAY-QR.");
         return;
       }
 
@@ -648,25 +529,57 @@ export default function PaymentPage() {
           setPayError("Chưa xác định được bookingId. Vui lòng thử lại.");
           return;
         }
-        const created = await createVnpayPayment();
-        if (!created?.url) return;
 
-        // Chuyển sang trang thanh toán VNPAY (nếu bạn muốn tự động)
-        // window.location.href = created.url;
-      }
+        let url = vnpayUrl;
+        if (!url) {
+          const created = await createVnpayPayment();
+          if (!created?.url) return;
+          url = created.url;
+        }
 
-      if (selectedPayment !== "qr" && selectedPayment !== "wallet") {
-        const payload = buildSuccessPayload({
-          ...baseExtra,
-          paymentRef: `${selectedPayment.toUpperCase()}-${orderId}`,
+        const stub = {
+          orderId,
+          bookingId,
+          station,
+          charger,
+          gun,
+          startTime: startTime || "",
+          baseline: baseline || "",
+          totalMinutes: totalMinutes || 0,
+          bookingFee: amount, // BE quyết định
+          roundedHours: Math.max(1, Math.ceil((totalMinutes || 0) / 60)),
+          pricePerHour: 0,
+          paymentMethod: "vnpay",
+          contact,
           vehiclePlate,
-        });
-        navigate(`/payment/success?order=${orderId}`, { state: payload, replace: true });
+          paidAt: Date.now(),
+        };
+        // Lưu theo orderId
+        saveOrderBlob(orderId, stub);
+        // Nếu đã biết vnp_TxnRef trong URL, lưu thêm bản sao theo txnRef
+        try {
+          const u = new URL(url);
+          const ref = u.searchParams.get("vnp_TxnRef");
+          if (ref) saveOrderBlob(ref, stub);
+        } catch { }
+        try { sessionStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }
+        try { localStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }
+
+        window.location.href = url;
+        return;
       }
+
+      setPayError("Hiện tại hệ thống chỉ hỗ trợ thanh toán qua VNPAY-QR.");
+      return;
     } finally {
       setLoading(false);
     }
   };
+
+  // Nếu chỉ hỗ trợ QR, auto chọn QR khi vào trang (UX mượt hơn)
+  useEffect(() => {
+    if (!state?.vnpayUrl && !selectedPayment) setSelectedPayment("qr");
+  }, [selectedPayment, state?.vnpayUrl]);
 
   return (
     <MainLayout>
@@ -694,7 +607,7 @@ export default function PaymentPage() {
                 <div className="os-qr">
                   {!bookingId && (
                     <p className="os-warning">
-                      Đang tìm booking phù hợp... {bookingLoad ? "(loading)" : ""}
+                      Đang tìm booking phù hợp...
                     </p>
                   )}
 
@@ -705,11 +618,6 @@ export default function PaymentPage() {
                       <p className="os-qr-mini">
                         Mã giao dịch: <b>{paymentRef || bookingId || orderId}</b>
                       </p>
-                      <div className="os-qr-actions">
-                        <button className="primary-btn" onClick={() => { window.location.href = vnpayUrl; }}>
-                          Mở trang VNPAY
-                        </button>
-                      </div>
                     </>
                   ) : (
                     <>
@@ -756,9 +664,9 @@ export default function PaymentPage() {
                 <b>{station?.name}</b> — {charger?.title} — Cổng <b>{gun?.name}</b>
               </p>
               <ul className="os-station-list">
-                <li>Công suất: 60 kW</li>
-                <li>Tình trạng trụ: Trống</li>
-                <li>Loại cổng sạc: DC</li>
+                <li>Công suất: {charger?.power || "—"}</li>
+                <li>Tình trạng trụ: {charger?.status || "—"}</li>
+                <li>Loại cổng sạc: {charger?.connector || "—"}</li>
                 <li>Tốc độ sạc:</li>
                 <ul>
                   <li>8 – 12 tiếng cho ô tô</li>
@@ -769,34 +677,23 @@ export default function PaymentPage() {
 
             <div className="os-block">
               <h3>2. Chi phí (phí đặt chỗ, không phải tiền sạc)</h3>
-              <table className="os-table">
-                <tbody>
-                  <tr>
-                    <td>Đơn giá đặt chỗ theo giờ</td>
-                    <td className="os-right">{vnd(pricePerHour)}</td>
-                  </tr>
-                  <tr>
-                    <td>Số giờ đặt (làm tròn lên, tối thiểu 1h)</td>
-                    <td className="os-right">{roundedHours} giờ</td>
-                  </tr>
-                  <tr>
-                    <td>Phí đặt chỗ</td>
-                    <td className="os-right">{vnd(amount)}</td>
-                  </tr>
-                  <tr>
-                    <td>Tạm tính</td>
-                    <td className="os-right">{vnd(amount)}</td>
-                  </tr>
-                  <tr>
-                    <td>Giảm giá</td>
-                    <td className="os-right">0%</td>
-                  </tr>
-                  <tr className="os-total">
-                    <td><b>Tổng</b></td>
-                    <td className="os-right"><b>{vnd(amount)}</b></td>
-                  </tr>
-                </tbody>
-              </table>
+              {amount == null ? (
+                <p className="os-warning">Đang chờ hệ thống tính phí từ booking...</p>
+              ) : (
+                <table className="os-table">
+                  <tbody>
+                    <tr>
+                      <td>Phí đặt chỗ (theo hệ thống)</td>
+                      <td className="os-right">{vnd(amount)}</td>
+                    </tr>
+                    <tr className="os-total">
+                      <td><b>Tổng</b></td>
+                      <td className="os-right"><b>{vnd(amount)}</b></td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
+
               <p className="os-note">
                 Lưu ý: Đây là <b>phí đặt chỗ</b> cho khoảng thời gian bạn giữ trụ, không phải tiền điện sạc.
               </p>

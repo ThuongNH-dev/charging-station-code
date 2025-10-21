@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from "react";
-import MainLayout from "../../layouts/MainLayout";
+import React, { useEffect, useRef, useState } from "react";
 import "./SessionManager.css";
 
-/** ================= Helpers (định dạng) ================= */
 const fmtTime = (iso) => {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -16,121 +14,181 @@ const fmtTime = (iso) => {
 };
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
 
-/** ================== Component ================== */
 export default function SessionManager() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [activeStop, setActiveStop] = useState(null);
+  const [showPaymentMenu, setShowPaymentMenu] = useState(null);
+  const [selectedMethod, setSelectedMethod] = useState("POS");
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
-    let alive = true;
-
-    async function load() {
-      setLoading(true);
-      setErr("");
-      try {
-        // TODO: GẮN API Ở ĐÂY
-        // const res = await fetchAuthJSON(`${API_BASE}/Sessions?stationId=...`);
-        // const items = res.items || res.data || res.results || res.$values || res || [];
-        // const parsed = Array.isArray(items) ? items : [items];
-
-        // Demo data (xóa khi nối API):
-        const parsed = [
-          {
-            sessionCode: "S-1001",
-            chargerCode: "A-02",
-            customerCode: "CUST-8821",
-            startTime: "2025-09-22T11:12:10",
-            endTime: null,
-            energyKwh: null,
-            cost: null,
-            status: "UNPAID", // hoặc PAID / CANCELLED
-          },
-        ];
-
-        if (alive) {
-          setRows(parsed);
-          setLoading(false);
-        }
-      } catch (e) {
-        if (alive) {
-          setErr(e?.message || "Lỗi tải dữ liệu");
-          setLoading(false);
-        }
-      }
-    }
-
-    load();
-    return () => { alive = false; };
+    setTimeout(() => {
+      setRows([
+        {
+          sessionCode: "S-1001",
+          chargerCode: "A-02",
+          customerCode: "CUST-8821",
+          startTime: "2025-09-22T10:15:12",
+          endTime: "2025-09-22T11:26:34",
+          energyKwh: 71,
+          cost: 298200,
+          status: "UNPAID",
+        },
+      ]);
+      setLoading(false);
+    }, 300);
   }, []);
 
-  const onStop = (row) => {
-    // TODO: gọi API dừng phiên
-    console.log("Stop session", row.sessionCode);
+  // ✅ Đóng dropdown khi click ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target)
+      ) {
+        setShowPaymentMenu(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleStopClick = (row) => {
+    setShowPaymentMenu(null);
+    if (activeStop === row.sessionCode) setActiveStop(null);
+    else setActiveStop(row.sessionCode);
+  };
+
+  const handleCancel = () => {
+    setActiveStop(null);
+    setShowPaymentMenu(null);
+  };
+
+  const handleShowPayment = (row) => {
+    setShowPaymentMenu((prev) => (prev === row.sessionCode ? null : row.sessionCode));
+  };
+
+  const handleSelectMethod = (method) => {
+    setSelectedMethod(method);
+    alert(`✅ Đã chọn phương thức: ${method}`);
+    setShowPaymentMenu(null);
+    setActiveStop(null);
   };
 
   return (
-    <MainLayout>
-      <div className="sess-wrap">
-        <div className="sess-card">
-          <div className="sess-head">
-            <h3>Phiên sạc (đang chạy / lịch sử)</h3>
-          </div>
+    <div className="sess-wrap">
+      <div className="sess-card">
+        <div className="sess-head">
+          <h3>Phiên sạc (đang chạy / lịch sử)</h3>
+        </div>
 
-          <div className="sess-table">
-            <table>
-              <thead>
+        <div className="sess-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Mã phiên</th>
+                <th>Trụ</th>
+                <th>Khách hàng</th>
+                <th>Bắt đầu</th>
+                <th>Kết thúc</th>
+                <th>kWh</th>
+                <th>Chi phí</th>
+                <th>TT</th>
+                <th style={{ width: "160px" }}>Thao tác</th> {/* ✅ rộng hơn */}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
                 <tr>
-                  <th>Mã phiên</th>
-                  <th>Trụ</th>
-                  <th>Khách hàng</th>
-                  <th>Bắt đầu</th>
-                  <th>Kết thúc</th>
-                  <th>kWh</th>
-                  <th>Chi phí</th>
-                  <th>TT</th>
-                  <th>Thao tác</th>
+                  <td colSpan={9} className="center muted">
+                    Đang tải…
+                  </td>
                 </tr>
-              </thead>
-
-              <tbody>
-                {loading && (
-                  <tr><td colSpan={9} className="center muted">Đang tải…</td></tr>
-                )}
-                {err && !loading && (
-                  <tr><td colSpan={9} className="center error">{err}</td></tr>
-                )}
-                {!loading && !err && rows.length === 0 && (
-                  <tr><td colSpan={9} className="center muted">Chưa có phiên nào.</td></tr>
-                )}
-
-                {!loading && !err && rows.map((r, i) => (
-                  <tr key={r.sessionCode || i}>
+              ) : (
+                rows.map((r) => (
+                  <tr key={r.sessionCode}>
                     <td className="strong">{r.sessionCode}</td>
-                    <td>{r.chargerCode || "—"}</td>
-                    <td>{r.customerCode || "—"}</td>
+                    <td>{r.chargerCode}</td>
+                    <td>{r.customerCode}</td>
                     <td>{fmtTime(r.startTime)}</td>
                     <td>{fmtTime(r.endTime)}</td>
-                    <td>{r.energyKwh != null ? r.energyKwh : "—"}</td>
-                    <td>{r.cost != null ? vnd(r.cost) : "—"}</td>
+                    <td>{r.energyKwh}</td>
+                    <td>{vnd(r.cost)}</td>
                     <td>
-                      <span className={`pill ${String(r.status).toLowerCase()}`}>
-                        {String(r.status).toUpperCase() || "—"}
-                      </span>
+                      <span className="pill unpaid">UNPAID</span>
                     </td>
-                    <td>
-                      <button className="btn-ghost" onClick={() => onStop(r)}>
-                        Dừng
-                      </button>
+                    <td className="relative">
+                      {/* Trạng thái bình thường */}
+                      {activeStop !== r.sessionCode && (
+                        <button
+                          className="btn-dark"
+                          onClick={() => handleStopClick(r)}
+                        >
+                          Dừng
+                        </button>
+                      )}
+
+                      {/* Khi bấm Dừng → hiện hai nút */}
+                      {activeStop === r.sessionCode && (
+                        <div className="inline-actions">
+                          <button
+                            className="btn-dark small"
+                            onClick={() => handleShowPayment(r)}
+                          >
+                            Thu tiền
+                          </button>
+                          <button
+                            className="btn-light small"
+                            onClick={handleCancel}
+                          >
+                            Hủy
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Dropdown chọn phương thức */}
+                      {showPaymentMenu === r.sessionCode && (
+                        <div
+                          ref={dropdownRef}
+                          className="popup-payment"
+                        >
+                          <div className="popup-header">Chọn phương thức</div>
+                          <div
+                            className={`popup-item ${
+                              selectedMethod === "CASH" ? "active" : ""
+                            }`}
+                            onClick={() => handleSelectMethod("CASH")}
+                          >
+                            🏦 Tiền mặt
+                          </div>
+                          <div
+                            className={`popup-item ${
+                              selectedMethod === "POS" ? "active" : ""
+                            }`}
+                            onClick={() => handleSelectMethod("POS")}
+                          >
+                            💳 POS
+                          </div>
+                          <div
+                            className={`popup-item ${
+                              selectedMethod === "QR" ? "active" : ""
+                            }`}
+                            onClick={() => handleSelectMethod("QR")}
+                          >
+                            📱 QR tại trạm
+                          </div>
+                        </div>
+                      )}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
-    </MainLayout>
+    </div>
   );
 }
