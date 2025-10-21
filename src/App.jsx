@@ -25,6 +25,9 @@ import AdminLayout from "./components/admin/layout/AdminLayout";
 import StationManagement from "./components/admin/pages/StationManagement";
 import UserManagement from "./components/admin/pages/UserManagement";
 import Reports from "./components/admin/pages/Reports";
+import RegisterSelect from "./pages/Register/RegisterSelect";
+import PersonalRegister from "./pages/Register/PersonalRegister";
+import BusinessRegister from "./pages/Register/BusinessRegister";
 
 // Chuyển role thành path tương ứng
 
@@ -63,6 +66,10 @@ export default function App() {
       {/* PUBLIC */}
       <Route path="/homepage" element={<Homepage />} />{" "}
       {/* ✅ KHÔNG bọc GuestRoute */}
+      <Route path="/register/select" element={<RegisterSelect />} />
+      <Route path="/register/personal" element={<PersonalRegister />} />
+      <Route path="/register/business" element={<BusinessRegister />} />
+      {/* các route khác của bạn */}
       <Route
         path="/login"
         element={

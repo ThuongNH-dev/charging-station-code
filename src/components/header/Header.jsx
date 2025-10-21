@@ -3,7 +3,7 @@ import { Layout, Button, Tooltip } from "antd";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import AccountMenu from "../others/Menu";
-import { FileSearchOutlined } from "@ant-design/icons"; // ✅ icon bạn muốn
+import { FileSearchOutlined } from "@ant-design/icons";
 import "./Header.css";
 
 const { Header } = Layout;
@@ -11,16 +11,19 @@ const { Header } = Layout;
 export default function Head() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, user, userRole: ctxRole, userName: ctxName } = useAuth();
+  const {
+    isAuthenticated,
+    user,
+    userRole: ctxRole,
+    userName: ctxName,
+  } = useAuth();
 
-  // ===== ROLE =====
   const role = (user?.role || ctxRole || "").toLowerCase();
   const isStaff = role === "staff";
   const isAdmin = role === "admin";
   const isCustomer = role === "customer";
   const userName = user?.name || user?.userName || ctxName || "User";
 
-  // ===== MENU TRÁI =====
   const items = isStaff
     ? [
         { key: "s1", label: "Quản lý trụ sạc", path: "/staff/stations" },
@@ -35,7 +38,6 @@ export default function Head() {
         { key: "4", label: "Liên hệ", path: "/contact" },
       ];
 
-  // ===== ACTIVE MENU =====
   const path = location.pathname;
   let activeKey = isStaff ? "s1" : "1";
 
@@ -51,15 +53,23 @@ export default function Head() {
     else if (path === "/") activeKey = "1";
   }
 
-  // ===== PHẦN PHẢI =====
   const renderRight = () => {
     if (!isAuthenticated) {
       return (
         <>
-          <Button className="btn-outline" type="text" onClick={() => navigate("/login")}>
+          <Button
+            className="btn-outline"
+            type="text"
+            onClick={() => navigate("/login")}
+          >
             Đăng nhập
           </Button>
-          <Button className="btn-outline" type="text" onClick={() => navigate("/register")}>
+          <Button
+            className="btn-outline"
+            type="text"
+            onClick={() => navigate("/register/select")}
+          >
+            {/* ✅ Điều hướng đến trang chọn loại tài khoản */}
             Đăng ký
           </Button>
         </>
@@ -68,7 +78,6 @@ export default function Head() {
 
     return (
       <div className="header-right">
-        {/* ✅ Icon chỉ hiện nếu là Customer */}
         {isCustomer && (
           <Tooltip title="Lịch sử đặt chỗ">
             <FileSearchOutlined
@@ -85,7 +94,6 @@ export default function Head() {
   return (
     <Layout>
       <Header className="app-header">
-        {/* ===== BÊN TRÁI ===== */}
         <div className="left">
           <img
             src="/logoV2.png"
@@ -94,13 +102,14 @@ export default function Head() {
             onClick={() => navigate(isStaff ? "/staff/stations" : "/homepage")}
           />
 
-          {/* ❗Nếu là ADMIN thì ẩn menu trái, chỉ hiện logo */}
           {!isAdmin && (
             <ul className="nav">
               {items.map((item) => (
                 <li key={item.key}>
                   <div
-                    className={`nav-item ${activeKey === item.key ? "active" : ""}`}
+                    className={`nav-item ${
+                      activeKey === item.key ? "active" : ""
+                    }`}
                     onClick={() => navigate(item.path)}
                   >
                     {item.label}
@@ -111,7 +120,6 @@ export default function Head() {
           )}
         </div>
 
-        {/* ===== BÊN PHẢI ===== */}
         <div className="actions">{renderRight()}</div>
       </Header>
     </Layout>
