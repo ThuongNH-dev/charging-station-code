@@ -792,7 +792,6 @@ export default function BookingPorts() {
 
               {/* Phương tiện + Ghi chú giá */}
               <div className="bp-section">
-                <div className="bp-label">Phương tiện</div>
                 <div className="bp-vehicle-box">
                   {myVehicleType ? (
                     <>

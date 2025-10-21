@@ -77,7 +77,7 @@
 }
 .bp-title.with-mb { margin-bottom: 8px; }
 
-.bp-subtle { color: var(--bp-text-subtle); }
+.bp-subtle { color: var(--bp-text-subtle); justify-content: center;}
 
 .bp-note {
   font-size: 14px;

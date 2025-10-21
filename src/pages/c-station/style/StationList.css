@@ -1,141 +1,73 @@
-/* ===== LAYOUT CHÍNH (đã đồng bộ) ===== */
-
-/* Bạn đã set sẵn — giữ nguyên, chỉ nhắc lại để rõ chủ đích token */
-.bp-container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 20px 32px 40px;
-  background: var(--bp-bg, #fff);
-  color: var(--bp-text);
-  box-sizing: border-box;
-  overflow-x: hidden;
-}
-
-/* Map trên, list dưới — giữ gap 20 như bạn đã chọn */
-.mapListLayout {
+/* Grid 3 cột cố định */
+.stationListGrid.three-cols {
+  margin-top: 30px;
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr)); /* 1 hàng 3 trạm */
   gap: 20px;
-  width: 100%;
-  margin: 0 auto;
-  align-items: start;
 }
 
-/* Map panel khớp panel theme (không padding để canvas tràn full) */
-.stations-map-panel {
-  padding: 0;
+/* responsive giữ UX tốt */
+@media (max-width: 1024px) {
+  .stationListGrid.three-cols {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .stationListGrid.three-cols {
+    grid-template-columns: 1fr;
+  }
 }
 
-/* Canvas map: dùng token border/shadow/bo góc */
-.stations-map-canvas {
-  width: 100%;
-  height: 420px;
-  border-radius: var(--bp-radius-lg);
-  overflow: hidden;
-  background: #f3f4f6;
-  border: 1px solid var(--bp-border);
-  box-shadow: var(--bp-shadow);
-  position: relative;
-  top: 0;
-}
-
-/* Lưới danh sách: cùng độ rộng với map, gap 20 (theo bạn) */
-.stationListGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 20px;
-  width: 100%;
-}
-
-/* Card wrapper: hiệu ứng highlight + bo góc theo token */
-.stationListItemWrapper {
-  transition: box-shadow .15s ease, transform .15s ease, outline-color .15s ease;
-  border-radius: var(--bp-radius-lg);
-}
+/* highlight khi nhảy từ map */
 .highlight-card {
-  outline: 3px solid var(--bp-primary);
-  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.08);
-  transform: translateY(-1px);
+  outline: 2px solid var(--bp-primary);
+  box-shadow: 0 0 0 4px var(--bp-primary-soft);
+  border-radius: var(--bp-radius-lg);
 }
 
-/* ===== SEARCH + FILTERS (đồng bộ token, KHÔNG kéo ngang) ===== */
-
-/* Hàng filter: linh hoạt — 1 hàng ở màn rộng, tự wrap khi hẹp */
-.sf-row {
+/* Breadcrumb-style pagination */
+.bp-breadcrumbs {
   display: flex;
-  flex-wrap: wrap;                /* ✅ không còn overflow ngang */
-  gap: 10px;
   align-items: center;
-  overflow-x: visible;
-  padding-bottom: 0;
+  justify-content: center;
+  gap: 8px;
+  margin: 18px 0 6px;
+  flex-wrap: wrap;
 }
 
-/* Ô search: ưu tiên ~400px nhưng co giãn mềm theo không gian */
-.sf-search {
-  flex: 1 1 400px;                /* ✅ hướng đến 400px */
-  max-width: 560px;
-  min-width: 280px;
-  padding: 10px 12px;
+.bp-breadcrumb,
+.bp-breadcrumb.nav {
   border: 1px solid var(--bp-border);
-  border-radius: var(--bp-radius-md);
-  background: var(--bp-surface);
-  color: var(--bp-text);
+  background: #fff;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
   font-size: 14px;
-  outline: none;
-  transition: border-color .15s ease, box-shadow .15s ease;
-}
-.sf-search:focus {
-  border-color: var(--bp-primary);
-  box-shadow: 0 0 0 3px var(--bp-primary-soft);
 }
 
-/* Dropdown: giữ đúng 120px, đồng bộ token */
-.sf-select {
-  flex: 0 0 120px;
-  width: 120px;
-  min-width: 120px;
-  padding: 8px 10px;
-  border: 1px solid var(--bp-border);
-  border-radius: var(--bp-radius-md);
-  background: var(--bp-surface);
-  color: var(--bp-text);
+.bp-breadcrumb:hover {
+  box-shadow: var(--bp-shadow);
+}
+
+.bp-breadcrumb.active {
+  background: var(--bp-primary-soft);
+  color: var(--bp-primary-strong);
+  border-color: var(--bp-primary);
+  cursor: default;
+}
+
+.bp-breadcrumb.nav:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+
+.bp-ellipsis {
+  padding: 0 4px;
+  color: var(--bp-muted);
+}
+
+.bp-pagination-hint {
+  color: var(--bp-text-subtle);
   font-size: 13px;
-  outline: none;
-  transition: border-color .15s ease, box-shadow .15s ease;
+  margin-bottom: 8px;
 }
-.sf-select:focus {
-  border-color: var(--bp-primary);
-  box-shadow: 0 0 0 3px var(--bp-primary-soft);
-}
-
-/* (Tuỳ chọn) Giữ đúng 1 hàng trên desktop thật rộng */
-@media (min-width: 1280px) {
-  .sf-row { flex-wrap: nowrap; }  /* ✅ ép 1 hàng khi đủ chỗ */
-  .sf-search { flex-basis: 400px; max-width: 520px; }
-}
-
-/* ===== RESPONSIVE ===== */
-@media (max-width: 1280px) {
-  .bp-container { max-width: 1100px; }
-  .stationListGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-
-  /* Khi hẹp hơn, cho search chiếm 1 dòng để dropdown đều nhau */
-  .sf-search { flex: 1 1 100%; max-width: 100%; }
-}
-
-@media (max-width: 768px) {
-  .bp-container { max-width: 95%; padding: 16px; }
-  .stationListGrid { grid-template-columns: 1fr; }
-  .stations-map-canvas { height: 360px; }
-}
-
-/* ===== TIỆN ÍCH AN TOÀN TRÀN ===== */
-.mapListLayout,
-.stations-map-panel,
-.stations-map-canvas,
-.stationListGrid {
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-html, body, #root { overflow-x: hidden; }

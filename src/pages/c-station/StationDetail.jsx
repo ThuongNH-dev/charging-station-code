@@ -201,8 +201,6 @@ export default function StationDetail() {
         let lastErr = null;
         const chargerRoutes = [
           `${API_BASE}/Chargers?stationId=${st.id}`,
-          `${API_BASE}/Stations/${st.id}/chargers`,
-          `${API_BASE}/Chargers/by-station/${st.id}`,
         ];
         for (const url of chargerRoutes) {
           try {
@@ -226,9 +224,7 @@ export default function StationDetail() {
         if (chargersList.length) {
           const chargerIds = chargersList.map(c => c.id);
           const portsRoutes = [
-            `${API_BASE}/Ports/by-station/${st.id}`,
-            `${API_BASE}/Stations/${st.id}/ports`,
-            `${API_BASE}/Ports`, // fallback: lấy tất cả rồi lọc
+            `${API_BASE}/Ports?stationId=${st.id}`,
           ];
           for (const url of portsRoutes) {
             try {
@@ -281,6 +277,7 @@ export default function StationDetail() {
             `${API_BASE}/Pricing/rules`,
             `${API_BASE}/PricingRule`,
           ];
+          // const ruleRoutes = []; // để trống nếu BE không có endpoint này
           for (const url of ruleRoutes) {
             try {
               const data = await fetchJSONAuth(url);
@@ -321,11 +318,11 @@ export default function StationDetail() {
 
             let priceText = "";
             if (normal && peak) {
-              priceText = `${vnd(normal.pricePerKwh)} / kWh (thường) — ${vnd(peak.pricePerKwh)} / kWh (cao điểm)`;
+              priceText = `${vnd(normal.pricePerKwh)}/kWh - ${vnd(peak.pricePerKwh)}/kWh `;
             } else if (normal) {
-              priceText = `${vnd(normal.pricePerKwh)} / kWh`;
+              priceText = `${vnd(normal.pricePerKwh)}/kWh`;
             } else if (peak) {
-              priceText = `${vnd(peak.pricePerKwh)} / kWh (cao điểm)`;
+              priceText = `${vnd(peak.pricePerKwh)}/kWh`;
             }
 
             const priceValue = (normal?.pricePerKwh ?? peak?.pricePerKwh ?? ch.priceValue);
@@ -346,8 +343,8 @@ export default function StationDetail() {
         // 5) (optional) merge pricing theo station
         if (chargersList.length) {
           try {
-            const priceUrl = `${API_BASE}/Pricing/by-station/${st.id}`;
-            const pricing = await fetchJSONAuth(priceUrl).catch(() => null);
+            // const priceUrl = `${API_BASE}/Pricing/by-station/${st.id}`;
+            // const pricing = await fetchJSONAuth(priceUrl).catch(() => null);
             const rows = Array.isArray(pricing?.items) ? pricing.items : (Array.isArray(pricing) ? pricing : []);
             if (rows?.length) {
               const map = new Map(rows.map(r => [String(r.chargerId ?? r.ChargerId), r]));
@@ -610,7 +607,7 @@ export default function StationDetail() {
 
                     {Number.isFinite(ch.idleFeePerMin) && ch.idleFeePerMin > 0 && (
                       <div className="row">
-                        <span className="label">Phí chờ:</span>
+                        <span className="label">Phí phạt:</span>
                         <span>{vnd(ch.idleFeePerMin)} / phút</span>
                       </div>
                     )}
