@@ -1,7 +1,14 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Button, Menu, MenuItem, ListItemIcon, Divider, Avatar, Typography, Box,
+  Button,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  Divider,
+  Avatar,
+  Typography,
+  Box,
 } from "@mui/material";
 
 // ✅ icon hiện đại, màu mềm
@@ -16,7 +23,12 @@ import { useAuth } from "../../context/AuthContext";
 const ME_URL = "https://localhost:7268/api/Auth";
 
 function getInitials(name = "") {
-  return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join("");
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
 }
 
 function pickName(obj = {}) {
@@ -65,7 +77,9 @@ export default function AccountMenu() {
   const navigate = useNavigate();
   const { user, userName, userRole, token, logout } = useAuth();
 
-  const [displayName, setDisplayName] = React.useState(userName || pickName(user) || "");
+  const [displayName, setDisplayName] = React.useState(
+    userName || pickName(user) || ""
+  );
   const [roleText, setRoleText] = React.useState(userRole || user?.role || "");
   const [avatarUrl, setAvatarUrl] = React.useState("");
 
@@ -88,7 +102,10 @@ export default function AccountMenu() {
       try {
         const res = await fetch(ME_URL, {
           method: "GET",
-          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
         });
         if (!res.ok) return;
 
@@ -97,21 +114,31 @@ export default function AccountMenu() {
         if (ct.includes("application/json")) data = await res.json();
         else {
           const text = await res.text();
-          try { data = JSON.parse(text); } catch { data = null; }
+          try {
+            data = JSON.parse(text);
+          } catch {
+            data = null;
+          }
         }
         if (ignore || !data) return;
 
-        const src = data.data || data.result || data.user || data.payload || data || {};
+        const src =
+          data.data || data.result || data.user || data.payload || data || {};
         const apiName = pickName(src) || pickName(src.profile || {});
         const apiRole = pickRole(src) || pickRole(src.profile || {});
         if (apiName && !displayName) setDisplayName(apiName);
         if (apiRole && !roleText) setRoleText(apiRole);
-        const apiAvatar = src.avatarUrl || src.avatar || src.profile?.avatarUrl || "";
+        const apiAvatar =
+          src.avatarUrl || src.avatar || src.profile?.avatarUrl || "";
         if (apiAvatar) setAvatarUrl(apiAvatar);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     fetchMe();
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, [token, displayName, roleText]);
 
   React.useEffect(() => {
@@ -143,12 +170,17 @@ export default function AccountMenu() {
         sx={{
           textTransform: "none",
           borderRadius: "999px",
-          pl: 1, pr: 1.25, py: 0.5,
+          pl: 1,
+          pr: 1.25,
+          py: 0.5,
           fontWeight: 600,
           color: "text.primary",
           backgroundColor: "white",
           boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-          "&:hover": { backgroundColor: "#f5f7fa", boxShadow: "0 3px 10px rgba(0,0,0,0.1)" },
+          "&:hover": {
+            backgroundColor: "#f5f7fa",
+            boxShadow: "0 3px 10px rgba(0,0,0,0.1)",
+          },
           gap: 1,
         }}
       >
@@ -174,13 +206,29 @@ export default function AccountMenu() {
         PaperProps={{
           elevation: 3,
           sx: {
-            mt: 1.2, minWidth: 240, borderRadius: "14px", p: 0.5,
-            boxShadow: "0 8px 20px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)",
+            mt: 1.2,
+            minWidth: 240,
+            borderRadius: "14px",
+            p: 0.5,
+            boxShadow:
+              "0 8px 20px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.04)",
           },
         }}
       >
-        <Box sx={{ px: 1.5, py: 1.5, display: "flex", alignItems: "center", gap: 1.2 }}>
-          <Avatar alt={displayName || "User"} src={avatarUrl} sx={{ width: 38, height: 38, bgcolor: "primary.main" }}>
+        <Box
+          sx={{
+            px: 1.5,
+            py: 1.5,
+            display: "flex",
+            alignItems: "center",
+            gap: 1.2,
+          }}
+        >
+          <Avatar
+            alt={displayName || "User"}
+            src={avatarUrl}
+            sx={{ width: 38, height: 38, bgcolor: "primary.main" }}
+          >
             {getInitials(displayName) || "U"}
           </Avatar>
           <Box>
@@ -195,30 +243,70 @@ export default function AccountMenu() {
 
         <Divider />
 
-        <MenuItem onClick={() => { handleClose(); navigate("/profile"); }}
-          sx={{ borderRadius: "10px", mx: 0.5, margin: "5px 0px", "&:hover": { background: "#f5f7fa" } }}>
+        <MenuItem
+          onClick={() => {
+            handleClose();
+            navigate("/profile/update-info");
+          }}
+          sx={{
+            borderRadius: "10px",
+            mx: 0.5,
+            margin: "5px 0px",
+            "&:hover": { background: "#f5f7fa" },
+          }}
+        >
           Quản lý tài khoản
         </MenuItem>
 
-        <MenuItem onClick={() => { handleClose(); navigate("/settings"); }}
-          sx={{ borderRadius: "10px", mx: 0.5, margin: "5px 0px", "&:hover": { background: "#f5f7fa" } }}>
+        <MenuItem
+          onClick={() => {
+            handleClose();
+            navigate("/settings");
+          }}
+          sx={{
+            borderRadius: "10px",
+            mx: 0.5,
+            margin: "5px 0px",
+            "&:hover": { background: "#f5f7fa" },
+          }}
+        >
           Cài đặt tài khoản
         </MenuItem>
 
-        <MenuItem onClick={() => { handleClose(); navigate("/dashboard"); }}
-          sx={{ borderRadius: "10px", mx: 0.5, margin: "5px 0px", "&:hover": { background: "#f5f7fa" } }}>
+        <MenuItem
+          onClick={() => {
+            handleClose();
+            navigate("/dashboard");
+          }}
+          sx={{
+            borderRadius: "10px",
+            mx: 0.5,
+            margin: "5px 0px",
+            "&:hover": { background: "#f5f7fa" },
+          }}
+        >
           Bảng điều khiển
         </MenuItem>
 
         <Divider sx={{ my: 0.5 }} />
 
-        <MenuItem onClick={() => { handleClose(); logout(); navigate("/"); }}
+        <MenuItem
+          onClick={() => {
+            handleClose();
+            logout();
+            navigate("/");
+          }}
           sx={{
-            borderRadius: "10px", mx: 0.5, color: "error.main",
+            borderRadius: "10px",
+            mx: 0.5,
+            color: "error.main",
             "& .MuiSvgIcon-root": { color: "error.main" },
-            "&:hover": { backgroundColor: "#fff2f2" }
-          }}>
-          <ListItemIcon><LogoutRoundedIcon fontSize="small" /></ListItemIcon>
+            "&:hover": { backgroundColor: "#fff2f2" },
+          }}
+        >
+          <ListItemIcon>
+            <LogoutRoundedIcon fontSize="small" />
+          </ListItemIcon>
           Đăng xuất
         </MenuItem>
       </Menu>

@@ -1,0 +1,168 @@
+/* ====== Tổng thể ====== */
+.pay-wrap {
+  display: flex;
+  justify-content: center;
+  background-color: #f8fafc;
+  padding: 30px;
+  min-height: 80vh;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+/* ====== Bố cục ====== */
+.pay-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  width: 100%;
+  max-width: 1100px;
+}
+
+/* ====== Thẻ card ====== */
+.pay-card {
+  background: white;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  padding: 20px 25px 25px;
+  display: flex;
+  flex-direction: column;
+}
+
+.pay-card h3 {
+  font-size: 17px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 16px;
+}
+
+/* ====== Form thanh toán ====== */
+.pay-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+}
+
+.pay-form label {
+  grid-column: span 2;
+  font-weight: 500;
+  font-size: 14px;
+  color: #374151;
+}
+
+.pay-form select,
+.pay-form input {
+  grid-column: span 2;
+  padding: 9px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.15s ease;
+  background-color: #f9fafb;
+}
+
+.pay-form select:focus,
+.pay-form input:focus {
+  border-color: #2563eb;
+  background-color: white;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.pay-form input::placeholder {
+  color: #9ca3af;
+}
+
+.pay-form button {
+  grid-column: span 2;
+  margin-top: 6px;
+  padding: 10px 14px;
+  background-color: #0f172a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.pay-form button:hover {
+  background-color: #1e293b;
+}
+
+.pay-form button:active {
+  background-color: #334155;
+}
+
+/* ====== Bảng giao dịch ====== */
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table-wrap thead {
+  background-color: #f1f5f9;
+}
+
+.table-wrap th {
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.table-wrap td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #1f2937;
+}
+
+.table-wrap tr:hover {
+  background-color: #f9fafb;
+}
+
+/* ====== Trạng thái ====== */
+.center {
+  text-align: center;
+}
+
+.muted {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.paid {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+/* ====== Nút export ====== */
+.export {
+  margin-top: 12px;
+  padding: 8px 14px;
+  border: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  color: #374151;
+  align-self: flex-start;
+  transition: all 0.15s ease;
+}
+
+.export:hover {
+  background-color: #e5e7eb;
+}
+
+/* ====== Responsive ====== */
+@media (max-width: 900px) {
+  .pay-top {
+    grid-template-columns: 1fr;
+  }
+}

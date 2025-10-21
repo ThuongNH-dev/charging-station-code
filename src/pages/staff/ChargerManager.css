@@ -1,17 +1,183 @@
-.sc-wrap { padding: 16px 20px; }
-.sc-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-.sc-actions { display:flex; gap:8px; align-items:center; }
-.sc-search { width:260px; height:34px; border:1px solid #e5e7eb; border-radius:8px; padding:0 12px; outline:none; }
-.sc-primary { height:36px; border:none; background:#111827; color:#fff; padding:0 12px; border-radius:8px; cursor:pointer; }
+/* ====== Tổng thể ====== */
+.sc-wrap {
+  background-color: #f8fafc;
+  min-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px;
+  font-family: "Inter", system-ui, sans-serif;
+}
 
-.sc-table table { width:100%; border-collapse:collapse; background:#fff; border-radius:10px; overflow:hidden; }
-.sc-table th, .sc-table td { border:1px solid #e5e7eb; padding:10px 12px; font-size:14px; }
-.sc-table th { background:#f9fafb; text-align:left; }
+/* ====== Header ====== */
+.sc-header {
+  width: 100%;
+  max-width: 1000px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
 
-.status.ok { color:#0e9f6e; font-weight:600; }
-.status.charging { color:#2563eb; font-weight:600; }
-.status.error { color:#ef4444; font-weight:600; }
+.sc-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
 
-.sc-empty, .sc-error { padding:16px; }
-.link { background:none; border:none; color:#2563eb; cursor:pointer; padding:0; }
-.link:hover { text-decoration:underline; }
+.sc-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ====== Ô tìm kiếm ====== */
+.sc-search {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #374151;
+  background-color: #ffffff;
+  width: 180px;
+  transition: all 0.15s ease;
+}
+
+.sc-search::placeholder {
+  color: #9ca3af;
+}
+
+.sc-search:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* ====== Nút chính ====== */
+.sc-primary {
+  background-color: #111827;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sc-primary:hover {
+  background-color: #1e293b;
+}
+
+/* ====== Bảng ====== */
+.sc-table {
+  width: 100%;
+  max-width: 1000px;
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  padding: 20px 25px;
+}
+
+.sc-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.sc-table th,
+.sc-table td {
+  padding: 10px 12px;
+  border: 1px solid #9ca3af;
+  text-align: left;
+  color: #111827;
+}
+
+.sc-table th {
+  font-weight: 600;
+  background-color: #f9fafb;
+}
+
+/* ====== Trạng thái ====== */
+.status.ok {
+  color: #16a34a;
+  font-weight: 500;
+}
+
+.status.charging {
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.status.error {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+/* ====== Liên kết thao tác ====== */
+.link {
+  background: none;
+  border: none;
+  color: #111827;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.link:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+/* ====== Trạng thái tải và lỗi ====== */
+.sc-empty,
+.sc-error {
+  width: 100%;
+  max-width: 1000px;
+  text-align: center;
+  padding: 20px;
+  border-radius: 8px;
+}
+
+.sc-empty {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.sc-error {
+  color: #dc2626;
+}
+
+/* ====== Responsive ====== */
+@media (max-width: 768px) {
+  .sc-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .sc-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .sc-search {
+    width: 60%;
+  }
+
+  .sc-primary {
+    flex-shrink: 0;
+  }
+
+  .sc-table {
+    padding: 15px;
+  }
+
+  .sc-table table {
+    font-size: 13px;
+  }
+}
