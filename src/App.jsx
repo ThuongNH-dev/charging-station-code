@@ -1,5 +1,4 @@
 // src/App.jsx
-import React from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -31,8 +30,8 @@ import UserManagement from "./components/admin/pages/UserManagement";
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
     case "customer": return "/stations";
-    case "admin": return "/homepage";
-    case "staff": return "/homepage";
+    case "admin": return "/admin";
+    case "staff": return "/staff";
     default: return "/homepage";
   }
 }
@@ -163,7 +162,7 @@ export default function App() {
       <Route
         path="/invoice" element={
           <ProtectedRoute allowedRoles={["Customer"]}>
-            <InvoicePage/>
+            <InvoicePage />
           </ProtectedRoute>
         }
       />
@@ -173,12 +172,12 @@ export default function App() {
         path="/staff/*"
         element={
           <ProtectedRoute allowedRoles={["Staff"]}>
-            <StaffLayout/>
+            <StaffLayout />
           </ProtectedRoute>
         }
       />
 
-        {/* Admin */}
+      {/* Admin
       <Route path="/admin/*" element={
         <ProtectedRoute allowedRoles={["Admin"]}>
           <AdminLayout/>
@@ -188,7 +187,40 @@ export default function App() {
         <Route path="stations" element={<StationManagement />} />
 
         <Route path="/admin/users" element={<UserManagement />} />
-        </Route>  
+        </Route>  */}
+
+      {/* <Route path="/admin" element={
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AdminLayout/>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/stations" element={
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <StationManagement/>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/users" element={
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <UserManagement/>
+        </ProtectedRoute>
+      } /> */}
+
+      <Route
+        path="admin"
+        element={
+          <ProtectedRoute allowedRoles={["Admin"]}>
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
+        {/* LƯU Ý: path con là tương đối, KHÔNG dùng "/admin/..." */}
+        <Route index element={<StationManagement />} />
+        <Route path="stations" element={<StationManagement />} />
+        <Route path="users" element={<UserManagement />} />
+      </Route>
+
 
 
       {/* FALLBACK */}
