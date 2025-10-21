@@ -17,10 +17,16 @@ import Login from "./components/login/Login";
 import Homepage from "./pages/homepage/homepage";
 import ServicePlans from "./components/subscription/ServicePlans";
 import Unauthorized from "./pages/Unauthorized"; // ✅ thêm trang này (mục 2)
-import ChargerManager from "./pages/staff/ChargerManager";
-import SessionManager from "./pages/staff/SessionManager";
+// import ChargerManager from "./pages/staff/ChargerManager";
+// import SessionManager from "./pages/staff/SessionManager";
 import BookingHistory from "./pages/booking/BookingHisory"; // ✅ thêm trang lịch sử đặt chỗ
 import InvoicePage from "./components/charging/Invoice";
+import StaffLayout from "./layouts/StaffLayout";
+import AdminLayout from "./components/admin/layout/AdminLayout";
+import StationManagement from "./components/admin/pages/StationManagement";
+import UserManagement from "./components/admin/pages/UserManagement";
+
+// Chuyển role thành path tương ứng
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
@@ -164,22 +170,26 @@ export default function App() {
 
       {/*Staff */}
       <Route
-        path="/staff/stations"
+        path="/staff/*"
         element={
           <ProtectedRoute allowedRoles={["Staff"]}>
-            <ChargerManager />
+            <StaffLayout/>
           </ProtectedRoute>
         }
       />
 
-      <Route
-        path="/staff/sessions"
-        element={
-          <ProtectedRoute allowedRoles={["Staff"]}>
-            <SessionManager />
-          </ProtectedRoute>
-        }
-      />
+        {/* Admin */}
+      <Route path="/admin/*" element={
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AdminLayout/>
+        </ProtectedRoute>
+      } >
+        <Route index element={<StationManagement />} />
+        <Route path="stations" element={<StationManagement />} />
+
+        <Route path="/admin/users" element={<UserManagement />} />
+        </Route>  
+
 
       {/* FALLBACK */}
       <Route path="*" element={<Navigate to="/homepage" replace />} /> {/* ✅ */}
