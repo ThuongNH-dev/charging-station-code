@@ -1,5 +1,4 @@
 // src/App.jsx
-import React from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -17,16 +16,22 @@ import Login from "./components/login/Login";
 import Homepage from "./pages/homepage/homepage";
 import ServicePlans from "./components/subscription/ServicePlans";
 import Unauthorized from "./pages/Unauthorized"; // ✅ thêm trang này (mục 2)
-import ChargerManager from "./pages/staff/ChargerManager";
-import SessionManager from "./pages/staff/SessionManager";
+// import ChargerManager from "./pages/staff/ChargerManager";
+// import SessionManager from "./pages/staff/SessionManager";
 import BookingHistory from "./pages/booking/BookingHisory"; // ✅ thêm trang lịch sử đặt chỗ
 import InvoicePage from "./components/charging/Invoice";
+import StaffLayout from "./layouts/StaffLayout";
+import AdminLayout from "./components/admin/layout/AdminLayout";
+import StationManagement from "./components/admin/pages/StationManagement";
+import UserManagement from "./components/admin/pages/UserManagement";
+
+// Chuyển role thành path tương ứng
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
     case "customer": return "/stations";
-    case "admin": return "/homepage";
-    case "staff": return "/homepage";
+    case "admin": return "/admin";
+    case "staff": return "/staff";
     default: return "/homepage";
   }
 }
@@ -157,29 +162,66 @@ export default function App() {
       <Route
         path="/invoice" element={
           <ProtectedRoute allowedRoles={["Customer"]}>
-            <InvoicePage/>
+            <InvoicePage />
           </ProtectedRoute>
         }
       />
 
       {/*Staff */}
       <Route
-        path="/staff/stations"
+        path="/staff/*"
         element={
           <ProtectedRoute allowedRoles={["Staff"]}>
-            <ChargerManager />
+            <StaffLayout />
           </ProtectedRoute>
         }
       />
 
+      {/* Admin
+      <Route path="/admin/*" element={
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AdminLayout/>
+        </ProtectedRoute>
+      } >
+        <Route index element={<StationManagement />} />
+        <Route path="stations" element={<StationManagement />} />
+
+        <Route path="/admin/users" element={<UserManagement />} />
+        </Route>  */}
+
+      {/* <Route path="/admin" element={
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <AdminLayout/>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/stations" element={
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <StationManagement/>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/users" element={
+        <ProtectedRoute allowedRoles={["Admin"]}>
+          <UserManagement/>
+        </ProtectedRoute>
+      } /> */}
+
       <Route
-        path="/staff/sessions"
+        path="admin"
         element={
-          <ProtectedRoute allowedRoles={["Staff"]}>
-            <SessionManager />
+          <ProtectedRoute allowedRoles={["Admin"]}>
+            <AdminLayout />
           </ProtectedRoute>
         }
-      />
+      >
+        {/* LƯU Ý: path con là tương đối, KHÔNG dùng "/admin/..." */}
+        <Route index element={<StationManagement />} />
+        <Route path="stations" element={<StationManagement />} />
+        <Route path="users" element={<UserManagement />} />
+      </Route>
+
+
 
       {/* FALLBACK */}
       <Route path="*" element={<Navigate to="/homepage" replace />} /> {/* ✅ */}
