@@ -2,104 +2,23 @@ import React, { useState, useEffect } from "react";
 
 import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import "./StationManagement.css";
-
-// CHÚ THÍCH: Giả lập dữ liệu Customer để tìm kiếm Tên theo ID
-const mockCustomers = [
-  { CustomerId: 1, FullName: "Nguyễn Quang Huy" },
-  { CustomerId: 2, FullName: "Nguyễn Quang Huy" },
-  { CustomerId: 3, FullName: "Anna Is" },
-  { CustomerId: 4, FullName: "YNhi" },
-  { CustomerId: 5, FullName: "Nguyễn Quang Huy" },
-  { CustomerId: 100, FullName: "Nguyễn Văn A" },
-  { CustomerId: 821, FullName: "Khách VIP 821" },
-];
+// Giả định stationApi và customerApi tồn tại
+import { stationApi } from "../../../api/stationApi";
 
 /**
  * Giả lập API tìm kiếm tên người dùng theo CustomerId (BE API)
  * @param {number} id - ID người dùng cần tìm (CustomerId)
  * @returns {string | null} Tên người dùng (FullName) hoặc null
  */
-const findCustomerNameById = (id) => {
-  if (!id) return null;
-  const customer = mockCustomers.find(
-    (c) => String(c.CustomerId) === String(id)
-  );
-  return customer ? customer.FullName : null;
-};
 
-// --- DỮ LIỆU MÔ PHỎNG (Giữ nguyên) ---
-const initialStations = [
-  {
-    StationId: 1,
-    StationName: "VinFast Station Hanoi",
-    Address: "123 Nguy?n V?n C?, Long Biên",
-    City: "Hà Nội",
-    Latitude: 21.037,
-    Longitude: 105.836,
-    Status: "Active",
-    chargers: [
-      {
-        ChargerId: 1,
-        StationId: 1,
-        Code: "C001",
-        Type: "AC",
-        PowerKw: 120.0,
-        InstalledAt: "2023-05-01 08:00:00.000",
-        Status: "Online",
-        ports: [
-          {
-            PortId: 1,
-            ChargerId: 1,
-            ConnectorType: "CCS2",
-            MaxPowerKw: 120.0,
-            Code: "P001",
-            Status: "Available", // Online: Hiện nút BẮT ĐẦU
-            activeSession: false,
-          },
-          {
-            PortId: 2,
-            ChargerId: 1,
-            ConnectorType: "Type2",
-            MaxPowerKw: 90.0,
-            Code: "P002",
-            Status: "Busy", // Đang bận: Hiện nút TỔNG KẾT
-            activeSession: true,
-          },
-        ],
-      },
-      {
-        ChargerId: 2,
-        StationId: 1,
-        Code: "C002",
-        Type: "DC",
-        PowerKw: 60.0,
-        InstalledAt: "2023-06-15 08:00:00.000",
-        Status: "Offline",
-        ports: [
-          {
-            PortId: 3,
-            ChargerId: 2,
-            ConnectorType: "CCS2",
-            MaxPowerKw: 60.0,
-            Code: "P003",
-            Status: "Maintenance", // Bảo trì: KHÔNG hiện nút
-            activeSession: false,
-          },
-        ],
-      },
-    ],
+const customerApi = {
+  // ✅ LƯU Ý: Đây là API giả lập, hãy đảm bảo nó hoạt động với dữ liệu test của bạn
+  async getById(id) {
+    const res = await fetch(`https://localhost:7268/api/Customers/${id}`);
+    if (!res.ok) throw new Error("Không thể lấy thông tin khách hàng");
+    return res.json();
   },
-  {
-    StationId: 2,
-    StationName: "Tesla Station HCM",
-    Address: "45 Lê Lợi, Qun 1",
-    City: "TP HCM",
-    Latitude: 10.775,
-    Longitude: 106.7,
-    Status: "Offline",
-    chargers: [],
-  },
-];
+};
 
 // Dữ liệu khởi tạo cho Modal (Giữ nguyên)
 const newStationInitialState = {
@@ -126,7 +45,6 @@ const newPortInitialState = {
 };
 
 function StationPage() {
-  const [stations, setStations] = useState(initialStations);
   const [activeModal, setActiveModal] = useState(null);
   const [newStation, setNewStation] = useState(newStationInitialState);
   const [editingStation, setEditingStation] = useState({});
@@ -153,9 +71,49 @@ function StationPage() {
   const [endSessionData, setEndSessionData] = useState(null); // Dữ liệu cho modal Tổng kết
 
   // THÊM: Logic để LỌC danh sách trạm
-  // ✨ BƯỚC 1: THÊM STATE VÀ HÀM XỬ LÝ
+  const [stations, setStations] = useState([]);
   const [statusFilter, setStatusFilter] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
+  useEffect(() => {
+    fetchStations();
+  }, []);
+
+  const closeModal = () => {
+    setActiveModal(null);
+    setStartSessionData({ carPlate: "", userId: "" });
+    setEndSessionData(null);
+  };
+
+  // GỌI API ĐỂ LẤY DANH SÁCH TRẠM
+  const fetchStations = async () => {
+    try {
+      const data = await stationApi.getAllStations();
+      // ✅ LƯU Ý: Nếu API trả về camelCase (ví dụ: stationName, status),
+      // bạn cần ánh xạ nó sang PascalCase (StationName, Status) hoặc sửa code
+      // hiển thị. (Giả định API trả về đúng cấu trúc như code đang sử dụng)
+      const mappedData = data.map((s) => ({
+        StationId: s.StationId || s.stationId,
+        StationName: s.StationName || s.stationName || "Tên không xác định",
+        Address: s.Address || s.address,
+        City: s.City || s.city,
+        // Chuẩn hóa trạng thái: API có thể trả về 'Open', chuyển thành 'Active'
+        Status:
+          (s.Status || s.status) === "Open" ? "Active" : s.Status || s.status,
+        Latitude: s.Latitude || s.latitude,
+        Longitude: s.Longitude || s.longitude,
+        ImageUrl: s.ImageUrl || s.imageUrl,
+        // Đảm bảo chargers tồn tại và là mảng
+        chargers: (s.chargers || s.Chargers || []).map((c) => ({
+          ...c, // Giữ nguyên các trường khác
+          ports: c.ports || c.Ports || [], // Đảm bảo ports là mảng
+        })),
+      }));
+
+      setStations(mappedData);
+    } catch (err) {
+      console.error("Lỗi khi tải danh sách trạm:", err);
+    }
+  };
 
   const handleStatusFilterChange = (e) => {
     setStatusFilter(e.target.value);
@@ -168,13 +126,16 @@ function StationPage() {
   // Logic lọc: Gộp cả trạng thái và tên
   const filteredStations = stations.filter((station) => {
     // 1. Lọc theo trạng thái
+    const statusToCheck = station.Status === "Active" ? "Active" : "Offline"; // Chuẩn hóa giá trị
     const isStatusMatch =
-      statusFilter === "All" || station.Status === statusFilter;
+      statusFilter === "All" || statusToCheck === statusFilter;
 
-    // 2. Lọc theo tên (Không phân biệt chữ hoa/thường)
-    const isNameMatch = station.StationName.toLowerCase().includes(
-      searchTerm.toLowerCase()
-    );
+    // 2. Lọc theo tên
+    const stationName = station.StationName || "";
+    const lowerCaseStationName = stationName.toLowerCase();
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+
+    const isNameMatch = lowerCaseStationName.includes(lowerCaseSearchTerm);
 
     // Trả về true nếu cả hai điều kiện đều đúng
     return isStatusMatch && isNameMatch;
@@ -182,17 +143,31 @@ function StationPage() {
 
   // CHÚ THÍCH: Logic tìm kiếm tên người dùng (giả lập debounce/API call)
   useEffect(() => {
+    const fetchCustomerName = async () => {
+      if (!startSessionData.userId) {
+        setFoundUserName(null);
+        return;
+      }
+
+      try {
+        // ✅ SỬA LỖI: Gọi API thực tế
+        const customer = await customerApi.getById(startSessionData.userId);
+        setFoundUserName(customer.FullName);
+      } catch (error) {
+        setFoundUserName(null); // Không tìm thấy
+        console.error("Lỗi tìm kiếm khách hàng:", error);
+      }
+    };
+
     if (activeModal === "startSession" && startSessionData.userId) {
-      const timer = setTimeout(() => {
-        const name = findCustomerNameById(startSessionData.userId);
-        setFoundUserName(name);
-      }, 300);
+      const timer = setTimeout(fetchCustomerName, 300); // Thêm Debounce
 
       return () => clearTimeout(timer);
     } else if (activeModal !== "startSession") {
       setFoundUserName(null);
     }
   }, [startSessionData.userId, activeModal]);
+
   // --- HANDLER CHUNG CHO INPUT (Giữ nguyên) ---
 
   const handleInputChange = (e, state, setState) => {
@@ -236,8 +211,37 @@ function StationPage() {
       if (s.StationId === stationId) {
         s.chargers.forEach((c) => {
           if (c.ChargerId === chargerId) {
+            // Cần tìm port đang bận có sessionData
             const port = c.ports.find((p) => p.PortId === portId);
-            if (port) session = port.sessionData;
+            if (port && port.Status === "Busy" && port.sessionData) {
+              // TÍNH TOÁN DỮ LIỆU GIẢ LẬP KHI KẾT THÚC
+              const now = new Date();
+              const startTime = new Date(port.sessionData.startTime);
+              const durationMs = now - startTime;
+              const durationHours = (durationMs / (1000 * 60 * 60)).toFixed(2); // Giờ
+
+              // Giả lập năng lượng (kW * giờ * hiệu suất)
+              // Giả định MaxPowerKw của port là công suất trung bình (chỉ để giả lập)
+              const energyKwh = (
+                parseFloat(port.MaxPowerKw) *
+                durationHours *
+                0.95
+              ).toFixed(3);
+              const costVND = (parseFloat(energyKwh) * 3500).toLocaleString(
+                "vi-VN"
+              ); // Giả định 1kWh = 3500 VNĐ
+
+              session = {
+                ...port.sessionData,
+                endTime:
+                  now.toLocaleTimeString("vi-VN") +
+                  " " +
+                  now.toLocaleDateString("vi-VN"),
+                duration: durationHours,
+                energy: energyKwh,
+                cost: costVND,
+              };
+            }
           }
         });
       }
@@ -272,15 +276,14 @@ function StationPage() {
                       carPlate: startSessionData.carPlate || "Unknown",
                       userName: foundUserName,
                       userId: startSessionData.userId,
-                      startTime:
-                        new Date().toLocaleTimeString("vi-VN") +
-                        " " +
-                        new Date().toLocaleDateString("vi-VN"),
+                      // LƯU THỜI GIAN BẮT ĐẦU VÀO sessionData
+                      startTime: new Date().toISOString(), // Dùng ISO string để dễ tính toán sau này
+                      MaxPowerKw: port.MaxPowerKw, // Lưu công suất để tính năng lượng sau này
                       // Dữ liệu giả lập cho session đang chạy
-                      endTime: "Đang sạc", // Placeholder
-                      duration: "N/A", // Placeholder
-                      energy: "0.000", // Placeholder
-                      cost: "0", // Placeholder
+                      endTime: "Đang sạc",
+                      duration: "N/A",
+                      energy: "0.000",
+                      cost: "0",
                     },
                   };
                 }
@@ -312,6 +315,7 @@ function StationPage() {
                     ...port,
                     Status: "Available", // Chuyển sang sẵn sàng
                     activeSession: false,
+                    sessionData: null, // Xóa dữ liệu session
                   };
                 }
                 return port;
@@ -360,7 +364,7 @@ function StationPage() {
   const openEditChargerModal = (stationId, chargerId) => {
     const station = stations.find((s) => s.StationId === stationId);
     const charger = station?.chargers.find(
-      (c) => String(c.ChargerId) === String(chargerId)
+      (c) => Number(c.ChargerId) === Number(chargerId)
     );
     if (charger) {
       setEditingCharger({ ...charger, StationId: stationId });
@@ -402,225 +406,80 @@ function StationPage() {
   };
 
   // --- LOGIC CẬP NHẬT TRẠNG THÁI (Giữ nguyên) ---
-
-  const handleAddStation = () => {
-    if (!newStation.StationName || !newStation.Address) return;
-
-    setStations((prevStations) => {
-      const newStationId =
-        prevStations.length > 0
-          ? Math.max(...prevStations.map((s) => s.StationId)) + 1
-          : 1;
-      const newStationObj = {
-        ...newStation,
-        StationId: newStationId,
-        Latitude: parseFloat(newStation.Latitude) || 0,
-        Longitude: parseFloat(newStation.Longitude) || 0,
-        chargers: [],
-      };
-      return [...prevStations, newStationObj];
-    });
-
-    setActiveModal(null);
+  const handleAddStation = async () => {
+    try {
+      await stationApi.addStation(newStation);
+      setActiveModal(null);
+      fetchStations(); // load lại danh sách sau khi thêm
+    } catch (err) {
+      alert("Không thể thêm trạm mới: " + err.message);
+    }
   };
 
-  const handleSaveEditStation = () => {
-    if (!editingStation.StationName || !editingStation.StationId) return;
-
-    setStations((prevStations) =>
-      prevStations.map((station) => {
-        if (station.StationId === editingStation.StationId) {
-          return {
-            ...station,
-            ...editingStation,
-            Latitude: parseFloat(editingStation.Latitude) || 0,
-            Longitude: parseFloat(editingStation.Longitude) || 0,
-          };
-        }
-        return station;
-      })
-    );
-    setActiveModal(null);
+  const handleSaveEditStation = async () => {
+    try {
+      await stationApi.updateStation(editingStation.StationId, editingStation);
+      setActiveModal(null);
+      fetchStations();
+    } catch (err) {
+      alert("Cập nhật trạm thất bại: " + err.message);
+    }
   };
 
-  const handleCreateCharger = () => {
-    if (
-      !newChargerData.Code ||
-      !newChargerData.PowerKw ||
-      currentStationId === null
-    )
-      return;
-
-    setStations((prevStations) =>
-      prevStations.map((station) => {
-        if (station.StationId === currentStationId) {
-          const newChargerId =
-            station.chargers.length > 0
-              ? Math.max(...station.chargers.map((c) => c.ChargerId)) + 1
-              : 1;
-
-          const newCharger = {
-            ChargerId: newChargerId,
-            StationId: currentStationId,
-            Code: newChargerData.Code,
-            Type: newChargerData.Type,
-            PowerKw: parseFloat(newChargerData.PowerKw) || 0,
-            InstalledAt: new Date().toISOString().split("T")[0],
-            Status: newChargerData.Status,
-            ports: [],
-          };
-          return { ...station, chargers: [...station.chargers, newCharger] };
-        }
-        return station;
-      })
-    );
-    setActiveModal(null);
+  const handleCreateCharger = async () => {
+    try {
+      await stationApi.addCharger(currentStationId, newChargerData);
+      setActiveModal(null);
+      fetchStations();
+    } catch (err) {
+      alert("Không thể thêm bộ sạc: " + err.message);
+    }
   };
 
-  const handleSaveEditCharger = () => {
-    if (!editingCharger.Code || !editingCharger.ChargerId) return;
-
-    setStations((prevStations) =>
-      prevStations.map((station) => {
-        if (station.StationId === editingCharger.StationId) {
-          const updatedChargers = station.chargers.map((charger) => {
-            if (
-              String(charger.ChargerId) === String(editingCharger.ChargerId)
-            ) {
-              return {
-                ...charger,
-                Code: editingCharger.Code,
-                Type: editingCharger.Type,
-                PowerKw: parseFloat(editingCharger.PowerKw) || 0,
-                Status: editingCharger.Status,
-              };
-            }
-            return charger;
-          });
-          return { ...station, chargers: updatedChargers };
-        }
-        return station;
-      })
-    );
-    setActiveModal(null);
+  const handleSaveEditCharger = async () => {
+    try {
+      await stationApi.updateCharger(editingCharger.ChargerId, editingCharger);
+      setActiveModal(null);
+      fetchStations();
+    } catch (err) {
+      alert("Không thể cập nhật bộ sạc: " + err.message);
+    }
   };
 
-  const handleCreatePort = () => {
-    if (
-      !newPortData.ConnectorType ||
-      !newPortData.MaxPowerKw ||
-      currentStationId === null ||
-      currentChargerId === null
-    )
-      return;
-
-    setStations((prevStations) =>
-      prevStations.map((station) => {
-        if (station.StationId === currentStationId) {
-          const updatedChargers = station.chargers.map((charger) => {
-            if (charger.ChargerId === currentChargerId) {
-              const newPortId =
-                charger.ports.length > 0
-                  ? Math.max(...charger.ports.map((p) => p.PortId)) + 1
-                  : 1;
-              const newPort = {
-                PortId: newPortId,
-                ChargerId: currentChargerId,
-                ConnectorType: newPortData.ConnectorType,
-                Code: newPortData.Code || `P${newPortId}`,
-                MaxPowerKw: parseFloat(newPortData.MaxPowerKw) || 0,
-                Status: newPortData.Status,
-                activeSession: false,
-              };
-              return { ...charger, ports: [...charger.ports, newPort] };
-            }
-            return charger;
-          });
-          return { ...station, chargers: updatedChargers };
-        }
-        return station;
-      })
-    );
-    setActiveModal(null);
+  const handleCreatePort = async () => {
+    try {
+      await stationApi.addPort(currentChargerId, newPortData);
+      setActiveModal(null);
+      fetchStations();
+    } catch (err) {
+      alert("Không thể thêm cổng sạc: " + err.message);
+    }
   };
 
-  const handleSaveEditPort = () => {
-    if (!editingPort.ConnectorType || !editingPort.PortId) return;
-
-    setStations((prevStations) => {
-      return prevStations.map((station) => {
-        if (station.StationId === editingPort.StationId) {
-          const updatedChargers = station.chargers.map((charger) => {
-            if (charger.ChargerId === editingPort.ChargerId) {
-              const updatedPorts = charger.ports.map((port) => {
-                if (String(port.PortId) === String(editingPort.PortId)) {
-                  return {
-                    ...port,
-                    ConnectorType: editingPort.ConnectorType,
-                    MaxPowerKw: parseFloat(editingPort.MaxPowerKw) || 0,
-                    Status: editingPort.Status,
-                  };
-                }
-                return port;
-              });
-              return { ...charger, ports: updatedPorts };
-            }
-            return charger;
-          });
-          return { ...station, chargers: updatedChargers };
-        }
-        return station;
-      });
-    });
-    setActiveModal(null);
+  const handleSaveEditPort = async () => {
+    try {
+      await stationApi.updatePort(editingPort.PortId, editingPort);
+      setActiveModal(null);
+      fetchStations();
+    } catch (err) {
+      alert("Không thể cập nhật cổng: " + err.message);
+    }
   };
 
-  const handleDeleteConfirm = () => {
-    if (!targetId || !targetType) return;
-
-    setStations((prevStations) => {
+  const handleDeleteConfirm = async () => {
+    try {
       if (targetType === "station") {
-        return prevStations.filter((s) => s.StationId !== targetId);
+        await stationApi.deleteStation(targetId);
       } else if (targetType === "charger") {
-        return prevStations.map((station) => {
-          if (
-            station.chargers.some(
-              (c) => String(c.ChargerId) === String(targetId)
-            )
-          ) {
-            return {
-              ...station,
-              chargers: station.chargers.filter(
-                (c) => String(c.ChargerId) !== String(targetId)
-              ),
-            };
-          }
-          return station;
-        });
+        await stationApi.deleteCharger(targetId);
       } else if (targetType === "port") {
-        return prevStations.map((station) => {
-          const updatedChargers = station.chargers.map((charger) => {
-            if (
-              charger.ports.some((p) => String(p.PortId) === String(targetId))
-            ) {
-              return {
-                ...charger,
-                ports: charger.ports.filter(
-                  (p) => String(p.PortId) !== String(targetId)
-                ),
-              };
-            }
-            return charger;
-          });
-          return { ...station, chargers: updatedChargers };
-        });
+        await stationApi.deletePort(targetId);
       }
-      return prevStations;
-    });
-
-    setActiveModal(null);
-    setTargetId(null);
-    setTargetType(null);
+      setActiveModal(null);
+      fetchStations(); // Cập nhật lại danh sách
+    } catch (err) {
+      alert("Không thể xoá: " + err.message);
+    }
   };
 
   // --- HÀM RENDER ---
@@ -653,7 +512,11 @@ function StationPage() {
             </span>
           </h4>
           <p style={{ fontSize: "0.8em", color: "#666" }}>
-            Lắp đặt: {charger.InstalledAt.split(" ")[0]}
+            {/* ✅ LƯU Ý: Sửa lại cách truy cập InstalledAt để tránh lỗi nếu API trả về ISO 8601 */}
+            Lắp đặt:{" "}
+            {charger.InstalledAt?.split("T")[0] ||
+              charger.InstalledAt?.split(" ")[0] ||
+              "N/A"}
           </p>
           <div className="pole-actions">
             <button
@@ -756,8 +619,8 @@ function StationPage() {
       <div className="station-actions">
         <select
           className="input-field"
-          value={statusFilter} // Liên kết với state
-          onChange={handleStatusFilterChange} // Kích hoạt logic filter
+          value={statusFilter}
+          onChange={handleStatusFilterChange}
           style={{ maxWidth: "150px" }}
         >
           <option value="All">Tất cả trạng thái</option>
@@ -769,8 +632,8 @@ function StationPage() {
           type="text"
           placeholder="Tìm kiếm trạm theo tên..."
           className="input-field"
-          value={searchTerm} // Liên kết với state
-          onChange={handleSearchInputChange} // Kích hoạt filter tên
+          value={searchTerm}
+          onChange={handleSearchInputChange}
         />
         <button className="btn primary" onClick={openAddStationModal}>
           <PlusOutlined /> Thêm trạm mới
@@ -778,38 +641,44 @@ function StationPage() {
       </div>
 
       <div className="station-list">
-        {filteredStations.map(
-          (
-            station // 👈 Đã thay thế 'stations' bằng 'filteredStations'
-          ) => (
+        {Array.isArray(filteredStations) && filteredStations.length > 0 ? (
+          filteredStations.map((station) => (
             <div className="station-card" key={station.StationId}>
-              {station.ImageUrl && (
+              {/* Hình ảnh trạm */}
+              {station.ImageUrl ? (
                 <div className="station-image-container">
                   <img
                     src={station.ImageUrl}
                     alt={`Hình ảnh trạm sạc ${station.StationName}`}
-                    style={{
-                      width: "100%",
-                      height: "200px",
-                      objectFit: "cover",
-                      borderRadius: "4px",
-                    }}
+                    onError={(e) => (e.target.src = "/placeholder.png")}
+                    className="station-img"
+                  />
+                </div>
+              ) : (
+                <div className="station-image-container">
+                  <img
+                    src="/placeholder.png"
+                    alt="Hình ảnh trạm mặc định"
+                    className="station-img"
                   />
                 </div>
               )}
+
+              {/* Thông tin trạm */}
               <div className="station-header">
                 <div>
-                  <h3>{station.StationName}</h3>
+                  <h3>{station.StationName || "Tên trạm không xác định"}</h3>
                   <p>
-                    {station.Address} - {station.City}
+                    {station.Address || "Địa chỉ không xác định"} -{" "}
+                    {station.City || "Thành phố không xác định"}
                   </p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center" }}>
-                  {/* HIỂN THỊ TRẠNG THÁI TRẠM */}
                   <span
-                    className={`status-badge ${station.Status.toLowerCase()}`}
+                    className={`status-badge ${
+                      station.Status?.toLowerCase() || "offline"
+                    }`}
                   >
-                    {/* Logic: Active hiển thị là "Online" */}
                     {station.Status === "Active" ? "Online" : "Offline"}
                   </span>
                   <button
@@ -820,19 +689,16 @@ function StationPage() {
                   </button>
                 </div>
               </div>
-              {station.chargers.length > 0 ? (
+
+              {/* Bộ sạc */}
+              {Array.isArray(station.chargers) &&
+              station.chargers.length > 0 ? (
                 renderChargers(station)
               ) : (
-                <p
-                  style={{
-                    fontStyle: "italic",
-                    color: "#888",
-                    marginBottom: "16px",
-                  }}
-                >
-                  Trạm này chưa có bộ sạc nào.
-                </p>
+                <p className="no-chargers">Trạm này chưa có bộ sạc nào.</p>
               )}
+
+              {/* Footer */}
               <div className="station-footer">
                 <button
                   className="btn secondary"
@@ -848,12 +714,9 @@ function StationPage() {
                 </button>
               </div>
             </div>
-          )
-        )}
-
-        {/* THÊM THÔNG BÁO NẾU KHÔNG CÓ KẾT QUẢ */}
-        {filteredStations.length === 0 && (
-          <p style={{ margin: "20px", color: "#888", fontStyle: "italic" }}>
+          ))
+        ) : (
+          <p className="no-stations">
             Không tìm thấy trạm nào khớp với bộ lọc.
           </p>
         )}
@@ -874,7 +737,7 @@ function StationPage() {
                 >
                   <h3>Bắt đầu phiên sạc (Remote)</h3>
                   <span
-                    onClick={() => setActiveModal(null)}
+                    onClick={closeModal}
                     style={{
                       cursor: "pointer",
                       color: "#999",
@@ -954,7 +817,7 @@ function StationPage() {
                 >
                   <h3>Tổng kết phiên sạc</h3>
                   <span
-                    onClick={() => setActiveModal(null)}
+                    onClick={closeModal}
                     style={{
                       cursor: "pointer",
                       color: "#999",
@@ -985,7 +848,15 @@ function StationPage() {
                     }}
                   />
                   <p style={{ margin: "0" }}>
-                    Bắt đầu: **{endSessionData.startTime}**
+                    Bắt đầu: **
+                    {new Date(endSessionData.startTime).toLocaleTimeString(
+                      "vi-VN"
+                    ) +
+                      " " +
+                      new Date(endSessionData.startTime).toLocaleDateString(
+                        "vi-VN"
+                      )}
+                    **
                   </p>
                   <p style={{ margin: "0" }}>
                     Kết thúc: **{endSessionData.endTime}**
