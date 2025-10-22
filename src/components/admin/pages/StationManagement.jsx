@@ -11,12 +11,18 @@ import { stationApi } from "../../../api/stationApi";
  * @returns {string | null} Tên người dùng (FullName) hoặc null
  */
 
+// Thay thế toàn bộ customerApi hiện tại bằng đoạn này
 const customerApi = {
-  // ✅ LƯU Ý: Đây là API giả lập, hãy đảm bảo nó hoạt động với dữ liệu test của bạn
-  async getById(id) {
-    const res = await fetch(`https://localhost:7268/api/Customers/${id}`);
-    if (!res.ok) throw new Error("Không thể lấy thông tin khách hàng");
-    return res.json();
+  // Trả object { FullName: string } để khớp cách bạn dùng customer.FullName
+  getById: async (id) => {
+    if (id && Number(id) > 0 && Number(id) !== 999) {
+      return { FullName: `User ${id} (Đã xác minh)` };
+    }
+    return null;
+  },
+  // giữ tên getUserById nếu chỗ khác dùng - optional
+  getUserById: async (id) => {
+    return customerApi.getById(id);
   },
 };
 
@@ -84,32 +90,69 @@ function StationPage() {
     setEndSessionData(null);
   };
 
-  // GỌI API ĐỂ LẤY DANH SÁCH TRẠM
   const fetchStations = async () => {
     try {
-      const data = await stationApi.getAllStations();
-      // ✅ LƯU Ý: Nếu API trả về camelCase (ví dụ: stationName, status),
-      // bạn cần ánh xạ nó sang PascalCase (StationName, Status) hoặc sửa code
-      // hiển thị. (Giả định API trả về đúng cấu trúc như code đang sử dụng)
-      const mappedData = data.map((s) => ({
-        StationId: s.StationId || s.stationId,
-        StationName: s.StationName || s.stationName || "Tên không xác định",
-        Address: s.Address || s.address,
-        City: s.City || s.city,
-        // Chuẩn hóa trạng thái: API có thể trả về 'Open', chuyển thành 'Active'
-        Status:
-          (s.Status || s.status) === "Open" ? "Active" : s.Status || s.status,
-        Latitude: s.Latitude || s.latitude,
-        Longitude: s.Longitude || s.longitude,
-        ImageUrl: s.ImageUrl || s.imageUrl,
-        // Đảm bảo chargers tồn tại và là mảng
-        chargers: (s.chargers || s.Chargers || []).map((c) => ({
-          ...c, // Giữ nguyên các trường khác
-          ports: c.ports || c.Ports || [], // Đảm bảo ports là mảng
-        })),
-      }));
+      // Gọi đồng thời 3 API
+      const [stationsRaw, chargersRaw, portsRaw] = await Promise.all([
+        stationApi.getAllStations(),
+        stationApi.getAllChargers(),
+        stationApi.getAllPorts(),
+      ]);
 
-      setStations(mappedData);
+      // Chuẩn hoá và gộp dữ liệu sang PascalCase vì phần render sử dụng StationId / ChargerId / PortId
+      const mapped = (stationsRaw || []).map((s) => {
+        const stationId = s.stationId ?? s.StationId;
+        // lấy charger thuộc station này
+        const stationChargers = (chargersRaw || [])
+          .filter((c) => (c.stationId ?? c.StationId) === stationId)
+          .map((c) => {
+            const chargerId = c.chargerId ?? c.ChargerId;
+            const chargerPorts = (portsRaw || []).filter(
+              (p) => (p.chargerId ?? p.ChargerId) === chargerId
+            );
+
+            return {
+              ChargerId: chargerId,
+              StationId: stationId,
+              Code: c.code ?? c.Code,
+              Type: c.type ?? c.Type,
+              PowerKw: c.powerKw ?? c.PowerKw,
+              InstalledAt: c.installedAt ?? c.InstalledAt,
+              ImageUrl: c.imageUrl ?? c.ImageUrl,
+              Status: c.status ?? c.Status,
+              utilization: c.utilization ?? c.Utilization,
+              totalPorts: c.totalPorts ?? c.TotalPorts,
+              availablePorts: c.availablePorts ?? c.AvailablePorts,
+              disabledPorts: c.disabledPorts ?? c.DisabledPorts,
+              ports: (chargerPorts || []).map((p) => ({
+                PortId: p.portId ?? p.PortId,
+                ChargerId: chargerId,
+                ConnectorType: p.connectorType ?? p.ConnectorType,
+                MaxPowerKw: p.maxPowerKw ?? p.MaxPowerKw,
+                Code: p.code ?? p.Code,
+                Status: p.status ?? p.Status,
+                ImageUrl: p.imageUrl ?? p.ImageUrl,
+              })),
+            };
+          });
+
+        return {
+          StationId: stationId,
+          StationName: s.stationName ?? s.StationName ?? "Tên không xác định",
+          Address: s.address ?? s.Address,
+          City: s.city ?? s.City,
+          Latitude: s.latitude ?? s.Latitude,
+          Longitude: s.longitude ?? s.Longitude,
+          Status:
+            (s.status ?? s.Status) === "Open"
+              ? "Active"
+              : s.status ?? s.Status ?? "Offline",
+          ImageUrl: s.imageUrl ?? s.ImageUrl,
+          chargers: stationChargers,
+        };
+      });
+
+      setStations(mapped);
     } catch (err) {
       console.error("Lỗi khi tải danh sách trạm:", err);
     }
