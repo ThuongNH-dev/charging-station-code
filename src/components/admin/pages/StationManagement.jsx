@@ -1,64 +1,64 @@
-import React, { useState, useEffect } from "react";
-import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons"; // Giả định dùng Ant Design Icons
+import React, { useState } from "react";
+import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import "./StationManagement.css";
-
-// Dữ liệu mô phỏng để khởi tạo state (đã chuẩn hóa theo DB)
+// --- DỮ LIỆU MÔ PHỎNG (KHỚP CHÍNH XÁC VỚI DB) ---
 const initialStations = [
   {
-    id: 1,
-    StationName: "VinFast Station Ha Noi",
-    Address: "123 Nguy?n V?n Linh, C? Long Biên",
+    StationId: 1,
+    StationName: "VinFast Station Hanoi",
+    Address: "123 Nguy?n V?n C?, Long Biên",
     City: "Hà Nội",
     Latitude: 21.037,
     Longitude: 105.836,
-    total_power_kw: 150, // Giữ lại từ code cũ
-    operating_hours: "06:00 - 23:00", // Giữ lại từ code cũ
-    price_kwh: 3500, // Giữ lại từ code cũ
-    Status: "Active",
+    Status: "Active", // Khớp: Status
     chargers: [
-      // Đổi tên 'poles' thành 'chargers'
+      // Cấp độ 2: Charger
       {
-        id: 1,
-        Code: "C001", // Đổi pole_name -> Code
-        Type: "AC",
+        ChargerId: 1, // Khớp: ChargerId
+        StationId: 1, // Khớp: StationId
+        Code: "C001", // Khớp: Code
+        Type: "AC", // Khớp: Type
+        PowerKw: 120.0, // Khớp: PowerKw (Tổng công suất trụ)
         InstalledAt: "2023-05-01 08:00:00.000",
+        Status: "Online", // Khớp: Status
         ports: [
+          // Cấp độ 3: Port
           {
-            id: 1,
-            description: "CCS2 - 120kW", // Giữ lại description
-            ConnectorType: "CCS2",
-            MaxPowerKw: 120, // Đổi peak_power_kw -> MaxPowerKw
-            allocated_power_kw: 120, // Giữ lại
-            Status: "Available", // Đổi port_status -> Status
-            Code: "P001",
-            activeSession: false,
+            PortId: 1, // Khớp: PortId
+            ChargerId: 1, // Khớp: ChargerId
+            ConnectorType: "CCS2", // Khớp: ConnectorType
+            MaxPowerKw: 120.0, // Khớp: MaxPowerKw (Công suất tối đa cổng)
+            Code: "P001", // Khớp: Code
+            Status: "Available", // Khớp: Status
+            activeSession: false, // Giữ lại cho chức năng UI (Start/End Session)
           },
           {
-            id: 2,
-            description: "Type2 - 90kW",
+            PortId: 2,
+            ChargerId: 1,
             ConnectorType: "Type2",
-            MaxPowerKw: 90,
-            allocated_power_kw: 90,
-            Status: "Available",
+            MaxPowerKw: 90.0,
             Code: "P002",
+            Status: "Available",
             activeSession: true,
           },
         ],
       },
       {
-        id: 2,
+        ChargerId: 2,
+        StationId: 1,
         Code: "C002",
         Type: "DC",
+        PowerKw: 60.0,
         InstalledAt: "2023-06-15 08:00:00.000",
+        Status: "Online",
         ports: [
           {
-            id: 3,
-            description: "CCS2 - 60kW",
+            PortId: 3,
+            ChargerId: 2,
             ConnectorType: "CCS2",
-            MaxPowerKw: 60,
-            allocated_power_kw: 60,
-            Status: "Available",
+            MaxPowerKw: 60.0,
             Code: "P003",
+            Status: "Available",
             activeSession: false,
           },
         ],
@@ -66,45 +66,39 @@ const initialStations = [
     ],
   },
   {
-    id: 2,
+    StationId: 2,
     StationName: "Tesla Station HCM",
-    Address: "45 Lê Lợi, Quận 1",
-    City: "TP.HCM",
+    Address: "45 Lê Lợi, Qun 1",
+    City: "TP HCM",
     Latitude: 10.775,
     Longitude: 106.7,
-    total_power_kw: 300,
-    operating_hours: "24/7",
-    price_kwh: 4000,
     Status: "Active",
     chargers: [],
   },
 ];
 
-// Dữ liệu khởi tạo cho Modal (đã chuẩn hóa)
+// Dữ liệu khởi tạo cho Modal (tối giản)
 const newStationInitialState = {
   StationName: "",
   Address: "",
   City: "",
-  total_power_kw: "",
-  operating_hours: "",
-  price_kwh: "",
-  Status: "Active",
   Latitude: "",
   Longitude: "",
+  Status: "Active",
 };
 
 const newChargerInitialState = {
-  Code: "", // Đổi pole_name -> Code
-  Type: "DC", // Thêm Type
+  Code: "",
+  Type: "DC",
+  PowerKw: "", // Bắt buộc phải có
+  Status: "Online",
 };
 
 const newPortInitialState = {
-  description: "",
-  MaxPowerKw: "", // Đổi peak_power_kw -> MaxPowerKw
-  allocated_power_kw: "",
-  Status: "Available", // Đổi port_status -> Status
   ConnectorType: "CCS2",
-  Code: "", // Thêm Code
+  MaxPowerKw: "",
+  Code: "",
+  Status: "Available",
 };
 
 function StationPage() {
@@ -120,10 +114,10 @@ function StationPage() {
   const [editingPort, setEditingPort] = useState({});
 
   const [currentStationId, setCurrentStationId] = useState(null);
-  const [currentChargerId, setCurrentChargerId] = useState(null); // Đổi currentPoleId -> currentChargerId
+  const [currentChargerId, setCurrentChargerId] = useState(null);
 
   const [targetId, setTargetId] = useState(null);
-  const [targetType, setTargetType] = useState(null); // station, charger, port
+  const [targetType, setTargetType] = useState(null);
 
   // --- HANDLER CHUNG CHO INPUT ---
 
@@ -145,9 +139,8 @@ function StationPage() {
   const handleEditPortInputChange = (e) =>
     handleInputChange(e, editingPort, setEditingPort);
 
-  // --- MODAL HANDLERS ---
+  // --- MODAL HANDLERS (Giữ nguyên logic mở modal) ---
 
-  // Mở modal Thêm Cổng
   const openAddPortModal = (stationId, chargerId) => {
     setCurrentStationId(stationId);
     setCurrentChargerId(chargerId);
@@ -155,75 +148,70 @@ function StationPage() {
     setActiveModal("addPort");
   };
 
-  // Mở modal Thêm Trạm
   const openAddStationModal = () => {
     setNewStation(newStationInitialState);
     setActiveModal("addStation");
   };
 
-  // Mở modal Thêm Trụ/Bộ sạc
   const openAddChargerModal = (stationId) => {
-    // Đổi openAddPoleModal -> openAddChargerModal
     setCurrentStationId(stationId);
     setNewChargerData(newChargerInitialState);
     setActiveModal("addCharger");
   };
 
-  // Mở modal Sửa Trạm
   const openEditStationModal = (stationId) => {
-    const station = stations.find((s) => s.id === stationId);
+    const station = stations.find((s) => s.StationId === stationId);
     if (station) {
       setEditingStation(station);
       setActiveModal("editStation");
     }
   };
 
-  // Mở modal Sửa Trụ/Bộ sạc
   const openEditChargerModal = (stationId, chargerId) => {
-    // Đổi openEditPoleModal -> openEditChargerModal
-    const station = stations.find((s) => s.id === stationId);
+    const station = stations.find((s) => s.StationId === stationId);
     const charger = station?.chargers.find(
-      (c) => String(c.id) === String(chargerId)
+      (c) => String(c.ChargerId) === String(chargerId)
     );
     if (charger) {
-      setEditingCharger({ ...charger, stationId: stationId });
+      setEditingCharger({ ...charger, StationId: stationId });
       setActiveModal("editCharger");
     }
   };
 
-  // Mở modal Sửa Cổng
   const openEditPortModal = (portId) => {
     let portToEdit = null;
     let stationId, chargerId;
 
-    // Tìm cổng sạc cần sửa (tìm lồng nhau)
     stations.forEach((station) => {
       station.chargers.forEach((charger) => {
         const foundPort = charger.ports.find(
-          (p) => String(p.id) === String(portId)
+          (p) => String(p.PortId) === String(portId)
         );
         if (foundPort) {
           portToEdit = foundPort;
-          stationId = station.id;
-          chargerId = charger.id;
+          stationId = station.StationId;
+          chargerId = charger.ChargerId;
         }
       });
     });
 
     if (portToEdit) {
-      setEditingPort({ ...portToEdit, stationId, chargerId });
+      setEditingPort({
+        ...portToEdit,
+        StationId: stationId,
+        ChargerId: chargerId,
+      });
       setActiveModal("editPort");
     }
   };
 
-  // Mở modal Xóa
   const openDeleteModal = (id, type) => {
     setTargetId(id);
     setTargetType(type);
     setActiveModal("deleteConfirm");
   };
 
-  // --- LOGIC CẬP NHẬT TRẠNG THÁI ---
+  // --- LOGIC CẬP NHẬT TRẠNG THÁI (Đã chuẩn hóa ID và thuộc tính) ---
 
   // 1. Logic Thêm Trạm
   const handleAddStation = () => {
@@ -232,16 +220,14 @@ function StationPage() {
     setStations((prevStations) => {
       const newStationId =
         prevStations.length > 0
-          ? Math.max(...prevStations.map((s) => s.id)) + 1
+          ? Math.max(...prevStations.map((s) => s.StationId)) + 1
           : 1;
       const newStationObj = {
         ...newStation,
-        id: newStationId,
-        total_power_kw: parseFloat(newStation.total_power_kw) || 0,
-        price_kwh: parseFloat(newStation.price_kwh) || 0,
+        StationId: newStationId,
         Latitude: parseFloat(newStation.Latitude) || 0,
         Longitude: parseFloat(newStation.Longitude) || 0,
-        chargers: [], // Khởi tạo mảng chargers rỗng
+        chargers: [],
       };
       return [...prevStations, newStationObj];
     });
@@ -251,16 +237,14 @@ function StationPage() {
 
   // 2. Logic Lưu Sửa Trạm
   const handleSaveEditStation = () => {
-    if (!editingStation.StationName || !editingStation.id) return;
+    if (!editingStation.StationName || !editingStation.StationId) return;
 
     setStations((prevStations) =>
       prevStations.map((station) => {
-        if (station.id === editingStation.id) {
+        if (station.StationId === editingStation.StationId) {
           return {
             ...station,
             ...editingStation,
-            total_power_kw: parseFloat(editingStation.total_power_kw) || 0,
-            price_kwh: parseFloat(editingStation.price_kwh) || 0,
             Latitude: parseFloat(editingStation.Latitude) || 0,
             Longitude: parseFloat(editingStation.Longitude) || 0,
           };
@@ -271,24 +255,31 @@ function StationPage() {
     setActiveModal(null);
   };
 
-  // 3. Logic Thêm Trụ/Bộ sạc
+  // 3. Logic Thêm Bộ sạc
   const handleCreateCharger = () => {
-    // Đổi handleCreatePole -> handleCreateCharger
-    if (!newChargerData.Code || currentStationId === null) return;
+    if (
+      !newChargerData.Code ||
+      !newChargerData.PowerKw ||
+      currentStationId === null
+    )
+      return;
 
     setStations((prevStations) =>
       prevStations.map((station) => {
-        if (station.id === currentStationId) {
+        if (station.StationId === currentStationId) {
           const newChargerId =
             station.chargers.length > 0
-              ? Math.max(...station.chargers.map((c) => c.id)) + 1
+              ? Math.max(...station.chargers.map((c) => c.ChargerId)) + 1
               : 1;
 
           const newCharger = {
-            id: newChargerId,
+            ChargerId: newChargerId,
+            StationId: currentStationId,
             Code: newChargerData.Code,
             Type: newChargerData.Type,
+            PowerKw: parseFloat(newChargerData.PowerKw) || 0,
             InstalledAt: new Date().toISOString().split("T")[0],
+            Status: newChargerData.Status,
             ports: [],
           };
           return { ...station, chargers: [...station.chargers, newCharger] };
@@ -299,20 +290,23 @@ function StationPage() {
     setActiveModal(null);
   };
 
-  // 4. Logic Lưu Sửa Trụ/Bộ sạc
+  // 4. Logic Lưu Sửa Bộ sạc
   const handleSaveEditCharger = () => {
-    // Đổi handleSaveEditPole -> handleSaveEditCharger
-    if (!editingCharger.Code || !editingCharger.id) return;
+    if (!editingCharger.Code || !editingCharger.ChargerId) return;
 
     setStations((prevStations) =>
       prevStations.map((station) => {
-        if (station.id === editingCharger.stationId) {
+        if (station.StationId === editingCharger.StationId) {
           const updatedChargers = station.chargers.map((charger) => {
-            if (String(charger.id) === String(editingCharger.id)) {
+            if (
+              String(charger.ChargerId) === String(editingCharger.ChargerId)
+            ) {
               return {
                 ...charger,
                 Code: editingCharger.Code,
                 Type: editingCharger.Type,
+                PowerKw: parseFloat(editingCharger.PowerKw) || 0,
+                Status: editingCharger.Status,
               };
             }
             return charger;
@@ -328,35 +322,29 @@ function StationPage() {
   // 5. Logic Thêm Cổng
   const handleCreatePort = () => {
     if (
-      !newPortData.description ||
+      !newPortData.ConnectorType ||
       !newPortData.MaxPowerKw ||
       currentStationId === null ||
-      currentChargerId === null // Đổi currentPoleId -> currentChargerId
+      currentChargerId === null
     )
       return;
 
     setStations((prevStations) =>
       prevStations.map((station) => {
-        if (station.id === currentStationId) {
+        if (station.StationId === currentStationId) {
           const updatedChargers = station.chargers.map((charger) => {
-            // Đổi poles -> chargers
-            if (charger.id === currentChargerId) {
-              // Đổi poleId -> chargerId
+            if (charger.ChargerId === currentChargerId) {
               const newPortId =
                 charger.ports.length > 0
-                  ? Math.max(...charger.ports.map((p) => p.id)) + 1
+                  ? Math.max(...charger.ports.map((p) => p.PortId)) + 1
                   : 1;
               const newPort = {
-                id: newPortId,
-                description: newPortData.description,
+                PortId: newPortId,
+                ChargerId: currentChargerId,
                 ConnectorType: newPortData.ConnectorType,
                 Code: newPortData.Code || `P${newPortId}`,
                 MaxPowerKw: parseFloat(newPortData.MaxPowerKw) || 0,
-                allocated_power_kw:
-                  parseFloat(newPortData.allocated_power_kw) ||
-                  parseFloat(newPortData.MaxPowerKw) ||
-                  0,
-                Status: newPortData.Status, // Đổi port_status -> Status
+                Status: newPortData.Status,
                 activeSession: false,
               };
               return { ...charger, ports: [...charger.ports, newPort] };
@@ -373,24 +361,20 @@ function StationPage() {
 
   // 6. Logic Lưu Sửa Cổng
   const handleSaveEditPort = () => {
-    if (!editingPort.description || !editingPort.id) return;
+    if (!editingPort.ConnectorType || !editingPort.PortId) return;
 
     setStations((prevStations) => {
       return prevStations.map((station) => {
-        if (station.id === editingPort.stationId) {
+        if (station.StationId === editingPort.StationId) {
           const updatedChargers = station.chargers.map((charger) => {
-            // Đổi poles -> chargers
-            if (charger.id === editingPort.chargerId) {
-              // Đổi poleId -> chargerId
+            if (charger.ChargerId === editingPort.ChargerId) {
               const updatedPorts = charger.ports.map((port) => {
-                if (String(port.id) === String(editingPort.id)) {
+                if (String(port.PortId) === String(editingPort.PortId)) {
                   return {
                     ...port,
-                    description: editingPort.description,
                     ConnectorType: editingPort.ConnectorType,
-                    allocated_power_kw:
-                      parseFloat(editingPort.allocated_power_kw) || 0,
-                    Status: editingPort.Status, // Đổi port_status -> Status
+                    MaxPowerKw: parseFloat(editingPort.MaxPowerKw) || 0,
+                    Status: editingPort.Status,
                   };
                 }
                 return port;
@@ -413,15 +397,18 @@ function StationPage() {
 
     setStations((prevStations) => {
       if (targetType === "station") {
-        return prevStations.filter((s) => s.id !== targetId);
+        return prevStations.filter((s) => s.StationId !== targetId);
       } else if (targetType === "charger") {
-        // Đổi "pole" -> "charger"
         return prevStations.map((station) => {
-          if (station.chargers.some((c) => String(c.id) === String(targetId))) {
+          if (
+            station.chargers.some(
+              (c) => String(c.ChargerId) === String(targetId)
+            )
+          ) {
             return {
               ...station,
               chargers: station.chargers.filter(
-                (c) => String(c.id) !== String(targetId)
+                (c) => String(c.ChargerId) !== String(targetId)
               ),
             };
           }
@@ -430,12 +417,13 @@ function StationPage() {
       } else if (targetType === "port") {
         return prevStations.map((station) => {
           const updatedChargers = station.chargers.map((charger) => {
-            // Đổi poles -> chargers
-            if (charger.ports.some((p) => String(p.id) === String(targetId))) {
+            if (
+              charger.ports.some((p) => String(p.PortId) === String(targetId))
+            ) {
               return {
                 ...charger,
                 ports: charger.ports.filter(
-                  (p) => String(p.id) !== String(targetId)
+                  (p) => String(p.PortId) !== String(targetId)
                 ),
               };
             }
@@ -452,103 +440,101 @@ function StationPage() {
     setTargetType(null);
   };
 
-  // --- HÀM RENDER TRỤ/BỘ SẠC VÀ CỔNG SẠC ---
-  const renderChargers = (
-    station // Đổi renderPoles -> renderChargers
-  ) =>
-    station.chargers.map(
-      (
-        charger // Đổi station.poles -> station.chargers
-      ) => (
-        <div className="pole-section" key={String(charger.id)}>
-          <div className="pole-header">
-            {/* Hiển thị Code thay vì pole_name */}
-            <h4>
-              {charger.Code ? charger.Code : `Bộ sạc ${charger.id}`} (
-              {charger.Type})
-            </h4>
-            <div className="pole-actions">
+  // --- HÀM RENDER ---
+  const renderChargers = (station) =>
+    station.chargers.map((charger) => (
+      <div className="pole-section" key={String(charger.ChargerId)}>
+        <div className="pole-header">
+          {/* Code, Type và PowerKw */}
+          <h4>
+            {charger.Code} ({charger.Type} - {charger.PowerKw}kW)
+          </h4>
+          <p style={{ fontSize: "0.8em", color: "#666" }}>
+            Lắp đặt: {charger.InstalledAt.split(" ")[0]}
+          </p>
+          <div className="pole-actions">
+            <button
+              className="icon-btn"
+              onClick={() =>
+                openEditChargerModal(station.StationId, charger.ChargerId)
+              }
+            >
+              <EditOutlined />
+            </button>
+            <button
+              className="icon-btn"
+              onClick={() => openDeleteModal(charger.ChargerId, "charger")}
+            >
+              <DeleteOutlined />
+            </button>
+          </div>
+        </div>
+        {charger.ports.map((port) => (
+          <div className="port-card" key={port.PortId}>
+            <div className="port-details">
+              {/* ConnectorType, Code và MaxPowerKw */}
+              <p>
+                <strong>
+                  {port.ConnectorType} ({port.Code})
+                </strong>
+              </p>
+              <p className="port-extra-info">
+                Công suất tối đa: {port.MaxPowerKw}kW
+              </p>
+            </div>
+            <div className="status-row">
+              <span className={`badge ${port.Status.toLowerCase()}`}>
+                {port.Status.toLowerCase() === "available"
+                  ? "Sẵn sàng"
+                  : port.Status.toLowerCase() === "maintenance"
+                  ? "Bảo trì"
+                  : "Đang bận"}
+              </span>
+              {/* Nút Session giữ lại cho chức năng UI */}
+              {port.activeSession ? (
+                <button
+                  className="btn small red"
+                  onClick={() => setActiveModal("endSession")}
+                >
+                  Tổng kết
+                </button>
+              ) : (
+                <button
+                  className="btn small green"
+                  onClick={() => setActiveModal("startSession")}
+                >
+                  Bắt đầu
+                </button>
+              )}
               <button
                 className="icon-btn"
-                onClick={() => openEditChargerModal(station.id, charger.id)} // Đổi openEditPoleModal -> openEditChargerModal
+                onClick={() => openEditPortModal(port.PortId)}
               >
                 <EditOutlined />
               </button>
               <button
                 className="icon-btn"
-                onClick={() => openDeleteModal(charger.id, "charger")} // Đổi "pole" -> "charger"
+                onClick={() => openDeleteModal(port.PortId, "port")}
               >
                 <DeleteOutlined />
               </button>
             </div>
           </div>
-          {charger.ports.map((port) => (
-            <div className="port-card" key={port.id}>
-              <div className="port-details">
-                <p>
-                  <strong>
-                    {port.description} ({port.ConnectorType} - {port.Code})
-                  </strong>
-                </p>
-                <p className="port-extra-info">
-                  {/* Đổi peak_power_kw -> MaxPowerKw */}
-                  Công suất tối đa: {port.MaxPowerKw}kW | Cấp phát:{" "}
-                  {port.allocated_power_kw}kW
-                </p>
-              </div>
-              <div className="status-row">
-                {/* Đổi port_status -> Status */}
-                <span className={`badge ${port.Status.toLowerCase()}`}>
-                  {port.Status.toLowerCase() === "available"
-                    ? "Sẵn sàng"
-                    : port.Status.toLowerCase() === "maintenance"
-                    ? "Bảo trì"
-                    : "Đang bận"}
-                </span>
-                {port.activeSession ? (
-                  <button
-                    className="btn small red"
-                    onClick={() => setActiveModal("endSession")}
-                  >
-                    Tổng kết
-                  </button>
-                ) : (
-                  <button
-                    className="btn small green"
-                    onClick={() => setActiveModal("startSession")}
-                  >
-                    Bắt đầu
-                  </button>
-                )}
-                <button
-                  className="icon-btn"
-                  onClick={() => openEditPortModal(port.id)}
-                >
-                  <EditOutlined />
-                </button>
-                <button
-                  className="icon-btn"
-                  onClick={() => openDeleteModal(port.id, "port")}
-                >
-                  <DeleteOutlined />
-                </button>
-              </div>
-            </div>
-          ))}
-          <button
-            className="link-btn"
-            onClick={() => openAddPortModal(station.id, charger.id)}
-          >
-            + Thêm cổng sạc
-          </button>
-        </div>
-      )
-    );
+        ))}
+        <button
+          className="link-btn"
+          onClick={() => openAddPortModal(station.StationId, charger.ChargerId)}
+        >
+          + Thêm cổng sạc
+        </button>
+      </div>
+    ));
 
   return (
     <div className="station-page">
       <h2 className="admin-title">Quản lý Trạm & Bộ sạc</h2>
       <div className="station-actions">
+        {/* Nút và input tìm kiếm giữ nguyên */}
         <select className="input-field">
           <option>Tất cả trạm</option>
         </select>
@@ -561,47 +547,36 @@ function StationPage() {
           <PlusOutlined /> Thêm trạm mới
         </button>
       </div>
-      {/* RENDER DANH SÁCH TRẠM */}
+
       <div className="station-list">
         {stations.map((station) => (
-          <div className="station-card" key={station.id}>
+          <div className="station-card" key={station.StationId}>
             <div className="station-header">
               <div>
-                {/* Đổi station.name -> station.StationName */}
                 <h3>{station.StationName}</h3>
                 <p>
                   {station.Address} - {station.City}
-                </p>{" "}
-                {/* Thêm City */}
-                <p>
-                  Công suất: {station.total_power_kw}kW | Giờ hoạt động:{" "}
-                  {station.operating_hours} | Giá: {station.price_kwh}đ/kWh
                 </p>
                 <p style={{ fontSize: "0.8em", color: "#666" }}>
                   Lat: {station.Latitude} | Long: {station.Longitude}
                 </p>
               </div>
               <div style={{ display: "flex", alignItems: "center" }}>
-                {/* Đổi station.status -> station.Status */}
                 <span
                   className={`status-badge ${station.Status.toLowerCase()}`}
                 >
-                  {station.Status.toLowerCase() === "active"
-                    ? "Đang hoạt động"
-                    : station.Status.toLowerCase() === "offline"
-                    ? "Offline"
-                    : "Bảo trì"}
+                  {station.Status === "Active" ? "Đang hoạt động" : "Offline"}
                 </span>
                 <button
                   className="icon-btn"
-                  onClick={() => openEditStationModal(station.id)}
+                  onClick={() => openEditStationModal(station.StationId)}
                 >
                   <EditOutlined />
                 </button>
               </div>
             </div>
-            {station.chargers.length > 0 ? ( // Đổi poles -> chargers
-              renderChargers(station) // Đổi renderPoles -> renderChargers
+            {station.chargers.length > 0 ? (
+              renderChargers(station)
             ) : (
               <p
                 style={{
@@ -616,13 +591,13 @@ function StationPage() {
             <div className="station-footer">
               <button
                 className="btn secondary"
-                onClick={() => openDeleteModal(station.id, "station")}
+                onClick={() => openDeleteModal(station.StationId, "station")}
               >
                 Xóa trạm
               </button>
               <button
                 className="btn primary"
-                onClick={() => openAddChargerModal(station.id)} // Đổi openAddPoleModal -> openAddChargerModal
+                onClick={() => openAddChargerModal(station.StationId)}
               >
                 Thêm bộ sạc
               </button>
@@ -630,18 +605,17 @@ function StationPage() {
           </div>
         ))}
       </div>
-      {/* Modal hiển thị */}
+      {/* Modal hiển thị (Đã chuẩn hóa tên thuộc tính trong input) */}
       {activeModal && (
         <div className="modal-overlay" onClick={() => setActiveModal(null)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            {/* Modal Thêm Trạm */}
             {activeModal === "addStation" && (
               <>
                 <h3>Thêm Trạm</h3>
                 <input
                   type="text"
                   placeholder="Tên trạm *"
-                  name="StationName" // Đã đổi
+                  name="StationName"
                   value={newStation.StationName}
                   onChange={handleNewStationInputChange}
                 />
@@ -655,38 +629,8 @@ function StationPage() {
                 <input
                   type="text"
                   placeholder="Thành phố *"
-                  name="City" // Đã thêm
+                  name="City"
                   value={newStation.City}
-                  onChange={handleNewStationInputChange}
-                />
-                <input
-                  type="text"
-                  placeholder="Tổng công suất (kW, tùy chọn)"
-                  name="total_power_kw"
-                  value={newStation.total_power_kw}
-                  onChange={handleNewStationInputChange}
-                />
-                <input
-                  type="text"
-                  placeholder="Giờ hoạt động (vd: 06:00 - 23:00)"
-                  name="operating_hours"
-                  value={newStation.operating_hours}
-                  onChange={handleNewStationInputChange}
-                />
-                <select
-                  name="Status" // Đã đổi
-                  value={newStation.Status}
-                  onChange={handleNewStationInputChange}
-                >
-                  <option value="Active">Đang hoạt động</option>
-                  <option value="Offline">Offline</option>
-                  <option value="Maintenance">Bảo trì</option>
-                </select>
-                <input
-                  type="number"
-                  placeholder="Giá/kWh (vd: 3500)"
-                  name="price_kwh"
-                  value={newStation.price_kwh}
                   onChange={handleNewStationInputChange}
                 />
                 <input
@@ -703,6 +647,14 @@ function StationPage() {
                   value={newStation.Longitude}
                   onChange={handleNewStationInputChange}
                 />
+                <select
+                  name="Status"
+                  value={newStation.Status}
+                  onChange={handleNewStationInputChange}
+                >
+                  <option value="Active">Đang hoạt động</option>
+                  <option value="Offline">Offline</option>
+                </select>
                 <div className="modal-actions">
                   <button onClick={() => setActiveModal(null)}>Hủy</button>
                   <button className="save" onClick={handleAddStation}>
@@ -711,14 +663,14 @@ function StationPage() {
                 </div>
               </>
             )}
-            {/* Modal Sửa Trạm */}
+
             {activeModal === "editStation" && (
               <>
-                <h3>Sửa Trạm (ID: {editingStation.id})</h3>
+                <h3>Sửa Trạm (ID: {editingStation.StationId})</h3>
                 <input
                   type="text"
                   placeholder="Tên trạm *"
-                  name="StationName" // Đã đổi
+                  name="StationName"
                   value={editingStation.StationName}
                   onChange={handleEditStationInputChange}
                 />
@@ -732,54 +684,32 @@ function StationPage() {
                 <input
                   type="text"
                   placeholder="Thành phố *"
-                  name="City" // Đã thêm
+                  name="City"
                   value={editingStation.City}
                   onChange={handleEditStationInputChange}
                 />
                 <input
-                  type="text"
-                  placeholder="Tổng công suất (kW)"
-                  name="total_power_kw"
-                  value={editingStation.total_power_kw}
-                  onChange={handleEditStationInputChange}
-                />
-                <input
-                  type="text"
-                  placeholder="Giờ hoạt động"
-                  name="operating_hours"
-                  value={editingStation.operating_hours}
-                  onChange={handleEditStationInputChange}
-                />
-                <select
-                  name="Status" // Đã đổi
-                  value={editingStation.Status}
-                  onChange={handleEditStationInputChange}
-                >
-                  <option value="Active">Đang hoạt động</option>
-                  <option value="Offline">Offline</option>
-                  <option value="Maintenance">Bảo trì</option>
-                </select>
-                <input
                   type="number"
-                  placeholder="Giá/kWh"
-                  name="price_kwh"
-                  value={editingStation.price_kwh}
-                  onChange={handleEditStationInputChange}
-                />
-                <input
-                  type="number"
-                  placeholder="Vĩ độ (Latitude)"
+                  placeholder="Vĩ độ (Latitude) *"
                   name="Latitude"
                   value={editingStation.Latitude}
                   onChange={handleEditStationInputChange}
                 />
                 <input
                   type="number"
-                  placeholder="Kinh độ (Longitude)"
+                  placeholder="Kinh độ (Longitude) *"
                   name="Longitude"
                   value={editingStation.Longitude}
                   onChange={handleEditStationInputChange}
                 />
+                <select
+                  name="Status"
+                  value={editingStation.Status}
+                  onChange={handleEditStationInputChange}
+                >
+                  <option value="Active">Đang hoạt động</option>
+                  <option value="Offline">Offline</option>
+                </select>
                 <div className="modal-actions">
                   <button onClick={() => setActiveModal(null)}>Hủy</button>
                   <button className="save" onClick={handleSaveEditStation}>
@@ -788,53 +718,91 @@ function StationPage() {
                 </div>
               </>
             )}
-            {/* Modal Sửa Cổng (EDIT PORT) */}
-            {activeModal === "editPort" && (
+
+            {activeModal === "addCharger" && (
               <>
-                <h3>Sửa Cổng (ID: {editingPort.id})</h3>
+                <h3>Thêm Bộ sạc (Trạm ID: {currentStationId})</h3>
                 <input
                   type="text"
-                  placeholder="Mô tả cổng (vd: CCS - 50kW)"
-                  name="description"
-                  value={editingPort.description}
-                  onChange={handleEditPortInputChange}
-                />
-                <input
-                  type="text"
-                  placeholder="Kiểu đầu sạc (CCS2, Type2, ...)"
-                  name="ConnectorType"
-                  value={editingPort.ConnectorType}
-                  onChange={handleEditPortInputChange}
-                />
-                <p className="read-only-info">
-                  **Công suất Tối đa (Peak): {editingPort.MaxPowerKw}kW** (Không
-                  thể sửa)
-                </p>
-                <input
-                  type="number"
-                  placeholder="Công suất Cấp phát (kW, tùy chọn)"
-                  name="allocated_power_kw"
-                  value={editingPort.allocated_power_kw}
-                  onChange={handleEditPortInputChange}
+                  placeholder="Mã Bộ sạc (VD: C003) *"
+                  name="Code"
+                  value={newChargerData.Code}
+                  onChange={handleNewChargerInputChange}
                 />
                 <select
-                  name="Status" // Đã đổi
-                  value={editingPort.Status} // Đã đổi
-                  onChange={handleEditPortInputChange}
+                  name="Type"
+                  value={newChargerData.Type}
+                  onChange={handleNewChargerInputChange}
                 >
-                  <option value="Available">Sẵn sàng</option>
-                  <option value="Maintenance">Bảo trì</option>
-                  <option value="Busy">Đang bận</option>
+                  <option value="DC">DC (Sạc nhanh)</option>
+                  <option value="AC">AC (Sạc chậm)</option>
+                </select>
+                <input
+                  type="number"
+                  placeholder="Công suất (PowerKw) *"
+                  name="PowerKw"
+                  value={newChargerData.PowerKw}
+                  onChange={handleNewChargerInputChange}
+                />
+                <select
+                  name="Status"
+                  value={newChargerData.Status}
+                  onChange={handleNewChargerInputChange}
+                >
+                  <option value="Online">Online</option>
+                  <option value="Offline">Offline</option>
                 </select>
                 <div className="modal-actions">
                   <button onClick={() => setActiveModal(null)}>Hủy</button>
-                  <button className="save" onClick={handleSaveEditPort}>
+                  <button className="save" onClick={handleCreateCharger}>
+                    Tạo
+                  </button>
+                </div>
+              </>
+            )}
+
+            {activeModal === "editCharger" && (
+              <>
+                <h3>Sửa Bộ sạc (ID: {editingCharger.ChargerId})</h3>
+                <input
+                  type="text"
+                  name="Code"
+                  placeholder="Mã Bộ sạc (VD: C001)"
+                  value={editingCharger.Code}
+                  onChange={handleEditChargerInputChange}
+                />
+                <select
+                  name="Type"
+                  value={editingCharger.Type}
+                  onChange={handleEditChargerInputChange}
+                >
+                  <option value="DC">DC (Sạc nhanh)</option>
+                  <option value="AC">AC (Sạc chậm)</option>
+                </select>
+                <input
+                  type="number"
+                  placeholder="Công suất (PowerKw) *"
+                  name="PowerKw"
+                  value={editingCharger.PowerKw}
+                  onChange={handleEditChargerInputChange}
+                />
+                <select
+                  name="Status"
+                  value={editingCharger.Status}
+                  onChange={handleEditChargerInputChange}
+                >
+                  <option value="Online">Online</option>
+                  <option value="Offline">Offline</option>
+                </select>
+                <div className="modal-actions">
+                  <button onClick={() => setActiveModal(null)}>Hủy</button>
+                  <button className="save" onClick={handleSaveEditCharger}>
                     Lưu
                   </button>
                 </div>
               </>
             )}
-            {/* Modal Thêm Cổng Sạc */}
+
             {activeModal === "addPort" && (
               <>
                 <h3>
@@ -850,14 +818,7 @@ function StationPage() {
                 />
                 <input
                   type="text"
-                  placeholder="Mô tả (vd: CCS - 50kW) *"
-                  name="description"
-                  value={newPortData.description}
-                  onChange={handleNewPortInputChange}
-                />
-                <input
-                  type="text"
-                  placeholder="Kiểu đầu sạc (CCS2, Type2, ...) *"
+                  placeholder="Kiểu đầu sạc (CCS2, Type2) *"
                   name="ConnectorType"
                   value={newPortData.ConnectorType}
                   onChange={handleNewPortInputChange}
@@ -865,19 +826,12 @@ function StationPage() {
                 <input
                   type="number"
                   placeholder="Công suất Tối đa (MaxPowerKw, kW) *"
-                  name="MaxPowerKw" // Đã đổi
+                  name="MaxPowerKw"
                   value={newPortData.MaxPowerKw}
                   onChange={handleNewPortInputChange}
                 />
-                <input
-                  type="number"
-                  placeholder="Công suất Cấp phát (kW, tùy chọn)"
-                  name="allocated_power_kw"
-                  value={newPortData.allocated_power_kw}
-                  onChange={handleNewPortInputChange}
-                />
                 <select
-                  name="Status" // Đã đổi
+                  name="Status"
                   value={newPortData.Status}
                   onChange={handleNewPortInputChange}
                 >
@@ -893,41 +847,50 @@ function StationPage() {
                 </div>
               </>
             )}
-            {/* Modal Thêm Trụ/Bộ sạc */}
-            {activeModal === "addCharger" && ( // Đổi "addPole" -> "addCharger"
+
+            {activeModal === "editPort" && (
               <>
-                <h3>Thêm Bộ sạc (Trạm ID: {currentStationId})</h3>
+                <h3>Sửa Cổng (ID: {editingPort.PortId})</h3>
                 <input
                   type="text"
-                  placeholder="Mã Bộ sạc (VD: C003) *"
-                  name="Code" // Đổi pole_name -> Code
-                  value={newChargerData.Code}
-                  onChange={handleNewChargerInputChange}
+                  placeholder="Kiểu đầu sạc (CCS2, Type2) *"
+                  name="ConnectorType"
+                  value={editingPort.ConnectorType}
+                  onChange={handleEditPortInputChange}
+                />
+                <input
+                  type="number"
+                  placeholder="Công suất Tối đa (MaxPowerKw) *"
+                  name="MaxPowerKw"
+                  value={editingPort.MaxPowerKw}
+                  onChange={handleEditPortInputChange}
                 />
                 <select
-                  name="Type"
-                  value={newChargerData.Type}
-                  onChange={handleNewChargerInputChange}
+                  name="Status"
+                  value={editingPort.Status}
+                  onChange={handleEditPortInputChange}
                 >
-                  <option value="DC">DC (Sạc nhanh)</option>
-                  <option value="AC">AC (Sạc chậm)</option>
+                  <option value="Available">Sẵn sàng</option>
+                  <option value="Maintenance">Bảo trì</option>
+                  <option value="Busy">Đang bận</option>
                 </select>
                 <div className="modal-actions">
                   <button onClick={() => setActiveModal(null)}>Hủy</button>
-                  <button className="save" onClick={handleCreateCharger}>
-                    Tạo
+                  <button className="save" onClick={handleSaveEditPort}>
+                    Lưu
                   </button>
                 </div>
               </>
             )}
-            {/* Modal Xác nhận xoá (Chung) */}
+
+            {/* Modal Xóa và Session giữ nguyên */}
             {activeModal === "deleteConfirm" && (
               <>
                 <h3>
                   Xác nhận xoá{" "}
                   {targetType === "station"
                     ? "Trạm"
-                    : targetType === "charger" // Đổi "pole" -> "charger"
+                    : targetType === "charger"
                     ? "Bộ sạc"
                     : "Cổng"}
                 </h3>
@@ -947,34 +910,6 @@ function StationPage() {
                 </div>
               </>
             )}
-            {/* Modal Sửa Trụ/Bộ sạc */}
-            {activeModal === "editCharger" && ( // Đổi "editPole" -> "editCharger"
-              <>
-                <h3>Sửa Bộ sạc (ID: {editingCharger.id})</h3>
-                <input
-                  type="text"
-                  name="Code" // Đổi pole_name -> Code
-                  placeholder="Mã Bộ sạc (VD: C001)"
-                  value={editingCharger.Code}
-                  onChange={handleEditChargerInputChange}
-                />
-                <select
-                  name="Type"
-                  value={editingCharger.Type}
-                  onChange={handleEditChargerInputChange}
-                >
-                  <option value="DC">DC (Sạc nhanh)</option>
-                  <option value="AC">AC (Sạc chậm)</option>
-                </select>
-                <div className="modal-actions">
-                  <button onClick={() => setActiveModal(null)}>Hủy</button>
-                  <button className="save" onClick={handleSaveEditCharger}>
-                    Lưu
-                  </button>
-                </div>
-              </>
-            )}
-            {/* Các Modal khác (Start/End Session giữ nguyên) */}
             {activeModal === "startSession" && (
               <>
                 <h3>Bắt đầu phiên sạc (Remote)</h3>
@@ -984,10 +919,7 @@ function StationPage() {
                   <button onClick={() => setActiveModal(null)}>Hủy</button>
                   <button
                     className="save green"
-                    onClick={() =>
-                      console.log("Bắt đầu phiên sạc") ||
-                      setActiveModal("endSession")
-                    }
+                    onClick={() => setActiveModal("endSession")}
                   >
                     Bắt đầu
                   </button>
@@ -997,10 +929,7 @@ function StationPage() {
             {activeModal === "endSession" && (
               <>
                 <h3>Tổng kết phiên sạc</h3>
-                <p>Trạm: Q1-01 · Bộ sạc: C001 · Cổng: CCS2 - 22kW</p>
-                <p>
-                  Thời lượng: 5 phút | Năng lượng: 0.047 kWh | Chi phí: 329đ
-                </p>
+                <p>Thông tin phiên sạc...</p>
                 <div className="modal-actions">
                   <button
                     className="save blue"
