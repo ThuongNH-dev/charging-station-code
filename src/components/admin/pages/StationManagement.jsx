@@ -452,7 +452,25 @@ function StationPage() {
   // 🏗️ Thêm trạm mới
   const handleAddStation = async () => {
     try {
-      await stationApi.addStation(newStation);
+      // chuẩn hóa dữ liệu trước khi gửi
+      const stationData = {
+        StationName: newStation.StationName?.trim() || "",
+        Address: newStation.Address?.trim() || "",
+        City: newStation.City?.trim() || "",
+        Latitude: Number(newStation.Latitude) || 0,
+        Longitude: Number(newStation.Longitude) || 0,
+        Status: newStation.Status || "Offline",
+      };
+
+      // validate cơ bản trước khi gửi
+      if (!stationData.StationName || !stationData.Address) {
+        alert("Vui lòng điền đầy đủ Tên trạm và Địa chỉ!");
+        return;
+      }
+
+      console.log("Creating station:", stationData);
+
+      await stationApi.addStation(stationData); // gửi dữ liệu đã chuẩn hóa
       setActiveModal(null);
       fetchStations(); // load lại danh sách sau khi thêm
     } catch (err) {
@@ -474,7 +492,23 @@ function StationPage() {
   // ⚡ Thêm trụ sạc (charger)
   const handleCreateCharger = async () => {
     try {
-      await stationApi.addCharger(currentStationId, newChargerData);
+      // ✅ Đảm bảo lấy đúng stationId (dù BE trả về viết hoa hay thường)
+      const stationId =
+        currentStationId?.stationId ??
+        currentStationId?.StationId ??
+        currentStationId;
+
+      if (!stationId) {
+        alert(
+          "Không tìm thấy StationId. Vui lòng chọn trạm trước khi thêm trụ sạc."
+        );
+        return;
+      }
+
+      // ✅ Gửi dữ liệu kèm stationId (theo format BE yêu cầu)
+      const dataToSend = { ...newChargerData, stationId };
+
+      await stationApi.addCharger(stationId, dataToSend);
       setActiveModal(null);
       fetchStations();
     } catch (err) {
@@ -485,7 +519,17 @@ function StationPage() {
   // 🔧 Cập nhật trụ sạc
   const handleSaveEditCharger = async () => {
     try {
-      await stationApi.updateCharger(editingCharger.chargerId, editingCharger);
+      const chargerId =
+        editingCharger?.chargerId ??
+        editingCharger?.ChargerId ??
+        editingCharger?.id;
+
+      if (!chargerId) {
+        alert("Không tìm thấy ID của bộ sạc để cập nhật.");
+        return;
+      }
+
+      await stationApi.updateCharger(chargerId, editingCharger);
       setActiveModal(null);
       fetchStations();
     } catch (err) {
@@ -494,12 +538,19 @@ function StationPage() {
   };
 
   // ⚙️ Thêm cổng sạc
+  // Cách 1: arrow function
   const handleCreatePort = async () => {
     try {
-      console.log("Creating port for charger:", currentChargerId, newPortData);
-      await stationApi.addPort(currentChargerId, newPortData);
+      const chargerId =
+        currentChargerId?.chargerId ??
+        currentChargerId?.ChargerId ??
+        currentChargerId;
+
+      if (!chargerId) throw new Error("Chưa chọn trụ sạc hợp lệ");
+
+      await stationApi.addPort(chargerId, newPortData);
       setActiveModal(null);
-      fetchStations(); // refresh data
+      fetchStations();
     } catch (err) {
       alert("Không thể thêm cổng sạc: " + err.message);
     }
@@ -728,11 +779,12 @@ function StationPage() {
                 <div style={{ display: "flex", alignItems: "center" }}>
                   <span
                     className={`status-badge ${
-                      station.Status?.toLowerCase() || "offline"
+                      status === "online" ? "active" : "offline"
                     }`}
                   >
-                    {station.Status === "Active" ? "Online" : "Offline"}
+                    {status === "online" ? "Online" : "Offline"}
                   </span>
+
                   <button
                     className="icon-btn"
                     onClick={() => openEditStationModal(station.StationId)}
