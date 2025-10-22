@@ -627,6 +627,19 @@ function StationPage() {
   const renderChargers = (station) =>
     station.chargers.map((charger) => (
       <div className="pole-section" key={String(charger.ChargerId)}>
+        {charger.ImageUrl && (
+          <img
+            src={charger.ImageUrl}
+            alt={`Hình ảnh bộ sạc ${charger.Code}`}
+            style={{
+              width: "60px",
+              height: "60px",
+              objectFit: "cover",
+              marginRight: "10px",
+              borderRadius: "2px",
+            }}
+          />
+        )}
         <div className="pole-header">
           {/* HIỂN THỊ TRẠNG THÁI BỘ SẠC */}
           <h4>
@@ -770,6 +783,20 @@ function StationPage() {
             station // 👈 Đã thay thế 'stations' bằng 'filteredStations'
           ) => (
             <div className="station-card" key={station.StationId}>
+              {station.ImageUrl && (
+                <div className="station-image-container">
+                  <img
+                    src={station.ImageUrl}
+                    alt={`Hình ảnh trạm sạc ${station.StationName}`}
+                    style={{
+                      width: "100%",
+                      height: "200px",
+                      objectFit: "cover",
+                      borderRadius: "4px",
+                    }}
+                  />
+                </div>
+              )}
               <div className="station-header">
                 <div>
                   <h3>{station.StationName}</h3>
