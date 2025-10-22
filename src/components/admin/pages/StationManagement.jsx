@@ -449,6 +449,7 @@ function StationPage() {
   };
 
   // --- LOGIC CẬP NHẬT TRẠNG THÁI (Giữ nguyên) ---
+  // 🏗️ Thêm trạm mới
   const handleAddStation = async () => {
     try {
       await stationApi.addStation(newStation);
@@ -459,9 +460,10 @@ function StationPage() {
     }
   };
 
+  // 🛠️ Cập nhật trạm
   const handleSaveEditStation = async () => {
     try {
-      await stationApi.updateStation(editingStation.StationId, editingStation);
+      await stationApi.updateStation(editingStation.stationId, editingStation);
       setActiveModal(null);
       fetchStations();
     } catch (err) {
@@ -469,6 +471,7 @@ function StationPage() {
     }
   };
 
+  // ⚡ Thêm trụ sạc (charger)
   const handleCreateCharger = async () => {
     try {
       await stationApi.addCharger(currentStationId, newChargerData);
@@ -479,9 +482,10 @@ function StationPage() {
     }
   };
 
+  // 🔧 Cập nhật trụ sạc
   const handleSaveEditCharger = async () => {
     try {
-      await stationApi.updateCharger(editingCharger.ChargerId, editingCharger);
+      await stationApi.updateCharger(editingCharger.chargerId, editingCharger);
       setActiveModal(null);
       fetchStations();
     } catch (err) {
@@ -489,19 +493,22 @@ function StationPage() {
     }
   };
 
+  // ⚙️ Thêm cổng sạc
   const handleCreatePort = async () => {
     try {
+      console.log("Creating port for charger:", currentChargerId, newPortData);
       await stationApi.addPort(currentChargerId, newPortData);
       setActiveModal(null);
-      fetchStations();
+      fetchStations(); // refresh data
     } catch (err) {
       alert("Không thể thêm cổng sạc: " + err.message);
     }
   };
 
+  // 🧩 Cập nhật cổng sạc
   const handleSaveEditPort = async () => {
     try {
-      await stationApi.updatePort(editingPort.PortId, editingPort);
+      await stationApi.updatePort(editingPort.portId, editingPort);
       setActiveModal(null);
       fetchStations();
     } catch (err) {
@@ -509,6 +516,7 @@ function StationPage() {
     }
   };
 
+  // ❌ Xóa trạm / trụ / cổng (dùng chung)
   const handleDeleteConfirm = async () => {
     try {
       if (targetType === "station") {
@@ -518,6 +526,7 @@ function StationPage() {
       } else if (targetType === "port") {
         await stationApi.deletePort(targetId);
       }
+
       setActiveModal(null);
       fetchStations(); // Cập nhật lại danh sách
     } catch (err) {
