@@ -2,9 +2,9 @@
 export function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
     case "admin":
-      return "/admin/stations";
+      return "/admin";
     case "staff":
-      return "/staff/stations";
+      return "/staff";
     case "customer":
       return "/stations";
     default:

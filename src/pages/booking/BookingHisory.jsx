@@ -10,52 +10,91 @@ const PAYMENT_CREATE_URL = `${API_ABS}/Payment/create`;
 const HOLD_MINUTES_DEFAULT = 15;
 const vndNumber = (n) => (Number(n) || 0).toLocaleString("vi-VN");
 
+// === URL normalizer (string | {result|url|href} | relative) -> absolute string or ""
+// function toUrlString(val) {
+//   if (!val) return "";
+//   const s =
+//     typeof val === "string" ? val
+//       : (val.result ?? val.url ?? val.href ?? "");
+//   if (!s) return "";
+//   if (/^https?:\/\//i.test(s)) return s;
+//   try { return new URL(s, window.location.origin).toString(); } catch { return ""; }
+// }
+
+// === URL normalizer: string | {result|url|href|paymentUrl} | relative -> absolute string
+function toUrlString(val) {
+  if (!val) return "";
+  // nếu là object, lấy các key thường gặp
+  if (typeof val === "object") {
+    const cand =
+      val.result ?? val.url ?? val.href ?? val.paymentUrl ?? val.paymentURL ??
+      (val.data && (val.data.result ?? val.data.url ?? val.data.href)) ?? "";
+    return toUrlString(cand); // đệ quy 1 bước
+  }
+  // nếu là string
+  const s = String(val).trim();
+  if (!s) return "";
+  // tuyệt đối sẵn
+  if (/^https?:\/\//i.test(s)) return s;
+  // relative -> tuyệt đối theo origin hiện tại
+  try { return new URL(s, window.location.origin).toString(); } catch { return ""; }
+}
+
+
 // === Storage helpers ===
-function dualRead(key) { let s=null; try{s=sessionStorage.getItem(key);}catch{} if(!s) try{s=localStorage.getItem(key);}catch{} return s; }
-function dualWrite(key,val){ try{sessionStorage.setItem(key,val);}catch{} try{localStorage.setItem(key,val);}catch{} }
+function dualRead(key) { let s = null; try { s = sessionStorage.getItem(key); } catch { } if (!s) try { s = localStorage.getItem(key); } catch { } return s; }
+function dualWrite(key, val) { try { sessionStorage.setItem(key, val); } catch { } try { localStorage.setItem(key, val); } catch { } }
 
 // === Payment storage helpers ===
 function wasFinalized(orderId) { return dualRead(`pay:${orderId}:finalized`) === "1"; }
 function findPaymentStubByBookingId(bookingId) {
-  const collect=(store)=>{const keys=[];try{for(let i=0;i<store.length;i++){const k=store.key(i);if(k&&k.startsWith("pay:")&&!k.endsWith(":pending")&&!k.endsWith(":finalized"))keys.push(k);}}catch{};return keys;};
-  const keys=Array.from(new Set([...collect(localStorage),...collect(sessionStorage)]));
-  for(const k of keys){try{const s=dualRead(k); if(!s) continue; const obj=JSON.parse(s);
-    if(String(obj?.bookingId)===String(bookingId)){
-      const orderId=obj?.orderId||obj?.paymentRef||k.replace(/^pay:/,"");
-      return { orderId, paidAt: obj?.paidAt ? new Date(obj.paidAt).getTime() : Date.now(),
-        totalMinutes: obj?.totalMinutes>0?obj.totalMinutes:HOLD_MINUTES_DEFAULT };
-    }}catch{}}
+  const collect = (store) => { const keys = []; try { for (let i = 0; i < store.length; i++) { const k = store.key(i); if (k && k.startsWith("pay:") && !k.endsWith(":pending") && !k.endsWith(":finalized")) keys.push(k); } } catch { }; return keys; };
+  const keys = Array.from(new Set([...collect(localStorage), ...collect(sessionStorage)]));
+  for (const k of keys) {
+    try {
+      const s = dualRead(k); if (!s) continue; const obj = JSON.parse(s);
+      if (String(obj?.bookingId) === String(bookingId)) {
+        const orderId = obj?.orderId || obj?.paymentRef || k.replace(/^pay:/, "");
+        return {
+          orderId, paidAt: obj?.paidAt ? new Date(obj.paidAt).getTime() : Date.now(),
+          totalMinutes: obj?.totalMinutes > 0 ? obj.totalMinutes : HOLD_MINUTES_DEFAULT
+        };
+      }
+    } catch { }
+  }
   return null;
 }
 
-function useTick(ms=1000){const [,setN]=useState(0); const ref=useRef(null);
-  useEffect(()=>{ref.current=setInterval(()=>setN(n=>(n+1)%1_000_000),ms); return()=>clearInterval(ref.current);},[ms]);}
+function useTick(ms = 1000) {
+  const [, setN] = useState(0); const ref = useRef(null);
+  useEffect(() => { ref.current = setInterval(() => setN(n => (n + 1) % 1_000_000), ms); return () => clearInterval(ref.current); }, [ms]);
+}
 
 function StatusPill({ status }) {
-  const raw=String(status||"");
-  const key=raw.toLowerCase().replace(/[\s_]+/g,"");
-  const clsMap={pending:"pill pending", confirmed:"pill ok", completed:"pill done", cancelled:"pill cancel", failed:"pill fail"};
-  const className=clsMap[key] || (key.includes("cancel")?"pill cancel":"pill");
-  const label=raw.replace(/_/g," ").trim();
+  const raw = String(status || "");
+  const key = raw.toLowerCase().replace(/[\s_]+/g, "");
+  const clsMap = { pending: "pill pending", confirmed: "pill ok", completed: "pill done", cancelled: "pill cancel", failed: "pill fail" };
+  const className = clsMap[key] || (key.includes("cancel") ? "pill cancel" : "pill");
+  const label = raw.replace(/_/g, " ").trim();
   return <span className={className}>{label}</span>;
 }
 
 // ---- API: đổi trạng thái booking ----
 async function updateBookingStatus(bookingId, status) {
   return await fetchAuthJSON(`${API_ABS}/Booking/${bookingId}/status`, {
-    method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({status})
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status })
   });
 }
 
 // === Date helpers ===
 function parseDateSafe(v) { // YYYY-MM-DD -> Date at local midnight
   if (!v) return null;
-  const [y,m,d]=v.split("-").map(Number);
+  const [y, m, d] = v.split("-").map(Number);
   if (!y || !m || !d) return null;
-  return new Date(y, m-1, d, 0, 0, 0, 0);
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
 }
 function endOfDay(date) {
-  const d=new Date(date); d.setHours(23,59,59,999); return d;
+  const d = new Date(date); d.setHours(23, 59, 59, 999); return d;
 }
 function pickDateField(row, fieldKey) {
   const map = {
@@ -103,7 +142,7 @@ export default function HistoryPage() {
 
         // Truyền kèm field + range nếu có chọn
         if (dateFrom) url.searchParams.set("from", dateFrom); // ví dụ BE chấp nhận YYYY-MM-DD
-        if (dateTo)   url.searchParams.set("to", dateTo);
+        if (dateTo) url.searchParams.set("to", dateTo);
         if (dateField) url.searchParams.set("dateField", dateField); // phòng khi BE hỗ trợ
 
         const res = await fetchAuthJSON(url.toString(), { method: "GET" });
@@ -199,30 +238,41 @@ export default function HistoryPage() {
         cancelUrl: window.location.origin + "/user/history",
       };
       const res = await fetch(PAYMENT_CREATE_URL, {
-        method:"POST", credentials:"include",
-        headers:{ "Accept":"application/json","Content-Type":"application/json" },
-        body:JSON.stringify(payload),
+        method: "POST", credentials: "include",
+        headers: { "Accept": "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
       let paymentUrl = res.headers.get("Location") || "";
       let orderId = "";
+
       const ct = res.headers.get("content-type") || "";
       if (ct.includes("application/json")) {
-        const data = await res.json().catch(()=> ({}));
-        paymentUrl = paymentUrl || data.paymentUrl || data.paymentURL || data.url || data.redirectUrl || data.data?.paymentUrl || data.data?.url || data.data?.redirectUrl || "";
-        orderId   = data.orderId || data.id || data.txnRef || data.data?.orderId || data.data?.id || "";
+        const data = await res.json().catch(() => ({}));
+        const cand =
+          paymentUrl ||
+          data.paymentUrl || data.paymentURL || data.url || data.redirectUrl ||
+          data.data?.paymentUrl || data.data?.url || data.data?.redirectUrl || "";
+        paymentUrl = toUrlString(cand); // <— QUAN TRỌNG
+
+        orderId = data.orderId || data.id || data.txnRef || data.data?.orderId || data.data?.id || "";
       } else {
-        const text = await res.text().catch(()=> "");
-        if (!paymentUrl && /^https?:\/\//i.test(text.trim())) paymentUrl = text.trim();
+        const text = await res.text().catch(() => "");
+        if (!paymentUrl && text) paymentUrl = toUrlString(text.trim()); // <— QUAN TRỌNG
       }
+
       if (!res.ok) throw new Error(`Create payment failed ${res.status} ${res.statusText}`);
-      if (!paymentUrl) throw new Error("BE không trả paymentUrl / Location header.");
+      if (!paymentUrl) throw new Error("BE không trả paymentUrl / Location header hợp lệ.");
+
 
       if (!orderId) {
         try {
-          const u = new URL(paymentUrl);
-          orderId = u.searchParams.get("orderId") || u.searchParams.get("txnRef") || u.searchParams.get("vnp_TxnRef") || "";
-        } catch {}
+          const u = new URL(toUrlString(paymentUrl));
+          orderId = u.searchParams.get("orderId")
+            || u.searchParams.get("txnRef")
+            || u.searchParams.get("vnp_TxnRef")
+            || "";
+        } catch { }
       }
 
       if (orderId) {
@@ -231,7 +281,7 @@ export default function HistoryPage() {
         dualWrite("pay:lastOrderId", String(orderId));
         dualWrite(`pay:${orderId}:pending`, "1");
       }
-      window.location.href = paymentUrl;
+      window.location.href = toUrlString(paymentUrl);
     } catch (e) {
       alert(e.message || "Không thể khởi tạo thanh toán.");
     }
@@ -242,7 +292,7 @@ export default function HistoryPage() {
     try {
       const res = await updateBookingStatus(row.bookingId, "Cancelled");
       if (res?.status && res.status !== "Cancelled") throw new Error("Đổi trạng thái không thành 'Cancelled'.");
-      setItems((arr)=> arr.map((x)=> (x.bookingId===row.bookingId?{...x, status:"Cancelled"}:x)));
+      setItems((arr) => arr.map((x) => (x.bookingId === row.bookingId ? { ...x, status: "Cancelled" } : x)));
     } catch (e) {
       alert(e.message || "Không thể huỷ booking.");
     }

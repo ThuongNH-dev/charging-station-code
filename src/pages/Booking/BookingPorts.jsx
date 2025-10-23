@@ -485,7 +485,10 @@ export default function BookingPorts() {
           orderId,
           bookingId,
           booking: created,
-          vnpayUrl: payRes.paymentUrl,
+          // vnpayUrl: payRes.paymentUrl,
+          vnpayUrl: (typeof payRes.paymentUrl === "string"
+            ? payRes.paymentUrl
+            : payRes.paymentUrl?.result || ""),
           startTime: fmtLocal(startLocal),
           endTime: fmtLocal(endLocal),
           station: { id, name: station?.name, address: station?.address },
