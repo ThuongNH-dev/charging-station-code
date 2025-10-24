@@ -16,6 +16,7 @@ const useUserServicesHook = () => {
   const [allAccounts, setAllAccounts] = useState([]);
   const [allVehicles, setAllVehicles] = useState([]);
   const [servicePackages, setServicePackages] = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -23,15 +24,17 @@ const useUserServicesHook = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [accounts, vehicles, services] = await Promise.all([
+      const [accounts, vehicles, services, subscriptionsData] = await Promise.all([
         userApi.fetchAllUsers(),
         userApi.fetchAllVehicles(),
         userApi.fetchAllServicePackages(),
+        userApi.fetchAllSubscriptions(),
       ]);
 
       setAllAccounts(accounts || []);
       setAllVehicles(vehicles || []);
       setServicePackages(services || []);
+      setSubscriptions(subscriptionsData || []);
     } catch (err) {
       console.error("❌ Lỗi khi load dữ liệu:", err);
       setError(err.message || "Không thể tải dữ liệu");
@@ -66,6 +69,7 @@ const useUserServicesHook = () => {
     allAccounts,
     allVehicles,
     servicePackages,
+    subscriptions,
     isLoading,
     error,
     fetchData,
@@ -196,6 +200,7 @@ const UserManagement = () => {
     allAccounts,
     allVehicles,
     servicePackages,
+    subscriptions,
     isLoading,
     error,
     ...crudActions
@@ -315,12 +320,14 @@ const UserManagement = () => {
               userType="individual"
               setActiveModal={setActiveModal}
               servicePackages={servicePackages}
+              subscriptions={subscriptions}
             />
             <UserTables
               filteredData={companyUsers}
               userType="company"
               setActiveModal={setActiveModal}
               servicePackages={servicePackages}
+              subscriptions={subscriptions}
             />
           </div>
         )}

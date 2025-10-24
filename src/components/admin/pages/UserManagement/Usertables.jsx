@@ -53,7 +53,7 @@ const getColumns = (userType) => {
 /* =========================================================
    🔹 HÀM RENDER GIÁ TRỊ Ô (CELL)
    ========================================================= */
-const renderCell = (user, key, index, servicePackages) => {
+const renderCell = (user, key, index, servicePackages, subscriptions) => {
   const customerInfo =
     user.customers && user.customers.length > 0 ? user.customers[0] : {};
   const companyData = user.company || {};
@@ -107,25 +107,26 @@ const renderCell = (user, key, index, servicePackages) => {
           return "—";
         }
 
-        const planId =
-          user.subscriptionPlanId ||
-          customerInfo.subscriptionPlanId ||
-          user.planId ||
-          null;
-
-        // Nếu user có planId, tìm plan tương ứng
-        if (planId) {
-          const plan = servicePackages.find(
-            (p) =>
-              Number(p.subscriptionPlanId || p.SubscriptionPlanId) ===
-              Number(planId)
-          );
-          return plan?.planName || plan?.PlanName || "—";
+        // Tìm subscription của user dựa trên customerId
+        const customerId = customerInfo.customerId;
+        if (!customerId) {
+          return "Chưa đăng ký";
         }
 
-        // Nếu user chưa có plan, hiển thị gói mặc định (gói đầu tiên)
-        const defaultPlan = servicePackages[0];
-        return defaultPlan?.planName || defaultPlan?.PlanName || "Chưa đăng ký";
+        // Tìm subscription active của customer
+        const userSubscription = subscriptions.find(
+          (sub) => 
+            Number(sub.customerId) === Number(customerId) && 
+            sub.status === "Active"
+        );
+
+        if (userSubscription) {
+          // Nếu có subscription active, hiển thị tên gói từ subscription
+          return userSubscription.planName || "—";
+        }
+
+        // Nếu không có subscription active, hiển thị "Chưa đăng ký"
+        return "Chưa đăng ký";
       } catch (error) {
         console.error("❌ Lỗi khi render planName:", error);
         return "—";
@@ -154,6 +155,7 @@ export const UserTables = ({
   userType = "individual",
   setActiveModal,
   servicePackages = [],
+  subscriptions = [],
 }) => {
   const columns = getColumns(userType);
 
@@ -224,7 +226,7 @@ export const UserTables = ({
 
                 return (
                   <td key={col.key}>
-                    {renderCell(user, col.key, index, servicePackages)}
+                    {renderCell(user, col.key, index, servicePackages, subscriptions)}
                   </td>
                 );
               })}

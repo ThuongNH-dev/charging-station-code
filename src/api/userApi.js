@@ -212,4 +212,10 @@ export const userApi = {
     const res = await axios.delete(`${BASE_URL}/SubscriptionPlans/${id}`);
     return res.data;
   },
+
+  // === SUBSCRIPTIONS ===
+  fetchAllSubscriptions: async () => {
+    const res = await axios.get(`${BASE_URL}/Subscriptions`);
+    return res.data;
+  },
 };
