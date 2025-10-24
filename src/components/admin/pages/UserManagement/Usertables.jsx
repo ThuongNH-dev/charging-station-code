@@ -113,15 +113,19 @@ const renderCell = (user, key, index, servicePackages) => {
           user.planId ||
           null;
 
-        if (!planId) return "—";
+        // Nếu user có planId, tìm plan tương ứng
+        if (planId) {
+          const plan = servicePackages.find(
+            (p) =>
+              Number(p.subscriptionPlanId || p.SubscriptionPlanId) ===
+              Number(planId)
+          );
+          return plan?.planName || plan?.PlanName || "—";
+        }
 
-        const plan = servicePackages.find(
-          (p) =>
-            Number(p.subscriptionPlanId || p.SubscriptionPlanId) ===
-            Number(planId)
-        );
-
-        return plan?.planName || plan?.PlanName || "—";
+        // Nếu user chưa có plan, hiển thị gói mặc định (gói đầu tiên)
+        const defaultPlan = servicePackages[0];
+        return defaultPlan?.planName || defaultPlan?.PlanName || "Chưa đăng ký";
       } catch (error) {
         console.error("❌ Lỗi khi render planName:", error);
         return "—";
