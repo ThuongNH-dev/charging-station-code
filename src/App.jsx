@@ -21,7 +21,7 @@ import InvoicePage from "./components/charging/Invoice";
 import StaffLayout from "./layouts/StaffLayout";
 import AdminLayout from "./components/admin/layout/AdminLayout";
 import StationManagement from "./components/admin/pages/StationManagement";
-import UserManagement from "./components/admin/pages/UserManagement";
+import UserManagement from "./components/admin/pages/UserManagement/UserManagement";
 import Reports from "./components/admin/pages/Reports";
 import RegisterSelect from "./pages/Register/RegisterSelect";
 import PersonalRegister from "./pages/Register/PersonalRegister";
