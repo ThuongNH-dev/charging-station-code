@@ -334,14 +334,14 @@ const ChargingProgress = () => {
 
     const orderId = "CHG" + Date.now();
     // Lấy customerId từ JWT (nếu BE encode)
-   let customerId = null;
-   try {
-     const tk = getToken && getToken();
-     const decoded = tk ? decodeJwtPayload(tk) : null;
-     // tuỳ BE map claim nào: "customerId" hoặc "nameid"…
-     customerId = decoded?.customerId ?? decoded?.nameid ?? null;
-     if (typeof customerId === "string" && /^\d+$/.test(customerId)) customerId = Number(customerId);
-   } catch {}
+    let customerId = null;
+    try {
+      const tk = getToken && getToken();
+      const decoded = tk ? decodeJwtPayload(tk) : null;
+      // tuỳ BE map claim nào: "customerId" hoặc "nameid"…
+      customerId = decoded?.customerId ?? decoded?.nameid ?? null;
+      if (typeof customerId === "string" && /^\d+$/.test(customerId)) customerId = Number(customerId);
+    } catch { }
 
     const payload = {
       orderId,
@@ -367,25 +367,105 @@ const ChargingProgress = () => {
       endedAt,
       pricingSource: pricingError ? "fallback" : "dynamic",
       // thông tin bổ sung:
-     customerId,
-     // nếu hệ thống đã có ChargingSession, bạn có thể đẩy id vào state khi bắt đầu sạc:
-     chargingSessionId: state?.chargingSessionId ?? null,
+      customerId,
+      // nếu hệ thống đã có ChargingSession, bạn có thể đẩy id vào state khi bắt đầu sạc:
+      chargingSessionId: state?.chargingSessionId ?? null,
     };
 
     sessionStorage.setItem(`chargepay:${orderId}`, JSON.stringify(payload));
     return payload;
   };
 
-  // const goToChargingPayment = () => {
-  const goToInvoicePage = () => {
-    const payload = buildChargingPaymentPayload();
-    // // 👉 Điều hướng sang trang thanh toán sau sạc
-    // navigate(`/payment/charging?order=${payload.orderId}`, { state: payload, replace: true });
-    // 👉 Điều hướng sang trang Invoice, truyền draft dữ liệu để Invoice.jsx tạo hóa đơn
-    navigate(`/invoice?order=${payload.orderId}`, {
+  // ✨ NEW: gọi BE để kết thúc phiên sạc và nhận số liệu chuẩn
+  async function endSessionOnServer({ endSoc, chargingSessionId }) {
+    // Nếu chưa có chargingSessionId (demo), bỏ qua gọi API để không lỗi.
+    if (!chargingSessionId || !Number.isFinite(Number(chargingSessionId))) return null;
+
+    try {
+      const url = `${API_BASE}/ChargingSessions/end`;
+      const body = {
+        chargingSessionId: Number(chargingSessionId),
+        endSoc: Math.round(Number(endSoc) || 0),
+      };
+
+      // dùng fetchAuthJSON để tự gắn Authorization
+      const res = await fetchAuthJSON(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      // Kỳ vọng res.data theo mẫu BE gửi
+      if (res && res.data) return res.data;
+      return null;
+    } catch (e) {
+      console.error("[Charging] endSessionOnServer error:", e);
+      return null; // fallback sang tính tạm nếu BE lỗi
+    }
+  }
+
+
+  // ✨ UPDATE: gọi BE trước khi điều hướng sang Invoice
+  const goToInvoicePage = async () => {
+    // build payload tạm (phòng khi BE lỗi vẫn có số liệu)
+    const draft = buildChargingPaymentPayload();
+
+    // ✨ NEW: gọi BE end session (nếu có chargingSessionId)
+    let beData = null;
+    try {
+      beData = await endSessionOnServer({
+        endSoc: battery,                           // % pin kết thúc
+        chargingSessionId: state?.chargingSessionId ?? draft.chargingSessionId,
+      });
+    } catch { }
+
+    // ✨ NEW: nếu BE trả data → dùng số liệu chính thức để override draft
+    let finalPayload = { ...draft };
+    if (beData) {
+      finalPayload = {
+        ...finalPayload,
+        // Đồng bộ lại các trường chuẩn từ BE
+        chargingSessionId: beData.chargingSessionId ?? finalPayload.chargingSessionId,
+        vehicleId: beData.vehicleId ?? finalPayload.vehicleId,
+        portId: beData.portId ?? finalPayload.portId,
+        startSoc: beData.startSoc ?? finalPayload.initialBattery,
+        finalBattery: beData.endSoc ?? finalPayload.finalBattery,
+        energyUsedKWh: beData.energyKwh ?? finalPayload.energyUsedKWh,
+        sessionSeconds: Number.isFinite(beData.durationMin) ? beData.durationMin * 60 : finalPayload.sessionSeconds,
+        idlePenalty: undefined, // sẽ tính lại từ beData.idleMin * (dynPenaltyPerMin)
+        subtotal: beData.subtotal,
+        tax: beData.tax,
+        totalPayable: beData.total ?? finalPayload.totalPayable,
+        endedAt: beData.endedAt,
+        billingMonth: beData.billingMonth,
+        billingYear: beData.billingYear,
+        status: beData.status ?? "Completed",
+        // nếu muốn lưu riêng các giá trị BE
+        be: {
+          durationMin: beData.durationMin,
+          idleMin: beData.idleMin,
+        },
+      };
+
+      // Nếu BE không trả penalty trực tiếp, tính lại penalty theo rule hiện tại:
+      if (Number.isFinite(beData.idleMin)) {
+        const perMin = Number.isFinite(dynPenaltyPerMin) ? dynPenaltyPerMin : 10000;
+        const penaltyFromBE = beData.idleMin * perMin;
+        finalPayload.idlePenalty = penaltyFromBE;
+        // Nếu muốn đồng bộ tổng:
+        if (!Number.isFinite(finalPayload.totalPayable)) {
+          finalPayload.totalPayable = (beData.total ?? 0) || ((beData.subtotal ?? 0) + (beData.tax ?? 0) + penaltyFromBE);
+        }
+      }
+    }
+
+    // ✨ UPDATE: lưu lại payload cuối cùng (để Invoice.jsx có thể đọc)
+    sessionStorage.setItem(`chargepay:${finalPayload.orderId}`, JSON.stringify(finalPayload));
+
+    // Điều hướng sang hóa đơn (giữ nguyên)
+    navigate(`/invoice?order=${finalPayload.orderId}`, {
       state: {
-        ...payload,
-        // Gợi ý trước cho Invoice.jsx (có thể dùng/ghi đè khi gửi BE):
+        ...finalPayload,
         invoiceStatus: "Unpaid",
         isMonthlyInvoice: false,
       },
@@ -393,18 +473,22 @@ const ChargingProgress = () => {
     });
   };
 
-  const handleStopCharging = () => {
+  // =======================
+  // ✨ HANDLERS KẾT THÚC SẠC
+  // =======================
+  const handleStopCharging = async () => {
     setIsCharging(false);
     clearInterval(chargeInterval.current);
     clearInterval(penaltyInterval.current);
-    goToInvoicePage();
+    await goToInvoicePage(); // Gọi hàm đã sửa ở trên
   };
 
-  const handleFinishCharging = () => {
+  const handleFinishCharging = async () => {
     clearInterval(chargeInterval.current);
     clearInterval(penaltyInterval.current);
-    goToInvoicePage();
+    await goToInvoicePage(); // Gọi hàm đã sửa ở trên
   };
+
 
   return (
     <MainLayout>

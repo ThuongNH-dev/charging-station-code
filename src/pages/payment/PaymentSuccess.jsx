@@ -244,6 +244,45 @@ async function enrichByPortId(portId) {
   return { charger, station };
 }
 
+// === API: bắt đầu phiên sạc theo Booking ===
+// Ghép URL an toàn cho cả base absolute ("https://.../api") lẫn relative ("/api")
+function joinUrl(base, path) {
+  const b = String(base || "");
+  const p = String(path || "");
+  if (/^https?:\/\//i.test(b)) {
+    // absolute
+    return (b.endsWith("/") ? b.slice(0, -1) : b) + (p.startsWith("/") ? p : `/${p}`);
+  }
+  // relative -> tránh "new URL" (cần absolute), nối chuỗi thường
+  const left = b ? (b.startsWith("/") ? b : `/${b}`) : "";
+  const right = p.startsWith("/") ? p : `/${p}`;
+  // loại bỏ double slashes (trừ "http://")
+  return (left + right).replace(/([^:]\/)\/+/g, "$1");
+}
+
+async function startChargingSession({ customerId, vehicleId, bookingId, portId }) {
+  const cid = Number(customerId);
+  const bid = Number(bookingId);
+  const pid = Number(portId);
+  const vidN = Number(vehicleId);
+
+  // Body PHẲNG đúng như BE mẫu của bạn
+  const body = {
+    customerId: cid,
+    bookingId: bid,
+    portId: pid,
+    ...(Number.isFinite(vidN) ? { vehicleId: vidN } : {}),
+  };
+
+  const url = joinUrl(API_BASE, "/ChargingSessions/start");
+
+  return await fetchAuthJSON(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 
 export default function PaymentSuccess() {
   const { state } = useLocation();
@@ -393,7 +432,7 @@ export default function PaymentSuccess() {
     return Array.from(new Set(arr)).slice(0, 3);
   }, [data]);
 
-  const navigateToCharging = () => {
+  const navigateToCharging = (extra = {}) => {
     const startTs = data?.startTime ? new Date(data.startTime).getTime() : NaN;
     const endTs = data?.endTime ? new Date(data.endTime).getTime() : NaN;
     const totalMinutes =
@@ -402,12 +441,12 @@ export default function PaymentSuccess() {
         : HOLD_MINUTES_DEFAULT;
 
     navigate("/charging", {
-      state: { ...data, fromPayment: true, totalMinutes },
+      state: { ...data, ...extra, fromPayment: true, totalMinutes },
       replace: true,
     });
   };
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (phase === "toStart") {
       setIdError("Chưa đến giờ bắt đầu. Vui lòng đợi.");
       return;
@@ -425,8 +464,42 @@ export default function PaymentSuccess() {
       return;
     }
     setIdError("");
-    navigateToCharging();
+
+    try {
+      // 1) Lấy customerId theo helper sẵn có
+      const customerId = await getCurrentCustomerIdLikePaymentPage();
+      if (!customerId) throw new Error("Không xác định được khách hàng.");
+
+      // 2) Xác định portId: ưu tiên người dùng nhập, fallback từ booking
+      const portId =
+        Number(idInput) || Number(data?.gun?.id) || Number(data?.gun?.portId);
+      if (!Number.isFinite(portId)) throw new Error("Port/Gun ID không hợp lệ.");
+
+      // 3) Vehicle: nếu bạn có trong state (Location.state) thì lấy, chưa có thì để null
+      const vehicleId = state?.vehicleId ?? null;
+
+      // 4) Gọi BE bắt đầu phiên sạc
+      const res = await startChargingSession({
+        customerId,
+        vehicleId,
+        bookingId: data.bookingId,
+        portId,
+      });
+
+      const d = res?.data || {};
+      // 5) Điều hướng sang Charging, truyền kèm thông tin BE trả về
+      navigateToCharging({
+        chargingSessionId: d.chargingSessionId,
+        startedAt: d.startedAt,
+        vehicleId: d.vehicleId ?? vehicleId,
+        pricingRuleId: d.pricingRuleId ?? null,
+        portId, // để ChargingProgress dùng khi gọi pricing động
+      });
+    } catch (e) {
+      setIdError(e?.message || "Không bắt đầu phiên sạc được. Vui lòng thử lại.");
+    }
   };
+
 
   const onEnter = (e) => e.key === "Enter" && handleStart();
 
