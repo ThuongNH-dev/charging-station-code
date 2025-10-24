@@ -143,3 +143,14 @@
   transform: scale(1.1);
 }
 
+.invoice-icon {
+  font-size: 31px;
+  color: rgb(0, 0, 0);
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.15s ease;
+}
+.invoice-icon:hover {
+  color: #006d32;
+  transform: scale(1.1);
+}
+

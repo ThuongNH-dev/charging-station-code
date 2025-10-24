@@ -26,6 +26,7 @@ import Reports from "./components/admin/pages/Reports";
 import RegisterSelect from "./pages/Register/RegisterSelect";
 import PersonalRegister from "./pages/Register/PersonalRegister";
 import BusinessRegister from "./pages/Register/BusinessRegister";
+import InvoiceCharging from "./pages/payment/InvoiceCharging";
 import NotFound from "./pages/NotFound";
 
 // Chuyển role thành path tương ứng
@@ -122,14 +123,6 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      {/* <Route
-        path="/payment/success"
-        element={
-          <ProtectedRoute allowedRoles={["Customer"]}>
-            <PaymentSuccess />
-          </ProtectedRoute>
-        }
-      /> */}
       <Route
         path="/payment/failure"
         element={
@@ -188,6 +181,10 @@ export default function App() {
             <InvoicePage />
           </ProtectedRoute>
         }
+      />
+      <Route
+        path="/invoiceCharging"
+        element={<InvoiceCharging />}
       />
       {/*Staff */}
       <Route

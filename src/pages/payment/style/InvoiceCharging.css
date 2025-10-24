@@ -1,0 +1,178 @@
+.iv-root {
+  padding: 16px 20px;
+}
+
+.iv-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.iv-topbar h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.iv-filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.iv-filter select,
+.iv-filter input {
+  height: 32px;
+  padding: 4px 8px;
+  border: 1px solid #d7dbe0;
+  border-radius: 8px;
+  outline: none;
+}
+.iv-filter input[type="number"] {
+  width: 100px;
+}
+.iv-btn {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: #0ea5e9;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+.iv-btn:hover { opacity: .9; }
+.iv-btn.ghost {
+  background: transparent;
+  color: #0ea5e9;
+  border: 1px solid #0ea5e9;
+}
+
+.iv-empty,
+.iv-error,
+.iv-warn {
+  padding: 14px 16px;
+  border-radius: 10px;
+  margin: 12px 0;
+}
+.iv-empty { background: #f7fafc; color: #415063; }
+.iv-error { background: #fff5f5; color: #c53030; border: 1px solid #fed7d7; }
+.iv-warn  { background: #fffaf0; color: #b7791f; border: 1px solid #feebc8; }
+
+.iv-table {
+  border: 1px solid #e6eaf0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.iv-head,
+.iv-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 110px 140px 120px 180px 180px 110px 140px;
+  gap: 0;
+  align-items: center;
+}
+.iv-head {
+  background: #f2f4f7;
+  font-weight: 600;
+  color: #3b4353;
+}
+.iv-head > div,
+.iv-row > .cell {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef1f5;
+}
+.iv-rowwrap:last-child .iv-row > .cell { border-bottom: none; }
+
+.iv-row .cell.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.iv-row .cell.strong { font-weight: 600; }
+
+.iv-list .iv-rowwrap {
+  border-top: 1px solid #eef1f5;
+}
+.iv-list .iv-rowwrap:first-child { border-top: none; }
+
+.iv-expand {
+  background: #fbfdff;
+  border-top: 1px dashed #e6eaf0;
+  padding: 8px 12px 14px;
+}
+
+/* Sub table */
+.iv-subtable {
+  border: 1px solid #e6eaf0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.iv-subhead,
+.iv-subrow {
+  display: grid;
+  grid-template-columns: 70px 1.5fr 120px 120px 150px 120px 150px 120px;
+  align-items: center;
+}
+.iv-subhead {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #3b4353;
+}
+.iv-subhead > div,
+.iv-subrow > div {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eef1f5;
+}
+.iv-sublist .iv-subrow:last-child > div { border-bottom: none; }
+.iv-empty-sub {
+  padding: 10px 12px; color: #667085;
+}
+
+/* Pills */
+.pill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid #d7dbe0;
+  color: #49566a;
+  background: #fff;
+}
+.pill.ok {
+  background: #ecfeff; color: #0e7490; border-color: #a5f3fc;
+}
+.pill.warn {
+  background: #fff7ed; color: #9a3412; border-color: #fed7aa;
+}
+.pill.danger {
+  background: #fff1f2; color: #be123c; border-color: #fecdd3;
+}
+
+/* Actions cell */
+.cell.actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .iv-head, .iv-row {
+    grid-template-columns: 80px 1fr 90px 120px 110px 160px 160px 90px 110px;
+  }
+  .iv-subhead, .iv-subrow {
+    grid-template-columns: 60px 1.5fr 100px 100px 130px 100px 130px 110px;
+  }
+}
+@media (max-width: 880px) {
+  .iv-head, .iv-row {
+    grid-template-columns: 80px 1fr 90px 120px 110px 160px 110px;
+  }
+  .iv-head > div:nth-child(8),
+  .iv-row > .cell:nth-child(8) { display: none; } /* ẩn cột "Phiên sạc" */
+}
+@media (max-width: 680px) {
+  .iv-head, .iv-row {
+    grid-template-columns: 80px 1fr 90px 120px 110px;
+  }
+  .iv-head > div:nth-child(6),
+  .iv-row > .cell:nth-child(6),
+  .iv-head > div:nth-child(7),
+  .iv-row > .cell:nth-child(7),
+  .iv-head > div:nth-child(3),
+  .iv-row > .cell:nth-child(3) { display: none; } /* ẩn Created/Updated/Month */
+}
