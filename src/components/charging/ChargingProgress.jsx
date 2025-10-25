@@ -44,13 +44,13 @@ function parseNumberLike(n) {
   return NaN;
 }
 
+// Khớp chính xác với GetCurrentTimeRange() bên BE:
+// Low: 22:00–06:00, Normal: 06:00–17:00, Peak: 17:00–22:00
 function nowTimeRange(dt = new Date()) {
-  const wd = dt.getDay(); // 0=CN, 1..6=Thứ2..Thứ7
   const h = dt.getHours();
-  if (wd === 0) return "Normal";
-  if (h >= 17 && h < 22) return "Peak";
+  if (h >= 22 || h < 6) return "Low";
   if (h >= 6 && h < 17) return "Normal";
-  return "Normal";
+  return "Peak";
 }
 
 function normalizeCharger(c = {}) {
@@ -193,18 +193,34 @@ const ChargingProgress = () => {
   const [dynGraceSeconds, setDynGraceSeconds] = useState(NaN);
   const [pricingLoading, setPricingLoading] = useState(true);
   const [pricingError, setPricingError] = useState("");
+  const [session, setSession] = useState(null); // dữ liệu phiên sạc chuẩn từ BE
 
   const parsedFromLabel = priceLabel ? Number((priceLabel.match(/\d+/g) || []).join("")) : NaN;
   const fallbackPricePerKWh = Number.isFinite(state.pricePerKWh)
     ? state.pricePerKWh
     : Number.isFinite(parsedFromLabel)
-    ? parsedFromLabel
-    : 5500;
+      ? parsedFromLabel
+      : 5500;
 
   const batteryCapacity = Number.isFinite(state.batteryCapacity) ? state.batteryCapacity : 75;
-  const initialBattery = Number.isFinite(state.battery) ? Math.max(0, Math.min(100, state.battery)) : 0;
-
+  const initialBattery = (() => {
+    const fromSession = Number(session?.startSoc);
+    if (Number.isFinite(fromSession)) return Math.max(0, Math.min(100, fromSession));
+    const fromState = Number(state?.startSoc);
+    if (Number.isFinite(fromState)) return Math.max(0, Math.min(100, fromState));
+    return 0;
+  })();
   const [battery, setBattery] = useState(initialBattery);
+  const startSocRef = useRef(initialBattery);
+  useEffect(() => {
+    const soc = Number(session?.startSoc);
+    if (Number.isFinite(soc)) {
+      const clamp = Math.max(0, Math.min(100, soc));
+      startSocRef.current = clamp;
+      setBattery(clamp);
+    }
+  }, [session]);
+
   const TOTAL_TIME_MINUTES = Number.isFinite(state.totalTimeMinutes) ? state.totalTimeMinutes : 120;
 
   const [timeLeft, setTimeLeft] = useState("");
@@ -227,7 +243,7 @@ const ChargingProgress = () => {
           try {
             const s = await fetchAuthJSON(`${API_ABS}/ChargingSessions/${encodeURIComponent(state.chargingSessionId)}`, { method: "GET" });
             seed = s?.data || s || null;
-          } catch {}
+          } catch { }
         }
         if (!seed) return; // không có gì để hydrate
 
@@ -238,7 +254,7 @@ const ChargingProgress = () => {
           if (pId != null) {
             port = await fetchAuthJSON(`${API_ABS}/Ports/${encodeURIComponent(pId)}`, { method: "GET" });
           }
-        } catch {}
+        } catch { }
         try {
           const chId =
             port?.chargerId ?? port?.ChargerId ??
@@ -247,23 +263,19 @@ const ChargingProgress = () => {
           if (chId != null) {
             charger = await fetchAuthJSON(`${API_ABS}/Chargers/${encodeURIComponent(chId)}`, { method: "GET" });
           }
-        } catch {}
+        } catch { }
 
         const merged = {
           ...seed,
-          portStatus: (port?.status ?? port?.Status ?? null) ?? (seed?.portStatus ?? null),
-          chargerType: (charger?.type ?? charger?.Type ?? null) ?? (seed?.chargerType ?? null),
-          chargerPowerKw:
-            (Number(charger?.powerKw ?? charger?.PowerKW ?? charger?.power ?? charger?.Power) || null) ??
-            (seed?.chargerPowerKw ?? null),
-          chargerId:
-            (port?.chargerId ?? port?.ChargerId ?? null) ??
-            (seed?.chargerId ?? seed?.ChargerId ?? null),
+          // Không cố lấy 3 field null của BE
+          portStatus: seed?.portStatus ?? null,
+          chargerType: seed?.chargerType ?? null,
+          chargerPowerKw: seed?.chargerPowerKw ?? null,
         };
-
+        setSession(merged);
         sessionStorage.setItem("charging:start:data", JSON.stringify({ message: "Bắt đầu phiên sạc", data: merged }));
         showStartSessionToast(merged);
-        return; // ✅ Kết thúc nhánh có sẵn sessionId
+        return;
       }
       // Lấy dữ liệu để start
       const customerId =
@@ -303,7 +315,7 @@ const ChargingProgress = () => {
           if (raw.portId != null) {
             port = await fetchAuthJSON(`${API_ABS}/Ports/${encodeURIComponent(raw.portId)}`, { method: "GET" });
           }
-        } catch {}
+        } catch { }
         try {
           const chargerId =
             port?.chargerId ?? port?.ChargerId ??
@@ -311,25 +323,14 @@ const ChargingProgress = () => {
           if (chargerId != null) {
             charger = await fetchAuthJSON(`${API_ABS}/Chargers/${encodeURIComponent(chargerId)}`, { method: "GET" });
           }
-        } catch {}
+        } catch { }
 
         const merged = {
           ...raw,
-          // Ưu tiên giá trị từ API phụ, fallback về raw nếu đã có
-          portStatus:
-            (port?.status ?? port?.Status ?? null) ??
-            (raw?.portStatus ?? null),
-          chargerType:
-            (charger?.type ?? charger?.Type ?? null) ??
-            (raw?.chargerType ?? null),
-          chargerPowerKw:
-            (Number(charger?.powerKw ?? charger?.PowerKW ?? charger?.power ?? charger?.Power) || null) ??
-            (raw?.chargerPowerKw ?? null),
-          chargerId:
-            (port?.chargerId ?? port?.ChargerId ?? null) ??
-            (raw?.chargerId ?? raw?.ChargerId ?? null),
+          // Có thể bổ sung chargerId nếu cần
+          chargerId: (port?.chargerId ?? port?.ChargerId ?? null) ?? (raw?.chargerId ?? raw?.ChargerId ?? null),
         };
-
+        setSession(merged); // << BẮT BUỘC có
         sessionStorage.setItem("charging:start:data", JSON.stringify({ message: msg, data: merged }));
         showStartSessionToast(merged);
       } catch (e) {
@@ -360,7 +361,7 @@ const ChargingProgress = () => {
       try {
         const obj = JSON.parse(cached);
         if (obj?.data) showStartSessionToast(obj.data);
-      } catch {}
+      } catch { }
     }
   }, []);
 
@@ -383,6 +384,7 @@ const ChargingProgress = () => {
 
         const chNorm = normalizeCharger(chargerRaw || state.charger || {});
         const currentTR = nowTimeRange(new Date());
+        const chargerType = (chargerRaw?.type ?? chargerRaw?.Type ?? state?.charger?.type ?? state?.charger?.Type ?? "").toString();
 
         let rules = null;
         const tryEndpoints = [
@@ -398,7 +400,7 @@ const ChargingProgress = () => {
               rules = arr;
               break;
             }
-          } catch {}
+          } catch { }
         }
 
         let pricePerKwh = chNorm.pricePerKwh;
@@ -406,7 +408,13 @@ const ChargingProgress = () => {
         let graceSeconds = chNorm.idleGraceSeconds;
 
         if (rules && rules.length) {
-          const best = pickRule(rules, { powerKw: chNorm.powerKw, timeRange: currentTR });
+          // Lọc trước theo type & timeRange (==, không includes)
+          const typed = rules.filter(r => {
+            const rTR = (r.timeRange ?? r.TimeRange ?? "").toString();
+            const rType = (r.chargerType ?? r.ChargerType ?? "").toString();
+            return rTR === currentTR && (!chargerType || rType === chargerType);
+          });
+          const best = pickRule(typed.length ? typed : rules, { powerKw: chNorm.powerKw, timeRange: currentTR });
           if (best) {
             const rPrice = Number(best.pricePerKwh ?? best.pricePerKWh ?? best.PricePerKwh ?? best.PricePerKWh);
             const rPenalty = Number(best.idleFeePerMin ?? best.IdleFeePerMin);
@@ -491,11 +499,24 @@ const ChargingProgress = () => {
 
   useEffect(() => {
     if (!isCharging || battery >= 100) return;
+    const kwFromState = Number(state?.charger?.powerKw);
+    const kwFromSession = Number(session?.chargerPowerKw);
+    const powerKw = Number.isFinite(kwFromSession) && kwFromSession > 0
+      ? kwFromSession
+      : (Number.isFinite(kwFromState) && kwFromState > 0 ? kwFromState : 7); // fallback 7kW
+    const cap = Number.isFinite(batteryCapacity) && batteryCapacity > 0 ? batteryCapacity : 60;
+
+    const tickSec = 1_0; // 10s/tick
+    const deltaPctPerSec = (powerKw / 3600) / cap * 100;
+
     chargeInterval.current = setInterval(() => {
-      setBattery((prev) => (prev < 100 ? prev + 1 : 100));
-    }, 300);
+      setBattery((prev) => {
+        const next = prev + deltaPctPerSec;
+        return next >= 100 ? 100 : Number(next.toFixed(2));
+      });
+    }, tickSec);
     return () => clearInterval(chargeInterval.current);
-  }, [battery, isCharging]);
+  }, [isCharging, batteryCapacity, state?.charger?.powerKw, session?.chargerPowerKw]);
 
   useEffect(() => {
     if (battery < 100 || !isCharging) return;
@@ -504,6 +525,16 @@ const ChargingProgress = () => {
     }, 1000);
     return () => clearInterval(penaltyInterval.current);
   }, [battery, isCharging]);
+
+  // Tạm tính đến hiện tại (chỉ tăng khi % pin nhảy thêm 1%)
+  const roundedBattery = Math.floor(battery);
+  const roundedStartSoc = Math.floor(startSocRef.current);
+  const chargedPercentSoFar = Math.max(0, roundedBattery - roundedStartSoc); // chỉ dùng % nguyên
+  const energyKwhSoFar = Number(((chargedPercentSoFar / 100) * batteryCapacity).toFixed(2));
+  const livePricePerKwh = Number.isFinite(dynPricePerKWh) ? dynPricePerKWh : fallbackPricePerKWh;
+  const liveSubtotal = Math.round(energyKwhSoFar * livePricePerKwh); // chưa cộng idle
+  const liveTax = Math.round(liveSubtotal * 0.1); // BE 10%
+  const liveTotal = liveSubtotal + liveTax;
 
   const buildChargingPaymentPayload = () => {
     const endedAt = Date.now();
@@ -525,7 +556,7 @@ const ChargingProgress = () => {
       const decoded = tk ? decodeJwtPayload(tk) : null;
       customerId = decoded?.customerId ?? decoded?.nameid ?? decoded?.sub ?? null;
       if (typeof customerId === "string" && /^\d+$/.test(customerId)) customerId = Number(customerId);
-    } catch {}
+    } catch { }
 
     const payload = {
       orderId,
@@ -584,62 +615,27 @@ const ChargingProgress = () => {
   }
 
   const goToInvoicePage = async () => {
-    const draft = buildChargingPaymentPayload();
-
-    let beData = null;
-    try {
-      beData = await endSessionOnServer({
-        endSoc: battery,
-        chargingSessionId: state?.chargingSessionId ?? draft.chargingSessionId,
-      });
-    } catch {}
-
-    let finalPayload = { ...draft };
-    if (beData) {
-      finalPayload = {
-        ...finalPayload,
-        chargingSessionId: beData.chargingSessionId ?? finalPayload.chargingSessionId,
-        vehicleId: beData.vehicleId ?? finalPayload.vehicleId,
-        portId: beData.portId ?? finalPayload.portId,
-        startSoc: beData.startSoc ?? finalPayload.initialBattery,
-        finalBattery: beData.endSoc ?? finalPayload.finalBattery,
-        energyUsedKWh: beData.energyKwh ?? finalPayload.energyUsedKWh,
-        sessionSeconds: Number.isFinite(beData.durationMin) ? beData.durationMin * 60 : finalPayload.sessionSeconds,
-        idlePenalty: undefined,
-        subtotal: beData.subtotal,
-        tax: beData.tax,
-        totalPayable: beData.total ?? finalPayload.totalPayable,
-        endedAt: beData.endedAt,
-        billingMonth: beData.billingMonth,
-        billingYear: beData.billingYear,
-        status: beData.status ?? "Completed",
-        be: {
-          durationMin: beData.durationMin,
-          idleMin: beData.idleMin,
-        },
-      };
-
-      if (Number.isFinite(beData.idleMin)) {
-        const perMin = Number.isFinite(dynPenaltyPerMin) ? dynPenaltyPerMin : 10000;
-        const penaltyFromBE = beData.idleMin * perMin;
-        finalPayload.idlePenalty = penaltyFromBE;
-        if (!Number.isFinite(finalPayload.totalPayable)) {
-          finalPayload.totalPayable =
-            (beData.total ?? 0) || (beData.subtotal ?? 0) + (beData.tax ?? 0) + penaltyFromBE;
-        }
-      }
-    }
-
-    sessionStorage.setItem(`chargepay:${finalPayload.orderId}`, JSON.stringify(finalPayload));
-
-    navigate(`/invoice?order=${finalPayload.orderId}`, {
-      state: {
-        ...finalPayload,
-        invoiceStatus: "Unpaid",
-        isMonthlyInvoice: false,
-      },
-      replace: true,
+    const beData = await endSessionOnServer({
+      endSoc: Math.round(battery),
+      chargingSessionId: state?.chargingSessionId,
     });
+    if (!beData) {
+      message.error("Không kết thúc phiên sạc được. Vui lòng thử lại.");
+      return;
+    }
+    // Lưu số liệu từ BE + một ít info hiển thị
+    const orderId = `CHG${beData.chargingSessionId || Date.now()}`;
+    const finalPayload = {
+      orderId,
+      ...beData,
+      station: state.station,
+      charger: state.charger,
+      gun: state.gun,
+      invoiceStatus: "Unpaid",
+      isMonthlyInvoice: false,
+    };
+    sessionStorage.setItem(`chargepay:${orderId}`, JSON.stringify(finalPayload));
+    navigate(`/invoice?order=${orderId}`, { state: finalPayload, replace: true });
   };
 
   const handleStopCharging = async () => {
@@ -679,12 +675,12 @@ const ChargingProgress = () => {
 
             <div className="charging-status">
               <div className="status-box battery-box">
-                <div className="battery-ring" style={{ ["--pct"]: battery }} aria-label={`Mức pin hiện tại ${battery}%`}>
+                <div className="battery-ring" style={{ ["--pct"]: Math.round(battery) }} aria-label={`Mức pin hiện tại ${Math.round(battery)}%`}>
                   <ThunderboltOutlined className="battery-icon" />
                 </div>
                 <div className="battery-info">
                   <p>Phần trăm pin</p>
-                  <h3>{battery}%</h3>
+                  <h3>{Math.round(battery)}%</h3>
                 </div>
               </div>
 
@@ -726,16 +722,16 @@ const ChargingProgress = () => {
                 </div>
 
                 <div>
-                  <p>Tạm tính (ước tính tới khi đầy)</p>
-                  <h4>{estimatedCostToFull}</h4>
+                  <p>Tạm tính đến hiện tại</p>
+                  <h4>{vnd(liveTotal)}</h4>
                   <div className="sub">
-                    Cần khoảng {needKWhToFull.toFixed(2)} kWh • {fmtHM(estimatedTimeMinutes)}
+                    {energyKwhSoFar.toFixed(2)} kWh • Giá {livePricePerKwh.toLocaleString("vi-VN")} VND/kWh • Thuế 10%
                   </div>
                 </div>
 
                 <div>
                   <p>Phí phạt</p>
-                  {battery < 100 ? (
+                  {roundedBattery < 100 ? (
                     <h4>0 VND</h4>
                   ) : graceLeftSecs > 0 ? (
                     <div>
@@ -756,7 +752,7 @@ const ChargingProgress = () => {
             </div>
 
             <div className="charging-buttons">
-              {battery < 100 && isCharging ? (
+              {roundedBattery < 100 && isCharging ? (
                 <>
                   <button className="btn-stop" onClick={handleStopCharging}>
                     Dừng sạc

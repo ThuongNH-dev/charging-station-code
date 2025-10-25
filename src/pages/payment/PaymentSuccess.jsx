@@ -487,14 +487,20 @@ export default function PaymentSuccess() {
       });
 
       const d = res?.data || {};
-      // 5) Điều hướng sang Charging, truyền kèm thông tin BE trả về
+
+      // ✅ Truyền toàn bộ thông tin cần hiển thị, nhất là startSoc
       navigateToCharging({
         chargingSessionId: d.chargingSessionId,
         startedAt: d.startedAt,
-        vehicleId: d.vehicleId ?? vehicleId,
+        startSoc: d.startSoc,            // << thêm
+        status: d.status,                // << thêm (để hiển thị trạng thái)
         pricingRuleId: d.pricingRuleId ?? null,
-        portId, // để ChargingProgress dùng khi gọi pricing động
+        vehicleType: d.vehicleType,      // << thêm (nếu muốn hiển thị)
+        vehicleId: d.vehicleId ?? vehicleId,
+        customerId: d.customerId,        // << thêm (giữ nhất quán)
+        portId,                          // giữ lại để FE gọi pricing động nếu cần
       });
+
     } catch (e) {
       setIdError(e?.message || "Không bắt đầu phiên sạc được. Vui lòng thử lại.");
     }
