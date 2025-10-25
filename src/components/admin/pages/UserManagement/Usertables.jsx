@@ -68,9 +68,9 @@ const renderCell = (user, key, index, servicePackages, subscriptions) => {
     case "companyName":
       return (
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          {companyData.imageUrl && (
+          {user.avatarUrl && (
             <img
-              src={companyData.imageUrl}
+              src={user.avatarUrl}
               alt="logo"
               style={{
                 width: 32,
@@ -80,17 +80,15 @@ const renderCell = (user, key, index, servicePackages, subscriptions) => {
               }}
             />
           )}
-          <span>{companyData.companyName || user.userName || "—"}</span>
+          <span>{user.userName || "—"}</span>
         </div>
       );
     case "fullName":
       return customerInfo.fullName || "—";
     case "phone":
-      return customerInfo.phone || companyData.companyPhone || "—";
+      return customerInfo.phone || "—";
     case "email":
-      return (
-        customerInfo.email || companyData.companyEmail || user.userName || "—"
-      );
+      return user.userName || "—";
     case "taxCode":
       return companyData.taxCode || "—";
     case "scale":

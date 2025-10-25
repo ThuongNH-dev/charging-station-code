@@ -165,8 +165,20 @@ const BASE_URL = import.meta.env.DEV
 export const userApi = {
   // === USERS ===
   fetchAllUsers: async () => {
-    const res = await axios.get(`${BASE_URL}/Auth`);
-    return res.data;
+    try {
+      console.log("🔍 Fetching users from:", `${BASE_URL}/Auth`);
+      const res = await axios.get(`${BASE_URL}/Auth`);
+      console.log("✅ Users API response:", res.data);
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error fetching users:", error);
+      console.error("❌ Error details:", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      throw error;
+    }
   },
 
   updateUserStatus: async (id, data) => {
@@ -181,10 +193,17 @@ export const userApi = {
 
   // === VEHICLES ===
   fetchAllVehicles: async () => {
-    const res = await axios.get(`${BASE_URL}/Vehicles?page=1&pageSize=50`);
-    // ⚠️ BE trả về object { page, pageSize, totalItems, totalPages, items: [...] }
-    // => Ta chỉ cần lấy phần "items"
-    return res.data.items || [];
+    try {
+      console.log("🔍 Fetching vehicles from:", `${BASE_URL}/Vehicles`);
+      const res = await axios.get(`${BASE_URL}/Vehicles?page=1&pageSize=50`);
+      console.log("✅ Vehicles API response:", res.data);
+      // ⚠️ BE trả về object { page, pageSize, totalItems, totalPages, items: [...] }
+      // => Ta chỉ cần lấy phần "items"
+      return res.data.items || [];
+    } catch (error) {
+      console.error("❌ Error fetching vehicles:", error);
+      return [];
+    }
   },
 
   updateVehicle: async (id, data) => {
@@ -199,8 +218,15 @@ export const userApi = {
 
   // === SERVICE PACKAGES ===
   fetchAllServicePackages: async () => {
-    const res = await axios.get(`${BASE_URL}/SubscriptionPlans`);
-    return res.data;
+    try {
+      console.log("🔍 Fetching service packages from:", `${BASE_URL}/SubscriptionPlans`);
+      const res = await axios.get(`${BASE_URL}/SubscriptionPlans`);
+      console.log("✅ Service packages API response:", res.data);
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error fetching service packages:", error);
+      return [];
+    }
   },
 
   updateServicePackage: async (id, data) => {
@@ -215,7 +241,14 @@ export const userApi = {
 
   // === SUBSCRIPTIONS ===
   fetchAllSubscriptions: async () => {
-    const res = await axios.get(`${BASE_URL}/Subscriptions`);
-    return res.data;
+    try {
+      console.log("🔍 Fetching subscriptions from:", `${BASE_URL}/Subscriptions`);
+      const res = await axios.get(`${BASE_URL}/Subscriptions`);
+      console.log("✅ Subscriptions API response:", res.data);
+      return res.data;
+    } catch (error) {
+      console.error("❌ Error fetching subscriptions:", error);
+      return [];
+    }
   },
 };
