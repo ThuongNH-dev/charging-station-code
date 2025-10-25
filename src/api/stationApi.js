@@ -58,27 +58,29 @@ function normalizeStation(s = {}) {
   // 1. Lấy giá trị trạng thái thô
   let rawStatus = s.status ?? s.Status ?? "";
 
-  // 2. CHUẨN HÓA TRẠNG THÁI (STATUS)
-  let normalizedStatus = "Offline"; // Mặc định là Offline nếu không xác định
+  // 2. CHUẨN HÓA TRẠNG THÁI (STATUS) - Backend sử dụng "Open"/"Closed"
+  let normalizedStatus = "Closed"; // Mặc định là Closed nếu không xác định
 
-  // Kiểm tra các định dạng có thể có từ DB (số 1, chuỗi 'online', 'Online', 'ONL', 'Active')
+  // Kiểm tra các định dạng có thể có từ DB
   if (
     rawStatus === 1 ||
     String(rawStatus).toLowerCase() === "online" ||
     String(rawStatus).toLowerCase() === "onl" ||
     String(rawStatus).toLowerCase() === "active" ||
+    String(rawStatus).toLowerCase() === "open" ||
     String(rawStatus) === "Đang hoạt động" // Thêm các chuỗi tiếng Việt nếu cần
   ) {
-    normalizedStatus = "Active"; // Sửa từ "Online" thành "Active" để khớp với UI
+    normalizedStatus = "Open"; // Backend sử dụng "Open" thay vì "Active"
   }
-  // Nếu không phải Active, giữ nguyên 'Offline' (hoặc kiểm tra rõ ràng cho Offline)
+  // Nếu không phải Open, giữ nguyên 'Closed' (hoặc kiểm tra rõ ràng cho Closed)
   else if (
     rawStatus === 0 ||
     String(rawStatus).toLowerCase() === "offline" ||
     String(rawStatus).toLowerCase() === "off" ||
+    String(rawStatus).toLowerCase() === "closed" ||
     String(rawStatus) === "Nghỉ"
   ) {
-    normalizedStatus = "Offline";
+    normalizedStatus = "Closed";
   }
   // Ghi chú: Nếu giá trị Status là một chuỗi tùy chỉnh (ví dụ: 'Maintenance'), bạn có thể giữ nguyên.
 
@@ -138,20 +140,59 @@ export const stationApi = {
   // ✅ SỬA LOGIC TRONG updateStation
   async updateStation(stationId, stationData) {
     try {
-      const res = await fetchAuthJSON(resolveUrl(`/Stations/${stationId}`), {
-        method: "PUT", // Hoặc PATCH
-        body: JSON.stringify(stationData),
+      console.log("🔄 API: Đang gửi request cập nhật trạm:", {
+        url: `/Stations/${stationId}`,
+        method: "PUT",
+        data: stationData,
+        status: stationData.Status
       });
 
+      // Đảm bảo dữ liệu được gửi đúng format
+      const requestBody = JSON.stringify(stationData);
+      console.log("📤 Request Body:", requestBody);
+
+      // Thử endpoint chính trước
+      let res = await fetchAuthJSON(resolveUrl(`/Stations/${stationId}`), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: requestBody,
+      });
+
+      // Nếu endpoint chính không hoạt động, thử các endpoint khác
+      if (!res) {
+        console.warn("⚠️ Endpoint chính không hoạt động, thử endpoint khác...");
+        
+        // Thử endpoint với tên khác
+        try {
+          res = await fetchAuthJSON(resolveUrl(`/stations/${stationId}`), {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+            },
+            body: requestBody,
+          });
+          console.log("📥 API Response (endpoint thay thế):", res);
+        } catch (altErr) {
+          console.warn("⚠️ Endpoint thay thế cũng không hoạt động:", altErr);
+        }
+      }
+
+      console.log("📥 API Response:", res);
+      console.log("📥 Response Status:", res?.status || "No status");
+      console.log("📥 Response Data:", res);
+
+      // ✅ SỬA LỖI: Backend trả về HTTP 204 No Content (thành công nhưng không có body)
+      // Đây là hành vi bình thường của REST API khi cập nhật thành công
       let updatedData = res;
 
-      // KIỂM TRA QUAN TRỌNG:
-      // Nếu API không trả về đối tượng nào (res là null/undefined),
-      // chúng ta giả định cập nhật thành công và sử dụng dữ liệu đã gửi (stationData)
-      if (!res) {
-        console.warn(
-          `Cập nhật Trạm ID ${stationId} thành công (Backend trả về rỗng). Sử dụng dữ liệu đầu vào.`
-        );
+      // Nếu API trả về null/undefined (HTTP 204), coi như thành công
+      if (res === null || res === undefined) {
+        console.log("✅ Backend trả về HTTP 204 No Content - cập nhật thành công");
+        console.log("✅ Sử dụng dữ liệu đã gửi để cập nhật UI");
         // Sử dụng dữ liệu đã gửi, kết hợp với StationId
         updatedData = { ...stationData, StationId: stationId };
       }

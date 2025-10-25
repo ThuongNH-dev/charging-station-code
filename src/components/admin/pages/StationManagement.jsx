@@ -34,7 +34,7 @@ const newStationInitialState = {
   City: "",
   Latitude: "",
   Longitude: "",
-  Status: "Active",
+  Status: "Open",
 };
 
 const newChargerInitialState = {
@@ -144,10 +144,7 @@ function StationPage() {
           City: s.city ?? s.City,
           Latitude: s.latitude ?? s.Latitude,
           Longitude: s.longitude ?? s.Longitude,
-          Status:
-            (s.status ?? s.Status) === "Open"
-              ? "Active"
-              : s.status ?? s.Status ?? "Offline",
+          Status: s.status ?? s.Status ?? "Closed",
           ImageUrl: s.imageUrl ?? s.ImageUrl,
           chargers: stationChargers,
         };
@@ -170,7 +167,7 @@ function StationPage() {
   // Logic lọc: Gộp cả trạng thái và tên
   const filteredStations = stations.filter((station) => {
     // 1. Lọc theo trạng thái
-    const statusToCheck = station.Status === "Active" ? "Active" : "Offline"; // Chuẩn hóa giá trị
+    const statusToCheck = station.Status === "Open" ? "Open" : "Closed"; // Chuẩn hóa giá trị
     const isStatusMatch =
       statusFilter === "All" || statusToCheck === statusFilter;
 
@@ -515,18 +512,86 @@ function StationPage() {
   // 🛠️ Cập nhật trạm
   const handleSaveEditStation = async () => {
     try {
+      // Chuẩn bị dữ liệu gửi đi - đảm bảo format đúng
+      const updateData = {
+        StationId: editingStation.StationId,
+        StationName: editingStation.StationName,
+        Address: editingStation.Address,
+        City: editingStation.City,
+        Latitude: Number(editingStation.Latitude) || 0,
+        Longitude: Number(editingStation.Longitude) || 0,
+        Status: editingStation.Status, // Đảm bảo Status được gửi đúng
+        ImageUrl: editingStation.ImageUrl || ""
+      };
+
+      // Validation dữ liệu trước khi gửi
+      if (!updateData.StationId) {
+        alert("Lỗi: Không tìm thấy ID trạm");
+        return;
+      }
+
+      if (!updateData.StationName?.trim()) {
+        alert("Lỗi: Tên trạm không được để trống");
+        return;
+      }
+
+      if (!updateData.Address?.trim()) {
+        alert("Lỗi: Địa chỉ không được để trống");
+        return;
+      }
+
+      if (!updateData.Status) {
+        alert("Lỗi: Trạng thái không được để trống");
+        return;
+      }
+
+      console.log("🔄 Đang cập nhật trạm:", {
+        stationId: editingStation.StationId,
+        originalData: editingStation,
+        preparedData: updateData,
+        status: updateData.Status
+      });
+
       const updatedStation = await stationApi.updateStation(
         editingStation.StationId,
-        editingStation
+        updateData
       );
+
+      console.log("✅ Cập nhật thành công:", updatedStation);
+      console.log("🔍 Kiểm tra dữ liệu:", {
+        original: editingStation,
+        response: updatedStation,
+        status: updatedStation.Status
+      });
+      
+      // 🔍 Debug: Kiểm tra dữ liệu trước khi cập nhật state
+      console.log("🔍 Dữ liệu từ API:", {
+        StationId: updatedStation.StationId,
+        StationName: updatedStation.StationName,
+        Status: updatedStation.Status,
+        Address: updatedStation.Address
+      });
+
       setActiveModal(null);
+      
       // ✅ SỬA LỖI: Cập nhật state trực tiếp
-      setStations((prev) =>
-        prev.map((s) =>
+      setStations((prev) => {
+        console.log("🔍 Trước khi cập nhật state:", prev.find(s => s.StationId === updatedStation.StationId));
+        const updated = prev.map((s) =>
           s.StationId === updatedStation.StationId ? updatedStation : s
-        )
-      );
+        );
+        console.log("🔍 Sau khi cập nhật state:", updated.find(s => s.StationId === updatedStation.StationId));
+        return updated;
+      });
+
+      alert("Cập nhật trạm thành công!");
+      
+      // ✅ Đơn giản hóa: Không cần kiểm tra lại từ server
+      // Vì backend đã cập nhật thành công (HTTP 204), UI đã được cập nhật
+      console.log("✅ Cập nhật trạm hoàn tất");
+      
     } catch (err) {
+      console.error("❌ Lỗi cập nhật trạm:", err);
       alert("Cập nhật trạm thất bại: " + err.message);
     }
   };
@@ -952,8 +1017,8 @@ function StationPage() {
           style={{ maxWidth: "150px" }}
         >
           <option value="All">Tất cả trạng thái</option>
-          <option value="Active">Online</option>
-          <option value="Offline">Offline</option>
+          <option value="Open">Open</option>
+          <option value="Closed">Closed</option>
         </select>
         {/* INPUT TÌM KIẾM THEO TÊN */}
         <input
@@ -1004,12 +1069,12 @@ function StationPage() {
                 <div style={{ display: "flex", alignItems: "center" }}>
                   <span
                     className={`status-badge ${
-                      // So sánh với "Active" (chữ hoa) vì đã được chuẩn hóa
-                      station.Status === "Active" ? "active" : "offline"
+                      // So sánh với "Open" (chữ hoa) vì đã được chuẩn hóa
+                      station.Status === "Open" ? "active" : "offline"
                     }`}
                   >
-                    {/* So sánh với "Active" (chữ hoa) vì đã được chuẩn hóa */}
-                    {station.Status === "Active" ? "Online" : "Offline"}
+                    {/* So sánh với "Open" (chữ hoa) vì đã được chuẩn hóa */}
+                    {station.Status === "Open" ? "Open" : "Closed"}
                   </span>
 
                   <button
@@ -1274,8 +1339,8 @@ function StationPage() {
                   value={newStation.Status}
                   onChange={handleNewStationInputChange}
                 >
-                  <option value="Active">Đang hoạt động</option>
-                  <option value="Offline">Offline</option>
+                  <option value="Open">Open</option>
+                  <option value="Closed">Closed</option>
                 </select>
                 <div className="modal-actions">
                   <button onClick={() => setActiveModal(null)}>Hủy</button>
@@ -1329,8 +1394,8 @@ function StationPage() {
                   value={editingStation.Status}
                   onChange={handleEditStationInputChange}
                 >
-                  <option value="Active">Đang hoạt động</option>
-                  <option value="Offline">Offline</option>
+                  <option value="Open">Open</option>
+                  <option value="Closed">Closed</option>
                 </select>
                 <div className="modal-actions">
                   <button onClick={() => setActiveModal(null)}>Hủy</button>
