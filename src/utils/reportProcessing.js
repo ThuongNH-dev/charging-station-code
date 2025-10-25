@@ -1,43 +1,50 @@
-// src/utils/reportProcessing.js - PHIÊN BẢN HOÀN CHỈNH (SỬA LỖI NGUỒN DỮ LIỆU)
+// ✅ src/utils/reportProcessing.js
+// PHIÊN BẢN HOÀN CHỈNH + DEBUG TOÀN DIỆN + FIX ISSUE REVENUE BY PLAN + HEATMAP HOURLY
 
 import moment from "moment";
-// import 'moment/locale/vi';
 
-// Hàm hỗ trợ định dạng tiền tệ
-const formatCurrency = (value) => {
-  if (typeof value !== "number" || isNaN(value)) return "0 đ";
+const DEBUG_MODE = true; // Bật/tắt debug toàn bộ
+
+/* =========================================================
+ * 🔹 1. HÀM HỖ TRỢ ĐỊNH DẠNG TIỀN TỆ
+ * ========================================================= */
+export const formatCurrency = (value) => {
+  const num = parseFloat(value);
+  if (isNaN(num)) return "0 ₫";
   return new Intl.NumberFormat("vi-VN", {
     style: "currency",
     currency: "VND",
     minimumFractionDigits: 0,
-  }).format(value);
+  }).format(num);
 };
 
-// =========================================================
-// 1. Tính toán KPI Tổng quan
-// =========================================================
+/* =========================================================
+ * 🔹 2. TÍNH TOÁN KPI TỔNG QUAN
+ * ========================================================= */
 export const calculateKpiOverview = (rawData) => {
-  const invoicesData =
-    rawData.invoicesData && Array.isArray(rawData.invoicesData.data)
-      ? rawData.invoicesData.data
-      : [];
+  const invoicesData = Array.isArray(rawData.invoicesData)
+    ? rawData.invoicesData
+    : Array.isArray(rawData.invoicesData?.data)
+    ? rawData.invoicesData.data
+    : [];
 
-  const totalRevenue = invoicesData.reduce(
-    (sum, invoice) => sum + (invoice.total || 0),
-    0
-  );
+  if (DEBUG_MODE) console.log("DEBUG KPI — invoicesData:", invoicesData);
 
+  let totalRevenue = 0;
   let totalEnergy = 0;
   let totalDurationMin = 0;
-  let completedSessionsCount = 0;
+  let completedSessions = 0;
 
   invoicesData.forEach((invoice) => {
-    if (invoice.chargingSessions && Array.isArray(invoice.chargingSessions)) {
+    const rev = invoice.total ?? invoice.totalAmount ?? 0;
+    totalRevenue += rev;
+
+    if (Array.isArray(invoice.chargingSessions)) {
       invoice.chargingSessions.forEach((session) => {
         if (session.status === "Completed") {
-          totalEnergy += session.energyKwh || 0;
-          totalDurationMin += session.durationMin || 0;
-          completedSessionsCount++;
+          totalEnergy += session.energyKwh ?? session.energyConsumed ?? 0;
+          totalDurationMin += session.durationMin ?? 0;
+          completedSessions++;
         }
       });
     }
@@ -47,26 +54,34 @@ export const calculateKpiOverview = (rawData) => {
   const prevEnergy = totalEnergy * 0.95;
 
   const revenuePercent =
-    totalRevenue > 0
+    prevRevenue > 0
       ? (((totalRevenue - prevRevenue) / prevRevenue) * 100).toFixed(1)
       : 0;
   const energyPercent =
-    totalEnergy > 0
+    prevEnergy > 0
       ? (((totalEnergy - prevEnergy) / prevEnergy) * 100).toFixed(1)
       : 0;
 
   const avgRevenuePerSession =
-    completedSessionsCount > 0
-      ? formatCurrency(totalRevenue / completedSessionsCount)
-      : "0 đ";
+    completedSessions > 0
+      ? formatCurrency(totalRevenue / completedSessions)
+      : "0 ₫";
 
-  const avgDurationSeconds =
-    completedSessionsCount > 0
-      ? Math.round((totalDurationMin * 60) / completedSessionsCount)
+  const avgDurationSec =
+    completedSessions > 0
+      ? Math.round((totalDurationMin * 60) / completedSessions)
       : 0;
-  const avgDurationPerSession = `${Math.floor(avgDurationSeconds / 60)}m ${
-    avgDurationSeconds % 60
+  const avgDurationPerSession = `${Math.floor(avgDurationSec / 60)}m ${
+    avgDurationSec % 60
   }s`;
+
+  if (DEBUG_MODE)
+    console.log(
+      "DEBUG KPI — totalRevenue, totalEnergy, completedSessions:",
+      totalRevenue,
+      totalEnergy,
+      completedSessions
+    );
 
   return {
     totalRevenue: formatCurrency(totalRevenue),
@@ -78,279 +93,350 @@ export const calculateKpiOverview = (rawData) => {
   };
 };
 
-// =========================================================
-// 2. Xử lý Cơ cấu Dịch vụ
-// =========================================================
+/* =========================================================
+ * 🔹 3. CƠ CẤU DỊCH VỤ (Pie + Bar Chart) - FIXED
+ * ========================================================= */
 export const processServiceStructure = (rawData) => {
-  const safePlansData = Array.isArray(rawData.plansData)
+  const plansData = Array.isArray(rawData.subscriptionPlansData)
+    ? rawData.subscriptionPlansData
+    : Array.isArray(rawData.plansData)
     ? rawData.plansData
     : [];
-  const safeInvoicesData =
-    rawData.invoicesData && Array.isArray(rawData.invoicesData.data)
-      ? rawData.invoicesData.data
-      : [];
 
-  // 1. Lập bản đồ Plan ID -> Plan Name
-  const planMap = safePlansData.reduce((map, plan) => {
-    map[plan.subscriptionPlanId] = plan.planName;
-    return map;
-  }, {});
+  const invoicesData = Array.isArray(rawData.invoicesData)
+    ? rawData.invoicesData
+    : Array.isArray(rawData.invoicesData?.data)
+    ? rawData.invoicesData.data
+    : [];
 
-  // 2. Tính tổng doanh thu theo Plan
-  const revenueByPlan = {};
-  safeInvoicesData.forEach((invoice) => {
-    if (invoice.chargingSessions && Array.isArray(invoice.chargingSessions)) {
-      invoice.chargingSessions.forEach((session) => {
-        const planId = session.pricingRuleId || "N/A";
-        const planName =
-          planMap[planId] ||
-          (planId === "N/A" ? "Vãng lai/Không gói" : `Gói ID: ${planId}`);
-        revenueByPlan[planName] =
-          (revenueByPlan[planName] || 0) + (session.total || 0);
-      });
-    }
-  });
-
-  // 3. Chuẩn bị dữ liệu Pie Chart
-  const pieChartData = Object.entries(revenueByPlan)
-    .sort(([, a], [, b]) => b - a)
-    .map(([name, value], index) => ({
-      name,
-      value,
-    }));
-
-  // 4. Dữ liệu Stacked Bar Chart
-  const topPlans = pieChartData.slice(0, 2);
-  const monthlyRevenue = [];
-  const currentDate = moment();
-
-  for (let i = 2; i >= 0; i--) {
-    const monthMoment = currentDate.clone().subtract(i, "months");
-    const monthLabel = monthMoment.format("MMM YYYY");
-    const monthData = { month: monthLabel, total: 0 };
-    let monthTotal = 0;
-    const multiplier = i === 2 ? 0.3 : i === 1 ? 0.6 : 1.0;
-
-    topPlans.forEach((plan) => {
-      const planValue = Math.round(plan.value * multiplier * 0.95);
-      monthData[plan.name] = planValue;
-      monthTotal += planValue;
-    });
-
-    monthData.total = monthTotal;
-    monthlyRevenue.push(monthData);
+  if (DEBUG_MODE) {
+    console.log("DEBUG Service — plansData:", plansData);
+    console.log("DEBUG Service — invoicesData:", invoicesData);
   }
 
-  const formattedMonthlyRevenue = monthlyRevenue.map((item) => {
-    const formattedItem = { month: item.month, total: item.total };
-    topPlans.forEach((plan) => {
-      formattedItem[plan.name] = item[plan.name];
-    });
-    return formattedItem;
+  const planNameMap = plansData.reduce((map, p) => {
+    const id = p.subscriptionPlanId ?? p.PlanId ?? p.id ?? "N/A";
+    map[id] = p.planName ?? `Gói #${id}`;
+    return map;
+  }, {});
+  planNameMap["N/A"] = "Trả trước";
+
+  const officialNames = [
+    "Tieu chuan",
+    "Cao cap",
+    "Bac",
+    "Doanh nghiep",
+    "Vang",
+    "Kim cuong",
+  ];
+  const revenueByPlanName = {};
+  officialNames.forEach((name) => (revenueByPlanName[name] = 0));
+  revenueByPlanName["Trả trước"] = 0;
+
+  invoicesData.forEach((invoice) => {
+    const totalRevenue = invoice.total ?? invoice.totalAmount ?? 0;
+    let planName = "Trả trước";
+
+    if (
+      Array.isArray(invoice.chargingSessions) &&
+      invoice.chargingSessions.length
+    ) {
+      const session = invoice.chargingSessions[0];
+      const planId =
+        session.subscriptionPlanId ?? session.pricingRuleId ?? "N/A";
+      planName = planNameMap[planId] ?? "Trả trước";
+    }
+
+    if (!officialNames.includes(planName) && planName !== "Trả trước") {
+      planName = "Khác";
+      if (!revenueByPlanName[planName]) revenueByPlanName[planName] = 0;
+    }
+
+    revenueByPlanName[planName] += totalRevenue;
   });
 
-  return {
-    pieChartData: pieChartData.map((item, index) => ({
-      name: item.name,
-      value: item.value,
-      color:
-        index === 0
-          ? "var(--primary-color)"
-          : index === 1
-          ? "var(--info-color)"
-          : "var(--success-color)",
-    })),
-    monthlyRevenue: formattedMonthlyRevenue,
-  };
+  if (DEBUG_MODE)
+    console.log("DEBUG Service — revenueByPlanName:", revenueByPlanName);
+
+  const pieChartData = [];
+  let otherTotal = 0;
+  Object.entries(revenueByPlanName).forEach(([name, value]) => {
+    if (officialNames.includes(name) || name === "Trả trước") {
+      pieChartData.push({ name, value });
+    } else {
+      otherTotal += value;
+    }
+  });
+  if (otherTotal > 0) pieChartData.push({ name: "Khác", value: otherTotal });
+
+  const BAR_CHART_PLAN_NAMES = [...officialNames, "Trả trước"];
+  const currentDate = moment();
+  const months = [];
+  for (let i = 2; i >= 0; i--) {
+    const m = currentDate.clone().subtract(i, "months").format("MM/YYYY");
+    const multiplier = i === 2 ? 0.4 : i === 1 ? 0.7 : 1;
+
+    const monthData = { month: m, total: 0 };
+    BAR_CHART_PLAN_NAMES.forEach((planName) => {
+      const val = Math.round((revenueByPlanName[planName] ?? 0) * multiplier);
+      monthData[planName] = val;
+      monthData.total += val;
+    });
+    months.push(monthData);
+  }
+
+  if (DEBUG_MODE) console.log("DEBUG Service — monthlyRevenue:", months);
+
+  return { pieData: pieChartData, monthlyRevenue: months };
 };
 
-// =========================================================
-// 3. Xử lý So sánh Khu vực & Chi tiết Trạm
-// =========================================================
+/* =========================================================
+ * 🔹 4. SO SÁNH KHU VỰC & CHI TIẾT TRẠM
+ * ========================================================= */
 export const processRegionalComparison = (rawData) => {
   const stationsData = Array.isArray(rawData.stationsData)
     ? rawData.stationsData
+    : rawData.stationsData?.items || [];
+  const invoicesData = Array.isArray(rawData.invoicesData)
+    ? rawData.invoicesData
+    : Array.isArray(rawData.invoicesData?.data)
+    ? rawData.invoicesData.data
     : [];
-  const invoicesData =
-    rawData.invoicesData && Array.isArray(rawData.invoicesData.data)
-      ? rawData.invoicesData.data
-      : [];
 
-  const regionalSummary = {
-    "Miền Bắc": {
-      totalSessions: 0,
-      totalEnergy: 0,
-      usagePercent: 0,
-      totalValue: "0 đ",
-    },
-    "Miền Trung": {
-      totalSessions: 0,
-      totalEnergy: 0,
-      usagePercent: 0,
-      totalValue: "0 đ",
-    },
-    "Miền Nam": {
-      totalSessions: 0,
-      totalEnergy: 0,
-      usagePercent: 0,
-      totalValue: "0 đ",
-    },
+  if (DEBUG_MODE) {
+    console.log("DEBUG Regional — stationsData:", stationsData);
+    console.log("DEBUG Regional — invoicesData:", invoicesData);
+  }
+
+  const areaMap = {
+    "Miền Bắc": "mienBac",
+    "Miền Trung": "mienTrung",
+    "Miền Nam": "mienNam",
   };
 
+  const regionalSummary = {};
+
+  ["Miền Bắc", "Miền Trung", "Miền Nam"].forEach((region) => {
+    const stationsInRegion = stationsData.filter((s) => s.region === region);
+
+    const totalRevenue = stationsInRegion.reduce(
+      (sum, s) => sum + (s.revenue || 0),
+      0
+    );
+    const totalSessions = stationsInRegion.reduce(
+      (sum, s) => sum + (s.sessions || 0),
+      0
+    );
+    const avgUsage = stationsInRegion.length
+      ? stationsInRegion.reduce((sum, s) => sum + (s.usage || 0), 0) /
+        stationsInRegion.length
+      : 0;
+
+    const mappedKey = areaMap[region] || region;
+    regionalSummary[mappedKey] = {
+      revenue: totalRevenue,
+      sessions: totalSessions,
+      avgUsage,
+    };
+  });
+
   const stationStats = {};
-  stationsData.forEach((station) => {
-    stationStats[station.stationId] = {
+  stationsData.forEach((st) => {
+    stationStats[st.stationId] = {
+      stationName: st.stationName ?? "Không xác định",
+      city: st.city ?? "Miền Nam",
       totalSessions: 0,
       totalEnergy: 0,
       totalRevenue: 0,
-      region: station.city || "Miền Nam",
-      stationName: station.stationName || "Không xác định",
     };
   });
 
   invoicesData.forEach((invoice) => {
-    if (invoice.chargingSessions && Array.isArray(invoice.chargingSessions)) {
-      invoice.chargingSessions.forEach((session) => {
-        let stationId = 0;
-        if (session.portId === 1 || session.portId === 16) stationId = 1;
-        else if (session.portId === 9) stationId = 2;
-        else if (session.portId >= 3 && session.portId <= 6) stationId = 3;
-
+    if (Array.isArray(invoice.chargingSessions)) {
+      invoice.chargingSessions.forEach((s) => {
+        const stationId = s.stationId ?? s.StationId;
         if (stationStats[stationId]) {
           stationStats[stationId].totalSessions += 1;
-          stationStats[stationId].totalEnergy += session.energyKwh || 0;
-          stationStats[stationId].totalRevenue += session.total || 0;
+          stationStats[stationId].totalEnergy +=
+            s.energyKwh ?? s.energyConsumed ?? 0;
+          stationStats[stationId].totalRevenue += s.total ?? s.totalAmount ?? 0;
         }
       });
     }
   });
 
   const detailedStationTable = [];
-  Object.values(stationStats).forEach((stats) => {
+  Object.values(stationStats).forEach((s) => {
     const region =
-      stats.region.includes("Hà Nội") || stats.region.includes("Hải Phòng")
+      s.city.includes("Hà Nội") || s.city.includes("Hải Phòng")
         ? "Miền Bắc"
-        : stats.region.includes("Đà Nẵng") ||
-          stats.region.includes("Huế") ||
-          stats.region.includes("Nha Trang") ||
-          stats.region.includes("Quy Nhơn")
+        : s.city.includes("Đà Nẵng") ||
+          s.city.includes("Huế") ||
+          s.city.includes("Nha Trang")
         ? "Miền Trung"
         : "Miền Nam";
 
-    const usageRate = Math.min(
-      100,
-      (stats.totalSessions / 30) * 100 * 0.9
-    ).toFixed(1);
+    const usage = Math.min(100, (s.totalSessions / 30) * 100).toFixed(1);
 
-    if (regionalSummary[region]) {
-      regionalSummary[region].totalSessions += stats.totalSessions;
-      regionalSummary[region].totalEnergy += stats.totalEnergy;
-      const currentTotal =
-        parseFloat(regionalSummary[region].totalValue.replace(/[^0-9]/g, "")) ||
-        0;
-      regionalSummary[region].totalValue = formatCurrency(
-        currentTotal + stats.totalRevenue
-      );
-    }
+    const mappedKey = areaMap[region] || region;
+
+    regionalSummary[mappedKey].totalSessions += s.totalSessions;
+    regionalSummary[mappedKey].totalEnergy += s.totalEnergy;
+    regionalSummary[mappedKey].totalValue += s.totalRevenue;
 
     detailedStationTable.push({
-      stationName: stats.stationName,
-      totalEnergy: stats.totalEnergy.toFixed(2),
-      totalSessions: stats.totalSessions,
-      usage: `${usageRate}%`,
-      status: stats.totalSessions > 10 ? "Hoạt động tốt" : "Bình thường",
+      stationName: s.stationName,
       region,
+      totalSessions: s.totalSessions,
+      totalEnergy: `${s.totalEnergy.toFixed(2)} kWh`,
+      usage: `${usage}%`,
+      status: s.totalSessions > 10 ? "Hoạt động tốt" : "Bình thường",
     });
   });
 
-  Object.keys(regionalSummary).forEach((region) => {
-    const totalUsage = detailedStationTable
-      .filter((s) => s.region === region)
-      .reduce((sum, s) => sum + parseFloat(s.usage.replace("%", "")), 0);
+  Object.keys(regionalSummary).forEach((r) => {
     const count = detailedStationTable.filter(
-      (s) => s.region === region
+      (s) => areaMap[s.region] === r // map region sang key
     ).length;
-    regionalSummary[region].usagePercent =
-      count > 0 ? (totalUsage / count).toFixed(1) : 0;
+    regionalSummary[r].usagePercent = count
+      ? (
+          detailedStationTable
+            .filter((s) => areaMap[s.region] === r)
+            .reduce((sum, s) => sum + parseFloat(s.usage), 0) / count
+        ).toFixed(1)
+      : 0;
+    regionalSummary[r].totalValue = formatCurrency(
+      regionalSummary[r].totalValue
+    );
   });
+
+  if (DEBUG_MODE) {
+    console.log("DEBUG Regional — regionalSummary:", regionalSummary);
+    console.log("DEBUG Regional — detailedStationTable:", detailedStationTable);
+  }
 
   return { regionalSummary, detailedStationTable };
 };
 
-// =========================================================
-// 4. Xử lý Biểu đồ Thời gian
-// =========================================================
+/* =========================================================
+ * 🔹 5. BIỂU ĐỒ THỜI GIAN 7 NGÀY
+ * ========================================================= */
 export const processTimeChartData = (rawData) => {
-  const invoicesData =
-    rawData.invoicesData && Array.isArray(rawData.invoicesData.data)
-      ? rawData.invoicesData.data
-      : [];
-  const today = moment();
-  const dailyData = {};
+  const invoicesData = Array.isArray(rawData.invoicesData)
+    ? rawData.invoicesData
+    : Array.isArray(rawData.invoicesData?.data)
+    ? rawData.invoicesData.data
+    : [];
 
+  const today = moment();
+  const days = {};
   for (let i = 6; i >= 0; i--) {
-    const date = today.clone().subtract(i, "days");
-    const dateString = date.format("YYYY-MM-DD");
-    const dayName =
-      date.isoWeekday() === 7 ? "Chủ nhật" : `Thứ ${date.isoWeekday() + 1}`;
-    dailyData[dateString] = { day: dayName, sessions: 0, revenue: 0 };
+    const d = today.clone().subtract(i, "days");
+    const key = d.format("YYYY-MM-DD");
+    const dayName = d.isoWeekday() === 7 ? "CN" : `Th${d.isoWeekday() + 1}`;
+    days[key] = { day: dayName, sessions: 0, revenue: 0 };
   }
 
   invoicesData.forEach((invoice) => {
-    const invoiceDate = moment(invoice.createdAt).format("YYYY-MM-DD");
-    if (dailyData[invoiceDate]) {
-      dailyData[invoiceDate].revenue += invoice.total || 0;
-    }
+    const invDate = moment(invoice.createdAt).format("YYYY-MM-DD");
+    if (days[invDate])
+      days[invDate].revenue += invoice.total ?? invoice.totalAmount ?? 0;
 
-    if (invoice.chargingSessions && Array.isArray(invoice.chargingSessions)) {
-      invoice.chargingSessions.forEach((session) => {
-        const sessionDate = moment(session.endedAt).format("YYYY-MM-DD");
-        if (dailyData[sessionDate]) {
-          dailyData[sessionDate].sessions += 1;
-        }
+    if (Array.isArray(invoice.chargingSessions)) {
+      invoice.chargingSessions.forEach((s) => {
+        const sesDate = moment(s.endedAt ?? s.startTime).format("YYYY-MM-DD");
+        if (days[sesDate]) days[sesDate].sessions++;
       });
     }
   });
 
-  const dailySessions = Object.values(dailyData).map((item) => ({
-    day: item.day,
-    sessions: item.sessions,
+  const dailySessions = Object.values(days).map((d) => ({
+    day: d.day,
+    sessions: d.sessions,
+  }));
+  const dailyRevenue = Object.values(days).map((d) => ({
+    day: d.day,
+    revenue: parseFloat((d.revenue / 1000).toFixed(2)),
   }));
 
-  const dailyRevenue = Object.values(dailyData).map((item) => ({
-    day: item.day,
-    revenue: Math.round(item.revenue / 1000),
-  }));
+  if (DEBUG_MODE)
+    console.log(
+      "DEBUG TimeChart — dailySessions:",
+      dailySessions,
+      "dailyRevenue:",
+      dailyRevenue
+    );
 
   return { dailySessions, dailyRevenue };
 };
 
-// =========================================================
-// 5. Xử lý Cảnh báo
-// =========================================================
+/* =========================================================
+ * 🔹 6. BIỂU ĐỒ THEO GIỜ (HEATMAP)
+ * ========================================================= */
+export const processTimeChartHourly = (rawData) => {
+  const invoicesData = Array.isArray(rawData.invoicesData)
+    ? rawData.invoicesData
+    : Array.isArray(rawData.invoicesData?.data)
+    ? rawData.invoicesData.data
+    : [];
+
+  const hourlyData = {};
+  const today = moment();
+  for (let i = 6; i >= 0; i--) {
+    const d = today.clone().subtract(i, "days").format("YYYY-MM-DD");
+    for (let h = 0; h < 24; h++) {
+      const key = `${d}-${h}`;
+      hourlyData[key] = 0;
+    }
+  }
+
+  invoicesData.forEach((inv) => {
+    if (!Array.isArray(inv.chargingSessions)) return;
+
+    inv.chargingSessions.forEach((s) => {
+      const endTime = moment(s.endedAt ?? s.startTime);
+      if (!endTime.isValid()) return;
+
+      const dateKey = endTime.format("YYYY-MM-DD");
+      const hour = endTime.hour();
+      const key = `${dateKey}-${hour}`;
+
+      if (hourlyData[key] !== undefined) {
+        const addValue = s.energyKwh ?? s.energyConsumed ?? 1;
+        hourlyData[key] += addValue;
+      }
+    });
+  });
+
+  const result = Object.entries(hourlyData).map(([key, value]) => {
+    const [date, hour] = key.split("-");
+    return { date, hour: parseInt(hour), value };
+  });
+
+  if (DEBUG_MODE) console.log("DEBUG Hourly Heatmap:", result);
+
+  return result;
+};
+
+/* =========================================================
+ * 🔹 7. CẢNH BÁO HIỆU SUẤT
+ * ========================================================= */
 export const processWarnings = (rawData) => {
   const { detailedStationTable } = processRegionalComparison(rawData);
 
-  const warnings = [];
-  detailedStationTable.forEach((station) => {
-    const usagePercent = parseFloat(station.usage.replace("%", ""));
+  const warnings = detailedStationTable
+    .filter((s) => {
+      const usage = parseFloat(s.usage);
+      return usage > 90 || usage < 20;
+    })
+    .map((s) => ({
+      name: s.stationName,
+      usage: s.usage,
+      status: parseFloat(s.usage) > 90 ? "Quá tải" : "Ít sử dụng",
+      color: parseFloat(s.usage) > 90 ? "danger" : "warning",
+    }));
 
-    if (usagePercent > 90) {
-      warnings.push({
-        name: station.stationName,
-        usage: station.usage,
-        status: "Quá tải",
-        color: "danger",
-      });
-    } else if (usagePercent < 20) {
-      warnings.push({
-        name: station.stationName,
-        usage: station.usage,
-        status: "Ít sử dụng",
-        color: "warning",
-      });
-    }
-  });
+  if (DEBUG_MODE) console.log("DEBUG Warnings:", warnings);
 
   return warnings;
 };
