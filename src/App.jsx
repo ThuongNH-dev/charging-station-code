@@ -82,14 +82,6 @@ export default function App() {
           </GuestRoute>
         }
       />
-      <Route
-        path="/services"
-        element={
-          <GuestRoute>
-            <ServicePlans />
-          </GuestRoute>
-        }
-      />
       <Route path="/unauthorized" element={<Unauthorized />} /> {/* ✅ */}
       {/* PROTECTED (Customer) */}
       <Route
@@ -196,6 +188,14 @@ export default function App() {
         element={
           <ProtectedRoute allowedRoles={["Customer"]}>
             <InvoiceDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/services"
+        element={
+          <ProtectedRoute allowedRoles={["Customer"]}>
+            <ServicePlans />
           </ProtectedRoute>
         }
       />

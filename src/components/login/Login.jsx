@@ -85,7 +85,7 @@ export default function Login() {
             const t = await res.text();
             if (t) msg = `${msg}: ${t}`;
           }
-        } catch {}
+        } catch { }
         if (res.status === 404)
           msg += " — Kiểm tra lại API_BASE và route /Auth/login.";
         setError(msg);
@@ -111,6 +111,34 @@ export default function Login() {
       // ✅ Lưu token ngay
       storeToken(token);
 
+      // 🔹 LẤY accountId từ claim "nameidentifier"
+      const claims = decodeJwtPayload(token);
+      const accountId =
+        Number(
+          claims?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"]
+        ) || null;
+
+      // 🔹 GỌI BE lấy customerId theo accountId (KHÔNG dùng /me)
+      let customerId = null;
+      try {
+        const apiAbs = (getApiBase() || "").replace(/\/+$/, "") || "https://localhost:7268/api";
+        const resp = await fetch(`${apiAbs}/Customers/by-account/${accountId}`, {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+            authorization: `Bearer ${token}`,
+          },
+        });
+        if (resp.ok) {
+          const j = await resp.json();
+          customerId = j?.customerId ?? null;
+        } else {
+          console.warn("by-account fetch non-200:", resp.status);
+        }
+      } catch (err) {
+        console.warn("by-account fetch error:", err);
+      }
+
       const role = getRoleFromToken(token);
       const msg = data?.message ?? data ?? {};
       const user = {
@@ -120,7 +148,10 @@ export default function Login() {
         email: msg?.email || msg?.user?.email || null,
         role,
         token,
+        accountId,   
+        customerId,  
       };
+
 
       // ✅ Lưu user vào context + localStorage
       login(user, rememberMe);

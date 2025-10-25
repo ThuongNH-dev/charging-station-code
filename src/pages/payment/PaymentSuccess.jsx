@@ -5,6 +5,7 @@ import { CheckCircleFilled, ArrowLeftOutlined } from "@ant-design/icons";
 import MainLayout from "../../layouts/MainLayout";
 import "./style/PaymentSuccess.css";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
+import { getCustomerIdStrict, getAccountIdStrict } from  "../../api/authHelpers";
 
 const API_BASE = getApiBase();
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
@@ -119,6 +120,7 @@ function normalizeBooking(b = {}) {
     startTime: b.startTime,
     endTime: b.endTime,
     status: b.status,
+    customerId: b.customerId ?? b.CustomerId ?? null,
   };
 }
 
@@ -260,15 +262,15 @@ function joinUrl(base, path) {
   return (left + right).replace(/([^:]\/)\/+/g, "$1");
 }
 
-async function startChargingSession({ customerId, vehicleId, bookingId, portId }) {
-  const cid = Number(customerId);
+async function startChargingSession({ accountId, vehicleId, bookingId, portId }) {
+  const aid = Number(accountId);
   const bid = Number(bookingId);
   const pid = Number(portId);
   const vidN = Number(vehicleId);
 
   // Body PHẲNG đúng như BE mẫu của bạn
   const body = {
-    customerId: cid,
+    customerId: aid, 
     bookingId: bid,
     portId: pid,
     ...(Number.isFinite(vidN) ? { vehicleId: vidN } : {}),
@@ -330,7 +332,8 @@ export default function PaymentSuccess() {
         }
 
         // 2) Không có bookingId => rơi về logic cũ: lấy theo customer, chọn đơn phù hợp
-        const customerId = await getCurrentCustomerIdLikePaymentPage();
+        // Ưu tiên customerId của chính booking để đảm bảo trùng
+        const customerId = data?.customerId ?? (await getCustomerIdStrict());
         if (!customerId) throw new Error("Không xác định được khách hàng.");
 
         const res = await fetchAuthJSON(
@@ -466,9 +469,9 @@ export default function PaymentSuccess() {
     setIdError("");
 
     try {
-      // 1) Lấy customerId theo helper sẵn có
-      const customerId = await getCurrentCustomerIdLikePaymentPage();
-      if (!customerId) throw new Error("Không xác định được khách hàng.");
+      // 1) Lấy accountId (BE dùng nhầm tên field customerId)
+      const accountId = await getAccountIdStrict();
+      if (!accountId) throw new Error("Không xác định được accountId.");
 
       // 2) Xác định portId: ưu tiên người dùng nhập, fallback từ booking
       const portId =
@@ -480,7 +483,7 @@ export default function PaymentSuccess() {
 
       // 4) Gọi BE bắt đầu phiên sạc
       const res = await startChargingSession({
-        customerId,
+        accountId,
         vehicleId,
         bookingId: data.bookingId,
         portId,

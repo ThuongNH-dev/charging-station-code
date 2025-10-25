@@ -8,7 +8,6 @@ import "./style/PaymentPage.css";
 
 import { getApiBase, fetchAuthJSON } from "../../utils/api";
 
-//bắt lỗi xong xoá
 
 // ===== DEBUG LOGGER =====
 const DEBUG_PAY = true;
