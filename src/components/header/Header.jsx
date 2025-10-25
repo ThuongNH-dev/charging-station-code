@@ -5,7 +5,6 @@ import { useAuth } from "../../context/AuthContext";
 import AccountMenu from "../others/Menu";
 import { FileSearchOutlined } from "@ant-design/icons";
 import "./Header.css";
-
 const { Header } = Layout;
 
 export default function Head() {

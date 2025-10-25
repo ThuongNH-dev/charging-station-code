@@ -16,8 +16,6 @@ import Login from "./components/login/Login";
 import Homepage from "./pages/homepage/homepage";
 import ServicePlans from "./components/subscription/ServicePlans";
 import Unauthorized from "./pages/Unauthorized"; // ✅ thêm trang này (mục 2)
-// import ChargerManager from "./pages/staff/ChargerManager";
-// import SessionManager from "./pages/staff/SessionManager";
 import BookingHistory from "./pages/booking/BookingHisory"; // ✅ thêm trang lịch sử đặt chỗ
 import InvoicePage from "./components/charging/Invoice";
 import StaffLayout from "./layouts/StaffLayout";
@@ -28,6 +26,7 @@ import Reports from "./components/admin/pages/Reports";
 import RegisterSelect from "./pages/Register/RegisterSelect";
 import PersonalRegister from "./pages/Register/PersonalRegister";
 import BusinessRegister from "./pages/Register/BusinessRegister";
+import NotFound from "./pages/NotFound";
 
 // Chuyển role thành path tương ứng
 
@@ -59,8 +58,11 @@ function GuestRoute({ children }) {
   return <Navigate to={target} replace />;
 }
 
+
 export default function App() {
   return (
+
+    
     <Routes>
       <Route path="/" element={<Navigate to="/homepage" replace />} />
       {/* PUBLIC */}
@@ -120,14 +122,14 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route
+      {/* <Route
         path="/payment/success"
         element={
           <ProtectedRoute allowedRoles={["Customer"]}>
             <PaymentSuccess />
           </ProtectedRoute>
         }
-      />
+      /> */}
       <Route
         path="/payment/failure"
         element={
@@ -152,6 +154,16 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      <Route
+        path="/payment/success"
+        element={
+          <ProtectedRoute allowedRoles={["Customer"]}>
+            <PaymentSuccess />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/charging"
         element={
@@ -160,6 +172,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      
       <Route
         path="/user/history"
         element={
@@ -185,34 +198,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      {/* Admin
-      <Route path="/admin/*" element={
-        <ProtectedRoute allowedRoles={["Admin"]}>
-          <AdminLayout/>
-        </ProtectedRoute>
-      } >
-        <Route index element={<StationManagement />} />
-        <Route path="stations" element={<StationManagement />} />
-
-        <Route path="/admin/users" element={<UserManagement />} />
-        </Route>  */}
-      {/* <Route path="/admin" element={
-        <ProtectedRoute allowedRoles={["Admin"]}>
-          <AdminLayout/>
-        </ProtectedRoute>
-      } />
-
-      <Route path="/admin/stations" element={
-        <ProtectedRoute allowedRoles={["Admin"]}>
-          <StationManagement/>
-        </ProtectedRoute>
-      } />
-
-      <Route path="/admin/users" element={
-        <ProtectedRoute allowedRoles={["Admin"]}>
-          <UserManagement/>
-        </ProtectedRoute>
-      } /> */}
+      {/* Admin */}
       <Route
         path="admin"
         element={
@@ -228,8 +214,11 @@ export default function App() {
         <Route path="reports" element={<Reports />} />
       </Route>
       {/* FALLBACK */}
-      <Route path="*" element={<Navigate to="/homepage" replace />} />{" "}
+      <Route path="*" element={<NotFound/>} />
       {/* ✅ */}
+
     </Routes>
+
+
   );
 }

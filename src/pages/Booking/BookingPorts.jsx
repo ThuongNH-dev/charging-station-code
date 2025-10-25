@@ -167,6 +167,38 @@ function fmtUtcZ(dt) {
   return z.toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
+// ====== BOOKING CONFLICT DETECTION ======
+function normalizeBooking(b = {}) {
+  return {
+    id: b.id ?? b.bookingId ?? b.BookingId,
+    portId: b.portId ?? b.PortId,
+    startTime: b.startTime ?? b.StartTime ?? b.start ?? b.Start,
+    endTime: b.endTime ?? b.EndTime ?? b.end ?? b.End,
+    status: b.status ?? b.Status ?? "Unknown",
+    customerId: b.customerId ?? b.CustomerId,
+  };
+}
+
+function checkTimeConflict(newStart, newEnd, existingBookings) {
+  const newStartMs = newStart.getTime();
+  const newEndMs = newEnd.getTime();
+  
+  for (const booking of existingBookings) {
+    const existingStart = new Date(booking.startTime);
+    const existingEnd = new Date(booking.endTime);
+    
+    // Kiểm tra overlap: (newStart < existingEnd) && (newEnd > existingStart)
+    if (newStartMs < existingEnd.getTime() && newEndMs > existingStart.getTime()) {
+      return {
+        conflict: true,
+        conflictingBooking: booking,
+        message: `Khung giờ này đã được đặt từ ${existingStart.toLocaleString("vi-VN")} đến ${existingEnd.toLocaleString("vi-VN")}`
+      };
+    }
+  }
+  
+  return { conflict: false };
+}
 
 export default function BookingPorts() {
   // === User/Vehicle ===
@@ -187,6 +219,12 @@ export default function BookingPorts() {
   const [portsError, setPortsError] = useState("");
 
   const [selectedGun, setSelectedGun] = useState(null);
+
+  // ====== EXISTING BOOKINGS & CONFLICT DETECTION ======
+  const [existingBookings, setExistingBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [bookingConflict, setBookingConflict] = useState(null);
+
 
   // ====== THỜI GIAN (cập nhật từng phút) ======
   const [now, setNow] = useState(new Date());
@@ -359,6 +397,65 @@ export default function BookingPorts() {
     setSelectedGun(firstAvail);
   }, [ports, selectedGun]);
 
+
+  // ====== FETCH EXISTING BOOKINGS FOR SELECTED PORT ======
+  useEffect(() => {
+    if (!selectedGun?.id) {
+      setExistingBookings([]);
+      setBookingConflict(null);
+      return;
+    }
+
+    let alive = true;
+    (async () => {
+      try {
+        setBookingsLoading(true);
+        setBookingConflict(null);
+
+        // Fetch bookings cho port này
+        const today = new Date();
+        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
+        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+
+        const url = `/Booking?portId=${selectedGun.id}&startTime=${startOfDay.toISOString()}&endTime=${endOfDay.toISOString()}`;
+        const data = await fetchAuthJSON(url, { method: "GET" });
+        
+        if (!alive) return;
+
+        const bookings = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+        const normalizedBookings = bookings
+          .filter(b => b.status !== "Cancelled" && b.status !== "Completed")
+          .map(normalizeBooking);
+        
+        setExistingBookings(normalizedBookings);
+      } catch (e) {
+        if (!alive) return;
+        console.warn("Không thể tải danh sách booking:", e.message);
+        setExistingBookings([]);
+      } finally {
+        if (alive) setBookingsLoading(false);
+      }
+    })();
+
+    return () => { alive = false; };
+  }, [selectedGun?.id]);
+
+  // ====== CHECK CONFLICT WHEN TIME CHANGES ======
+  useEffect(() => {
+    if (!selectedGun || !existingBookings.length) {
+      setBookingConflict(null);
+      return;
+    }
+
+    const today = new Date();
+    const startLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), startHour, startMinute, 0, 0);
+    const endLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), endHour, endMinute, 0, 0);
+
+    const conflict = checkTimeConflict(startLocal, endLocal, existingBookings);
+    setBookingConflict(conflict.conflict ? conflict : null);
+  }, [selectedGun, startHour, startMinute, endHour, endMinute, existingBookings]);
+
+
   // ====== BOOK (để BE tính phí; FE không gửi amount)
   const handleBook = async () => {
     const MIN_GAP_MINUTES = 60;
@@ -366,6 +463,12 @@ export default function BookingPorts() {
 
     if (!me?.customerId) { alert("Chưa đăng nhập hoặc không lấy được customerId."); return; }
     if (!myVehicleId) { alert("Tài khoản chưa có xe. Hãy thêm xe trước khi đặt."); return; }
+
+    // Kiểm tra conflict trước khi đặt
+    if (bookingConflict) {
+      alert(`Không thể đặt chỗ: ${bookingConflict.message}`);
+      return;
+    }
 
     const today = new Date();
     const startLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), startHour, startMinute, 0, 0);
@@ -485,7 +588,10 @@ export default function BookingPorts() {
           orderId,
           bookingId,
           booking: created,
-          vnpayUrl: payRes.paymentUrl,
+          // vnpayUrl: payRes.paymentUrl,
+          vnpayUrl: (typeof payRes.paymentUrl === "string"
+            ? payRes.paymentUrl
+            : payRes.paymentUrl?.result || ""),
           startTime: fmtLocal(startLocal),
           endTime: fmtLocal(endLocal),
           station: { id, name: station?.name, address: station?.address },
@@ -792,7 +898,6 @@ export default function BookingPorts() {
 
               {/* Phương tiện + Ghi chú giá */}
               <div className="bp-section">
-                <div className="bp-label">Phương tiện</div>
                 <div className="bp-vehicle-box">
                   {myVehicleType ? (
                     <>
@@ -821,12 +926,50 @@ export default function BookingPorts() {
                 <RowKV k="Chi phí" v={<i>Sẽ tính và hiển thị ở bước thanh toán</i>} />
               </div>
 
+              {/* Conflict Warning */}
+              {bookingConflict && (
+                <div className="bp-conflict-warning" style={{ 
+                  marginTop: 12, 
+                  padding: 12, 
+                  backgroundColor: "#fee", 
+                  border: "1px solid #fcc", 
+                  borderRadius: 6,
+                  color: "#c33"
+                }}>
+                  <strong>⚠️ Khung giờ đã được đặt:</strong><br />
+                  {bookingConflict.message}
+                </div>
+              )}
+
+              {/* Available Slots Display */}
+              {existingBookings.length > 0 && (
+                <div className="bp-available-slots" style={{ marginTop: 12 }}>
+                  <div className="bp-label">Khung giờ đã được đặt hôm nay:</div>
+                  <div style={{ fontSize: "0.9em", color: "#666" }}>
+                    {existingBookings.map((booking, idx) => (
+                      <div key={idx} style={{ margin: "4px 0" }}>
+                        • {new Date(booking.startTime).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })} - 
+                        {new Date(booking.endTime).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}
+                        <span style={{ color: "#999", marginLeft: 8 }}>
+                          ({booking.status})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+
               <button
                 className="bp-btn-primary"
-                disabled={!canBookToday || totalMinutes < MIN_GAP_MINUTES || !selectedGun}
+                disabled={!canBookToday || totalMinutes < MIN_GAP_MINUTES || !selectedGun || bookingConflict}
                 onClick={handleBook}
+                style={{
+                  backgroundColor: bookingConflict ? "#ccc" : undefined,
+                  cursor: bookingConflict ? "not-allowed" : undefined
+                }}
               >
-                Đặt ngay
+                {bookingConflict ? "Khung giờ đã được đặt" : "Đặt ngay"}
               </button>
 
               {totalMinutes < MIN_GAP_MINUTES && (

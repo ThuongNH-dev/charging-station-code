@@ -190,8 +190,8 @@
 }
 
 .price {
-  font-size: 15px !important;
-  font-weight: 700;
+  font-size: 14px !important;
+  font-weight: 500 !important;
   color: var(--bp-primary);
 }
 

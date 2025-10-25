@@ -19,6 +19,11 @@ export default function StationList() {
   const [q, setQ] = useState("");
   const [city, setCity] = useState("");
 
+  // 🔢 Pagination
+  const PAGE_SIZE = 6; // <= 6 trạm / trang
+  const [page, setPage] = useState(1);
+  const [pendingScrollId, setPendingScrollId] = useState(null);
+
   const itemRefs = useRef({});
 
   useEffect(() => {
@@ -44,7 +49,7 @@ export default function StationList() {
   // ✅ Lọc theo keyword + city
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
-    return stations.filter((st) => {
+    const result = stations.filter((st) => {
       const stCity = st.city || st.addressCity || "";
       const hitCity = !city || stCity === city;
       const hitKW =
@@ -53,15 +58,105 @@ export default function StationList() {
         (st.address || "").toLowerCase().includes(kw);
       return hitCity && hitKW;
     });
+
+    // Reset về trang 1 nếu filter thay đổi mà trang hiện tại vượt quá tổng trang
+    return result;
   }, [stations, q, city]);
 
+  // 👉 Tổng trang & data cho trang hiện tại
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const current = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
+
+  // Nếu filter làm tổng trang < page hiện tại thì kéo về trang cuối
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [totalPages, page]);
+
+  // Marker -> nhảy tới đúng trang rồi highlight item
   const handleMarkerClick = (id) => {
-    const el = itemRefs.current[id];
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-      el.classList.add("highlight-card");
-      setTimeout(() => el.classList.remove("highlight-card"), 900);
-    }
+    const idxInFiltered = filtered.findIndex((s) => (s.id ?? s.name) === id || s.id === id);
+    if (idxInFiltered === -1) return;
+
+    const targetPage = Math.floor(idxInFiltered / PAGE_SIZE) + 1;
+    setPage(targetPage);
+    setPendingScrollId(id);
+  };
+
+  // Sau khi page đổi và list render, scroll & highlight
+  useEffect(() => {
+    if (!pendingScrollId) return;
+    // chờ DOM cập nhật refs
+    const t = setTimeout(() => {
+      const el = itemRefs.current[pendingScrollId];
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        el.classList.add("highlight-card");
+        setTimeout(() => el.classList.remove("highlight-card"), 900);
+      }
+      setPendingScrollId(null);
+    }, 50);
+    return () => clearTimeout(t);
+  }, [pendingScrollId, page, current]);
+
+  // Breadcrumb-style pagination (1 … 3 4 5 … n)
+  const renderPagination = () => {
+    if (totalPages <= 1) return null;
+
+    const pages = [];
+    const push = (p, label = p) => {
+      pages.push(
+        <button
+          key={label}
+          className={`bp-breadcrumb ${p === page ? "active" : ""}`}
+          aria-current={p === page ? "page" : undefined}
+          onClick={() => setPage(p)}
+        >
+          {label}
+        </button>
+      );
+    };
+
+    const showPage = (p) => p >= 1 && p <= totalPages;
+
+    // First
+    push(1);
+
+    // Left ellipsis
+    if (page > 3) pages.push(<span key="l-ellipsis" className="bp-ellipsis">…</span>);
+
+    // Middle neighbors
+    [page - 1, page, page + 1].forEach((p) => {
+      if (p !== 1 && p !== totalPages && showPage(p)) push(p);
+    });
+
+    // Right ellipsis
+    if (page < totalPages - 2) pages.push(<span key="r-ellipsis" className="bp-ellipsis">…</span>);
+
+    // Last
+    if (totalPages > 1) push(totalPages);
+
+    return (
+      <nav className="bp-breadcrumbs" aria-label="Phân trang">
+        <button
+          className="bp-breadcrumb nav"
+          disabled={page === 1}
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+        >
+          ← Trước
+        </button>
+        {pages}
+        <button
+          className="bp-breadcrumb nav"
+          disabled={page === totalPages}
+          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+        >
+          Sau →
+        </button>
+      </nav>
+    );
   };
 
   return (
@@ -72,8 +167,8 @@ export default function StationList() {
         <div className="bp-panel">
           <StationFilters
             context="list"
-            q={q} onQChange={setQ}
-            city={city} onCityChange={setCity}
+            q={q} onQChange={(v)=>{ setQ(v); setPage(1); }}
+            city={city} onCityChange={(v)=>{ setCity(v); setPage(1); }}
             cityOptions={cityOptions}
             visible={{
               search: true,
@@ -94,15 +189,17 @@ export default function StationList() {
           filtered.length === 0 ? (
             <p className="bp-subtle">Không có trạm phù hợp với điều kiện</p>
           ) : (
-            <div className="bp-left-col mapListLayout">
+            <>
               <div className="bp-panel stations-map-panel">
                 <div className="stations-map-canvas">
+                  {/* Map vẫn nhận toàn bộ filtered để hiển thị đủ marker */}
                   <StationMap stations={filtered} onMarkerClick={handleMarkerClick} />
                 </div>
               </div>
 
-              <div className="stationListGrid">
-                {filtered.map((st) => (
+              {/* Grid 3 cột, 6 item tối đa / trang */}
+              <div className="stationListGrid three-cols">
+                {current.map((st) => (
                   <div
                     key={st.id ?? `${st.name}-${st.city}`}
                     ref={(el) => { if (el && st.id != null) itemRefs.current[st.id] = el; }}
@@ -117,7 +214,10 @@ export default function StationList() {
                   </div>
                 ))}
               </div>
-            </div>
+
+              {/* Breadcrumb-style pagination */}
+              {renderPagination()}
+            </>
           )
         )}
       </div>

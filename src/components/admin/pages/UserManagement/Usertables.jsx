@@ -2,7 +2,7 @@ import React from "react";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 
 /* =========================================================
-   🔹 TIÊU ĐỀ BẢNG
+   🔹 HÀM TIÊU ĐỀ BẢNG
    ========================================================= */
 const getTableTitle = (userType) => {
   switch (userType) {
@@ -16,7 +16,7 @@ const getTableTitle = (userType) => {
 };
 
 /* =========================================================
-   🔹 CỘT BẢNG
+   🔹 HÀM XÁC ĐỊNH CỘT BẢNG THEO LOẠI USER
    ========================================================= */
 const getColumns = (userType) => {
   const cols = [
@@ -25,20 +25,20 @@ const getColumns = (userType) => {
   ];
 
   if (userType === "individual") {
+    // === CỘT CỦA NGƯỜI DÙNG CÁ NHÂN ===
     cols.push({ key: "fullName", header: "Tên" });
     cols.push({ key: "phone", header: "SĐT" });
     cols.push({ key: "email", header: "Email" });
     cols.push({ key: "accountType", header: "Loại tài khoản" });
     cols.push({ key: "planName", header: "Gói dịch vụ" });
   } else if (userType === "company") {
+    // === CỘT CỦA DOANH NGHIỆP ===
     cols.push({ key: "companyName", header: "Công ty" });
-    cols.push({ key: "fullName", header: "Người đại diện" });
-    cols.push({ key: "phone", header: "SĐT đại diện" });
+    // ❌ Đã bỏ Người đại diện, SĐT đại diện và Quy mô
     cols.push({ key: "email", header: "Email" });
     cols.push({ key: "taxCode", header: "Mã số thuế" });
-    cols.push({ key: "scale", header: "Quy mô" });
     cols.push({ key: "address", header: "Địa chỉ" });
-    cols.push({ key: "paymentStatus", header: "Thanh toán" });
+    cols.push({ key: "paymentStatus", header: "Trạng thái thanh toán" });
   }
 
   cols.push({ key: "role", header: "Vai trò" });
@@ -49,9 +49,9 @@ const getColumns = (userType) => {
 };
 
 /* =========================================================
-   🔹 HIỂN THỊ DỮ LIỆU CELL
+   🔹 HÀM RENDER GIÁ TRỊ Ô (CELL)
    ========================================================= */
-const renderCell = (user, key, index, servicePackages) => {
+const renderCell = (user, key, index, servicePackages, subscriptions) => {
   const customerInfo =
     user.customers && user.customers.length > 0 ? user.customers[0] : {};
   const companyData = user.company || {};
@@ -62,7 +62,7 @@ const renderCell = (user, key, index, servicePackages) => {
     case "accountId":
       return user.accountId;
 
-    // === Doanh nghiệp ===
+    // ======== DOANH NGHIỆP ========
     case "companyName":
       return (
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -81,44 +81,42 @@ const renderCell = (user, key, index, servicePackages) => {
           <span>{companyData.companyName || user.userName || "—"}</span>
         </div>
       );
-    case "fullName":
-      return customerInfo.fullName || "—";
-    case "phone":
-      return customerInfo.phone || companyData.companyPhone || "—";
     case "email":
       return (
         customerInfo.email || companyData.companyEmail || user.userName || "—"
       );
     case "taxCode":
       return companyData.taxCode || "—";
-    case "scale":
-      return companyData.scale || "—";
     case "address":
       return companyData.address || "—";
     case "paymentStatus":
       return companyData.paymentStatus || "—";
 
-    // === Cá nhân ===
+    // ======== CÁ NHÂN ========
+    case "fullName":
+      return customerInfo.fullName || "—";
+    case "phone":
+      return customerInfo.phone || "—";
     case "planName": {
       try {
-        if (!Array.isArray(servicePackages) || servicePackages.length === 0)
+        if (!Array.isArray(servicePackages) || servicePackages.length === 0) {
           return "—";
+        }
 
-        const planId =
-          user.subscriptionPlanId ||
-          customerInfo.subscriptionPlanId ||
-          user.planId ||
-          null;
+        const customerId = customerInfo.customerId;
+        if (!customerId) return "Chưa đăng ký";
 
-        if (!planId) return "—";
-
-        const plan = servicePackages.find(
-          (p) =>
-            Number(p.subscriptionPlanId || p.SubscriptionPlanId) ===
-            Number(planId)
+        const userSubscription = subscriptions.find(
+          (sub) =>
+            Number(sub.customerId) === Number(customerId) &&
+            sub.status === "Active"
         );
 
-        return plan?.planName || plan?.PlanName || "—";
+        if (userSubscription) {
+          return userSubscription.planName || "—";
+        }
+
+        return "Chưa đăng ký";
       } catch (error) {
         console.error("❌ Lỗi khi render planName:", error);
         return "—";
@@ -128,7 +126,7 @@ const renderCell = (user, key, index, servicePackages) => {
     case "accountType":
       return "Cá nhân";
 
-    // === Chung ===
+    // ======== CHUNG ========
     case "role":
       return user.role || "User";
     case "status":
@@ -140,29 +138,32 @@ const renderCell = (user, key, index, servicePackages) => {
 };
 
 /* =========================================================
-   🔹 COMPONENT CHÍNH
+   🔹 COMPONENT CHÍNH: UserTables
    ========================================================= */
 export const UserTables = ({
   filteredData = [],
   userType = "individual",
   setActiveModal,
   servicePackages = [],
+  subscriptions = [],
 }) => {
   const columns = getColumns(userType);
 
-  if (filteredData.length === 0)
+  if (filteredData.length === 0) {
     return (
       <div className="user-table-section">
         <h3>Thông tin {getTableTitle(userType)} (0 mục)</h3>
-        <p>Không có dữ liệu phù hợp.</p>
+        <p>Không tìm thấy dữ liệu người dùng nào phù hợp với bộ lọc.</p>
       </div>
     );
+  }
 
   return (
     <div className="user-table-section">
       <h3>
         Thông tin {getTableTitle(userType)} ({filteredData.length} mục)
       </h3>
+
       <table>
         <thead>
           <tr>
@@ -171,6 +172,7 @@ export const UserTables = ({
             ))}
           </tr>
         </thead>
+
         <tbody>
           {filteredData.map((user, index) => (
             <tr key={user.accountId}>
@@ -214,7 +216,13 @@ export const UserTables = ({
 
                 return (
                   <td key={col.key}>
-                    {renderCell(user, col.key, index, servicePackages)}
+                    {renderCell(
+                      user,
+                      col.key,
+                      index,
+                      servicePackages,
+                      subscriptions
+                    )}
                   </td>
                 );
               })}
