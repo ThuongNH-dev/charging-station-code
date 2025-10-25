@@ -30,15 +30,13 @@ const getColumns = (userType) => {
     cols.push({ key: "phone", header: "SĐT" });
     cols.push({ key: "email", header: "Email" });
     cols.push({ key: "accountType", header: "Loại tài khoản" });
-    cols.push({ key: "planName", header: "Gói dịch vụ" }); // ✅ lấy từ BE
+    cols.push({ key: "planName", header: "Gói dịch vụ" });
   } else if (userType === "company") {
     // === CỘT CỦA DOANH NGHIỆP ===
     cols.push({ key: "companyName", header: "Công ty" });
-    cols.push({ key: "fullName", header: "Người đại diện" });
-    cols.push({ key: "phone", header: "SĐT đại diện" });
+    // ❌ Đã bỏ Người đại diện, SĐT đại diện và Quy mô
     cols.push({ key: "email", header: "Email" });
     cols.push({ key: "taxCode", header: "Mã số thuế" });
-    cols.push({ key: "scale", header: "Quy mô" });
     cols.push({ key: "address", header: "Địa chỉ" });
     cols.push({ key: "paymentStatus", header: "Trạng thái thanh toán" });
   }
@@ -83,49 +81,41 @@ const renderCell = (user, key, index, servicePackages, subscriptions) => {
           <span>{companyData.companyName || user.userName || "—"}</span>
         </div>
       );
-    case "fullName":
-      return customerInfo.fullName || "—";
-    case "phone":
-      return customerInfo.phone || companyData.companyPhone || "—";
     case "email":
       return (
         customerInfo.email || companyData.companyEmail || user.userName || "—"
       );
     case "taxCode":
       return companyData.taxCode || "—";
-    case "scale":
-      return companyData.scale || "—";
     case "address":
       return companyData.address || "—";
     case "paymentStatus":
       return companyData.paymentStatus || "—";
 
     // ======== CÁ NHÂN ========
+    case "fullName":
+      return customerInfo.fullName || "—";
+    case "phone":
+      return customerInfo.phone || "—";
     case "planName": {
       try {
         if (!Array.isArray(servicePackages) || servicePackages.length === 0) {
           return "—";
         }
 
-        // Tìm subscription của user dựa trên customerId
         const customerId = customerInfo.customerId;
-        if (!customerId) {
-          return "Chưa đăng ký";
-        }
+        if (!customerId) return "Chưa đăng ký";
 
-        // Tìm subscription active của customer
         const userSubscription = subscriptions.find(
-          (sub) => 
-            Number(sub.customerId) === Number(customerId) && 
+          (sub) =>
+            Number(sub.customerId) === Number(customerId) &&
             sub.status === "Active"
         );
 
         if (userSubscription) {
-          // Nếu có subscription active, hiển thị tên gói từ subscription
           return userSubscription.planName || "—";
         }
 
-        // Nếu không có subscription active, hiển thị "Chưa đăng ký"
         return "Chưa đăng ký";
       } catch (error) {
         console.error("❌ Lỗi khi render planName:", error);
@@ -226,7 +216,13 @@ export const UserTables = ({
 
                 return (
                   <td key={col.key}>
-                    {renderCell(user, col.key, index, servicePackages, subscriptions)}
+                    {renderCell(
+                      user,
+                      col.key,
+                      index,
+                      servicePackages,
+                      subscriptions
+                    )}
                   </td>
                 );
               })}
