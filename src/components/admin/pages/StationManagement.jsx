@@ -1004,12 +1004,12 @@ function StationPage() {
                 <div style={{ display: "flex", alignItems: "center" }}>
                   <span
                     className={`status-badge ${
-                      // Chuyển status thành chữ thường để so sánh
-                      station.Status?.toLowerCase() === "active" ? "active" : "offline"
+                      // So sánh với "Active" (chữ hoa) vì đã được chuẩn hóa
+                      station.Status === "Active" ? "active" : "offline"
                     }`}
                   >
-                    {/* Chuyển status thành chữ thường để so sánh */}
-                    {station.Status?.toLowerCase() === "active" ? "Online" : "Offline"}
+                    {/* So sánh với "Active" (chữ hoa) vì đã được chuẩn hóa */}
+                    {station.Status === "Active" ? "Online" : "Offline"}
                   </span>
 
                   <button

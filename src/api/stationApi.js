@@ -61,16 +61,17 @@ function normalizeStation(s = {}) {
   // 2. CHUẨN HÓA TRẠNG THÁI (STATUS)
   let normalizedStatus = "Offline"; // Mặc định là Offline nếu không xác định
 
-  // Kiểm tra các định dạng có thể có từ DB (số 1, chuỗi 'online', 'Online', 'ONL')
+  // Kiểm tra các định dạng có thể có từ DB (số 1, chuỗi 'online', 'Online', 'ONL', 'Active')
   if (
     rawStatus === 1 ||
     String(rawStatus).toLowerCase() === "online" ||
     String(rawStatus).toLowerCase() === "onl" ||
+    String(rawStatus).toLowerCase() === "active" ||
     String(rawStatus) === "Đang hoạt động" // Thêm các chuỗi tiếng Việt nếu cần
   ) {
-    normalizedStatus = "Online";
+    normalizedStatus = "Active"; // Sửa từ "Online" thành "Active" để khớp với UI
   }
-  // Nếu không phải Online, giữ nguyên 'Offline' (hoặc kiểm tra rõ ràng cho Offline)
+  // Nếu không phải Active, giữ nguyên 'Offline' (hoặc kiểm tra rõ ràng cho Offline)
   else if (
     rawStatus === 0 ||
     String(rawStatus).toLowerCase() === "offline" ||
