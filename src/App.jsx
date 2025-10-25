@@ -26,7 +26,8 @@ import Reports from "./components/admin/pages/Reports";
 import RegisterSelect from "./pages/Register/RegisterSelect";
 import PersonalRegister from "./pages/Register/PersonalRegister";
 import BusinessRegister from "./pages/Register/BusinessRegister";
-import InvoiceCharging from "./pages/payment/InvoiceCharging";
+import InvoiceSummary from "./pages/payment/InvoiceSummary";
+import InvoiceDetail from "./pages/payment/InvoiceDetail";
 import NotFound from "./pages/NotFound";
 
 // Chuyển role thành path tương ứng
@@ -183,8 +184,20 @@ export default function App() {
         }
       />
       <Route
-        path="/invoiceCharging"
-        element={<InvoiceCharging />}
+        path="/invoiceSummary"
+        element={
+          <ProtectedRoute allowedRoles={["Customer"]}>
+            <InvoiceSummary />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/invoiceDetail/:invoiceId"
+        element={
+          <ProtectedRoute allowedRoles={["Customer"]}>
+            <InvoiceDetail />
+          </ProtectedRoute>
+        }
       />
       {/*Staff */}
       <Route

@@ -88,7 +88,7 @@ export default function Head() {
             <Tooltip title="Hóa đơn phiên sạc">
               <FileTextOutlined
                 className="invoice-icon"
-                onClick={() => navigate("/invoiceCharging")}
+                onClick={() => navigate("/invoiceSummary")}
               />
             </Tooltip>
           </>
