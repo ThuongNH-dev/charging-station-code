@@ -38,7 +38,21 @@ export const userApi = {
 
   // === SERVICE PACKAGES ===
   fetchAllServicePackages: async () => {
-    const res = await axios.get(`${BASE_URL}/SubscriptionPlans`);
+    try {
+      const res = await axios.get(`${BASE_URL}/SubscriptionPlans`);
+      // Đảm bảo luôn trả về mảng
+      if (Array.isArray(res.data)) return res.data;
+      if (res.data.items) return res.data.items;
+      return [];
+    } catch (error) {
+      console.error("❌ Lỗi khi tải danh sách gói dịch vụ:", error);
+      return [];
+    }
+  },
+
+  createServicePackage: async (data) => {
+    // HÀM MỚI: Thêm mới gói dịch vụ
+    const res = await axios.post(`${BASE_URL}/SubscriptionPlans`, data);
     return res.data;
   },
 
