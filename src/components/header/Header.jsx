@@ -3,7 +3,7 @@ import { Layout, Button, Tooltip } from "antd";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import AccountMenu from "../others/Menu";
-import { FileSearchOutlined } from "@ant-design/icons";
+import { FileSearchOutlined, FileTextOutlined } from "@ant-design/icons";
 import "./Header.css";
 const { Header } = Layout;
 
@@ -25,17 +25,17 @@ export default function Head() {
 
   const items = isStaff
     ? [
-        { key: "s1", label: "Quản lý trụ sạc", path: "/staff/stations" },
-        { key: "s2", label: "Phiên sạc", path: "/staff/sessions" },
-        { key: "s3", label: "Thanh toán", path: "/staff/payments" },
-        { key: "s4", label: "Báo cáo", path: "/staff/reports" },
-      ]
+      { key: "s1", label: "Quản lý trụ sạc", path: "/staff/stations" },
+      { key: "s2", label: "Phiên sạc", path: "/staff/sessions" },
+      { key: "s3", label: "Thanh toán", path: "/staff/payments" },
+      { key: "s4", label: "Báo cáo", path: "/staff/reports" },
+    ]
     : [
-        { key: "1", label: "Trang chủ", path: "/" },
-        { key: "2", label: "Danh mục", path: "/stations" },
-        { key: "3", label: "Dịch vụ", path: "/services" },
-        { key: "4", label: "Liên hệ", path: "/contact" },
-      ];
+      { key: "1", label: "Trang chủ", path: "/" },
+      { key: "2", label: "Danh mục", path: "/stations" },
+      { key: "3", label: "Dịch vụ", path: "/services" },
+      { key: "4", label: "Liên hệ", path: "/contact" },
+    ];
 
   const path = location.pathname;
   let activeKey = isStaff ? "s1" : "1";
@@ -68,7 +68,6 @@ export default function Head() {
             type="text"
             onClick={() => navigate("/register/select")}
           >
-            {/* ✅ Điều hướng đến trang chọn loại tài khoản */}
             Đăng ký
           </Button>
         </>
@@ -78,17 +77,27 @@ export default function Head() {
     return (
       <div className="header-right">
         {isCustomer && (
-          <Tooltip title="Lịch sử đặt chỗ">
-            <FileSearchOutlined
-              className="history-icon"
-              onClick={() => navigate("/user/history")}
-            />
-          </Tooltip>
+          <>
+            <Tooltip title="Phiên đặt chỗ">
+              <FileSearchOutlined
+                className="history-icon"
+                onClick={() => navigate("/user/history")}
+              />
+            </Tooltip>
+
+            <Tooltip title="Hóa đơn phiên sạc">
+              <FileTextOutlined
+                className="invoice-icon"
+                onClick={() => navigate("/invoiceCharging")}
+              />
+            </Tooltip>
+          </>
         )}
         <AccountMenu />
       </div>
     );
   };
+
 
   return (
     <Layout>
@@ -106,9 +115,8 @@ export default function Head() {
               {items.map((item) => (
                 <li key={item.key}>
                   <div
-                    className={`nav-item ${
-                      activeKey === item.key ? "active" : ""
-                    }`}
+                    className={`nav-item ${activeKey === item.key ? "active" : ""
+                      }`}
                     onClick={() => navigate(item.path)}
                   >
                     {item.label}
