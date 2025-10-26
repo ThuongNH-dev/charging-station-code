@@ -27,6 +27,32 @@ function decodeJwtPayload(token) {
   }
 }
 
+function getAccountIdFromLoginResponse(data, token) {
+  const p = decodeJwtPayload(token) || {};
+  // Ưu tiên từ login response (nếu BE trả về)
+  const fromResp =
+    data?.message?.accountId ??
+    data?.accountId ??
+    data?.user?.accountId ??
+    data?.message?.user?.accountId;
+
+    // Các key claim có thể chứa accountId/userId
+  const claimNameId =
+    p?.nameid ??
+    p?.["nameid"] ??
+    p?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"] ??
+    p?.["http://schemas.microsoft.com/ws/2008/06/identity/claims/nameidentifier"];
+
+  // Fallback từ token claim
+  const fromToken =
+    p?.accountId ?? p?.AccountId ?? p?.accId ??
+    p?.userId ?? p?.UserId ?? p?.sub ?? claimNameId;
+
+  const n = Number(fromResp ?? fromToken);
+  return Number.isFinite(n) ? n : null;
+}
+
+
 // ===== Lấy role từ token =====
 function getRoleFromToken(token) {
   const p = decodeJwtPayload(token);
@@ -49,7 +75,109 @@ function storeCustomerId(n) {
     console.warn("[LOGIN] storeCustomerId error:", e);
   }
 }
+// Trả về { customerId, companyId } – ƯU TIÊN /Auth/{accountId}, rồi /Customers/me, rồi claim
+async function resolveIdentity(token, accountId) {
+  const apiAbs = (getApiBase() || "").replace(/\/+$/, "");
+  let customerId = null;
+  let companyId = null;
 
+  // a) /Auth/{accountId} (đúng người đang đăng nhập)
+  if (accountId != null && String(accountId).trim() !== "") {
+    const accStr = encodeURIComponent(String(accountId).trim());
+    try {
+      const r = await fetch(`${apiAbs}/Auth/${accStr}`, {
+        method: "GET",
+        headers: { accept: "application/json", authorization: `Bearer ${token}` },
+      });
+      if (r.ok) {
+        const j = await r.json();
+        // BE của bạn thường trả 1 object có customers[]
+        const c0 = j?.customers?.[0] ?? j?.Customers?.[0] ?? null;
+        customerId = Number(c0?.customerId ?? c0?.CustomerId) || customerId;
+        companyId = Number(c0?.companyId ?? c0?.CompanyId ?? c0?.company?.id) || companyId;
+
+        // Nếu object không có customers -> thử trực tiếp
+        if (!customerId) {
+          customerId = Number(j?.customerId ?? j?.CustomerId) || customerId;
+          companyId = Number(j?.companyId ?? j?.CompanyId ?? j?.company?.id) || companyId;
+        }
+      } else {
+        console.warn("[resolveIdentity] /Auth/{id} NOT OK:", r.status);
+      }
+    } catch (e) {
+      console.warn("[resolveIdentity] /Auth/{id} error:", e);
+    }
+  }
+
+  // b) /Auth (không id) – chỉ dùng nếu chưa lấy được
+  if (!customerId) {
+    try {
+      const r = await fetch(`${apiAbs}/Auth`, {
+        method: "GET",
+        headers: { accept: "application/json", authorization: `Bearer ${token}` },
+      });
+      if (r.ok) {
+        const j = await r.json();
+        // /Auth có thể trả object hoặc mảng
+        if (Array.isArray(j)) {
+          // 🔴 Quan trọng: LỌC THEO accountId (đừng lấy phần tử đầu)
+          const mine = j.find(x =>
+            String(
+              x?.accountId ?? x?.AccountId ?? x?.id ?? x?.Id ?? x?.userId ?? x?.UserId
+            ) === String(accountId)
+          ) || j[0]; // fallback mềm
+          const c0 = mine?.customers?.[0] ?? mine?.Customers?.[0] ?? null;
+          if (c0) {
+            customerId = Number(c0?.customerId ?? c0?.CustomerId) || customerId;
+            companyId = Number(c0?.companyId ?? c0?.CompanyId ?? c0?.company?.id) || companyId;
+          } else {
+            customerId = Number(mine?.customerId ?? mine?.CustomerId) || customerId;
+            companyId = Number(mine?.companyId ?? mine?.CompanyId ?? mine?.company?.id) || companyId;
+          }
+        } else {
+          // object đơn
+          const directCid = Number(j?.customerId ?? j?.CustomerId);
+          if (Number.isFinite(directCid)) customerId = directCid;
+          if (!customerId && (j?.customers?.length || j?.Customers?.length)) {
+            const c0 = (j.customers ?? j.Customers)[0];
+            customerId = Number(c0?.customerId ?? c0?.CustomerId) || customerId;
+            companyId = Number(c0?.companyId ?? c0?.CompanyId ?? c0?.company?.id) || companyId;
+          }
+        }
+      } else {
+        console.warn("[resolveIdentity] /Auth NOT OK:", r.status);
+      }
+    } catch (e) {
+      console.warn("[resolveIdentity] /Auth error:", e);
+    }
+  }
+  // c) /Customers/me – fallback
+  if (!customerId) {
+    try {
+      const r = await fetch(`${apiAbs}/Customers/me`, {
+        method: "GET",
+        headers: { accept: "application/json", authorization: `Bearer ${token}` },
+      });
+      if (r.ok) {
+        const me = await r.json();
+        customerId = Number(me?.customerId ?? me?.CustomerId) || customerId;
+        companyId = Number(me?.companyId ?? me?.CompanyId ?? me?.company?.id) || companyId;
+      }
+    } catch { }
+  }
+
+  // d) claim trong token – fallback cuối
+  if (!customerId || !companyId) {
+    const p = decodeJwtPayload(token) || {};
+    customerId = Number(p?.customerId ?? p?.CustomerId) || customerId;
+    companyId = Number(p?.companyId ?? p?.CompanyId ?? p?.tenantId ?? p?.AccountId) || companyId;
+  }
+
+  return {
+    customerId: Number.isFinite(customerId) ? customerId : null,
+    companyId: Number.isFinite(companyId) ? companyId : null,
+  };
+}
 
 export default function Login() {
   const navigate = useNavigate();
@@ -123,61 +251,56 @@ export default function Login() {
 
       // ✅ Lưu token ngay
       storeToken(token);
+      // ✅ Lấy accountId từ response/token để gọi đúng /Auth/{accountId}
+      const accountId = getAccountIdFromLoginResponse(data, token);
+      console.debug("[LOGIN] accountId =", accountId);
 
-      // 🔹 LẤY accountId từ claim "nameidentifier"
-      const claims = decodeJwtPayload(token);
-      const accountId =
-        Number(
-          claims?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"]
-        ) || null;
+      // 🔹 LẤY customerId & companyId (Auth → Customers/me → claim)
+      const { customerId, companyId } = await resolveIdentity(token, accountId);
 
-      // 🔹 LẤY customerId từ /api/Auth (mảng accounts có customers[])
-      let customerId = null;
-      try {
-        const apiAbs = (getApiBase() || "").replace(/\/+$/, "") || "https://localhost:7268/api";
-        console.debug("[LOGIN] fetching /Auth to resolve customerId for accountId =", accountId);
-        const resp = await fetch(`${apiAbs}/Auth`, {
-          method: "GET",
-          headers: {
-            accept: "application/json",
-            authorization: `Bearer ${token}`,
-          },
-        });
-       if (resp.ok) {
-         const list = await resp.json(); // ← MẢNG
-         const mine = Array.isArray(list)
-           ? list.find(x => Number(x?.accountId) === Number(accountId))
-           : null;
-         customerId = Number(mine?.customers?.[0]?.customerId) || null;
-         console.debug("[LOGIN] /Auth matched customerId =", customerId, "from accountId =", accountId);
-         if (customerId) storeCustomerId(customerId);
-       } else {
-         console.warn("[LOGIN] /Auth non-200:", resp.status);
-       }
-     } catch (err) {
-       console.warn("[LOGIN] /Auth fetch error:", err);
-     }
+      if (customerId) {
+        localStorage.setItem("customerId", String(customerId));
+        sessionStorage.setItem("customerId", String(customerId));
+      }
+      if (companyId) {
+        localStorage.setItem("companyId", String(companyId));
+        sessionStorage.setItem("companyId", String(companyId));
+      }
+      if (Number.isFinite(accountId)) {
+        localStorage.setItem("accountId", String(accountId));
+        sessionStorage.setItem("accountId", String(accountId));
+      }
 
-      const role = getRoleFromToken(token);
-      const msg = data?.message ?? data ?? {};
+
+      // Build user object and role
+      const msg = data?.message || data || {};
+      const role = getRoleFromToken(token) || "Customer";
       const user = {
         id: msg?.userId ?? msg?.user?.id ?? null,
-        name:
-          msg?.fullName || msg?.user?.fullName || msg?.user?.name || userName,
+        name: msg?.fullName || msg?.user?.fullName || msg?.user?.name || userName,
         email: msg?.email || msg?.user?.email || null,
         role,
         token,
-        accountId,   
-        customerId,  
+        customerId,     // ✅
+        companyId,      // ✅ thêm vào context
       };
 
+      // Persist user depending on rememberMe
+      try {
+        localStorage.removeItem("user");
+        sessionStorage.removeItem("user");
+        if (rememberMe) {
+          localStorage.setItem("user", JSON.stringify(user));
+        } else {
+          sessionStorage.setItem("user", JSON.stringify(user));
+        }
+      } catch (e) {
+        console.warn("[LOGIN] storing user failed:", e);
+      }
 
-      // ✅ Lưu user vào context + localStorage
+      // ✅ Lưu user vào context + log
       login(user, rememberMe);
-      console.log("[LOGIN OK]", {
-        user,
-        tokenSnippet: token.slice(0, 12) + "...",
-      });
+      console.log("[LOGIN OK]", user);
 
       // ✅ Điều hướng (tránh race với guard)
       const from = location.state?.from?.pathname;

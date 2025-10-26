@@ -1,3 +1,4 @@
+import { useAuth } from "../../context/AuthContext";
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
@@ -182,11 +183,11 @@ function normalizeBooking(b = {}) {
 function checkTimeConflict(newStart, newEnd, existingBookings) {
   const newStartMs = newStart.getTime();
   const newEndMs = newEnd.getTime();
-  
+
   for (const booking of existingBookings) {
     const existingStart = new Date(booking.startTime);
     const existingEnd = new Date(booking.endTime);
-    
+
     // Kiểm tra overlap: (newStart < existingEnd) && (newEnd > existingStart)
     if (newStartMs < existingEnd.getTime() && newEndMs > existingStart.getTime()) {
       return {
@@ -196,7 +197,7 @@ function checkTimeConflict(newStart, newEnd, existingBookings) {
       };
     }
   }
-  
+
   return { conflict: false };
 }
 
@@ -208,6 +209,7 @@ export default function BookingPorts() {
   const [authError, setAuthError] = useState("");
   const { id, cid } = useParams(); // stationId & chargerId
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [station, setStation] = useState(null);
   const [charger, setCharger] = useState(null);
@@ -419,14 +421,14 @@ export default function BookingPorts() {
 
         const url = `/Booking?portId=${selectedGun.id}&startTime=${startOfDay.toISOString()}&endTime=${endOfDay.toISOString()}`;
         const data = await fetchAuthJSON(url, { method: "GET" });
-        
+
         if (!alive) return;
 
         const bookings = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
         const normalizedBookings = bookings
           .filter(b => b.status !== "Cancelled" && b.status !== "Completed")
           .map(normalizeBooking);
-        
+
         setExistingBookings(normalizedBookings);
       } catch (e) {
         if (!alive) return;
@@ -462,6 +464,7 @@ export default function BookingPorts() {
     if (!selectedGun || totalMinutes < MIN_GAP_MINUTES) return;
 
     if (!me?.customerId) { alert("Chưa đăng nhập hoặc không lấy được customerId."); return; }
+    console.debug("[BookingPorts] me =", me, "user =", user, "myVehicleId =", myVehicleId);
     if (!myVehicleId) { alert("Tài khoản chưa có xe. Hãy thêm xe trước khi đặt."); return; }
 
     // Kiểm tra conflict trước khi đặt
@@ -474,26 +477,16 @@ export default function BookingPorts() {
     const startLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), startHour, startMinute, 0, 0);
     const endLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate(), endHour, endMinute, 0, 0);
 
-    // // Payload PascalCase + ISO có offset
-    // const bookingDto = {
-    //   CustomerId: Number(me.customerId),
-    //   VehicleId: Number(myVehicleId),
-    //   PortId: Number(selectedGun.id),
-    //   StartTime: fmtLocal(startLocal),
-    //   EndTime: fmtLocal(endLocal),
-    //   Status: "Pending",
-    // };
-
     const bookingDto = {
       customerId: Number(me.customerId),
+      companyId: Number(user?.companyId) || null,
       vehicleId: Number(myVehicleId),
       portId: Number(selectedGun.id),
       startTime: fmtUtcZ(startLocal), // gửi UTC Z
       endTime: fmtUtcZ(endLocal),     // gửi UTC Z
       status: "Pending",
     };
-
-
+    console.debug("[BookingPorts] bookingDto =", bookingDto);
     console.log("[POST /Booking] payload =", bookingDto);
 
     try {
@@ -535,7 +528,6 @@ export default function BookingPorts() {
       }
       if (!bookingId) {
         try {
-          // const url = `${API_BASE}/Booking?customerId=${encodeURIComponent(me.customerId)}&page=1&pageSize=10`;
           const url = `/Booking?customerId=${encodeURIComponent(me.customerId)}&page=1&pageSize=10`;
           const latest = await fetchAuthJSON(url, { method: "GET" });
           const items = extractItems(latest);
@@ -554,8 +546,7 @@ export default function BookingPorts() {
       const startedAt = Date.now();
       while (Date.now() - startedAt < 15000) { // tối đa 15s
         try {
-          // const b = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
-          const b = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
+          const b = await fetchAuthJSON(`/Booking/${bookingId}`, { method: "GET" });
           price = Number(b?.price ?? b?.Price ?? 0);
           if (price > 0) break;
         } catch { }
@@ -572,7 +563,6 @@ export default function BookingPorts() {
         returnUrl: `${window.location.origin}/vnpay-bridge.html?order=${orderId}`,
       };
 
-      // const payRes = await fetchAuthJSON(`${API_BASE}/Payment/create`, {
       const payRes = await fetchAuthJSON(`/Payment/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -613,76 +603,87 @@ export default function BookingPorts() {
     }
   };
 
-  // === NẠP USER & VEHICLE ===
+  // === NẠP USER & VEHICLE (từ AuthContext, không đoán mò) ===
   useEffect(() => {
-    if (!getToken()) { navigate("/login", { replace: true }); return; }
+    // CHỈ kiểm tra token lưu trong storage — tránh redirect sớm do user context chưa kịp sẵn sàng
+    if (!getToken()) {
+      navigate("/login", { replace: true });
+      return;
+    }
+
+    // Log để chắc chắn đang dùng đúng user/customer
+    console.debug("[BookingPorts] user from context =", user);
+    const cidFromStorage = Number(localStorage.getItem("customerId") || sessionStorage.getItem("customerId"));
+    if (user?.customerId) {
+      setMe({ customerId: Number(user.customerId) });
+    } else if (Number.isFinite(cidFromStorage)) {
+      setMe({ customerId: cidFromStorage });
+    } else {
+      setAuthError("Không tìm thấy customerId trong phiên đăng nhập.");
+    }
+
+
+
     let alive = true;
-
-    const decodeJwtPayload = (t) => {
-      try {
-        const base64 = t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-        return JSON.parse(
-          decodeURIComponent(
-            atob(base64).split("").map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")
-          )
-        );
-      } catch { return null; }
-    };
-
     (async () => {
       try {
-        setAuthError("");
+        // 🚩 ĐỪNG trông chờ BE filter theo customerId; ép pageSize lớn để chắc chắn có trong trang đầu
+        const url = `/Vehicles?page=1&pageSize=200`; // <= đủ lớn để gom hết
+        const res = await fetchAuthJSON(url);
 
-        const meRes = await fetchAuthJSON("/Auth");
+        // Log raw response để xem đúng shape
+        console.debug("[BookingPorts] /Vehicles raw =", res);
 
-        let customerId =
-          meRes?.customerId ??
-          meRes?.id ??
-          meRes?.userId ??
-          meRes?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+        let vehicles = Array.isArray(res)
+          ? res
+          : (Array.isArray(res?.items) ? res.items : []);
 
-        if (!customerId) {
-          const p = decodeJwtPayload(getToken());
-          customerId =
-            p?.customerId ??
-            p?.sub ??
-            p?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
-        }
+        // Log sau khi đọc items
+        console.debug("[BookingPorts] vehicles (all) =", vehicles?.length, vehicles);
+
+        // Fallback lọc client-side theo customerId
+        const myCid = String(
+          user?.customerId ??
+          me?.customerId ??
+          localStorage.getItem("customerId") ??
+          sessionStorage.getItem("customerId") ??
+          ""
+        );
+        vehicles = vehicles.filter(v =>
+          String(v.customerId ?? v.CustomerId ?? v.userId ?? v.UserId) === myCid
+        );
+
+        console.debug("[BookingPorts] vehicles (mine) =", vehicles?.length, vehicles);
 
         if (!alive) return;
-        if (!customerId) throw new Error("Không tìm thấy customerId trong /Auth hoặc token");
-        setMe({ ...(meRes || {}), customerId });
-
-        const vehicles = await fetchAuthJSON("/Vehicles");
-        const myVehicles = (Array.isArray(vehicles) ? vehicles : (vehicles?.items || []))
-          .filter(v =>
-            String(v.customerId ?? v.CustomerId ?? v.userId ?? v.UserId) === String(customerId)
-          );
-
-        if (!alive) return;
-
-        if (myVehicles.length === 0) {
+        if (!vehicles.length) {
+          // Cho thêm log rõ ràng để debug khi BE có xe nhưng FE không thấy
+          console.warn("[BookingPorts] KHÔNG THẤY XE thuộc customerId =", myCid);
           throw new Error("Không tìm thấy xe nào thuộc tài khoản của bạn.");
         }
 
-        const first = myVehicles[0];
-        const vid = first?.id ?? first?.vehicleId ?? null;
+        const first = vehicles[0];
+        // BE dùng key vehicleId (không phải id)
+        const vid = first?.vehicleId ?? first?.id ?? null;
         setMyVehicleId(vid);
 
-        // Lấy loại xe & lưu
         const vtype =
           first?.vehicleType ?? first?.VehicleType ??
           first?.type ?? first?.Type ??
           first?.category ?? first?.Category ?? "";
         setMyVehicleType(String(vtype || "").trim());
+
+        console.debug("[BookingPorts] picked vehicleId =", vid, "type =", vtype);
       } catch (e) {
         if (!alive) return;
-        setAuthError(e?.message || "Không thể nạp người dùng/xe.");
+        console.error("[BookingPorts] Load vehicles error:", e);
+        setAuthError(e?.message || "Không thể nạp phương tiện.");
       }
     })();
 
     return () => { alive = false; };
-  }, [navigate]);
+  }, [navigate, user]);
+
 
   // ====== RENDER ======
   if (loading) {
@@ -928,11 +929,11 @@ export default function BookingPorts() {
 
               {/* Conflict Warning */}
               {bookingConflict && (
-                <div className="bp-conflict-warning" style={{ 
-                  marginTop: 12, 
-                  padding: 12, 
-                  backgroundColor: "#fee", 
-                  border: "1px solid #fcc", 
+                <div className="bp-conflict-warning" style={{
+                  marginTop: 12,
+                  padding: 12,
+                  backgroundColor: "#fee",
+                  border: "1px solid #fcc",
                   borderRadius: 6,
                   color: "#c33"
                 }}>
@@ -948,7 +949,7 @@ export default function BookingPorts() {
                   <div style={{ fontSize: "0.9em", color: "#666" }}>
                     {existingBookings.map((booking, idx) => (
                       <div key={idx} style={{ margin: "4px 0" }}>
-                        • {new Date(booking.startTime).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })} - 
+                        • {new Date(booking.startTime).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })} -
                         {new Date(booking.endTime).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })}
                         <span style={{ color: "#999", marginLeft: 8 }}>
                           ({booking.status})
@@ -1014,3 +1015,4 @@ function Review({ name, text }) {
     </div>
   );
 }
+

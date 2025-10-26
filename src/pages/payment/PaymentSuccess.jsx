@@ -5,7 +5,7 @@ import { CheckCircleFilled, ArrowLeftOutlined } from "@ant-design/icons";
 import MainLayout from "../../layouts/MainLayout";
 import "./style/PaymentSuccess.css";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
-import { getCustomerIdStrict, getAccountIdStrict } from  "../../api/authHelpers";
+import { getCustomerIdStrict, getAccountIdStrict } from "../../api/authHelpers";
 
 const API_BASE = getApiBase();
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
@@ -262,7 +262,7 @@ function joinUrl(base, path) {
   return (left + right).replace(/([^:]\/)\/+/g, "$1");
 }
 
-async function startChargingSession({ accountId, vehicleId, bookingId, portId }) {
+async function startChargingSession({ vehicleId, bookingId, portId }) {
   const aid = Number(accountId);
   const bid = Number(bookingId);
   const pid = Number(portId);
@@ -270,7 +270,6 @@ async function startChargingSession({ accountId, vehicleId, bookingId, portId })
 
   // Body PHẲNG đúng như BE mẫu của bạn
   const body = {
-    customerId: aid, 
     bookingId: bid,
     portId: pid,
     ...(Number.isFinite(vidN) ? { vehicleId: vidN } : {}),
@@ -469,21 +468,8 @@ export default function PaymentSuccess() {
     setIdError("");
 
     try {
-      // 1) Lấy accountId (BE dùng nhầm tên field customerId)
-      const accountId = await getAccountIdStrict();
-      if (!accountId) throw new Error("Không xác định được accountId.");
-
-      // 2) Xác định portId: ưu tiên người dùng nhập, fallback từ booking
-      const portId =
-        Number(idInput) || Number(data?.gun?.id) || Number(data?.gun?.portId);
-      if (!Number.isFinite(portId)) throw new Error("Port/Gun ID không hợp lệ.");
-
-      // 3) Vehicle: nếu bạn có trong state (Location.state) thì lấy, chưa có thì để null
-      const vehicleId = state?.vehicleId ?? null;
-
-      // 4) Gọi BE bắt đầu phiên sạc
+      // Không cần accountId/customerId, BE sẽ đọc từ token
       const res = await startChargingSession({
-        accountId,
         vehicleId,
         bookingId: data.bookingId,
         portId,
