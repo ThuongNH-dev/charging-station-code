@@ -358,3 +358,10 @@
   font-feature-settings: "tnum";
 }
 .cell.price .cur { opacity: 0.8; }
+
+.hist-root .pill.ok {
+  color: #096dd9 !important;
+  background: #e6f7ff !important;
+  border-color: #91d5ff !important;
+}
+

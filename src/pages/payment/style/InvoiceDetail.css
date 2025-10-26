@@ -82,3 +82,27 @@
 
 /* Warnings */
 .warn{color:#a8071a; background:#fff2f0; border:1px solid #ffccc7; padding:12px; border-radius:10px}
+
+.ivp-subscription {
+  background: var(--card);
+  padding: 20px 22px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.ivp-subscription .ivp-head h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text);
+}
+
+.ivp-subscription .ivp-meta div {
+  font-size: 15px;
+  color: var(--text);
+}
+
+.ivp-subscription .invoice-sum {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}

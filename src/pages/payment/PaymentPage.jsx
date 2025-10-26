@@ -672,6 +672,7 @@ export default function PaymentPage() {
     setPayError("");
 
     try {
+      
       // B1: đảm bảo đã có link VNPAY
       let payUrl = vnpayUrl;
       payUrl = toUrlString(payUrl);
@@ -684,41 +685,11 @@ export default function PaymentPage() {
         payUrl = toUrlString(created.url);
       }
 
-      // B2: mở VNPAY ở tab mới
-      const payWin = window.open(payUrl, "_blank", "noopener");
-
-      // B3: poll BE tới khi thấy paid/confirmed
-      try { sessionStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }
-      try { localStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }
-
-      const res = await pollUntilPaid({
-        apiBase: API_BASE,
-        bookingId,
-        invoiceId,
-        timeoutMs: 300000, // 5 phút
-        stepMs: 2500,
-      });
-
-      if (res.ok) {
-        if (bookingId) {
-           // Thanh toán booking ➜ về trang PaymentSuccess (giữ nguyên luồng cũ)
-          navigate(`/payment/success?bookingId=${encodeURIComponent(bookingId)}`, {
-            replace: true,
-            state: { paid: true, fromVnpay: true },
-          });
-        } else if (invoiceId) {
-          // Thanh toán Invoice ➜ quay về trang Invoice (danh sách)
-          // Nếu bạn muốn về chi tiết hóa đơn, đổi path thành `/invoiceDetail/${invoiceId}`
-          navigate("/invoiceSummary", {
-            replace: true,
-            state: { paid: true, invoiceId },
-          });
-        }
-        return;
-      }
-
-      // Hết thời gian poll mà chưa thấy paid
-      setPayError("Chưa xác nhận được thanh toán. Vui lòng kiểm tra lại hoặc làm mới trang.");
+      // B2: Đặt cờ pending (để trang bridge/success đọc được), rồi chuyển TAB HIỆN TẠI sang VNPAY
+      try { sessionStorage.setItem(`pay:${orderId}:pending`, "1"); } catch {}
+      try { localStorage.setItem(`pay:${orderId}:pending`, "1"); } catch {}
+      window.location.href = payUrl; // 👈 chuyển trong cùng tab
+      return; // dừng tại đây vì trang sẽ rẽ nhánh rời khỏi SPA hiện tại
     } finally {
       setLoading(false);
     }
@@ -792,9 +763,7 @@ export default function PaymentPage() {
                   disabled={payDisabled}
                 >
                   {selectedPayment === "qr"
-                    ? creatingVnpay
-                      ? "Đang khởi tạo..."
-                      : "Xác nhận đã quét"
+                    ? (creatingVnpay ? "Đang khởi tạo..." : "Chuyển đến VNPAY")
                     : "Thanh Toán"}
                 </button>
 
