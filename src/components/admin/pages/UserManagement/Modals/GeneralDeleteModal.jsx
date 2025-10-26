@@ -18,6 +18,7 @@ const GeneralDeleteModal = ({
   const objectName = objectMap[actionType] || "Mục";
 
   const handleDelete = async () => {
+    console.log("Xóa", actionType, entityId);
     setIsDeleting(true);
     let success = false;
 

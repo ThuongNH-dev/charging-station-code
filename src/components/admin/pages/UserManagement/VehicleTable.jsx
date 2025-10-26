@@ -84,6 +84,7 @@ const VehicleTable = ({ filteredData = [], setActiveModal }) => {
 
                   return (
                     <td key={col.key} className="action-cell">
+                      {/* Nút sửa: mở modal VehicleModal với dữ liệu sẵn */}
                       <button
                         className="icon-btn"
                         onClick={() =>
@@ -93,6 +94,8 @@ const VehicleTable = ({ filteredData = [], setActiveModal }) => {
                       >
                         <EditOutlined />
                       </button>
+
+                      {/* Nút xóa: cũng mở modal VehicleModal với nút Xóa */}
                       <button
                         className="icon-btn"
                         onClick={() =>
@@ -106,7 +109,7 @@ const VehicleTable = ({ filteredData = [], setActiveModal }) => {
                   );
                 }
 
-                // ✅ Ô dữ liệu bình thường
+                // Ô dữ liệu bình thường
                 return (
                   <td key={col.key}>{renderCell(vehicle, col.key, index)}</td>
                 );

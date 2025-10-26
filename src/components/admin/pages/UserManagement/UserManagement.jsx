@@ -1,17 +1,13 @@
-// 📁 src/pages/Admin/UserManagement/UserManagement.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import "../UserManagement.css";
 import { userApi } from "../../../../api/userApi";
-import UserTables from "./UserTables";
+import UserTables from "./Usertables";
 import VehicleTable from "./VehicleTable";
 import ServiceTable from "./ServiceTable";
 import AdminModals from "./Modals/AdminModals";
 import ServiceFilterBar from "./ServiceFilterBar";
 
-/* =========================================================
-   🔹 1. HOOK: FETCH DỮ LIỆU & CRUD
-   ========================================================= */
 const useUserServicesHook = () => {
   const [allAccounts, setAllAccounts] = useState([]);
   const [allVehicles, setAllVehicles] = useState([]);
@@ -20,7 +16,8 @@ const useUserServicesHook = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // 🧭 FETCH dữ liệu từ API
+  // FILE: UserManagement.js (Trong useUserServicesHook)
+
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -31,9 +28,33 @@ const useUserServicesHook = () => {
           userApi.fetchAllVehicles(),
           userApi.fetchAllServicePackages(),
           userApi.fetchAllSubscriptions(),
-        ]);
+        ]); // 1. Tạo Map tên gói từ ID gói dịch vụ (services)
 
-      setAllAccounts(accounts || []);
+      const serviceMap = (services || []).reduce((map, pkg) => {
+        map[pkg.id] = pkg.planName;
+        return map;
+      }, {}); // 2. Tạo Map Gói dịch vụ hiện tại của từng người dùng
+
+      const userPackageMap = (subscriptionsData || []).reduce((map, sub) => {
+        // Lấy tên gói từ serviceMap, nếu không có ID gói thì kiểm tra trường GoiDichVu (nếu có)
+        const packageName =
+          serviceMap[sub.servicePackageId] || sub.GoiDichVu || null;
+        if (packageName) {
+          map[sub.userId] = packageName;
+        }
+        return map;
+      }, {}); // 3. Gắn tên gói dịch vụ vào đối tượng người dùng
+
+      const accountsWithPackage = (accounts || []).map((user) => {
+        // ✅ SỬA: Gán "Chưa đăng ký" thay vì null nếu không tìm thấy gói
+        const packageName = userPackageMap[user.id] || "Chưa đăng ký";
+        return {
+          ...user,
+          servicePackageName: packageName,
+        };
+      }); // Cập nhật state với dữ liệu đã xử lý
+
+      setAllAccounts(accountsWithPackage);
       setAllVehicles(vehicles || []);
       setServicePackages(services || []);
       setSubscriptions(subscriptionsData || []);
@@ -49,17 +70,16 @@ const useUserServicesHook = () => {
     fetchData();
   }, [fetchData]);
 
-  // 🛠️ CRUD helper
-  const handleUpdate = async (apiFunc, id, data, successMsg) => {
+  const handleUpdate = async (apiFunc, id, data, successMsg, role) => {
+    if (typeof apiFunc !== "function") {
+      console.error("❌ apiFunc không phải là function", apiFunc);
+      return false;
+    }
     setIsLoading(true);
     setError(null);
     try {
-      if (id) {
-        await apiFunc(id, data);
-      } else {
-        await apiFunc(data);
-      }
-
+      if (id) await apiFunc(id, data, role);
+      else await apiFunc(data);
       alert(successMsg || "Cập nhật thành công!");
       await fetchData();
       return true;
@@ -73,7 +93,6 @@ const useUserServicesHook = () => {
     }
   };
 
-  // 📦 Return toàn bộ CRUD
   return {
     allAccounts,
     allVehicles,
@@ -82,6 +101,20 @@ const useUserServicesHook = () => {
     isLoading,
     error,
     fetchData,
+    // ✅ Truyền đầy đủ tất cả CRUD
+    updateUser: (
+      id,
+      data,
+      role // ✅ BỔ SUNG tham số 'role'
+    ) =>
+      handleUpdate(
+        userApi.updateUser,
+        id,
+        data,
+        "Đã cập nhật người dùng.",
+        role
+      ), // ✅ TRUYỀN 'role' vào handleUpdate
+
     updateUserStatus: (id, data) =>
       handleUpdate(
         userApi.updateUserStatus,
@@ -119,23 +152,22 @@ const useUserServicesHook = () => {
   };
 };
 
-/* =========================================================
-   🔹 2. HOOK: FILTER LOGIC (User / Vehicle / Service)
-   ========================================================= */
 const useFilterLogicHook = ({ allAccounts, allVehicles, servicePackages }) => {
-  const [userFilter, setUserFilter] = useState({ search: "", status: "all" });
+  const [userFilter, setUserFilter] = useState({
+    search: "",
+    status: "all",
+    servicePackage: "all",
+    role: "all",
+  });
   const [vehicleFilter, setVehicleFilter] = useState({
     search: "",
     status: "all",
   });
-
-  // 🟢 XÓA 'status' khỏi serviceFilter — chỉ còn category + search
   const [serviceFilter, setServiceFilter] = useState({
     search: "",
     category: "all",
   });
 
-  // --- FILTER USERS ---
   const filteredUsers = useMemo(() => {
     return allAccounts.filter((user) => {
       const matchSearch =
@@ -145,7 +177,16 @@ const useFilterLogicHook = ({ allAccounts, allVehicles, servicePackages }) => {
         userFilter.search === "";
       const matchStatus =
         userFilter.status === "all" || user.status === userFilter.status;
-      return matchSearch && matchStatus;
+
+      // 💡 LOGIC LỌC THEO GÓI DỊCH VỤ
+      const userPackageNameLower = user.servicePackageName?.toLowerCase() || "";
+      const filterPackageNameLower = userFilter.servicePackage.toLowerCase();
+
+      const matchServicePackage =
+        userFilter.servicePackage === "all" ||
+        userPackageNameLower === filterPackageNameLower;
+
+      return matchSearch && matchStatus && matchServicePackage; // CẬP NHẬT TRẢ VỀ
     });
   }, [allAccounts, userFilter]);
 
@@ -158,7 +199,6 @@ const useFilterLogicHook = ({ allAccounts, allVehicles, servicePackages }) => {
     [filteredUsers]
   );
 
-  // --- FILTER SERVICES ---
   const filteredServices = useMemo(() => {
     return servicePackages.filter((pkg) => {
       const categoryMatch =
@@ -173,7 +213,6 @@ const useFilterLogicHook = ({ allAccounts, allVehicles, servicePackages }) => {
     });
   }, [servicePackages, serviceFilter]);
 
-  // --- FILTER VEHICLES ---
   const filteredVehicles = useMemo(() => {
     return allVehicles.filter((vehicle) => {
       const matchSearch =
@@ -199,9 +238,6 @@ const useFilterLogicHook = ({ allAccounts, allVehicles, servicePackages }) => {
   };
 };
 
-/* =========================================================
-   🔹 3. COMPONENT CHÍNH
-   ========================================================= */
 const UserManagement = () => {
   const [activeTab, setActiveTab] = useState("users");
   const [activeModal, setActiveModal] = useState(null);
@@ -213,8 +249,26 @@ const UserManagement = () => {
     subscriptions,
     isLoading,
     error,
-    ...crudActions
+    updateUser,
+    updateUserStatus,
+    deleteUser,
+    createServicePackage,
+    updateServicePackage,
+    deleteServicePackage,
+    updateVehicle,
+    deleteVehicle,
   } = useUserServicesHook();
+
+  const crudActions = {
+    updateUser,
+    updateUserStatus,
+    deleteUser,
+    createServicePackage,
+    updateServicePackage,
+    deleteServicePackage,
+    updateVehicle,
+    deleteVehicle,
+  };
 
   const {
     userFilter,
@@ -227,10 +281,40 @@ const UserManagement = () => {
     filteredServices,
   } = useFilterLogicHook({ allAccounts, allVehicles, servicePackages });
 
-  // 🌀 Loading và Error (chỉ khi chưa mở modal)
+  useEffect(() => {
+    console.log("================== DEBUG USER MANAGEMENT ==================");
+    console.log("1. Trạng thái tải:", { isLoading, error });
+    console.log("2. Filter hiện tại:", userFilter); // Log tên gói dịch vụ có sẵn trong dropdown (ServicePackages)
+    const availablePackageNames = servicePackages.map((p) => p.planName);
+    console.log(
+      "3. Tên gói Dịch vụ có sẵn (cho Dropdown):",
+      availablePackageNames
+    ); // Log 3 người dùng đầu tiên với tên gói dịch vụ của họ (AllAccounts)
+
+    const userPackageDebug = allAccounts.slice(0, 3).map((u) => ({
+      id: u.id,
+      name: u.userName,
+      package: u.servicePackageName,
+    }));
+    console.log("4. 3 User đầu tiên & Gói Dịch vụ:", userPackageDebug); // Log 3 người dùng đầu tiên sau khi đã lọc (IndividualUsers)
+    const filteredUserDebug = individualUsers.slice(0, 3).map((u) => ({
+      id: u.id,
+      name: u.userName,
+      package: u.servicePackageName,
+    }));
+    console.log("5. 3 User đầu tiên SAU KHI LỌC:", filteredUserDebug);
+    console.log("=========================================================");
+  }, [
+    isLoading,
+    error,
+    userFilter,
+    servicePackages,
+    allAccounts,
+    individualUsers,
+  ]);
+
   if (isLoading && !activeModal)
     return <div className="user-page loading">Đang tải dữ liệu...</div>;
-
   if (error && !activeModal)
     return <div className="user-page error">Lỗi tải dữ liệu: {error}</div>;
 
@@ -238,7 +322,6 @@ const UserManagement = () => {
     <div className="user-page">
       <h2 className="admin-title">Quản lý Người dùng & Dịch vụ</h2>
 
-      {/* === TAB CHUYỂN === */}
       <div className="user-actions">
         <div className="tabs">
           <button
@@ -265,7 +348,6 @@ const UserManagement = () => {
           </button>
         </div>
 
-        {/* 🟢 Nút Thêm gói dịch vụ chỉ hiển thị khi ở tab "service" */}
         {activeTab === "service" && (
           <button
             className="btn primary icon-btn"
@@ -276,7 +358,6 @@ const UserManagement = () => {
         )}
       </div>
 
-      {/* === THANH LỌC === */}
       <div className="filter-container">
         {activeTab === "users" && (
           <div className="filter-bar">
@@ -294,7 +375,35 @@ const UserManagement = () => {
                 <i className="fas fa-search search-icon"></i>
               </div>
             </div>
-
+            {/* 💡 BỘ LỌC GÓI DỊCH VỤ MỚI ĐƯỢC THÊM */}
+            <div className="filter-group">
+              <label className="filter-label">Gói dịch vụ:</label>
+              <select
+                value={userFilter.servicePackage}
+                onChange={(e) =>
+                  setUserFilter({
+                    ...userFilter,
+                    servicePackage: e.target.value,
+                  })
+                }
+                className="filter-dropdown"
+              >
+                <option value="all">Tất cả Gói</option>
+                {/* ✅ THÊM TÙY CHỌN CHƯA ĐĂNG KÝ */}
+                <option value="Chưa đăng ký">Chưa đăng ký</option>{" "}
+                {/* 💡 Lấy thông tin Gói Dịch Vụ từ state 'servicePackages' */}{" "}
+                {servicePackages.map(
+                  (
+                    pkg // Dùng planName làm cả value và label
+                  ) => (
+                    <option key={pkg.planName} value={pkg.planName}>
+                      {pkg.planName}
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
+            {/* 🛑 KẾT THÚC BỘ LỌC MỚI 🛑 */}
             <div className="filter-group">
               <label className="filter-label">Trạng thái:</label>
               <select
@@ -325,7 +434,6 @@ const UserManagement = () => {
         </div>
       </div>
 
-      {/* === DỮ LIỆU === */}
       <div className="data-table-container">
         {activeTab === "users" && (
           <div className="user-tables-group">
@@ -345,14 +453,12 @@ const UserManagement = () => {
             />
           </div>
         )}
-
         {activeTab === "vehicle" && (
           <VehicleTable
             filteredData={filteredVehicles}
             setActiveModal={setActiveModal}
           />
         )}
-
         {activeTab === "service" && (
           <ServiceTable
             filteredData={filteredServices}
@@ -361,10 +467,11 @@ const UserManagement = () => {
         )}
       </div>
 
-      {/* === MODALS === */}
       <AdminModals
         activeModal={activeModal}
         setActiveModal={setActiveModal}
+        allAccounts={allAccounts}
+        allVehicles={allVehicles}
         servicePackages={servicePackages}
         crudActions={crudActions}
       />

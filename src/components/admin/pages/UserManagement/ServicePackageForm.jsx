@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from "react";
 
 // 🔹 Form thêm / chỉnh sửa gói dịch vụ
-//   - initialData: dữ liệu ban đầu khi chỉnh sửa
-//   - crudActions: chứa các hàm updateServicePackage, createServicePackage
-//   - setActiveModal: dùng để đóng modal sau khi xử lý
+//   - initialData: dữ liệu ban đầu khi chỉnh sửa
+//   - crudActions: chứa các hàm updateServicePackage, createServicePackage
+//   - setActiveModal: dùng để đóng modal sau khi xử lý
 const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
   // Khởi tạo state form từ dữ liệu ban đầu hoặc giá trị mặc định
   const [formData, setFormData] = useState({
@@ -17,16 +17,25 @@ const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
     benefits: "",
     isForCompany: false,
     status: "Active",
-    ...initialData, // Ghi đè nếu có dữ liệu chỉnh sửa
+    ...initialData,
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Đồng bộ lại khi initialData thay đổi
   useEffect(() => {
-    if (initialData) {
-      setFormData(initialData);
-    }
+    setFormData({
+      planName: "",
+      description: "",
+      category: "Individual",
+      priceMonthly: 0,
+      discountPercent: 0,
+      freeIdleMinutes: 0,
+      benefits: "",
+      isForCompany: false,
+      status: "Active",
+      ...initialData,
+    });
   }, [initialData]);
 
   // Xử lý thay đổi input
@@ -38,32 +47,50 @@ const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
     }));
   };
 
+  // Lấy packageId luôn cập nhật từ initialData
+  const packageId =
+    (initialData?.subscriptionPlanId ||
+      initialData?.id ||
+      initialData?.packageId) ??
+    null;
+
   // Xử lý submit form
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
 
-    // 🌟 CHỈNH SỬA TẠI ĐÂY: Ưu tiên lấy subscriptionPlanId theo API mẫu
-    const packageId = initialData && (
-      initialData.subscriptionPlanId || initialData.id || initialData.packageId
-    );
+    // Validate cơ bản
+    if (!formData.planName.trim()) {
+      alert("Tên gói dịch vụ không được để trống!");
+      return;
+    }
+    if (formData.priceMonthly < 0) {
+      alert("Giá hàng tháng phải lớn hơn hoặc bằng 0!");
+      return;
+    }
+
+    setIsSubmitting(true);
     let success = false;
 
     try {
       if (packageId) {
         // 🔸 Gọi API update
-        await crudActions.updateServicePackage(packageId, formData);
-        success = true;
+        if (crudActions.updateServicePackage) {
+          await crudActions.updateServicePackage(packageId, formData);
+          success = true;
+        } else {
+          alert("Chức năng cập nhật chưa được triển khai API!");
+        }
       } else {
-        // 🔸 Gọi API create (nếu có)
+        // 🔸 Gọi API create
         if (crudActions.createServicePackage) {
           await crudActions.createServicePackage(formData);
+          success = true;
         } else {
           alert(
             "Chức năng thêm mới chưa được triển khai API! Tạm thời mô phỏng thành công."
           );
+          success = true;
         }
-        success = true;
       }
     } catch (error) {
       console.error("Lỗi xử lý gói dịch vụ:", error);
@@ -73,7 +100,7 @@ const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
 
     if (success) {
       setActiveModal(null); // Đóng modal
-      // 👉 Có thể thêm hàm refresh data ở component cha tại đây
+      // 👉 Nếu cần, gọi hàm refresh dữ liệu ở component cha tại đây
     }
 
     setIsSubmitting(false);

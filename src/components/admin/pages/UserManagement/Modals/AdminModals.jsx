@@ -3,29 +3,33 @@ import React from "react";
 import ServiceModal from "./ServiceModal";
 import GeneralDeleteModal from "./GeneralDeleteModal";
 import GeneralEditModal from "./GeneralEditModal";
-
-// ActiveModal: 'addService', 'editUser-123', 'deleteVehicle-456'
+import VehicleModal from "./VehicleModal";
 
 const AdminModals = ({
   activeModal,
   setActiveModal,
-  servicePackages,
-  crudActions,
+  allAccounts = [],
+  allVehicles = [],
+  servicePackages = [],
+  crudActions = {},
 }) => {
   if (!activeModal) return null;
 
-  // 1. Phân tích loại hành động và ID
   const parts = activeModal.split("-");
-  const actionType = parts[0]; // addService, editUser, deleteVehicle, ...
+  const actionType = parts[0]; // addService, editService, editUser, deleteUser, editVehicle, deleteVehicle
   const entityId = parts.length > 1 ? parts[1] : null;
 
-  // Lớp phủ (Overlay) cho tất cả các Modal
+  // Tìm dữ liệu để edit User
+  const entityData =
+    actionType.toLowerCase().includes("user") && entityId
+      ? allAccounts.find((u) => u.accountId === Number(entityId))
+      : null;
+
   return (
     <div className="modal-overlay" onClick={() => setActiveModal(null)}>
       <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-        {/* 1. Modal THÊM/CHỈNH SỬA GÓI DỊCH VỤ */}
-        {(actionType === "addService" ||
-          actionType.includes("editService")) && (
+        {/* Service Modal */}
+        {(actionType === "addService" || actionType === "editService") && (
           <ServiceModal
             activeModal={activeModal}
             setActiveModal={setActiveModal}
@@ -35,23 +39,43 @@ const AdminModals = ({
           />
         )}
 
-        {/* 2. Modal CHỈNH SỬA CHUNG (Người dùng/Xe) - Placeholder */}
-        {activeModal.includes("edit") && !activeModal.includes("Service") && (
+        {/* Edit User Modal */}
+        {actionType === "editUser" && entityData && (
           <GeneralEditModal
-            activeModal={activeModal}
             setActiveModal={setActiveModal}
-            actionType={actionType}
-            entityId={entityId}
+            entityData={entityData}
+            crudActions={crudActions}
           />
         )}
 
-        {/* 3. Modal XÓA CHUNG */}
-        {activeModal.includes("delete") && (
-          <GeneralDeleteModal
-            activeModal={activeModal}
+        {/* Delete User/Service Modal */}
+        {actionType.startsWith("delete") &&
+          entityId &&
+          !actionType.includes("Vehicle") && (
+            <GeneralDeleteModal
+              setActiveModal={setActiveModal}
+              entityId={entityId}
+              actionType={actionType.replace("delete", "").toLowerCase()}
+              crudActions={crudActions}
+            />
+          )}
+
+        {/* Edit Vehicle Modal */}
+        {actionType === "editVehicle" && entityId && (
+          <VehicleModal
             setActiveModal={setActiveModal}
             entityId={entityId}
-            actionType={actionType.replace("delete", "")} // user, vehicle, service
+            allVehicles={allVehicles}
+            crudActions={crudActions}
+          />
+        )}
+
+        {/* Delete Vehicle Modal */}
+        {actionType === "deleteVehicle" && entityId && (
+          <GeneralDeleteModal
+            setActiveModal={setActiveModal}
+            entityId={entityId}
+            actionType="vehicle"
             crudActions={crudActions}
           />
         )}
