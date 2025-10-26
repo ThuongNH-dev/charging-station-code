@@ -3,6 +3,10 @@
 // =========================================================
 
 import React from "react";
+import StackedBarChart from "./StackedBarChart";
+import PieChart from "./PieChart";
+import HeatmapChart from "./HeatmapChart";
+import KPIChart from "./KPIChart";
 
 const DEBUG_MODE = true;
 
@@ -490,10 +494,20 @@ export default function ReportContent({ data, reportFilter }) {
     return <div className="report-loading">Đang tải dữ liệu báo cáo...</div>;
 
   switch (reportFilter.viewType) {
+    case "overview":
+      return (
+        <div className="overview-content">
+          <KPIChart 
+            kpiData={data.kpiOverview} 
+            timeChartData={data.timeChart?.daily} 
+          />
+        </div>
+      );
+
     case "time-chart":
       return (
         <div className="time-chart-content">
-          {renderHourlyHeatmap(data.timeChart?.hourly)}
+          <HeatmapChart data={data.timeChart?.hourly} />
         </div>
       );
 
@@ -515,8 +529,8 @@ export default function ReportContent({ data, reportFilter }) {
     case "service-structure":
       return (
         <div className="service-structure-content">
-          {renderStackedBarChart(data.serviceStructure?.monthlyRevenue)}
-          {renderPieChart(data.serviceStructure?.pieData)}
+          <StackedBarChart data={data.serviceStructure?.monthlyRevenue} />
+          <PieChart data={data.serviceStructure?.pieData} />
         </div>
       );
 
