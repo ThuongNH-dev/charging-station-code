@@ -684,8 +684,6 @@ export default function PaymentPage() {
         payUrl = toUrlString(created.url);
       }
 
-      // B2: mở VNPAY ở tab mới
-      const payWin = window.open(payUrl, "_blank", "noopener");
 
       // B3: poll BE tới khi thấy paid/confirmed
       try { sessionStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }

@@ -1,6 +1,63 @@
 // src/utils/authHelpers.js
 import { fetchAuthJSON, getApiBase } from "../utils/api";
 
+// ==== Helpers chung để resolve customerId đúng với BE ====
+function decodeJwtPayload(token) {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64).split("").map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")
+    );
+    return JSON.parse(jsonPayload || "{}");
+  } catch { return {}; }
+}
+function getAccountIdFromToken() {
+  const t = localStorage.getItem("token") || sessionStorage.getItem("token") || "";
+  if (!t) return null;
+  const p = decodeJwtPayload(t);
+  const raw =
+    p?.accountId ??
+    p?.AccountId ??
+    p?.sub ??
+    p?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+function storeCustomerId(n) {
+  try {
+    if (Number.isFinite(n) && n > 0) {
+      localStorage.setItem("customerId", String(n));
+      sessionStorage.setItem("customerId", String(n));
+    }
+  } catch {}
+}
+export async function resolveCustomerIdFromAuth(apiBase) {
+  // 0) storage fast-path
+  try {
+    const s = sessionStorage.getItem("customerId") || localStorage.getItem("customerId");
+    const n = Number(s);
+    if (Number.isFinite(n) && n > 0) return n;
+  } catch {}
+  // 1) /Auth (mảng) -> match accountId -> customers[0].customerId
+  try {
+    const accountId = getAccountIdFromToken();
+    const res = await fetchAuthJSON(`${apiBase}/Auth`, { method: "GET" });
+    const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+    const mine = list.find(x => Number(x?.accountId) === Number(accountId));
+    const cid = Number(mine?.customers?.[0]?.customerId) || null;
+    if (cid) { storeCustomerId(cid); return cid; }
+  } catch {}
+  // 2) fallback /Customers/me
+  try {
+    const me = await fetchAuthJSON(`${apiBase}/Customers/me`, { method: "GET" });
+    const cid = Number(me?.customerId ?? me?.CustomerId);
+    if (Number.isFinite(cid) && cid > 0) { storeCustomerId(cid); return cid; }
+  } catch {}
+  return null;
+}
+
+
 // Lấy accountId ưu tiên từ JWT; fallback /Auth
 export function getAccountIdStrict() {
   try {

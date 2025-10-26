@@ -6,6 +6,7 @@ import { message } from "antd";
 import "./ChargingProgress.css";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchJSON, fetchAuthJSON, getApiBase, getToken } from "../../utils/api";
+import { resolveCustomerIdFromAuth } from "../../api/authHelpers";
 
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " VND";
 
@@ -279,15 +280,10 @@ const ChargingProgress = () => {
       }
       // Lấy dữ liệu để start
       const customerId =
-        state?.customerId ?? state?.customer?.id ?? state?.customer?.customerId ?? (() => {
-          try {
-            const tk = getToken && getToken();
-            const decoded = tk ? decodeJwtPayload(tk) : null;
-            return decoded?.customerId ?? decoded?.nameid ?? decoded?.sub ?? null;
-          } catch {
-            return null;
-          }
-        })();
+        state?.customerId
+        ?? state?.customer?.customerId
+        ?? await resolveCustomerIdFromAuth(API_ABS);
+
 
       const vehicleId = state?.vehicleId ?? state?.vehicle?.id ?? state?.vehicle?.vehicleId;
       const bookingId = state?.bookingId ?? state?.booking?.id ?? state?.booking?.bookingId;
@@ -298,7 +294,7 @@ const ChargingProgress = () => {
       try {
         const url = `${API_ABS}/ChargingSessions/start`;
         const body = { customerId: Number(customerId), vehicleId: Number(vehicleId), bookingId: Number(bookingId), portId: Number(portIdToUse) };
-
+        console.debug("[Charging] start payload", body);
         const res = await fetchAuthJSON(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -590,7 +586,7 @@ const ChargingProgress = () => {
   };
 
   // ✅ Gọi BE để kết thúc phiên sạc và nhận số liệu chuẩn (unwrap {message, data})
-  async function endSessionOnServer({ endSoc, chargingSessionId }) {
+  async function endSessionOnServer({ endSoc, chargingSessionId, customerId }) {
     if (!chargingSessionId || !Number.isFinite(Number(chargingSessionId))) return null;
 
     try {
@@ -598,6 +594,7 @@ const ChargingProgress = () => {
       const body = {
         chargingSessionId: Number(chargingSessionId),
         endSoc: Math.round(Number(endSoc) || 0),
+        ...(Number(customerId) > 0 ? { customerId: Number(customerId) } : {}),
       };
 
       const res = await fetchAuthJSON(url, {
@@ -635,8 +632,12 @@ const ChargingProgress = () => {
       isMonthlyInvoice: false,
     };
     sessionStorage.setItem(`chargepay:${orderId}`, JSON.stringify(finalPayload));
-    navigate(`/invoice?order=${orderId}`, { state: finalPayload, replace: true });
+    navigate(`/invoice?order=${orderId}`, {
+      state: { ...finalPayload, customerId: session?.customerId ?? state?.customerId ?? null },
+      replace: true
+    });
   };
+
 
   const handleStopCharging = async () => {
     setIsCharging(false);

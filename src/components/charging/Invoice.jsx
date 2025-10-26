@@ -71,7 +71,7 @@ export default function InvoicePage() {
         + "hoặc đảm bảo đã lưu payload BE vào sessionStorage trước khi mở trang này."
       );
     } else {
-      setError("");
+      setError(""); 
     }
   }, [endData]);
 
