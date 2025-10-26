@@ -262,17 +262,19 @@ function joinUrl(base, path) {
   return (left + right).replace(/([^:]\/)\/+/g, "$1");
 }
 
-async function startChargingSession({ vehicleId, bookingId, portId }) {
-  const aid = Number(accountId);
+
+async function startChargingSession({ vehicleId, bookingId, portId, customerId }) {
   const bid = Number(bookingId);
   const pid = Number(portId);
   const vidN = Number(vehicleId);
+  const cid = Number(customerId);
 
   // Body PHẲNG đúng như BE mẫu của bạn
   const body = {
     bookingId: bid,
     portId: pid,
     ...(Number.isFinite(vidN) ? { vehicleId: vidN } : {}),
+    ...(Number.isFinite(cid) ? { customerId: cid } : {}),
   };
 
   const url = joinUrl(API_BASE, "/ChargingSessions/start");
@@ -284,6 +286,39 @@ async function startChargingSession({ vehicleId, bookingId, portId }) {
   });
 }
 
+async function resolveMyVehicleId() {
+  // lấy customerId từ storage/token
+  const myCid =
+    Number(localStorage.getItem("customerId")) ||
+    Number(sessionStorage.getItem("customerId")) ||
+    Number((decodeJwtPayload(localStorage.getItem("token") || "") || {}).customerId) || null;
+
+  // gọi Vehicles (ép pageSize lớn, rồi lọc client-side theo customerId)
+  const paths = [
+    `/Vehicles?page=1&pageSize=200`,
+    `/Vehicles`
+  ];
+
+  let items = [];
+  for (const p of paths) {
+    try {
+      const res = await fetchAuthJSON(`${API_BASE}${p}`, { method: "GET" });
+      const list = Array.isArray(res) ? res : (Array.isArray(res?.items) ? res.items : []);
+      if (list.length) { items = list; break; }
+    } catch { }
+  }
+
+  if (!items.length) return null;
+
+  let mine = myCid ? items.filter(v =>
+    String(v.customerId ?? v.CustomerId ?? v.userId ?? v.UserId) === String(myCid)
+  ) : items;
+
+  if (!mine.length) mine = items;
+
+  const first = mine[0];
+  return first?.vehicleId ?? first?.id ?? null;
+}
 
 export default function PaymentSuccess() {
   const { state } = useLocation();
@@ -468,11 +503,31 @@ export default function PaymentSuccess() {
     setIdError("");
 
     try {
-      // Không cần accountId/customerId, BE sẽ đọc từ token
+      // Xác định portId: ưu tiên người dùng nhập, fallback từ booking
+      const portId =
+        Number(idInput) || Number(data?.gun?.id) || Number(data?.gun?.portId);
+      if (!Number.isFinite(portId)) {
+        setIdError("Port/Gun ID không hợp lệ.");
+        return;
+      }
+
+      // Lấy vehicleId giống trang Booking
+      const vehicleId = state?.vehicleId ?? (await resolveMyVehicleId());
+      // Nếu BE cho phép không gửi vehicleId thì có thể bỏ check này
+      if (vehicleId == null) {
+        setIdError("Không tìm thấy phương tiện của bạn.");
+        return;
+      }
+      const customerId =
+        Number(localStorage.getItem("customerId")) ||
+        Number(sessionStorage.getItem("customerId")) ||
+        Number((decodeJwtPayload(localStorage.getItem("token") || "") || {}).customerId) || null;
+
       const res = await startChargingSession({
         vehicleId,
         bookingId: data.bookingId,
         portId,
+        ...(customerId ? { customerId } : {}),
       });
 
       const d = res?.data || {};
