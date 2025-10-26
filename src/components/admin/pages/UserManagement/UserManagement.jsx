@@ -1,4 +1,4 @@
-// src/pages/Admin/UserManagement/UserManagement.jsx
+// 📁 src/pages/Admin/UserManagement/UserManagement.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import "../UserManagement.css";
@@ -20,16 +20,18 @@ const useUserServicesHook = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // 🧭 FETCH dữ liệu từ API
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [accounts, vehicles, services, subscriptionsData] = await Promise.all([
-        userApi.fetchAllUsers(),
-        userApi.fetchAllVehicles(),
-        userApi.fetchAllServicePackages(),
-        userApi.fetchAllSubscriptions(),
-      ]);
+      const [accounts, vehicles, services, subscriptionsData] =
+        await Promise.all([
+          userApi.fetchAllUsers(),
+          userApi.fetchAllVehicles(),
+          userApi.fetchAllServicePackages(),
+          userApi.fetchAllSubscriptions(),
+        ]);
 
       setAllAccounts(accounts || []);
       setAllVehicles(vehicles || []);
@@ -47,16 +49,22 @@ const useUserServicesHook = () => {
     fetchData();
   }, [fetchData]);
 
+  // 🛠️ CRUD helper
   const handleUpdate = async (apiFunc, id, data, successMsg) => {
     setIsLoading(true);
     setError(null);
     try {
-      await apiFunc(id, data);
+      if (id) {
+        await apiFunc(id, data);
+      } else {
+        await apiFunc(data);
+      }
+
       alert(successMsg || "Cập nhật thành công!");
       await fetchData();
       return true;
     } catch (err) {
-      console.error("❌ Lỗi cập nhật:", err);
+      console.error("❌ Lỗi xử lý:", err);
       setError(err.message);
       alert(`Lỗi: ${err.message}`);
       return false;
@@ -65,6 +73,7 @@ const useUserServicesHook = () => {
     }
   };
 
+  // 📦 Return toàn bộ CRUD
   return {
     allAccounts,
     allVehicles,
@@ -73,7 +82,6 @@ const useUserServicesHook = () => {
     isLoading,
     error,
     fetchData,
-    // CRUD USERS
     updateUserStatus: (id, data) =>
       handleUpdate(
         userApi.updateUserStatus,
@@ -83,7 +91,13 @@ const useUserServicesHook = () => {
       ),
     deleteUser: (id) =>
       handleUpdate(userApi.deleteUser, id, null, "Đã xóa người dùng."),
-    // CRUD SERVICES
+    createServicePackage: (data) =>
+      handleUpdate(
+        userApi.createServicePackage,
+        null,
+        data,
+        "Đã thêm mới gói dịch vụ."
+      ),
     updateServicePackage: (id, data) =>
       handleUpdate(
         userApi.updateServicePackage,
@@ -98,7 +112,6 @@ const useUserServicesHook = () => {
         null,
         "Đã xóa gói dịch vụ."
       ),
-    // CRUD VEHICLES
     updateVehicle: (id, data) =>
       handleUpdate(userApi.updateVehicle, id, data, "Đã cập nhật thông số xe."),
     deleteVehicle: (id) =>
@@ -115,9 +128,11 @@ const useFilterLogicHook = ({ allAccounts, allVehicles, servicePackages }) => {
     search: "",
     status: "all",
   });
+
+  // 🟢 XÓA 'status' khỏi serviceFilter — chỉ còn category + search
   const [serviceFilter, setServiceFilter] = useState({
     search: "",
-    status: "all",
+    category: "all",
   });
 
   // --- FILTER USERS ---
@@ -145,21 +160,16 @@ const useFilterLogicHook = ({ allAccounts, allVehicles, servicePackages }) => {
 
   // --- FILTER SERVICES ---
   const filteredServices = useMemo(() => {
-    const validPlans = ["Tiêu chuẩn", "Cao cấp", "Bạc", "Doanh nghiệp", "Vàng"];
     return servicePackages.filter((pkg) => {
-      const planMatch =
-        pkg.planName &&
-        validPlans.some((plan) =>
-          pkg.planName.toLowerCase().includes(plan.toLowerCase())
-        );
+      const categoryMatch =
+        serviceFilter.category === "all" ||
+        pkg.category === serviceFilter.category;
       const searchMatch =
         pkg.planName
           ?.toLowerCase()
           .includes(serviceFilter.search.toLowerCase()) ||
         serviceFilter.search === "";
-      const statusMatch =
-        serviceFilter.status === "all" || pkg.Status === serviceFilter.status;
-      return planMatch && searchMatch && statusMatch;
+      return categoryMatch && searchMatch;
     });
   }, [servicePackages, serviceFilter]);
 
@@ -217,6 +227,7 @@ const UserManagement = () => {
     filteredServices,
   } = useFilterLogicHook({ allAccounts, allVehicles, servicePackages });
 
+  // 🌀 Loading và Error (chỉ khi chưa mở modal)
   if (isLoading && !activeModal)
     return <div className="user-page loading">Đang tải dữ liệu...</div>;
 
@@ -254,6 +265,7 @@ const UserManagement = () => {
           </button>
         </div>
 
+        {/* 🟢 Nút Thêm gói dịch vụ chỉ hiển thị khi ở tab "service" */}
         {activeTab === "service" && (
           <button
             className="btn primary icon-btn"
@@ -282,6 +294,7 @@ const UserManagement = () => {
                 <i className="fas fa-search search-icon"></i>
               </div>
             </div>
+
             <div className="filter-group">
               <label className="filter-label">Trạng thái:</label>
               <select
@@ -303,6 +316,7 @@ const UserManagement = () => {
           <ServiceFilterBar
             serviceFilter={serviceFilter}
             setServiceFilter={setServiceFilter}
+            setActiveModal={setActiveModal}
           />
         )}
 

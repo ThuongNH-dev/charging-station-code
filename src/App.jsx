@@ -22,12 +22,14 @@ import StaffLayout from "./layouts/StaffLayout";
 import AdminLayout from "./components/admin/layout/AdminLayout";
 import StationManagement from "./components/admin/pages/StationManagement";
 import UserManagement from "./components/admin/pages/UserManagement/UserManagement";
-import Reports from "./components/admin/pages/Reports";
+import Reports from "./components/admin/pages/Reports/Reports";
 import RegisterSelect from "./pages/Register/RegisterSelect";
 import PersonalRegister from "./pages/Register/PersonalRegister";
 import BusinessRegister from "./pages/Register/BusinessRegister";
 import InvoiceCharging from "./pages/payment/InvoiceCharging";
 import NotFound from "./pages/NotFound";
+import OverviewKPIs from "./components/admin/pages/Reports/OverviewKPIs";
+import ReportContent from "./components/admin/pages/Reports/ReportContent";
 
 // Chuyển role thành path tương ứng
 
@@ -59,11 +61,8 @@ function GuestRoute({ children }) {
   return <Navigate to={target} replace />;
 }
 
-
 export default function App() {
   return (
-
-    
     <Routes>
       <Route path="/" element={<Navigate to="/homepage" replace />} />
       {/* PUBLIC */}
@@ -147,7 +146,6 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-
       <Route
         path="/payment/success"
         element={
@@ -156,7 +154,6 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-
       <Route
         path="/charging"
         element={
@@ -165,7 +162,6 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      
       <Route
         path="/user/history"
         element={
@@ -211,11 +207,8 @@ export default function App() {
         <Route path="reports" element={<Reports />} />
       </Route>
       {/* FALLBACK */}
-      <Route path="*" element={<NotFound/>} />
+      <Route path="*" element={<NotFound />} />
       {/* ✅ */}
-
     </Routes>
-
-
   );
 }

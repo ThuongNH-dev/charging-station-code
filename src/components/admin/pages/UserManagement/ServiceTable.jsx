@@ -1,60 +1,122 @@
-// src/components/UserManagement/ServiceTable.jsx
+// 📁 src/components/UserManagement/ServiceTable.jsx
 import React from "react";
-import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 
-const ServiceTable = ({ filteredData = [], setActiveModal }) => {
+/**
+ * Component hiển thị bảng danh sách các gói dịch vụ (Subscription Plans)
+ * @param {Array} filteredData - Danh sách các gói dịch vụ đã lọc từ API /SubscriptionPlans.
+ * @param {Function} setActiveModal - Hàm để mở modal Sửa/Xóa.
+ * @param {Boolean} isLoading - Trạng thái đang tải dữ liệu.
+ */
+const ServiceTable = ({
+  filteredData = [],
+  setActiveModal,
+  isLoading = false,
+}) => {
+  // 🌀 TRƯỜNG HỢP 1: Đang tải dữ liệu
+  if (isLoading) {
+    return <p>Đang tải dữ liệu gói dịch vụ...</p>;
+  }
+
+  // 🚫 TRƯỜNG HỢP 2: Không có dữ liệu (sau khi tải xong)
   if (filteredData.length === 0) {
+    console.error("❌ Lỗi hiển thị bảng dịch vụ: filteredData rỗng!", {
+      filteredDataLength: filteredData.length,
+      isLoading,
+    });
     return <p>Không tìm thấy gói dịch vụ nào phù hợp với bộ lọc.</p>;
   }
 
+  // 🧮 HÀM HỖ TRỢ CHUYỂN ĐỔI NGỮ NGHĨA
+  const formatCategory = (category) => {
+    // Dựa theo API cũ: Individual / Business
+    if (category === "Individual") return "Cá nhân";
+    if (category === "Business") return "Doanh nghiệp";
+
+    // Nếu API mới đổi sang “Trả trước” / “Thuê bao”, cần map lại ở đây
+    return category || "—";
+  };
+
+  // 🧩 KẾT HỢP MÔ TẢ QUYỀN LỢI & PHÚT CHỜ MIỄN PHÍ
+  const formatBenefits = (pkg) => {
+    let benefitStr = pkg.benefits || pkg.description || "";
+
+    if (pkg.freeIdleMinutes > 0) {
+      benefitStr +=
+        (benefitStr ? " | " : "") +
+        `Miễn phí Idle Fee ${pkg.freeIdleMinutes} phút`;
+    }
+
+    return benefitStr || "—";
+  };
+
+  // 📋 TRƯỜNG HỢP 3: HIỂN THỊ DỮ LIỆU TRÊN BẢNG
   return (
     <div className="user-table-section service-package-table">
       <h3>Danh sách Gói dịch vụ ({filteredData.length} mục)</h3>
-      <table>
+
+      <table className="minimal-table">
         <thead>
           <tr>
-            <th>ID</th>
             <th>Tên gói</th>
-            <th>Giá</th>
-            <th>Thời hạn</th>
-            <th>Giới hạn</th>
-            <th>Quyền lợi</th>
             <th>Loại</th>
-            <th>Trạng thái</th>
+            <th>Giá</th>
+            <th>Quyền lợi</th>
             <th>Hành động</th>
           </tr>
         </thead>
+
         <tbody>
           {filteredData.map((pkg) => (
-            <tr key={pkg.id}>
-              <td>{pkg.id}</td>
-              <td>{pkg.name}</td>
-              <td>{pkg.price}</td>
-              <td>{pkg.duration}</td>
-              <td>{pkg.limit}</td>
-              <td className="description-cell">{pkg.benefits}</td>
-              <td>{pkg.type}</td>
+            <tr key={pkg.subscriptionPlanId}>
+              {/* 📦 Tên gói */}
+              <td>{pkg.planName || "—"}</td>
+
+              {/* 🏷️ Loại */}
+              <td>{formatCategory(pkg.category)}</td>
+
+              {/* 💰 Giá */}
               <td>
-                <span
-                  className={`status ${
-                    pkg.status === "Đang bán" ? "active" : "inactive"
-                  }`}
-                >
-                  {pkg.status}
-                </span>
+                {pkg.priceMonthly
+                  ? `${pkg.priceMonthly.toLocaleString("vi-VN")} VND`
+                  : "0 VND"}
               </td>
+
+              {/* 🎁 Quyền lợi */}
+              <td className="description-cell">{formatBenefits(pkg)}</td>
+
+              {/* ⚙️ Hành động */}
               <td className="action-cell">
                 <button
-                  className="icon-btn"
-                  onClick={() => setActiveModal(`editService-${pkg.id}`)}
+                  className="text-action-btn edit-btn"
+                  onClick={() =>
+                    setActiveModal(`editService-${pkg.subscriptionPlanId}`)
+                  }
+                  style={{
+                    marginRight: "8px",
+                    cursor: "pointer",
+                    background: "none",
+                    border: "none",
+                    color: "#007bff",
+                    textDecoration: "underline",
+                  }}
                 >
-                  <EditOutlined />
+                  Sửa
                 </button>
+
                 <button
-                  className="icon-btn"
-                  onClick={() => setActiveModal(`deleteService-${pkg.id}`)}
+                  className="text-action-btn delete-btn"
+                  onClick={() =>
+                    setActiveModal(`deleteService-${pkg.subscriptionPlanId}`)
+                  }
+                  style={{
+                    cursor: "pointer",
+                    background: "none",
+                    border: "none",
+                    color: "red",
+                    textDecoration: "underline",
+                  }}
                 >
-                  <DeleteOutlined />
+                  Xóa
                 </button>
               </td>
             </tr>

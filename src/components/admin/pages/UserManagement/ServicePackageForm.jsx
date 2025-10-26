@@ -1,56 +1,79 @@
 // src/components/UserManagement/ServicePackageForm.jsx
 import React, { useState, useEffect } from "react";
 
-// Nhận initialData, crudActions (chứa updateServicePackage), và setActiveModal từ Modals/ServiceModal.jsx
+// 🔹 Form thêm / chỉnh sửa gói dịch vụ
+//   - initialData: dữ liệu ban đầu khi chỉnh sửa
+//   - crudActions: chứa các hàm updateServicePackage, createServicePackage
+//   - setActiveModal: dùng để đóng modal sau khi xử lý
 const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
   // Khởi tạo state form từ dữ liệu ban đầu hoặc giá trị mặc định
   const [formData, setFormData] = useState({
-    name: "",
-    price: 0,
-    duration: "",
-    limit: "",
+    planName: "",
+    description: "",
+    category: "Individual",
+    priceMonthly: 0,
+    discountPercent: 0,
+    freeIdleMinutes: 0,
     benefits: "",
-    type: "Public", // Giá trị mặc định
-    status: "Đang bán",
+    isForCompany: false,
+    status: "Active",
     ...initialData, // Ghi đè nếu có dữ liệu chỉnh sửa
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Đồng bộ lại khi initialData thay đổi
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
     }
   }, [initialData]);
 
+  // Xử lý thay đổi input
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
+  // Xử lý submit form
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Xác định hành động (Update hay Create)
-    const isEdit = initialData && initialData.id;
+    // 🌟 CHỈNH SỬA TẠI ĐÂY: Ưu tiên lấy subscriptionPlanId theo API mẫu
+    const packageId = initialData && (
+      initialData.subscriptionPlanId || initialData.id || initialData.packageId
+    );
     let success = false;
 
-    if (isEdit) {
-      // CALL API UPDATE
-      success = await crudActions.updateServicePackage(
-        initialData.id,
-        formData
-      );
-    } else {
-      // CALL API CREATE (Giả định bạn có hàm createServicePackage trong crudActions)
-      // success = await crudActions.createServicePackage(formData);
-      // Tạm thời bỏ qua phần Create vì API bạn cung cấp chưa có POST
-      alert("Chức năng thêm mới chưa được triển khai API!");
+    try {
+      if (packageId) {
+        // 🔸 Gọi API update
+        await crudActions.updateServicePackage(packageId, formData);
+        success = true;
+      } else {
+        // 🔸 Gọi API create (nếu có)
+        if (crudActions.createServicePackage) {
+          await crudActions.createServicePackage(formData);
+        } else {
+          alert(
+            "Chức năng thêm mới chưa được triển khai API! Tạm thời mô phỏng thành công."
+          );
+        }
+        success = true;
+      }
+    } catch (error) {
+      console.error("Lỗi xử lý gói dịch vụ:", error);
+      alert(`Lỗi: ${error.message || "Không thể xử lý gói dịch vụ."}`);
+      success = false;
     }
 
     if (success) {
-      setActiveModal(null); // Đóng modal sau khi thành công
+      setActiveModal(null); // Đóng modal
+      // 👉 Có thể thêm hàm refresh data ở component cha tại đây
     }
 
     setIsSubmitting(false);
@@ -58,30 +81,96 @@ const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
 
   return (
     <form onSubmit={handleSubmit} className="service-form">
+      {/* Tên gói */}
       <div className="form-group">
         <label>Tên gói:</label>
         <input
           type="text"
-          name="name"
-          value={formData.name}
+          name="planName"
+          value={formData.planName}
           onChange={handleChange}
           required
         />
       </div>
+
+      {/* Giá hàng tháng */}
       <div className="form-group">
-        <label>Giá:</label>
+        <label>Giá hàng tháng (VND):</label>
         <input
           type="number"
-          name="price"
-          value={formData.price}
+          name="priceMonthly"
+          value={formData.priceMonthly}
           onChange={handleChange}
           required
         />
       </div>
-      {/* ... Các trường input khác (duration, limit, benefits, type, status) ... */}
 
+      {/* Loại (Category) */}
       <div className="form-group">
-        <label>Quyền lợi:</label>
+        <label>Loại (Category):</label>
+        <select
+          name="category"
+          value={formData.category}
+          onChange={handleChange}
+          required
+        >
+          <option value="Individual">Cá nhân</option>
+          <option value="Business">Doanh nghiệp</option>
+        </select>
+      </div>
+
+      {/* Giảm giá */}
+      <div className="form-group">
+        <label>Giảm giá (%):</label>
+        <input
+          type="number"
+          name="discountPercent"
+          value={formData.discountPercent}
+          onChange={handleChange}
+          max="100"
+        />
+      </div>
+
+      {/* Phút chờ miễn phí */}
+      <div className="form-group">
+        <label>Phút chờ miễn phí:</label>
+        <input
+          type="number"
+          name="freeIdleMinutes"
+          value={formData.freeIdleMinutes}
+          onChange={handleChange}
+        />
+      </div>
+
+      {/* Checkbox dành cho doanh nghiệp */}
+      <div className="form-group checkbox-group">
+        <input
+          type="checkbox"
+          id="isForCompany"
+          name="isForCompany"
+          checked={formData.isForCompany}
+          onChange={handleChange}
+        />
+        <label htmlFor="isForCompany">Áp dụng cho Doanh nghiệp</label>
+      </div>
+
+      {/* Trạng thái */}
+      <div className="form-group">
+        <label>Trạng thái gói:</label>
+        <select
+          name="status"
+          value={formData.status}
+          onChange={handleChange}
+          required
+        >
+          <option value="Active">Đang hoạt động</option>
+          <option value="Inactive">Ngừng hoạt động</option>
+        </select>
+      </div>
+
+      {/* Mô tả / Quyền lợi */}
+      <div className="form-group">
+        <label>Mô tả / Quyền lợi:</label>
         <textarea
           name="benefits"
           value={formData.benefits}
@@ -90,12 +179,12 @@ const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
         />
       </div>
 
-      {/* Nút submit được di chuyển ra ngoài modal-actions (AdminModals) để giữ cấu trúc ban đầu */}
+      {/* Nút hành động */}
       <div className="modal-actions form-actions">
         <button type="submit" className="btn primary" disabled={isSubmitting}>
           {isSubmitting
             ? "Đang xử lý..."
-            : initialData
+            : packageId
             ? "Lưu thay đổi"
             : "Thêm mới"}
         </button>
