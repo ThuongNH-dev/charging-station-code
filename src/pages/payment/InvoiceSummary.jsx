@@ -167,14 +167,14 @@ export default function InvoiceSummary() {
     }
     return Array.from(map.values());
   }, [normalized]);
-  
+
   // sau const unique = useMemo(...)
 
-useEffect(() => {
-  try {
-    sessionStorage.setItem("charge:billing:list", JSON.stringify(unique));
-  } catch {}
-}, [unique]);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("charge:billing:list", JSON.stringify(unique));
+    } catch { }
+  }, [unique]);
 
 
   // filter + sort
@@ -264,69 +264,69 @@ useEffect(() => {
         {!loading && !err && pageItems.length > 0 && (
           <div className="sum-list">
             {pageItems.map((inv, idx) => {
-              const id = inv.id || `${inv.billingYear}-${inv.billingMonth}-${idx}`;
+              const id = inv.invoiceId || inv.id || `${inv.billingYear}-${inv.billingMonth}-${idx}`;
               return (
                 <button
                   key={id}
                   className="sum-card"
-                  onClick={() =>
-                    navigate(`/invoiceDetail/${encodeURIComponent(id)}`, {
-                      state: {
-                        invoiceId: id,
-                        invoice: inv, // gửi object để hiển thị tức thì
-                      },
-                    })
-                  }>
-                    {/* Top row: left title, right status */ }
-                    <div className="sum-row top">
-                      <div className="sum-title">Hóa đơn kỳ {inv.billingMonth}/{inv.billingYear}</div>
-                      <span className={pillClass(inv.status)}>{inv.status || "—"}</span>
-                    </div>
+                  onClick={() => navigate(`/invoiceDetail/${encodeURIComponent(inv.invoiceId || id)}`, {
+                    state: {
+                      invoiceId: inv.invoiceId || id,
+                      invoice: inv,
+                      period: { month: inv.billingMonth, year: inv.billingYear }
+                    }
+                  })}
+                  >
+                  {/* Top row: left title, right status */}
+                  <div className="sum-row top">
+                    <div className="sum-title">Hóa đơn kỳ {inv.billingMonth}/{inv.billingYear}</div>
+                    <span className={pillClass(inv.status)}>{inv.status || "—"}</span>
+                  </div>
 
-                  {/* Bottom row: meta left, total right */ }
-              <div className="sum-row bottom">
-                <div className="sum-meta">
-                  <div className="kv"><span className="k">Tạo lúc:</span><span className="v light">{fmt(inv.createdAt)}</span></div>
-                  <div className="kv"><span className="k">Cập nhật:</span><span className="v light">{fmt(inv.updatedAt)}</span></div>
-                </div>
-                <div className="sum-total">
-                  <div className="label">Tổng hóa đơn</div>
-                  <div className="num">{vnd(inv.total || 0)}</div>
-                </div>
-              </div>
+                  {/* Bottom row: meta left, total right */}
+                  <div className="sum-row bottom">
+                    <div className="sum-meta">
+                      <div className="kv"><span className="k">Tạo lúc:</span><span className="v light">{fmt(inv.createdAt)}</span></div>
+                      <div className="kv"><span className="k">Cập nhật:</span><span className="v light">{fmt(inv.updatedAt)}</span></div>
+                    </div>
+                    <div className="sum-total">
+                      <div className="label">Tổng hóa đơn</div>
+                      <div className="num">{vnd(inv.total || 0)}</div>
+                    </div>
+                  </div>
                 </button>
-        );
+              );
             })}
-      </div>
+          </div>
         )}
 
-      {/* Breadcrumb pagination */}
-      {!loading && !err && filtered.length > 0 && (
-        <>
-          <div className="bp-hint">
-            Đang hiển thị {Math.min(filtered.length, start + 1)}–{Math.min(filtered.length, start + pageItems.length)} / {filtered.length} hóa đơn
-          </div>
-          <nav className="bp-nav" aria-label="Phân trang">
-            <button className="bp-item nav" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>← Trước</button>
-            {pageList.map((p, i) =>
-              p === "..." ? (
-                <span key={`e${i}`} className="bp-ellipsis">…</span>
-              ) : (
-                <button
-                  key={p}
-                  className={`bp-item ${p === page ? "active" : ""}`}
-                  onClick={() => setPage(p)}
-                  disabled={p === page}
-                >
-                  {p}
-                </button>
-              )
-            )}
-            <button className="bp-item nav" disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Sau →</button>
-          </nav>
-        </>
-      )}
-    </div>
+        {/* Breadcrumb pagination */}
+        {!loading && !err && filtered.length > 0 && (
+          <>
+            <div className="bp-hint">
+              Đang hiển thị {Math.min(filtered.length, start + 1)}–{Math.min(filtered.length, start + pageItems.length)} / {filtered.length} hóa đơn
+            </div>
+            <nav className="bp-nav" aria-label="Phân trang">
+              <button className="bp-item nav" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>← Trước</button>
+              {pageList.map((p, i) =>
+                p === "..." ? (
+                  <span key={`e${i}`} className="bp-ellipsis">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    className={`bp-item ${p === page ? "active" : ""}`}
+                    onClick={() => setPage(p)}
+                    disabled={p === page}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+              <button className="bp-item nav" disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Sau →</button>
+            </nav>
+          </>
+        )}
+      </div>
     </MainLayout >
   );
 }

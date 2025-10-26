@@ -38,6 +38,19 @@ function getRoleFromToken(token) {
   );
 }
 
+function storeCustomerId(n) {
+  try {
+    if (Number.isFinite(n) && n > 0) {
+      localStorage.setItem("customerId", String(n));
+      sessionStorage.setItem("customerId", String(n));
+      console.debug("[LOGIN] stored customerId =", n);
+    }
+  } catch (e) {
+    console.warn("[LOGIN] storeCustomerId error:", e);
+  }
+}
+
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -118,26 +131,32 @@ export default function Login() {
           claims?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"]
         ) || null;
 
-      // 🔹 GỌI BE lấy customerId theo accountId (KHÔNG dùng /me)
+      // 🔹 LẤY customerId từ /api/Auth (mảng accounts có customers[])
       let customerId = null;
       try {
         const apiAbs = (getApiBase() || "").replace(/\/+$/, "") || "https://localhost:7268/api";
-        const resp = await fetch(`${apiAbs}/Customers/by-account/${accountId}`, {
+        console.debug("[LOGIN] fetching /Auth to resolve customerId for accountId =", accountId);
+        const resp = await fetch(`${apiAbs}/Auth`, {
           method: "GET",
           headers: {
             accept: "application/json",
             authorization: `Bearer ${token}`,
           },
         });
-        if (resp.ok) {
-          const j = await resp.json();
-          customerId = j?.customerId ?? null;
-        } else {
-          console.warn("by-account fetch non-200:", resp.status);
-        }
-      } catch (err) {
-        console.warn("by-account fetch error:", err);
-      }
+       if (resp.ok) {
+         const list = await resp.json(); // ← MẢNG
+         const mine = Array.isArray(list)
+           ? list.find(x => Number(x?.accountId) === Number(accountId))
+           : null;
+         customerId = Number(mine?.customers?.[0]?.customerId) || null;
+         console.debug("[LOGIN] /Auth matched customerId =", customerId, "from accountId =", accountId);
+         if (customerId) storeCustomerId(customerId);
+       } else {
+         console.warn("[LOGIN] /Auth non-200:", resp.status);
+       }
+     } catch (err) {
+       console.warn("[LOGIN] /Auth fetch error:", err);
+     }
 
       const role = getRoleFromToken(token);
       const msg = data?.message ?? data ?? {};

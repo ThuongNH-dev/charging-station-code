@@ -5,6 +5,7 @@ import MainLayout from "../../layouts/MainLayout";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import "./style/InvoiceDetail.css";
 
+
 const VND = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
 
 function normalizeApiBase(s) {
@@ -14,12 +15,49 @@ function normalizeApiBase(s) {
 }
 const API_ABS = normalizeApiBase(getApiBase()) || "https://localhost:7268/api";
 
+function toUrlString(val) {
+  if (!val) return "";
+  const s = typeof val === "string" ? val : (val.result ?? val.url ?? val.href ?? "");
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s)) return s;
+  try { return new URL(s, window.location.origin).toString(); } catch { return ""; }
+}
+
+function isPaidOrConfirmed(raw) {
+  if (!raw || typeof raw !== "object") return false;
+  const paid = raw.isPaid ?? raw.paid ?? raw.IsPaid;
+  if (paid === true || paid === "true" || paid === 1) return true;
+  const st = String(raw.status ?? raw.Status ?? "").toLowerCase();
+  if (["paid", "completed", "confirmed", "success"].includes(st)) return true;
+  const paymentStatus = String(raw.paymentStatus ?? raw.PaymentStatus ?? "").toLowerCase();
+  if (["paid", "success", "completed"].includes(paymentStatus)) return true;
+  return false;
+}
+
+async function fetchInvoiceById(id) {
+  const res = await fetchAuthJSON(`${API_ABS}/Invoices/${id}`, { method: "GET" });
+  return res?.data ?? res ?? null;
+}
+
+async function pollInvoicePaid(invoiceId, { timeoutMs = 300000, stepMs = 2500 } = {}) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    try {
+      const inv = await fetchInvoiceById(invoiceId);
+      if (isPaidOrConfirmed(inv)) return { ok: true, data: inv };
+    } catch { }
+    await new Promise(r => setTimeout(r, stepMs));
+  }
+  return { ok: false };
+}
+
+
 // ===== helpers =====
 const pillClass = (status) => {
   const s = String(status || "").toLowerCase().trim();
   if (/(^|[^a-z])overdue([^a-z]|$)/.test(s)) return "pill danger";
-  if (/(^|[^a-z])unpaid([^a-z]|$)/.test(s))  return "pill warn";
-  if (/(^|[^a-z])paid([^a-z]|$)/.test(s))    return "pill ok";
+  if (/(^|[^a-z])unpaid([^a-z]|$)/.test(s)) return "pill warn";
+  if (/(^|[^a-z])paid([^a-z]|$)/.test(s)) return "pill ok";
   return "pill";
 };
 
@@ -51,13 +89,13 @@ async function fetchSessionsForInvoice(invoiceId, context) {
     const sessions = Array.isArray(inv?.chargingSessions) ? inv.chargingSessions
       : Array.isArray(inv?.items) ? inv.items : null;
     if (sessions?.length) return sessions.map(normalizeSession).filter(Boolean);
-  } catch {}
+  } catch { }
 
   try {
     const r2 = await fetchAuthJSON(`${API_ABS}/ChargingSessions/by-invoice/${invoiceId}`, { method: "GET" });
     const arr = Array.isArray(r2?.data) ? r2.data : Array.isArray(r2) ? r2 : [];
     if (arr.length) return arr.map(normalizeSession).filter(Boolean);
-  } catch {}
+  } catch { }
 
   const { customerId, billingYear, billingMonth } = context || {};
   if (customerId && billingYear && billingMonth) {
@@ -72,7 +110,7 @@ async function fetchSessionsForInvoice(invoiceId, context) {
         arr = arr.filter(s => String(s.invoiceId) === String(invoiceId));
       }
       return arr;
-    } catch {}
+    } catch { }
   }
   return [];
 }
@@ -81,18 +119,18 @@ async function fetchSessionsForInvoice(invoiceId, context) {
 const inventorySafe = (arr) => (Array.isArray(arr) ? arr : []);
 const parseDate = (s) => {
   if (!s) return null;
-  const [y,m,d] = s.split("-").map(Number);
-  if (!y||!m||!d) return null;
-  return new Date(y, m-1, d, 0,0,0,0);
+  const [y, m, d] = s.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
 };
-const endOfDay = (d) => { const x = new Date(d); x.setHours(23,59,59,999); return x; };
-const buildPages = (total, current, window=2) => {
+const endOfDay = (d) => { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; };
+const buildPages = (total, current, window = 2) => {
   if (total <= 1) return [1];
-  const set = new Set([1,total]);
-  for (let i=current-window;i<=current+window;i++){ if(i>=1&&i<=total) set.add(i); }
-  const arr = [...set].sort((a,b)=>a-b);
-  const out=[];
-  for(let i=0;i<arr.length;i++){ out.push(arr[i]); if(i<arr.length-1 && arr[i+1]-arr[i]>1) out.push("..."); }
+  const set = new Set([1, total]);
+  for (let i = current - window; i <= current + window; i++) { if (i >= 1 && i <= total) set.add(i); }
+  const arr = [...set].sort((a, b) => a - b);
+  const out = [];
+  for (let i = 0; i < arr.length; i++) { out.push(arr[i]); if (i < arr.length - 1 && arr[i + 1] - arr[i] > 1) out.push("..."); }
   return out;
 };
 
@@ -102,14 +140,14 @@ export default function InvoiceDetail() {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
-  const [err, setErr]       = useState("");
+  const [err, setErr] = useState("");
   const [invoice, setInvoice] = useState(null);
 
   // ===== filters for sessions =====
   const [sessStatus, setSessStatus] = useState("all");     // all | completed | charging | failed | canceled
-  const [timeField, setTimeField]   = useState("startedAt"); // startedAt | endedAt
+  const [timeField, setTimeField] = useState("startedAt"); // startedAt | endedAt
   const [from, setFrom] = useState("");
-  const [to, setTo]     = useState("");
+  const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 10;
 
@@ -138,7 +176,7 @@ export default function InvoiceDetail() {
             }
           }
         }
-      } catch {}
+      } catch { }
       if (mounted) setLoading(false);
     })();
     return () => { mounted = false; };
@@ -152,11 +190,8 @@ export default function InvoiceDetail() {
       setLoading(true); setErr("");
       try {
         let latest = null;
-        try {
-          const resInv = await fetchAuthJSON(`${API_ABS}/Invoices/${targetId}`, { method: "GET" });
-          latest = resInv?.data ?? resInv ?? null;
-        } catch {}
-        if (!latest) latest = invoice ?? state?.invoice ?? null;
+        const resInv = await fetchAuthJSON(`${API_ABS}/Invoices/${targetId}`, { method: "GET" });
+        latest = resInv?.data ?? resInv ?? (invoice ?? state?.invoice ?? null);
         if (!latest) throw new Error("Không tải được chi tiết hóa đơn.");
 
         const sessions = await fetchSessionsForInvoice(
@@ -197,8 +232,8 @@ export default function InvoiceDetail() {
   // ===== compute like old page =====
   const sessions = inventorySafe(invoice?.chargingSessions);
   const subtotal = sessions.reduce((a, s) => a + (Number(s.subtotal) || 0), 0);
-  const tax      = sessions.reduce((a, s) => a + (Number(s.tax) || 0), 0);
-  const total    = sessions.reduce((a, s) => a + (Number(s.total) || 0), 0);
+  const tax = sessions.reduce((a, s) => a + (Number(s.tax) || 0), 0);
+  const total = sessions.reduce((a, s) => a + (Number(s.total) || 0), 0);
   const mismatch = Math.abs(total - (Number(invoice?.total) || 0)) > 1;
   const customer = invoice?.customer || null;
 
@@ -210,15 +245,15 @@ export default function InvoiceDetail() {
       arr = arr.filter((s) => {
         const v = String(s.status || "").toLowerCase();
         if (sessStatus === "completed") return v.includes("completed");
-        if (sessStatus === "charging")  return v.includes("charging");
-        if (sessStatus === "failed")    return v.includes("fail");
-        if (sessStatus === "canceled")  return v.includes("cancel");
+        if (sessStatus === "charging") return v.includes("charging");
+        if (sessStatus === "failed") return v.includes("fail");
+        if (sessStatus === "canceled") return v.includes("cancel");
         return true;
       });
     }
 
     const dFrom = parseDate(from);
-    const dTo   = to ? endOfDay(parseDate(to)) : null;
+    const dTo = to ? endOfDay(parseDate(to)) : null;
 
     if (dFrom || dTo) {
       arr = arr.filter((s) => {
@@ -226,7 +261,7 @@ export default function InvoiceDetail() {
         if (!t) return false;
         const d = new Date(t);
         if (dFrom && d < dFrom) return false;
-        if (dTo && d > dTo)   return false;
+        if (dTo && d > dTo) return false;
         return true;
       });
     }
@@ -240,6 +275,7 @@ export default function InvoiceDetail() {
   const start = (page - 1) * pageSize;
   const pageItems = filteredSessions.slice(start, start + pageSize);
   const pageList = buildPages(totalPages, page, 2);
+
 
   // ===== render states =====
   if (!targetId && !loading) {
@@ -286,10 +322,10 @@ export default function InvoiceDetail() {
               onClick={() => navigate("/payment", {
                 state: {
                   from: "invoice-detail",
-                  billingMonth: invoice.billingMonth,
-                  billingYear: invoice.billingYear,
-                  amount: invoice.total,
-                  invoiceId: invoice.id,
+                  invoiceId: Number(invoice.invoiceId ?? invoice.id),
+                  companyId: invoice.companyId ?? state?.companyId ?? null,
+                  // để PaymentPage hiển thị tức thời, BE vẫn là source of truth:
+                  presetAmount: Number(invoice.total) || undefined,
                 },
               })}
               className="btn primary"
@@ -317,7 +353,7 @@ export default function InvoiceDetail() {
 
         {/* ===== Filters for sessions ===== */}
         <div className="filters">
-          <select value={sessStatus} onChange={(e)=>setSessStatus(e.target.value)}>
+          <select value={sessStatus} onChange={(e) => setSessStatus(e.target.value)}>
             <option value="all">Tất cả phiên</option>
             <option value="completed">Hoàn tất</option>
             <option value="charging">Đang sạc</option>
@@ -326,15 +362,15 @@ export default function InvoiceDetail() {
           </select>
 
           <div className="datefilter">
-            <select className="df-field" value={timeField} onChange={(e)=>setTimeField(e.target.value)}>
+            <select className="df-field" value={timeField} onChange={(e) => setTimeField(e.target.value)}>
               <option value="startedAt">Bắt đầu</option>
               <option value="endedAt">Kết thúc</option>
             </select>
-            <input className="df-date" type="date" value={from} onChange={(e)=>setFrom(e.target.value)} />
+            <input className="df-date" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
             <span className="df-sep">—</span>
-            <input className="df-date" type="date" value={to} min={from || undefined} onChange={(e)=>setTo(e.target.value)} />
+            <input className="df-date" type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
             {(from || to) && (
-              <button className="df-clear" title="Xóa lọc ngày" onClick={()=>{setFrom(""); setTo("");}}>✕</button>
+              <button className="df-clear" title="Xóa lọc ngày" onClick={() => { setFrom(""); setTo(""); }}>✕</button>
             )}
           </div>
         </div>

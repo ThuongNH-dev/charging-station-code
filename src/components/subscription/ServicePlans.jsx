@@ -7,12 +7,16 @@ import { getApiBase, fetchAuthJSON } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
 
 // ==================== Helpers ====================
-function normalizeApiBase(s) {
-  const raw = (s || "").trim();
-  if (!raw) return "https://localhost:7268/api";
-  return raw.replace(/\/+$/, "");
+function getApiBaseAbs() {
+  const raw = (getApiBase() || "").trim();
+  // Nếu đã là http(s) thì dùng luôn
+  if (/^https?:\/\//i.test(raw)) return raw.replace(/\/+$/, "");
+  // Nếu FE trả về "/api" (proxy) mà bạn không reverse-proxy, ép sang BE mặc định
+  if (raw.startsWith("/")) return "https://localhost:7268/api";
+  // Fallback
+  return "https://localhost:7268/api";
 }
-const API_ABS = normalizeApiBase(getApiBase()) || "https://localhost:7268/api";
+const API_ABS = getApiBaseAbs();
 const CREATE_SUBS_API = `${API_ABS}/Subscriptions`;
 
 function vnd(n) {
@@ -83,6 +87,29 @@ function decodeJwtPayload(token) {
   }
 }
 
+function getAccountIdFromToken() {
+  const t = getToken();
+  if (!t) return null;
+  const p = decodeJwtPayload(t);
+  const raw =
+    p?.accountId ??
+    p?.AccountId ??
+    p?.sub ??
+    p?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function storeCustomerId(n) {
+  try {
+    if (Number.isFinite(n) && n > 0) {
+      sessionStorage.setItem("customerId", String(n));
+      localStorage.setItem("customerId", String(n));
+    }
+  } catch { }
+}
+
+
 // ===== Actor/Plan audience helpers =====
 function rolesFromToken(p) {
   const r1 = p?.role;
@@ -117,19 +144,19 @@ async function resolveActorType() {
       if (safeNum(p?.companyId) != null) return "company";
       if (safeNum(p?.customerId) != null) return "customer";
     }
-  } catch {}
+  } catch { }
 
   // 2) /Companies/me
   try {
     const cm = await fetchAuthJSON(`${API_ABS}/Companies/me`, { method: "GET" });
     if (safeNum((cm?.data || cm)?.companyId) != null) return "company";
-  } catch {}
+  } catch { }
 
   // 3) /Customers/me
   try {
     const cs = await fetchAuthJSON(`${API_ABS}/Customers/me`, { method: "GET" });
     if (safeNum((cs?.data || cs)?.customerId) != null) return "customer";
-  } catch {}
+  } catch { }
 
   // 4) Token fallback
   try {
@@ -139,21 +166,23 @@ async function resolveActorType() {
       if (safeNum(p?.companyId) != null) return "company";
       if (safeNum(p?.customerId) != null) return "customer";
     }
-  } catch {}
+  } catch { }
 
   return null;
 }
 
 /** Kiểm tra có được đăng ký gói này không; trả về true/false */
 async function ensurePlanAllowed(plan, msgApi) {
-  const actor = await resolveActorType();
-  const audience = planAudience(plan);
+  const actor = await resolveActorType(); // "company" | "customer" | null
+  const audience = planAudience(plan);    // <- bổ sung lấy audience đúng
+  const customerId = await resolveCustomerIdSmart();
+
+  if (!customerId) throw new Error("Không tìm thấy customerId để tạo hóa đơn.");
 
   if (!actor) {
     msgApi.warning("Không xác định được loại tài khoản. Sẽ kiểm tra lại khi xác nhận.");
-    return true; // cho qua bước mở modal; sẽ chặn thêm ở confirm
+    return true;
   }
-
   if (actor === "customer" && audience === "company") {
     msgApi.error("Tài khoản cá nhân không thể đăng ký gói dành cho doanh nghiệp.");
     return false;
@@ -163,6 +192,42 @@ async function ensurePlanAllowed(plan, msgApi) {
     return false;
   }
   return true;
+}
+
+
+async function resolveCompanyIdSmart() {
+  // /Auth
+  try {
+    const me = await fetchAuthJSON(`${API_ABS}/Auth`, { method: "GET" });
+    const d = me?.data || me;
+    const n = Number(d?.companyId ?? d?.CompanyId);
+    if (Number.isFinite(n) && n > 0) return n;
+  } catch { }
+
+  // /Companies/me
+  try {
+    const cm = await fetchAuthJSON(`${API_ABS}/Companies/me`, { method: "GET" });
+    const n = Number((cm?.data || cm)?.companyId ?? (cm?.data || cm)?.CompanyId);
+    if (Number.isFinite(n) && n > 0) return n;
+  } catch { }
+
+  // token
+  try {
+    const t = getToken();
+    if (t) {
+      const p = decodeJwtPayload(t);
+      const n = Number(p?.companyId ?? p?.CompanyId);
+      if (Number.isFinite(n) && n > 0) return n;
+    }
+  } catch { }
+
+  // storage (optional)
+  try {
+    const s = Number(localStorage.getItem("companyId") || sessionStorage.getItem("companyId"));
+    if (Number.isFinite(s) && s > 0) return s;
+  } catch { }
+
+  return null;
 }
 
 
@@ -180,10 +245,6 @@ function pickCustomerIdFrom(obj) {
     "custID",
     "customer_id",
     "cust_id",
-    "id",
-    "userId",
-    "sub",
-    "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier",
   ];
   for (const k of keys) {
     const v = obj[k];
@@ -202,57 +263,75 @@ function pickCustomerIdFrom(obj) {
  * - local/session storage
  */
 async function resolveCustomerIdSmart() {
-  // 1) /Auth
+  // 0) Storage (fast-path)
   try {
-    const meRes = await fetchAuthJSON(`${API_ABS}/Auth`, { method: "GET" });
-    const try1 = pickCustomerIdFrom(meRes?.data) ?? pickCustomerIdFrom(meRes);
-    if (try1 != null) return try1;
-  } catch {}
+    const stored = sessionStorage.getItem("customerId") || localStorage.getItem("customerId");
+    const n = safeNum(stored);
+    if (n) {
+      console.debug("[ServicePlans] customerId from storage =", n);
+      return n;
+    }
+  } catch { }
 
-  // 2) Token
+  // 1) Token → accountId
   try {
     const t = getToken();
     if (t) {
       const p = decodeJwtPayload(t);
 
-      // Nếu token có customerId trực tiếp
-      const fromTokenCust = pickCustomerIdFrom(p);
-      if (fromTokenCust != null) return fromTokenCust;
+      // Nếu token có field customerId rõ ràng thì nhận
+      const fromTokenCust = safeNum(p?.customerId ?? p?.CustomerId ?? p?.customer_id);
+      if (fromTokenCust != null) {
+        storeCustomerId(fromTokenCust);
+        console.debug("[ServicePlans] customerId from token =", fromTokenCust);
+        return fromTokenCust;
+      }
 
-      // Nếu token chỉ có accountId (sub) → gọi by-account
-      const accountId = safeNum(
-        p?.sub ??
-          p?.[
-            "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
-          ]
-      );
+      const accountId = getAccountIdFromToken();
+      console.debug("[ServicePlans] accountId from token =", accountId);
+
+      // 2) Từ token → accountId → /Auth (MẢNG) → customers[0].customerId
       if (accountId != null) {
         try {
-          const r1 = await fetchAuthJSON(
-            `${API_ABS}/Customers/by-account/${accountId}`,
-            { method: "GET" }
-          );
-          const tryByAcc = pickCustomerIdFrom(r1?.data) ?? pickCustomerIdFrom(r1);
-          if (tryByAcc != null) return tryByAcc;
-        } catch {}
+          const resp = await fetchAuthJSON(`${API_ABS}/Auth`, { method: "GET" });
+          const list = Array.isArray(resp?.data) ? resp.data : (Array.isArray(resp) ? resp : []);
+          const mine = list.find(x => Number(x?.accountId) === Number(accountId));
+          const cid = Number(mine?.customers?.[0]?.customerId) || null;
+          if (cid) {
+            storeCustomerId(cid);
+            console.debug("[ServicePlans] customerId from /Auth list =", cid);
+            return cid;
+          }
+        } catch (e) {
+          console.warn("[ServicePlans] /Auth resolve error:", e);
+        }
       }
     }
-  } catch {}
+  }
+  catch { }
 
-  // 3) /Customers/me
+
+
+  // 3) /Auth fallback (không có accountId trong token – hiếm)
   try {
-    const me = await fetchAuthJSON(`${API_ABS}/Customers/me`, { method: "GET" });
-    const id1 = pickCustomerIdFrom(me?.data) ?? pickCustomerIdFrom(me);
-    if (id1 != null) return id1;
-  } catch {}
+    const meRes = await fetchAuthJSON(`${API_ABS}/Auth`, { method: "GET" });
 
-  // 4) Lưu tạm
-  const stored =
-    sessionStorage.getItem("customerId") || localStorage.getItem("customerId");
-  if (stored && safeNum(stored) != null) return safeNum(stored);
+    const list = Array.isArray(meRes?.data) ? meRes.data : (Array.isArray(meRes) ? meRes : []);
+    // Nếu không có accountId, mà BE chỉ trả đúng 1 user trong danh sách hiện tại,
+    // thì lấy luôn customers[0] (dev environment). Nếu nhiều user → yêu cầu đăng nhập lại.
+    if (list.length === 1) {
+      const cid = Number(list[0]?.customers?.[0]?.customerId) || null;
+      if (cid) {
+        storeCustomerId(cid);
+        console.debug("[ServicePlans] customerId from /Auth(single) =", cid);
+        return cid;
+      }
+    }
+  } catch { }
 
   return null;
 }
+
 
 // ==================== Component ====================
 const ServicePlans = () => {
@@ -368,6 +447,7 @@ const ServicePlans = () => {
       customerId,
       subscriptionPlanId: plan.subscriptionPlanId,
     };
+    console.debug("[ServicePlans] createSubscription BODY =", body);
 
     const res = await fetchAuthJSON(`${API_ABS}/Subscriptions`, {
       method: "POST",
@@ -378,6 +458,71 @@ const ServicePlans = () => {
     return res; // kỳ vọng có res.subscriptionId
   };
 
+  // === Create invoice for the new subscription ===
+  async function createInvoiceForSubscription({
+    subscriptionId,
+    plan,
+    startDate,        // Date object
+  }) {
+    if (!subscriptionId) throw new Error("Thiếu subscriptionId để tạo hóa đơn.");
+    const actor = await resolveActorType();                  // "company" | "customer" | null
+    const custId = await resolveCustomerIdSmart();           // số hoặc null
+    const compId = await resolveCompanyIdSmart();            // số hoặc null
+
+    // Chọn đúng "vai" và chỉ gửi 1 ID
+    let finalCustomerId = null;
+    let finalCompanyId = null;
+    if (actor === "company") {
+      finalCompanyId = compId;
+    } else {
+      finalCustomerId = custId;
+    }
+    // Nếu không suy ra được actor, ưu tiên customer nếu có
+    if (!finalCustomerId && !finalCompanyId) {
+      if (custId) finalCustomerId = custId;
+      else if (compId) finalCompanyId = compId;
+    }
+    if (!finalCustomerId && !finalCompanyId) {
+      throw new Error("Thiếu customerId/companyId: cần ít nhất 1 trong 2.");
+    }
+
+    // Giá: dùng monthly của plan (đã chuẩn hóa)
+    const subtotal = normalizeMonthlyPriceVND(plan.priceMonthly);
+    const tax = 0; // tuỳ BE
+    const total = subtotal + tax;
+
+    // Kỳ cước từ startDate
+    const baseDate = startDate instanceof Date ? startDate : new Date();
+    const billMonth = baseDate.getMonth() + 1;
+    const billYear = baseDate.getFullYear();
+
+    const payload = {
+      subscriptionId: Number(subscriptionId),
+      billingMonth: billMonth,
+      billingYear: billYear,
+      subtotal,
+      tax,
+      total,
+      notes: `Invoice for subscription #${subscriptionId} - plan ${plan.planName}`,
+    };
+    // Chỉ gắn field có giá trị; xóa field còn lại để BE không cố tìm sai vai
+    if (finalCustomerId) payload.customerId = finalCustomerId;
+    if (finalCompanyId) payload.companyId = finalCompanyId;
+
+    // Gọi endpoint tạo invoice (thử /Invoices trước, sau đó /Invoice)
+    const res = await fetchAuthJSON(`${API_ABS}/Invoices`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const resData = res?.data ?? res; // phòng khi BE bỏ wrapper sau này
+    const invoiceId = Number(resData?.invoiceId ?? resData?.InvoiceId ?? NaN);
+    if (!Number.isFinite(invoiceId)) {
+      throw new Error("Tạo hoá đơn thất bại: BE không trả về invoiceId.");
+    }
+    return { invoiceId, companyId: resData?.companyId ?? finalCompanyId ?? null };
+  }
+
   const handleConfirmCreate = async () => {
     try {
       if (!selectedPlan || !startDate) {
@@ -385,41 +530,48 @@ const ServicePlans = () => {
         return;
       }
 
-      // 1) Tạo subscription “chuẩn”
+      // 1) tạo subscription trước
       const sub = await createSubscription(selectedPlan);
-
-      // 2) Đóng modal + báo thành công
-      setOpen(false);
-      msgApi.success("Đã tạo thuê bao. Chuyển sang trang thanh toán…");
-
-      // 3) Điều hướng sang trang thanh toán
-      if (sub?.subscriptionId) {
-        navigate("/payment", {
-          state: {
-            plan: selectedPlan,
-            subscriptionId: sub.subscriptionId,
-            // Gửi theo thời gian để PaymentPage có thể hiển thị
-            startDate: toIsoLocal(startDate),
-            autoRenew: !!autoRenew,
-            billingCycle,
-          },
-        });
-      } else {
-        // fallback nếu BE chưa trả id
-        navigate("/payment", {
-          state: {
-            plan: selectedPlan,
-            startDate: toIsoLocal(startDate),
-            autoRenew: !!autoRenew,
-            billingCycle,
-          },
-        });
+      console.debug("[ServicePlans] createSubscription RESPONSE =", sub);
+      const subscriptionId = Number(sub?.subscriptionId ?? sub?.id ?? 0);
+      if (!Number.isFinite(subscriptionId) || subscriptionId <= 0) {
+        throw new Error("Tạo thuê bao thất bại: không nhận được subscriptionId.");
       }
+      // 2) tạo invoice theo subscription
+      const created = await createInvoiceForSubscription({
+        subscriptionId,
+        plan: selectedPlan,
+        startDate,
+      });
+
+
+      // 3) Đóng modal & điều hướng sang trang xác nhận hóa đơn
+      setOpen(false);
+      msgApi.success("Đã tạo hoá đơn. Chuyển sang xác nhận thanh toán…");
+
+      navigate(`/invoiceDetail/${created.invoiceId}`, {
+        state: {
+          invoiceId: created.invoiceId,
+          // truyền thêm để hiển thị tức thời (optional)
+          invoice: {
+            invoiceId: created.invoiceId,
+            billingMonth: startDate.getMonth() + 1,
+            billingYear: startDate.getFullYear(),
+            total: normalizeMonthlyPriceVND(selectedPlan.priceMonthly),
+            status: "Unpaid",
+            customerId: undefined,
+            customer: undefined,
+          },
+          // nếu có companyId (doanh nghiệp) thì pass sang để tạo phiên thanh toán:
+          companyId: created.companyId ?? null,
+        },
+      });
     } catch (e) {
       console.error("Create subscription error:", e);
-      msgApi.error(e?.message || "Tạo thuê bao thất bại. Vui lòng thử lại.");
+      msgApi.error(e?.message || "Tạo thuê bao/hoá đơn thất bại. Vui lòng thử lại.");
     }
   };
+
 
   // ==================== Render ====================
   return (
