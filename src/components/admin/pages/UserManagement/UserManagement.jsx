@@ -7,6 +7,7 @@ import VehicleTable from "./VehicleTable";
 import ServiceTable from "./ServiceTable";
 import AdminModals from "./Modals/AdminModals";
 import ServiceFilterBar from "./ServiceFilterBar";
+import VehicleFilterBar from "./VehicleFilterBar";
 
 const useUserServicesHook = () => {
   const [allAccounts, setAllAccounts] = useState([]);
@@ -152,22 +153,36 @@ const useUserServicesHook = () => {
   };
 };
 
-const useFilterLogicHook = ({ allAccounts, allVehicles, servicePackages }) => {
+/* finalFilteredUsers removed — this logic depends on userTypeFilter, individualUsers and companyUsers
+   which are available inside the UserManagement component via state and the useFilterLogicHook.
+   Compute combined/filtered lists inside the component where those variables are in scope. */
+
+const useFilterLogicHook = ({
+  allAccounts,
+  allVehicles,
+  servicePackages,
+  userTypeFilter,
+}) => {
   const [userFilter, setUserFilter] = useState({
     search: "",
     status: "all",
     servicePackage: "all",
     role: "all",
   });
-  const [vehicleFilter, setVehicleFilter] = useState({
-    search: "",
-    status: "all",
-  });
+
   const [serviceFilter, setServiceFilter] = useState({
     search: "",
     category: "all",
   });
 
+  const [vehicleFilter, setVehicleFilter] = useState({
+    ownerType: "all", // Loại chủ sở hữu (Cá nhân/Công ty)
+    carMaker: "all", // Hãng
+    model: "all", // Dòng xe
+    ownerId: "", // ID Chủ sở hữu/ID Người dùng
+  });
+
+  // ...
   const filteredUsers = useMemo(() => {
     return allAccounts.filter((user) => {
       const matchSearch =
@@ -178,7 +193,6 @@ const useFilterLogicHook = ({ allAccounts, allVehicles, servicePackages }) => {
       const matchStatus =
         userFilter.status === "all" || user.status === userFilter.status;
 
-      // 💡 LOGIC LỌC THEO GÓI DỊCH VỤ
       const userPackageNameLower = user.servicePackageName?.toLowerCase() || "";
       const filterPackageNameLower = userFilter.servicePackage.toLowerCase();
 
@@ -186,9 +200,16 @@ const useFilterLogicHook = ({ allAccounts, allVehicles, servicePackages }) => {
         userFilter.servicePackage === "all" ||
         userPackageNameLower === filterPackageNameLower;
 
-      return matchSearch && matchStatus && matchServicePackage; // CẬP NHẬT TRẢ VỀ
+      // ✅ LOGIC LỌC THEO LOẠI NGƯỜI DÙNG (ROLE)
+      const matchRole =
+        userTypeFilter === "all" ||
+        (userTypeFilter === "individual" && user.role === "Customer") ||
+        (userTypeFilter === "company" && user.role === "Company");
+
+      // ✅ CẬP NHẬT TRẢ VỀ: Thêm matchRole vào điều kiện
+      return matchSearch && matchStatus && matchServicePackage && matchRole;
     });
-  }, [allAccounts, userFilter]);
+  }, [allAccounts, userFilter, userTypeFilter]);
 
   const individualUsers = useMemo(
     () => filteredUsers.filter((u) => u.role === "Customer"),
@@ -215,33 +236,181 @@ const useFilterLogicHook = ({ allAccounts, allVehicles, servicePackages }) => {
 
   const filteredVehicles = useMemo(() => {
     return allVehicles.filter((vehicle) => {
-      const matchSearch =
-        vehicle.carMaker
-          ?.toLowerCase()
-          .includes(vehicleFilter.search.toLowerCase()) ||
-        vehicleFilter.search === "";
-      return matchSearch;
+      // Lọc 1: Hãng xe (Car Maker)
+      const matchMaker =
+        vehicleFilter.carMaker === "all" ||
+        vehicle.carMaker?.toLowerCase() ===
+          vehicleFilter.carMaker.toLowerCase();
+
+      // Lọc 2: Dòng xe (Model)
+      const matchModel =
+        vehicleFilter.model === "all" ||
+        vehicle.model?.toLowerCase() === vehicleFilter.model.toLowerCase();
+
+      // Lọc 3: ID Chủ sở hữu (Owner ID)
+      const filterOwnerId = vehicleFilter.ownerId.trim();
+      const currentOwnerId = vehicle.customerId || vehicle.companyId || "";
+      const matchOwnerId =
+        filterOwnerId === "" ||
+        currentOwnerId.toString().includes(filterOwnerId);
+
+      // Lọc 4: Loại chủ sở hữu (Owner Type) - Cá nhân/Công ty
+      const matchOwnerType =
+        vehicleFilter.ownerType === "all" ||
+        (vehicleFilter.ownerType === "Cá nhân" &&
+          !!vehicle.customerId &&
+          !vehicle.companyId) ||
+        (vehicleFilter.ownerType === "Công ty" && !!vehicle.companyId);
+
+      return matchMaker && matchModel && matchOwnerId && matchOwnerType;
     });
   }, [allVehicles, vehicleFilter]);
+
+  const vehicleFilterOptions = useMemo(() => {
+    // Sử dụng Set để đảm bảo tính duy nhất và loại bỏ giá trị null/undefined
+    const makers = new Set();
+    const models = new Set(); // OwnerType chỉ có 2 loại cố định: 'Cá nhân' và 'Công ty'
+    const ownerTypes = ["Cá nhân", "Công ty"];
+
+    allVehicles.forEach((vehicle) => {
+      if (vehicle.carMaker) makers.add(vehicle.carMaker);
+      if (vehicle.model) models.add(vehicle.model);
+    });
+
+    return {
+      // Chuyển Set sang Array và sắp xếp theo thứ tự alphabet
+      carMakers: Array.from(makers).sort(),
+      models: Array.from(models).sort(),
+      ownerTypes: ownerTypes,
+    };
+  }, [allVehicles]);
 
   return {
     userFilter,
     setUserFilter,
-    vehicleFilter,
-    setVehicleFilter,
+    vehicleFilter, // ✅ ĐÃ CHÍNH XÁC
+    setVehicleFilter, // ✅ ĐÃ CHÍNH XÁC
     serviceFilter,
     setServiceFilter,
     individualUsers,
     companyUsers,
-    filteredVehicles,
+    filteredVehicles, // ✅ ĐÃ CHÍNH XÁC
     filteredServices,
+    vehicleFilterOptions,
   };
 };
 
+// TẠO COMPONENT MỚI ĐỂ CHỨA LOGIC LỌC CỦA NGƯỜI DÙNG
+const UserFilterBar = ({
+  userFilter,
+  setUserFilter,
+  userTypeFilter,
+  setUserTypeFilter,
+  servicePackages,
+}) => {
+  // Tạo danh sách các gói dịch vụ cho dropdown
+  const packageOptions = useMemo(() => {
+    return (servicePackages || []).map((pkg) => (
+      <option key={pkg.planName} value={pkg.planName}>
+        {pkg.planName}
+      </option>
+    ));
+  }, [servicePackages]);
+
+  return (
+    <div className="filter-bar">
+      {/* 1. LỌC TÌM KIẾM */}
+      <div className="filter-group">
+        <label className="filter-label">Tìm kiếm:</label>
+        <div className="search-box">
+          <input
+            type="text"
+            placeholder="Tên, Email..."
+            value={userFilter.search}
+            onChange={(e) =>
+              setUserFilter({ ...userFilter, search: e.target.value })
+            }
+          />
+          <i className="fas fa-search search-icon"></i>
+        </div>
+      </div>
+
+      {/* 2. LỌC LOẠI NGƯỜI DÙNG (Segmented Control) */}
+      <div className="filter-group">
+        <label className="filter-label">Loại người dùng:</label>
+        <div className="segmented-control">
+          {/* Nút 'Tất cả' */}
+          <button
+            className={`segmented-button ${
+              userTypeFilter === "all" ? "active" : ""
+            }`}
+            onClick={() => setUserTypeFilter("all")}
+          >
+            Tất cả
+          </button>
+          {/* Nút 'Cá nhân' */}
+          <button
+            className={`segmented-button ${
+              userTypeFilter === "individual" ? "active" : ""
+            }`}
+            onClick={() => setUserTypeFilter("individual")}
+          >
+            Cá nhân
+          </button>
+          {/* Nút 'Doanh nghiệp' */}
+          <button
+            className={`segmented-button ${
+              userTypeFilter === "company" ? "active" : ""
+            }`}
+            onClick={() => setUserTypeFilter("company")}
+          >
+            Doanh nghiệp
+          </button>
+        </div>
+      </div>
+
+      {/* 3. LỌC GÓI DỊCH VỤ */}
+      <div className="filter-group">
+        <label className="filter-label">Gói dịch vụ:</label>
+        <select
+          value={userFilter.servicePackage}
+          onChange={(e) =>
+            setUserFilter({
+              ...userFilter,
+              servicePackage: e.target.value,
+            })
+          }
+          className="filter-dropdown"
+        >
+          <option value="all">Tất cả Gói</option>
+          {/* Tùy chọn CHƯA ĐĂNG KÝ */}
+          <option value="Chưa đăng ký">Chưa đăng ký</option>
+          {packageOptions}
+        </select>
+      </div>
+
+      {/* 4. LỌC TRẠNG THÁI */}
+      <div className="filter-group">
+        <label className="filter-label">Trạng thái:</label>
+        <select
+          value={userFilter.status}
+          onChange={(e) =>
+            setUserFilter({ ...userFilter, status: e.target.value })
+          }
+          className="filter-dropdown"
+        >
+          <option value="all">Tất cả</option>
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+        </select>
+      </div>
+    </div>
+  );
+};
 const UserManagement = () => {
   const [activeTab, setActiveTab] = useState("users");
   const [activeModal, setActiveModal] = useState(null);
-
+  const [userTypeFilter, setUserTypeFilter] = useState("all");
   const {
     allAccounts,
     allVehicles,
@@ -273,13 +442,21 @@ const UserManagement = () => {
   const {
     userFilter,
     setUserFilter,
+    vehicleFilter, // ✅ CẦN THÊM DÒNG NÀY
+    setVehicleFilter,
     serviceFilter,
     setServiceFilter,
     individualUsers,
     companyUsers,
     filteredVehicles,
     filteredServices,
-  } = useFilterLogicHook({ allAccounts, allVehicles, servicePackages });
+    vehicleFilterOptions,
+  } = useFilterLogicHook({
+    allAccounts,
+    allVehicles,
+    servicePackages,
+    userTypeFilter,
+  });
 
   useEffect(() => {
     console.log("================== DEBUG USER MANAGEMENT ==================");
@@ -360,65 +537,21 @@ const UserManagement = () => {
 
       <div className="filter-container">
         {activeTab === "users" && (
-          <div className="filter-bar">
-            <div className="filter-group">
-              <label className="filter-label">Tìm kiếm:</label>
-              <div className="search-box">
-                <input
-                  type="text"
-                  placeholder="Tên, Email..."
-                  value={userFilter.search}
-                  onChange={(e) =>
-                    setUserFilter({ ...userFilter, search: e.target.value })
-                  }
-                />
-                <i className="fas fa-search search-icon"></i>
-              </div>
-            </div>
-            {/* 💡 BỘ LỌC GÓI DỊCH VỤ MỚI ĐƯỢC THÊM */}
-            <div className="filter-group">
-              <label className="filter-label">Gói dịch vụ:</label>
-              <select
-                value={userFilter.servicePackage}
-                onChange={(e) =>
-                  setUserFilter({
-                    ...userFilter,
-                    servicePackage: e.target.value,
-                  })
-                }
-                className="filter-dropdown"
-              >
-                <option value="all">Tất cả Gói</option>
-                {/* ✅ THÊM TÙY CHỌN CHƯA ĐĂNG KÝ */}
-                <option value="Chưa đăng ký">Chưa đăng ký</option>{" "}
-                {/* 💡 Lấy thông tin Gói Dịch Vụ từ state 'servicePackages' */}{" "}
-                {servicePackages.map(
-                  (
-                    pkg // Dùng planName làm cả value và label
-                  ) => (
-                    <option key={pkg.planName} value={pkg.planName}>
-                      {pkg.planName}
-                    </option>
-                  )
-                )}
-              </select>
-            </div>
-            {/* 🛑 KẾT THÚC BỘ LỌC MỚI 🛑 */}
-            <div className="filter-group">
-              <label className="filter-label">Trạng thái:</label>
-              <select
-                value={userFilter.status}
-                onChange={(e) =>
-                  setUserFilter({ ...userFilter, status: e.target.value })
-                }
-                className="filter-dropdown"
-              >
-                <option value="all">Tất cả</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
-            </div>
-          </div>
+          <UserFilterBar
+            userFilter={userFilter}
+            setUserFilter={setUserFilter}
+            userTypeFilter={userTypeFilter}
+            setUserTypeFilter={setUserTypeFilter}
+            servicePackages={servicePackages}
+          />
+        )}
+
+        {activeTab === "vehicle" && (
+          <VehicleFilterBar
+            vehicleFilter={vehicleFilter}
+            setVehicleFilter={setVehicleFilter}
+            filterOptions={vehicleFilterOptions}
+          />
         )}
 
         {activeTab === "service" && (
@@ -437,20 +570,27 @@ const UserManagement = () => {
       <div className="data-table-container">
         {activeTab === "users" && (
           <div className="user-tables-group">
-            <UserTables
-              filteredData={individualUsers}
-              userType="individual"
-              setActiveModal={setActiveModal}
-              servicePackages={servicePackages}
-              subscriptions={subscriptions}
-            />
-            <UserTables
-              filteredData={companyUsers}
-              userType="company"
-              setActiveModal={setActiveModal}
-              servicePackages={servicePackages}
-              subscriptions={subscriptions}
-            />
+            {/** HIỆN BẢNG CÁ NHÂN nếu userTypeFilter là 'all' HOẶC 'individual' **/}
+            {(userTypeFilter === "all" || userTypeFilter === "individual") && (
+              <UserTables
+                filteredData={individualUsers}
+                userType="individual"
+                setActiveModal={setActiveModal}
+                servicePackages={servicePackages}
+                subscriptions={subscriptions}
+              />
+            )}
+
+            {/** HIỆN BẢNG DOANH NGHIỆP nếu userTypeFilter là 'all' HOẶC 'company' **/}
+            {(userTypeFilter === "all" || userTypeFilter === "company") && (
+              <UserTables
+                filteredData={companyUsers}
+                userType="company"
+                setActiveModal={setActiveModal}
+                servicePackages={servicePackages}
+                subscriptions={subscriptions}
+              />
+            )}
           </div>
         )}
         {activeTab === "vehicle" && (

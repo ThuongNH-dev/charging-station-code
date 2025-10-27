@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
+
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { Pagination } from "antd";
 
 /* =========================================================
    🔹 HÀM TIÊU ĐỀ BẢNG
@@ -30,7 +32,7 @@ const getColumns = (userType) => {
     cols.push({ key: "phone", header: "SĐT" });
     cols.push({ key: "email", header: "Email" });
     cols.push({ key: "accountType", header: "Loại tài khoản" });
-    cols.push({ key: "planName", header: "Gói dịch vụ" });
+    cols.push({ key: "servicePackageName", header: "Gói dịch vụ" });
   } else if (userType === "company") {
     // === CỘT CỦA DOANH NGHIỆP ===
     cols.push({ key: "companyName", header: "Công ty" });
@@ -98,29 +100,9 @@ const renderCell = (user, key, index, servicePackages, subscriptions) => {
     case "phone":
       return customerInfo.phone || "—";
     case "planName": {
-      try {
-        if (!Array.isArray(servicePackages) || servicePackages.length === 0) {
-          return "—";
-        }
-
-        const customerId = customerInfo.customerId;
-        if (!customerId) return "Chưa đăng ký";
-
-        const userSubscription = subscriptions.find(
-          (sub) =>
-            Number(sub.customerId) === Number(customerId) &&
-            sub.status === "Active"
-        );
-
-        if (userSubscription) {
-          return userSubscription.planName || "—";
-        }
-
-        return "Chưa đăng ký";
-      } catch (error) {
-        console.error("❌ Lỗi khi render planName:", error);
-        return "—";
-      }
+      // user.servicePackageName đã được tính toán trong useUserServicesHook
+      // (ví dụ: "Gói Kim Cương" hoặc "Chưa đăng ký")
+      return user.servicePackageName || "—";
     }
 
     case "accountType":
@@ -148,7 +130,15 @@ export const UserTables = ({
   subscriptions = [],
 }) => {
   const columns = getColumns(userType);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10; // số hàng mỗi trang
+  const totalPages = Math.ceil(filteredData.length / pageSize);
 
+  // Chia dữ liệu theo trang
+  const pagedData = filteredData.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
   if (filteredData.length === 0) {
     return (
       <div className="user-table-section">
@@ -163,73 +153,83 @@ export const UserTables = ({
       <h3>
         Thông tin {getTableTitle(userType)} ({filteredData.length} mục)
       </h3>
+      <div className="table-responsive-wrapper">
+        <table>
+          <thead>
+            <tr>
+              {columns.map((col) => (
+                <th key={col.key}>{col.header}</th>
+              ))}
+            </tr>
+          </thead>
 
-      <table>
-        <thead>
-          <tr>
-            {columns.map((col) => (
-              <th key={col.key}>{col.header}</th>
-            ))}
-          </tr>
-        </thead>
+          <tbody>
+            {filteredData.map((user, index) => (
+              <tr key={user.accountId}>
+                {columns.map((col) => {
+                  if (col.key === "action") {
+                    return (
+                      <td key={col.key} className="action-cell">
+                        <button
+                          className="icon-btn"
+                          onClick={() =>
+                            setActiveModal(`editUser-${user.accountId}`)
+                          }
+                        >
+                          <EditOutlined />
+                        </button>
+                        <button
+                          className="icon-btn"
+                          onClick={() =>
+                            setActiveModal(`deleteUser-${user.accountId}`)
+                          }
+                        >
+                          <DeleteOutlined />
+                        </button>
+                      </td>
+                    );
+                  }
 
-        <tbody>
-          {filteredData.map((user, index) => (
-            <tr key={user.accountId}>
-              {columns.map((col) => {
-                if (col.key === "action") {
-                  return (
-                    <td key={col.key} className="action-cell">
-                      <button
-                        className="icon-btn"
-                        onClick={() =>
-                          setActiveModal(`editUser-${user.accountId}`)
-                        }
-                      >
-                        <EditOutlined />
-                      </button>
-                      <button
-                        className="icon-btn"
-                        onClick={() =>
-                          setActiveModal(`deleteUser-${user.accountId}`)
-                        }
-                      >
-                        <DeleteOutlined />
-                      </button>
-                    </td>
-                  );
-                }
+                  if (col.key === "status") {
+                    return (
+                      <td key={col.key}>
+                        <span
+                          className={`status ${
+                            user.status === "Active" ? "active" : "inactive"
+                          }`}
+                        >
+                          {user.status}
+                        </span>
+                      </td>
+                    );
+                  }
 
-                if (col.key === "status") {
                   return (
                     <td key={col.key}>
-                      <span
-                        className={`status ${
-                          user.status === "Active" ? "active" : "inactive"
-                        }`}
-                      >
-                        {user.status}
-                      </span>
+                      {renderCell(
+                        user,
+                        col.key,
+                        index,
+                        servicePackages,
+                        subscriptions
+                      )}
                     </td>
                   );
-                }
-
-                return (
-                  <td key={col.key}>
-                    {renderCell(
-                      user,
-                      col.key,
-                      index,
-                      servicePackages,
-                      subscriptions
-                    )}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div style={{ marginTop: 12, textAlign: "right" }}>
+          <Pagination
+            current={currentPage}
+            pageSize={pageSize}
+            total={filteredData.length}
+            onChange={(page) => setCurrentPage(page)}
+            showSizeChanger={false}
+          />
+        </div>
+      </div>
     </div>
   );
 };
