@@ -1,81 +1,196 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { fetchAuthJSON, getApiBase } from "../../utils/api";
+import { useNavigate } from "react-router-dom";
 import "./SessionManager.css";
 
-const fmtTime = (iso) => {
+const API_BASE = getApiBase();
+
+// === Helpers ===
+function fmtTime(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
   const hh = d.getHours().toString().padStart(2, "0");
   const mm = d.getMinutes().toString().padStart(2, "0");
   const ss = d.getSeconds().toString().padStart(2, "0");
-  const day = d.getDate();
-  const mon = d.getMonth() + 1;
+  const day = d.getDate().toString().padStart(2, "0");
+  const mon = (d.getMonth() + 1).toString().padStart(2, "0");
   const year = d.getFullYear();
   return `${hh}:${mm}:${ss} ${day}/${mon}/${year}`;
-};
-const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
+}
+
+function vnd(n) {
+  if (!n && n !== 0) return "—";
+  return (Number(n) || 0).toLocaleString("vi-VN") + " ₫";
+}
 
 export default function SessionManager() {
-  const [rows, setRows] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [activeStop, setActiveStop] = useState(null);
-  const [showPaymentMenu, setShowPaymentMenu] = useState(null);
-  const [selectedMethod, setSelectedMethod] = useState("POS");
-  const dropdownRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    setTimeout(() => {
-      setRows([
-        {
-          sessionCode: "S-1001",
-          chargerCode: "A-02",
-          customerCode: "CUST-8821",
-          startTime: "2025-09-22T10:15:12",
-          endTime: "2025-09-22T11:26:34",
-          energyKwh: 71,
-          cost: 298200,
-          status: "UNPAID",
-        },
-      ]);
-      setLoading(false);
-    }, 300);
+    loadSessions();
   }, []);
 
-  // ✅ Đóng dropdown khi click ra ngoài
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target)
-      ) {
-        setShowPaymentMenu(null);
+  // ✅ Lấy danh sách phiên + hóa đơn tương ứng
+  async function loadSessions() {
+    setLoading(true);
+    try {
+      const res = await fetchAuthJSON(`${API_BASE}/ChargingSessions`);
+      let sessionArr = res?.data ?? res?.$values ?? res?.items ?? res ?? [];
+      if (!Array.isArray(sessionArr)) sessionArr = [sessionArr];
+
+      // Lấy chi tiết từng phiên
+      const detailed = await Promise.all(
+        sessionArr.map(async (s) => {
+          try {
+            const det = await fetchAuthJSON(
+              `${API_BASE}/ChargingSessions/${s.chargingSessionId || s.id}`
+            );
+            return {
+              ...s,
+              ...det,
+              invoiceId: det?.data?.invoiceId || det?.invoiceId || s.invoiceId,
+            };
+          } catch {
+            return s;
+          }
+        })
+      );
+
+      // Lấy toàn bộ hóa đơn
+      const invRes = await fetchAuthJSON(`${API_BASE}/Invoices`);
+      let invoices =
+        invRes?.data ?? invRes?.$values ?? invRes?.items ?? invRes ?? [];
+      if (!Array.isArray(invoices)) invoices = [invoices];
+
+      // Map phiên -> trạng thái hóa đơn
+      const sessionToInvoiceStatus = {};
+      for (const inv of invoices) {
+        try {
+          const invDetail = await fetchAuthJSON(
+            `${API_BASE}/Invoices/${inv.invoiceId || inv.id}`
+          );
+          const invoiceData = invDetail?.data || invDetail;
+          const sessionsList =
+            invoiceData?.chargingSessions ||
+            invoiceData?.$values?.chargingSessions ||
+            [];
+
+          sessionsList.forEach((session) => {
+            const sessionId = session.chargingSessionId || session.id;
+            if (sessionId) {
+              sessionToInvoiceStatus[sessionId] = {
+                status: (inv.status || "UNPAID").toUpperCase(),
+                invoiceId: inv.invoiceId || inv.id,
+              };
+            }
+          });
+        } catch (e) {
+          console.error(`Error loading invoice ${inv.invoiceId}:`, e);
+        }
       }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
-  const handleStopClick = (row) => {
-    setShowPaymentMenu(null);
-    if (activeStop === row.sessionCode) setActiveStop(null);
-    else setActiveStop(row.sessionCode);
-  };
+      console.log(
+        `✅ Mapped ${Object.keys(sessionToInvoiceStatus).length} sessions to invoices`
+      );
 
-  const handleCancel = () => {
-    setActiveStop(null);
-    setShowPaymentMenu(null);
-  };
+      const merged = detailed.map((s) => {
+        const sessionId = s.chargingSessionId || s.id;
+        const invoiceInfo = sessionToInvoiceStatus[sessionId];
+        let invoiceStatus = "UNPAID";
+        if (invoiceInfo?.status) invoiceStatus = invoiceInfo.status;
 
-  const handleShowPayment = (row) => {
-    setShowPaymentMenu((prev) => (prev === row.sessionCode ? null : row.sessionCode));
-  };
+        return {
+          ...s,
+          energyKwh: s.energyKwh ?? 0,
+          total: s.total ?? 0,
+          invoiceStatus: invoiceStatus,
+          invoiceId: invoiceInfo?.invoiceId || null,
+        };
+      });
 
-  const handleSelectMethod = (method) => {
-    setSelectedMethod(method);
-    alert(`✅ Đã chọn phương thức: ${method}`);
-    setShowPaymentMenu(null);
-    setActiveStop(null);
-  };
+      const paidCount = merged.filter(
+        (s) => s.invoiceStatus === "PAID"
+      ).length;
+      const unpaidCount = merged.filter(
+        (s) => s.invoiceStatus === "UNPAID"
+      ).length;
+      console.log(`✅ Summary: ${paidCount} PAID, ${unpaidCount} UNPAID`);
+
+      setSessions(merged);
+    } catch (e) {
+      console.error(e);
+      setErr("Không thể tải danh sách phiên hoặc hóa đơn!");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ✅ Xử lý khi bấm nút “Dừng”
+  async function handleStopSession(s) {
+    const confirmStop = window.confirm(
+      `Bạn có chắc chắn muốn dừng phiên sạc #${s.chargingSessionId}?`
+    );
+    if (!confirmStop) return;
+
+    try {
+      const res = await fetchAuthJSON(`${API_BASE}/ChargingSessions/end`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chargingSessionId: s.chargingSessionId,
+          endSoc: s.endSoc ?? 80,
+        }),
+      });
+
+      const beData = res?.data || res;
+      if (!beData) {
+        alert("❌ Không thể dừng phiên sạc!");
+        return;
+      }
+
+      // ✅ Chuẩn bị payload cho invoice (đảm bảo có đủ dữ liệu)
+      const orderId = `CHG${beData.chargingSessionId || Date.now()}`;
+      const finalPayload = {
+        orderId,
+        ...beData,
+        chargingSessionId: beData.chargingSessionId ?? s.chargingSessionId,
+        customerId: beData.customerId ?? s.customerId ?? "—",
+        customerName:
+          beData.customerName ?? s.customerName ?? s.name ?? "Không có",
+        startedAt: beData.startedAt ?? s.startedAt ?? new Date().toISOString(),
+        endedAt: beData.endedAt ?? new Date().toISOString(),
+        energyKwh: beData.energyKwh ?? s.energyKwh ?? 0,
+        total: beData.total ?? s.total ?? 0,
+        station: s.station ?? { id: s.stationId, name: s.stationName },
+        charger: s.charger ?? { id: s.chargerId, name: s.chargerName },
+        gun: s.gun ?? { id: s.portId },
+        invoiceStatus: "UNPAID",
+        isMonthlyInvoice: false,
+      };
+
+      // ✅ Lưu vào sessionStorage để StaffInvoice đọc được
+      sessionStorage.setItem(
+        `chargepay:${orderId}`,
+        JSON.stringify(finalPayload)
+      );
+
+      alert("✅ Phiên sạc đã dừng! Chuyển đến hóa đơn...");
+
+      // ✅ Điều hướng đến staff/invoice (đúng path)
+      navigate(`/staff/invoice?order=${orderId}`, {
+        state: finalPayload,
+        replace: true,
+      });
+    } catch (err) {
+      console.error(err);
+      alert(`❌ Lỗi khi dừng phiên: ${err.message}`);
+    } finally {
+      await loadSessions();
+    }
+  }
 
   return (
     <div className="sess-wrap">
@@ -96,7 +211,7 @@ export default function SessionManager() {
                 <th>kWh</th>
                 <th>Chi phí</th>
                 <th>TT</th>
-                <th style={{ width: "160px" }}>Thao tác</th> {/* ✅ rộng hơn */}
+                <th style={{ width: "160px" }}>Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -106,80 +221,62 @@ export default function SessionManager() {
                     Đang tải…
                   </td>
                 </tr>
+              ) : err ? (
+                <tr>
+                  <td colSpan={9} className="center error">
+                    {err}
+                  </td>
+                </tr>
+              ) : sessions.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="center muted">
+                    Chưa có phiên sạc nào.
+                  </td>
+                </tr>
               ) : (
-                rows.map((r) => (
-                  <tr key={r.sessionCode}>
-                    <td className="strong">{r.sessionCode}</td>
-                    <td>{r.chargerCode}</td>
-                    <td>{r.customerCode}</td>
-                    <td>{fmtTime(r.startTime)}</td>
-                    <td>{fmtTime(r.endTime)}</td>
-                    <td>{r.energyKwh}</td>
-                    <td>{vnd(r.cost)}</td>
+                sessions.map((s) => (
+                  <tr key={s.chargingSessionId}>
+                    <td className="strong">S-{s.chargingSessionId}</td>
+                    <td>{s.portId ?? "—"}</td>
+                    <td>{s.customerId ? `CUST-${s.customerId}` : "—"}</td>
+                    <td>{fmtTime(s.startedAt)}</td>
+                    <td>{fmtTime(s.endedAt)}</td>
+                    <td>{s.energyKwh?.toFixed(2) ?? "—"}</td>
+                    <td>{vnd(s.total)}</td>
                     <td>
-                      <span className="pill unpaid">UNPAID</span>
+                      <span
+                        className={`pill ${
+                          s.invoiceStatus === "PAID"
+                            ? "paid"
+                            : s.invoiceStatus === "UNPAID"
+                            ? "unpaid"
+                            : "charging"
+                        }`}
+                      >
+                        {s.invoiceStatus}
+                      </span>
                     </td>
-                    <td className="relative">
-                      {/* Trạng thái bình thường */}
-                      {activeStop !== r.sessionCode && (
+
+                    {/* === Cột Thao Tác === */}
+                    <td>
+                      {s.status?.toLowerCase() === "charging" ? (
                         <button
                           className="btn-dark"
-                          onClick={() => handleStopClick(r)}
+                          onClick={() => handleStopSession(s)}
                         >
                           Dừng
                         </button>
-                      )}
-
-                      {/* Khi bấm Dừng → hiện hai nút */}
-                      {activeStop === r.sessionCode && (
-                        <div className="inline-actions">
-                          <button
-                            className="btn-dark small"
-                            onClick={() => handleShowPayment(r)}
-                          >
-                            Thu tiền
-                          </button>
-                          <button
-                            className="btn-light small"
-                            onClick={handleCancel}
-                          >
-                            Hủy
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Dropdown chọn phương thức */}
-                      {showPaymentMenu === r.sessionCode && (
-                        <div
-                          ref={dropdownRef}
-                          className="popup-payment"
+                      ) : (
+                        <button
+                          className="btn-light"
+                          onClick={() =>
+                            navigate(`/staff/invoice?order=S${s.chargingSessionId}`, {
+                              state: s,
+                            })
+                          }
                         >
-                          <div className="popup-header">Chọn phương thức</div>
-                          <div
-                            className={`popup-item ${
-                              selectedMethod === "CASH" ? "active" : ""
-                            }`}
-                            onClick={() => handleSelectMethod("CASH")}
-                          >
-                            🏦 Tiền mặt
-                          </div>
-                          <div
-                            className={`popup-item ${
-                              selectedMethod === "POS" ? "active" : ""
-                            }`}
-                            onClick={() => handleSelectMethod("POS")}
-                          >
-                            💳 POS
-                          </div>
-                          <div
-                            className={`popup-item ${
-                              selectedMethod === "QR" ? "active" : ""
-                            }`}
-                            onClick={() => handleSelectMethod("QR")}
-                          >
-                            📱 QR tại trạm
-                          </div>
-                        </div>
+                          Chi tiết
+                        </button>
                       )}
                     </td>
                   </tr>
