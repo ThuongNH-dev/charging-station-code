@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchAuthJSON, getApiBase, getToken } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
+import { sortInvoicesDesc } from "../../utils/invoiceSort";
 import "./style/InvoiceSummary.css";
 
 // ===== Helpers =====
@@ -124,8 +125,12 @@ export default function InvoiceSummary() {
         setLoading(true); setErr("");
         const res = await fetchAuthJSON(`${API_ABS}/Invoices/by-customer/${customerId}`, { method: "GET" });
         const list = Array.isArray(res?.data) ? res.data : [];
+        const sorted = sortInvoicesDesc(list);
         if (!m) return;
         setRawInvoices(list);
+        try {
+          sessionStorage.setItem("charge:billing:list", JSON.stringify(sorted));
+        } catch { }
       } catch (e) {
         if (m) setErr(e?.message || "Không tải được danh sách hóa đơn.");
       } finally {
@@ -160,13 +165,15 @@ export default function InvoiceSummary() {
       if (!map.has(k)) map.set(k, it);
       else {
         const cur = map.get(k);
-        const a = new Date(cur.updatedAt || 0).getTime();
-        const b = new Date(it.updatedAt || 0).getTime();
+        const a = new Date(cur.updatedAt || cur.createdAt || 0).getTime();
+        const b = new Date(it.updatedAt || it.createdAt || 0).getTime();
         if (b > a) map.set(k, it);
       }
     }
-    return Array.from(map.values());
+    // đảm bảo unique cũng theo thứ tự mới → cũ
+    return sortInvoicesDesc(Array.from(map.values()));
   }, [normalized]);
+
 
   // sau const unique = useMemo(...)
 
@@ -276,7 +283,7 @@ export default function InvoiceSummary() {
                       period: { month: inv.billingMonth, year: inv.billingYear }
                     }
                   })}
-                  >
+                >
                   {/* Top row: left title, right status */}
                   <div className="sum-row top">
                     <div className="sum-title">Hóa đơn kỳ {inv.billingMonth}/{inv.billingYear}</div>

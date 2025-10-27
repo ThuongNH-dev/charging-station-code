@@ -96,7 +96,7 @@ export default function InvoicePage() {
           <h2>Hóa đơn phiên sạc</h2>
           <div style={{ display: "flex", gap: 12 }}>
             <Link to="/stations">Về danh sách trạm</Link>
-            <button onClick={() => navigate(-1)}>Quay lại</button>
+            {/* <button onClick={() => navigate(-1)}>Quay lại</button> */}
           </div>
         </div>
 
@@ -160,8 +160,7 @@ export default function InvoicePage() {
 
             {/* Hành động */}
             <div style={{ marginTop: 16, display: "flex", gap: 8, alignItems: "center" }}>
-              <button onClick={() => navigate("/payments")}>Thanh toán ngay</button>
-              <button onClick={() => navigate("/history")}>Xem lịch sử</button>
+              <button onClick={() => navigate("/invoiceSummary")}>Xem tất cả hoá đơn</button>
             </div>
           </>
         )}

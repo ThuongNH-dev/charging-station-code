@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams, Link } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
+import { sortInvoicesDesc } from "../../utils/invoiceSort";
 import "./style/InvoiceDetail.css";
 
 const VND = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
@@ -36,7 +37,7 @@ async function pollInvoicePaid(invoiceId, { timeoutMs = 300000, stepMs = 2500 } 
     try {
       const inv = await fetchInvoiceById(invoiceId);
       if (isPaidOrConfirmed(inv)) return { ok: true, data: inv };
-    } catch {}
+    } catch { }
     await new Promise((r) => setTimeout(r, stepMs));
   }
   return { ok: false };
@@ -118,16 +119,16 @@ async function fetchSessionsForInvoice(invoiceId, context) {
     const sessions = Array.isArray(inv?.chargingSessions)
       ? inv.chargingSessions
       : Array.isArray(inv?.items)
-      ? inv.items
-      : null;
+        ? inv.items
+        : null;
     if (sessions?.length) return sessions.map(normalizeSession).filter(Boolean);
-  } catch {}
+  } catch { }
 
   try {
     const r2 = await fetchAuthJSON(`${API_ABS}/ChargingSessions/by-invoice/${invoiceId}`, { method: "GET" });
     const arr = Array.isArray(r2?.data) ? r2.data : Array.isArray(r2) ? r2 : [];
     if (arr.length) return arr.map(normalizeSession).filter(Boolean);
-  } catch {}
+  } catch { }
 
   const { customerId, billingYear, billingMonth } = context || {};
   if (customerId && billingYear && billingMonth) {
@@ -142,7 +143,7 @@ async function fetchSessionsForInvoice(invoiceId, context) {
         arr = arr.filter((s) => String(s.invoiceId) === String(invoiceId));
       }
       return arr;
-    } catch {}
+    } catch { }
   }
   return [];
 }
@@ -237,7 +238,7 @@ export default function InvoiceDetail() {
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [invoice, setInvoice] = useState(null); 
+  const [invoice, setInvoice] = useState(null);
 
   // id mục tiêu
   const targetId = useMemo(() => {
@@ -254,8 +255,10 @@ export default function InvoiceDetail() {
         } else {
           const raw = sessionStorage.getItem("charge:billing:list");
           if (raw) {
-            const list = JSON.parse(raw);
+            let list = JSON.parse(raw);
             if (Array.isArray(list)) {
+              // sort phòng trường hợp cache cũ chưa sắp xếp
+              list = sortInvoicesDesc(list);
               const found = list.find((i, idx) => {
                 const id = i?.id || `${i?.billingYear}-${i?.billingMonth}-${idx}`;
                 return id?.toString() === targetId?.toString();
@@ -264,7 +267,7 @@ export default function InvoiceDetail() {
             }
           }
         }
-      } catch {}
+      } catch { }
       if (mounted) setLoading(false);
     })();
     return () => {
@@ -368,7 +371,7 @@ export default function InvoiceDetail() {
 
   // ===== filter + pagination for sessions =====
   const [sessStatus, setSessStatus] = useState("all");
-  const [timeField, setTimeField] = useState("startedAt");
+  const [timeField, setTimeField] = useState("endedAt");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
@@ -376,6 +379,8 @@ export default function InvoiceDetail() {
 
   const filteredSessions = useMemo(() => {
     let arr = sessions.slice();
+
+    // 1) Lọc theo trạng thái
     if (sessStatus !== "all") {
       arr = arr.filter((s) => {
         const v = String(s.status || "").toLowerCase();
@@ -386,11 +391,16 @@ export default function InvoiceDetail() {
         return true;
       });
     }
+
+    // 2) Lọc theo khoảng ngày theo field đang chọn
     const dFrom = parseDate(from);
     const dTo = to ? endOfDay(parseDate(to)) : null;
     if (dFrom || dTo) {
       arr = arr.filter((s) => {
-        const t = s[timeField];
+        // Ưu tiên field đang chọn; nếu null thì fallback qua field còn lại
+        const primary = s?.[timeField];
+        const fallbackField = timeField === "startedAt" ? "endedAt" : "startedAt";
+        const t = primary ?? s?.[fallbackField];
         if (!t) return false;
         const d = new Date(t);
         if (dFrom && d < dFrom) return false;
@@ -398,8 +408,29 @@ export default function InvoiceDetail() {
         return true;
       });
     }
+
+    // 3) SẮP XẾP MỚI → CŨ
+    arr.sort((a, b) => {
+      // Lấy timestamp theo field đang chọn, nếu trống thì fallback
+      const fallbackField = timeField === "startedAt" ? "endedAt" : "startedAt";
+      const ta = a?.[timeField] ? new Date(a[timeField]).getTime()
+        : a?.[fallbackField] ? new Date(a[fallbackField]).getTime()
+          : 0;
+      const tb = b?.[timeField] ? new Date(b[timeField]).getTime()
+        : b?.[fallbackField] ? new Date(b[fallbackField]).getTime()
+          : 0;
+
+      if (tb !== ta) return tb - ta; // desc theo thời gian
+
+      // Tie-breaker: ưu tiên phiên có id lớn hơn (có xu hướng mới hơn)
+      const ida = Number(a.chargingSessionId ?? 0);
+      const idb = Number(b.chargingSessionId ?? 0);
+      return idb - ida;
+    });
+
     return arr;
   }, [sessions, sessStatus, timeField, from, to]);
+
 
   useEffect(() => {
     setPage(1);
