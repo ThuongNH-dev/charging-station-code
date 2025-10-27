@@ -413,13 +413,14 @@ export const stationApi = {
     }
   },
 
-  async endSession(sessionId, data) {
+  // ✅ BẢN ĐÚNG CHO CÁCH 2 - gọi 1 tham số payload { chargingSessionId, endSoc }
+  async endSession({ chargingSessionId, endSoc }) {
     try {
       const res = await fetchAuthJSON(
-        resolveUrl(`/api/sessions/end/${sessionId}`),
+        resolveUrl("/api/ChargingSessions/end"), // hoặc "/api/sessions/end" tùy BE
         {
           method: "POST",
-          body: JSON.stringify(data),
+          body: JSON.stringify({ chargingSessionId, endSoc }),
         }
       );
       return res || {};

@@ -73,7 +73,8 @@ function StationPage() {
   const [targetType, setTargetType] = useState(null);
 
   // --- START: Session-related state (Replace old duplicated block) ---
-  const [isStarting, setIsStarting] = useState(false); // Trạng thái loading khi bắt đầu sạc
+  // const [isStarting, setIsStarting] = useState(false); // Trạng thái loading khi bắt đầu sạc
+  // const [setIsEnding] = useState(false); // Trạng thái loading khi kết thúc sạc
   const [isEnding, setIsEnding] = useState(false); // Trạng thái loading khi kết thúc sạc
 
   // Cổng hiện tại được chọn
@@ -95,13 +96,15 @@ function StationPage() {
   const [stations, setStations] = useState([]);
   const [statusFilter, setStatusFilter] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
+  const [endSoc, setEndSoc] = useState("");
+  const [activeSessionsByPort, setActiveSessionsByPort] = useState({});
   useEffect(() => {
     fetchStations();
   }, []);
 
   const closeModal = () => {
     setActiveModal(null);
-    setStartSessionData({ carPlate: "", userId: "" });
+    setStartSessionData({ userId: "", vehicleInput: "" });
     setFoundUserName(null);
     setEndSessionData(null);
   };
@@ -208,7 +211,7 @@ function StationPage() {
       try {
         // ✅ SỬA LỖI: Gọi API thực tế
         const customer = await customerApi.getById(startSessionData.userId);
-        setFoundUserName(customer.FullName);
+        setFoundUserName(customer?.FullName ?? null);
       } catch (error) {
         setFoundUserName(null); // Không tìm thấy
         console.error("Lỗi tìm kiếm khách hàng:", error);
@@ -283,53 +286,68 @@ function StationPage() {
     setCurrentPortId(portId);
     setCurrentStationId(stationId);
     setCurrentChargerId(chargerId);
-    setStartSessionData({ carPlate: "", userId: "" });
+    setStartSessionData({ userId: "", vehicleInput: "" });
     setFoundUserName(null);
     setActiveModal("startSession");
   };
 
   // CHÚ THÍCH: Mở Modal Tổng kết và tìm dữ liệu session
   const openEndSessionModal = (portId, stationId, chargerId) => {
-    let session = null;
-    stations.forEach((s) => {
-      if (s.StationId === stationId) {
-        s.chargers.forEach((c) => {
-          if (c.ChargerId === chargerId) {
-            // Cần tìm port đang bận có sessionData
-            const port = c.ports.find((p) => p.PortId === portId);
-            if (port && port.Status === "Busy" && port.sessionData) {
-              // TÍNH TOÁN DỮ LIỆU GIẢ LẬP KHI KẾT THÚC
-              const now = new Date();
-              const startTime = new Date(port.sessionData.startTime);
-              const durationMs = now - startTime;
-              const durationHours = (durationMs / (1000 * 60 * 60)).toFixed(2); // Giờ
+    console.log("🧭 [END] Open modal với:", { portId, stationId, chargerId });
 
-              // Giả lập năng lượng (kW * giờ * hiệu suất)
-              // Giả định MaxPowerKw của port là công suất trung bình (chỉ để giả lập)
-              const energyKwh = (
-                parseFloat(port.MaxPowerKw) *
-                durationHours *
-                0.95
-              ).toFixed(3);
-              const costVND = (parseFloat(energyKwh) * 3500).toLocaleString(
-                "vi-VN"
-              ); // Giả định 1kWh = 3500 VNĐ
+    let session = null; // chỉ 1 biến session ở cấp hàm
+    setEndSoc(""); // reset input End SoC mỗi lần mở
 
-              session = {
-                ...port.sessionData,
-                endTime:
-                  now.toLocaleTimeString("vi-VN") +
-                  " " +
-                  now.toLocaleDateString("vi-VN"),
-                duration: durationHours,
-                energy: energyKwh,
-                cost: costVND,
-              };
-            }
-          }
-        });
+    const station = stations.find((s) => s.StationId === stationId);
+    const charger = station?.chargers.find((c) => c.ChargerId === chargerId);
+    const port = charger?.ports.find((p) => p.PortId === portId);
+
+    console.log("🔎 [END] Port tìm được:", port);
+    if (!port) {
+      console.warn("⚠️ [END] Không tìm thấy port theo ID.");
+    } else {
+      if (!isPortBusy(port.Status)) {
+        console.warn("⚠️ [END] Port không ở trạng thái Busy:", port.Status);
       }
-    });
+
+      // Lấy sessionData từ port hoặc fallback bộ nhớ tạm
+      const sd = port.sessionData ?? activeSessionsByPort?.[port.PortId];
+
+      if (sd) {
+        console.log("✅ [END] Dùng sessionData:", sd);
+
+        const now = new Date();
+        const startTime = new Date(sd.startTime);
+        const durationMs = now - startTime;
+        const durationHours = (durationMs / (1000 * 60 * 60)).toFixed(2);
+
+        const energyKwh = (
+          parseFloat(port.MaxPowerKw) *
+          durationHours *
+          0.95
+        ).toFixed(3);
+        const costVND = (parseFloat(energyKwh) * 3500).toLocaleString("vi-VN");
+
+        session = {
+          ...sd,
+          endTime:
+            now.toLocaleTimeString("vi-VN") +
+            " " +
+            now.toLocaleDateString("vi-VN"),
+          duration: durationHours,
+          energy: energyKwh,
+          cost: costVND,
+        };
+      } else {
+        console.warn("⚠️ [END] Không có sessionData trên port hoặc fallback.");
+      }
+    }
+
+    if (!session) {
+      console.warn(
+        "⚠️ [END] sessionData = null → sẽ hiện thông báo trên modal."
+      );
+    }
 
     setEndSessionData(session);
     setCurrentPortId(portId);
@@ -342,14 +360,10 @@ function StationPage() {
   // ✅ Bắt đầu phiên sạc
   // StationManagement.jsx (Khoảng dòng 356)
   const handleConfirmStartSession = async () => {
-    // Đảm bảo các ID là số, nếu không nhập thì mặc định là 0
-    // LƯU Ý: Nếu ID người dùng không hợp lệ (ví dụ: 'abc'), Number() sẽ trả về NaN,
-    // khi đó ta dùng '|| 0' để đảm bảo giá trị là 0.
     const customerId = Number(startSessionData.userId) || 0;
     const vehicleId = Number(startSessionData.vehicleInput) || 0;
     const portId = Number(currentPortId) || 0;
 
-    // 1. Kiểm tra xác thực người dùng (tránh gửi 0 nếu bắt buộc có người dùng)
     if (!foundUserName) {
       message.warning(
         "Vui lòng nhập và xác thực ID Người dùng trước khi bắt đầu."
@@ -357,29 +371,93 @@ function StationPage() {
       return;
     }
 
-    // 2. Xây dựng Payload
+    // ✅ Payload đúng chuẩn BE: bookingId = 0 (không phải null)
     const sessionData = {
-      customerId: customerId,
-      vehicleId: vehicleId,
-      bookingId: null, // Giữ nguyên giá trị 0 theo cấu trúc bạn cung cấp
-      portId: portId,
+      customerId,
+      vehicleId,
+      bookingId: null,
+      portId,
     };
 
-    // LOG để kiểm tra
-    console.log("📤 Đang gửi payload khởi tạo phiên sạc:", sessionData);
+    console.log(
+      "🚀 [START] Payload gửi lên BE:",
+      JSON.stringify(sessionData, null, 2)
+    );
 
     try {
-      await stationApi.startSession(sessionData);
-      message.success("✅ Bắt đầu phiên sạc từ xa thành công!");
-      setActiveModal(null); // Đóng modal
-      fetchStations(); // Cập nhật lại danh sách trạm
-    } catch (error) {
-      // Xử lý thông báo lỗi từ server, ví dụ: "Cổng sạc đang được sử dụng"
-      console.error("Lỗi khi bắt đầu phiên sạc:", error);
+      const res = await stationApi.startSession(sessionData);
+      console.log("✅ [START] Response BE:", res);
 
-      // Trích xuất thông báo lỗi nếu có (đã xử lý ở stationApi.js)
+      message.success("✅ Bắt đầu phiên sạc từ xa thành công!");
+
+      // Lấy sessionId theo nhiều khả năng tên field
+      const chargingSessionId =
+        res?.chargingSessionId ??
+        res?.sessionId ??
+        res?.data?.chargingSessionId ??
+        res?.data?.sessionId;
+
+      if (!chargingSessionId) {
+        console.warn(
+          "⚠️ [START] BE không trả về chargingSessionId. UI sẽ không end được!"
+        );
+      } else {
+        console.log("🆔 [START] chargingSessionId:", chargingSessionId);
+      }
+      setActiveSessionsByPort((prev) => ({
+        ...prev,
+        [portId]: {
+          sessionId: chargingSessionId,
+          startTime: new Date().toISOString(),
+          userId: Number(startSessionData.userId),
+          userName: foundUserName,
+          vehicleId: Number(startSessionData.vehicleInput) || 0,
+        },
+      }));
+      // Gắn tạm vào state để có thể "Dừng" ngay
+      if (chargingSessionId) {
+        setStations((prev) =>
+          prev.map((st) =>
+            st.StationId === currentStationId
+              ? {
+                  ...st,
+                  chargers: st.chargers.map((ch) =>
+                    ch.ChargerId === currentChargerId
+                      ? {
+                          ...ch,
+                          ports: ch.ports.map((p) =>
+                            p.PortId === currentPortId
+                              ? {
+                                  ...p,
+                                  Status: "Busy",
+                                  sessionData: {
+                                    sessionId: chargingSessionId,
+                                    startTime: new Date().toISOString(),
+                                    userId: Number(startSessionData.userId),
+                                    userName: foundUserName,
+                                    vehicleId:
+                                      Number(startSessionData.vehicleInput) ||
+                                      0,
+                                  },
+                                }
+                              : p
+                          ),
+                        }
+                      : ch
+                  ),
+                }
+              : st
+          )
+        );
+      }
+
+      setActiveModal(null);
+      // // Đồng bộ lại list từ server (nếu BE cũng cập nhật trạng thái)
+      // fetchStations();
+    } catch (error) {
+      console.error("❌ [START] Lỗi khi bắt đầu phiên sạc:", error);
       const errorMessage =
-        error.message || "Lỗi không xác định khi bắt đầu phiên sạc.";
+        error?.message || "Lỗi không xác định khi bắt đầu phiên sạc.";
       message.error(`Lỗi: ${errorMessage}`);
     }
   };
@@ -387,59 +465,96 @@ function StationPage() {
   // CHÚ THÍCH: Xác nhận Tổng kết (Chuyển trạng thái cổng sang Available)
   // ✅ Kết thúc phiên sạc
   const handleConfirmEndSession = async () => {
-    if (!endSessionData || !currentPortId) return;
+    if (!endSessionData || !currentPortId) {
+      console.warn("⚠️ [END] Thiếu endSessionData hoặc currentPortId.");
+      return;
+    }
 
     try {
       setIsEnding(true);
-      const { startTime } = endSessionData;
-      const endTime = new Date();
 
-      // Tính toán năng lượng và chi phí
-      const totalMinutes =
-        (endTime.getTime() - new Date(startTime).getTime()) / 60000;
-      const totalEnergy = (totalMinutes * 0.5).toFixed(2); // kWh
-      const totalCost = (totalEnergy * 3000).toFixed(0); // VNĐ
+      const chargingSessionId = endSessionData?.sessionId;
+      if (!chargingSessionId) {
+        message.error("Thiếu chargingSessionId. Không thể kết thúc phiên sạc.");
+        console.error(
+          "❌ [END] endSessionData không có sessionId:",
+          endSessionData
+        );
+        return;
+      }
+
+      if (endSoc === "" || Number.isNaN(Number(endSoc))) {
+        message.warning("Vui lòng nhập End SoC hợp lệ (0-100).");
+        console.warn("⚠️ [END] endSoc không hợp lệ:", endSoc);
+        return;
+      }
 
       const payload = {
-        endTime: endTime.toISOString(),
-        totalEnergy,
-        totalCost,
+        chargingSessionId,
+        endSoc: Math.max(0, Math.min(100, Number(endSoc))),
       };
 
-      const res = await stationApi.endSession(
-        endSessionData.sessionId,
-        payload
+      console.log("🛑 [END] Payload gửi BE:", JSON.stringify(payload, null, 2));
+
+      // ✅ Gọi API đúng chuẩn BE: body chỉ có { chargingSessionId, endSoc }
+      const res = await stationApi.endSession(payload);
+      console.log("✅ [END] Response BE:", res);
+
+      // 👉 BE của bạn trả về { message, data }, coi đó là thành công
+      const ok = !!(res?.data || res?.message);
+
+      // Nếu vẫn muốn chặt chẽ hơn, có thể thêm: || res === true
+
+      if (!ok) {
+        console.error("❌ [END] BE không trả success:", res);
+        message.error(res?.message || "Không thể kết thúc phiên sạc!");
+        return;
+      }
+
+      // === NHÁNH THÀNH CÔNG ===
+      message.success(res?.message || "Kết thúc phiên sạc thành công!");
+
+      const endTime = new Date();
+      const totalMinutes =
+        (endTime.getTime() - new Date(endSessionData.startTime).getTime()) /
+        60000;
+      const totalEnergy = (totalMinutes * 0.5).toFixed(2);
+      const totalCost = (totalEnergy * 3000).toFixed(0);
+
+      setEndSessionData({
+        ...endSessionData,
+        endTime,
+        totalEnergy,
+        totalCost,
+      });
+      setActiveModal("endSessionSummary");
+
+      // xoá session tạm
+      setActiveSessionsByPort((prev) => {
+        const copy = { ...prev };
+        delete copy[currentPortId];
+        return copy;
+      });
+
+      // reset port về Available
+      setStations((prev) =>
+        prev.map((station) => ({
+          ...station,
+          chargers: station.chargers.map((charger) => ({
+            ...charger,
+            ports: charger.ports.map((port) =>
+              port.PortId === currentPortId
+                ? { ...port, Status: "Available", sessionData: null }
+                : port
+            ),
+          })),
+        }))
       );
 
-      if (res?.success) {
-        // Hiển thị tổng kết
-        setEndSessionData({
-          ...endSessionData,
-          endTime,
-          totalEnergy,
-          totalCost,
-        });
-        setActiveModal("endSessionSummary");
-
-        // Reset trạng thái port về Available
-        setStations((prev) =>
-          prev.map((station) => ({
-            ...station,
-            chargers: station.chargers.map((charger) => ({
-              ...charger,
-              ports: charger.ports.map((port) =>
-                port.PortId === currentPortId
-                  ? { ...port, Status: "Available", sessionData: null }
-                  : port
-              ),
-            })),
-          }))
-        );
-      } else {
-        alert("❌ Không thể kết thúc phiên sạc!");
-      }
+      // (tuỳ chọn) đóng modal tổng kết ngay:
+      setActiveModal(null);
     } catch (error) {
-      console.error("Lỗi khi kết thúc phiên sạc:", error);
+      console.error("❌ [END] Lỗi khi kết thúc phiên sạc:", error);
     } finally {
       setIsEnding(false);
     }
@@ -767,7 +882,14 @@ function StationPage() {
   // ✅ BẢN CHỈNH SỬA HOÀN CHỈNH CHO StationManagement.jsx
 
   // GIẢ ĐỊNH: Danh sách các loại kết nối có thể có (Cần được định nghĩa trước)
-  const AVAILABLE_CONNECTOR_TYPES = ["CCS2", "CHAdeMO", "Type 2", "GB/T"];
+  const AVAILABLE_CONNECTOR_TYPES = ["CCS2", "CHAdeMO", "Type2", "GB/T"];
+  // THÊM ↓↓↓
+  const normalizeStatus = (status) =>
+    (status ?? "").toString().trim().toLowerCase();
+  const isPortBusy = (status) => {
+    const s = normalizeStatus(status);
+    return ["busy", "charging", "inuse", "occupied"].includes(s);
+  };
 
   const handleCreatePort = async () => {
     try {
@@ -1018,46 +1140,52 @@ function StationPage() {
             </div>
             <div className="status-row">
               {/* HIỂN THỊ TRẠNG THÁI CỔNG */}
-              <span className={`badge ${port.Status.toLowerCase()}`}>
-                {/* Nếu Status là Available, hiển thị là "Online" */}
-                {port.Status.toLowerCase() === "available"
-                  ? "Online"
-                  : port.Status.toLowerCase() === "maintenance"
-                  ? "Bảo trì"
-                  : "Đang bận"}
-              </span>
+              {(() => {
+                const s = normalizeStatus(port.Status);
+                return (
+                  <>
+                    <span className={`badge ${s}`}>
+                      {s === "available"
+                        ? "Online"
+                        : s === "maintenance"
+                        ? "Bảo trì"
+                        : "Đang bận"}
+                    </span>
 
-              {/* LOGIC CẬP NHẬT CHO NÚT BẮT ĐẦU VÀ TỔNG KẾT */}
-              {port.Status.toLowerCase() === "available" && (
-                <button
-                  className="btn small green"
-                  onClick={() =>
-                    openStartSessionModal(
-                      port.PortId,
-                      station.StationId,
-                      charger.ChargerId
-                    )
-                  }
-                >
-                  Bắt đầu
-                </button>
-              )}
-              {port.Status.toLowerCase() === "busy" && (
-                <button
-                  className="btn small red"
-                  onClick={() =>
-                    openEndSessionModal(
-                      port.PortId,
-                      station.StationId,
-                      charger.ChargerId
-                    )
-                  }
-                >
-                  Dừng
-                </button>
-              )}
+                    {s === "available" && (
+                      <button
+                        className="btn small green"
+                        onClick={() =>
+                          openStartSessionModal(
+                            port.PortId,
+                            station.StationId,
+                            charger.ChargerId
+                          )
+                        }
+                      >
+                        Bắt đầu
+                      </button>
+                    )}
+
+                    {isPortBusy(port.Status) && (
+                      <button
+                        className="btn small red"
+                        onClick={() =>
+                          openEndSessionModal(
+                            port.PortId,
+                            station.StationId,
+                            charger.ChargerId
+                          )
+                        }
+                      >
+                        Dừng
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
+
               {/* KHÔNG HIỂN THỊ GÌ nếu là "Maintenance" */}
-
               <button
                 className="icon-btn"
                 onClick={() => openEditPortModal(port.PortId)}
@@ -1347,6 +1475,18 @@ function StationPage() {
                   }}
                 >
                   <h3>Tổng kết phiên sạc</h3>
+                  <div className="input-field" style={{ marginTop: 12 }}>
+                    <label>End SoC (%) *</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      placeholder="Nhập SoC khi kết thúc (0-100)"
+                      value={endSoc}
+                      onChange={(e) => setEndSoc(e.target.value)}
+                    />
+                  </div>
+
                   <span
                     onClick={closeModal}
                     style={{
@@ -1412,8 +1552,11 @@ function StationPage() {
                   <button
                     className="btn blue"
                     onClick={handleConfirmEndSession}
+                    disabled={
+                      isEnding || endSoc === "" || Number.isNaN(Number(endSoc))
+                    }
                   >
-                    Đóng
+                    {isEnding ? "Đang kết thúc..." : "Kết thúc"}
                   </button>
                 </div>
               </>
