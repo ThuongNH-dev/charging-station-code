@@ -28,6 +28,7 @@ import PersonalRegister from "./pages/Register/PersonalRegister";
 import BusinessRegister from "./pages/Register/BusinessRegister";
 import InvoiceSummary from "./pages/payment/InvoiceSummary";
 import InvoiceDetail from "./pages/payment/InvoiceDetail";
+import ResourceManagement from "./pages/company/ReManagerment";
 import NotFound from "./pages/NotFound";
 
 // Chuyển role thành path tương ứng
@@ -40,6 +41,8 @@ function roleToPath(role) {
       return "/admin";
     case "staff":
       return "/staff";
+    case "company":
+      return "/company";
     default:
       return "/homepage";
   }
@@ -64,7 +67,7 @@ function GuestRoute({ children }) {
 export default function App() {
   return (
 
-    
+
     <Routes>
       <Route path="/" element={<Navigate to="/homepage" replace />} />
       {/* PUBLIC */}
@@ -158,7 +161,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      
+
       <Route
         path="/user/history"
         element={
@@ -194,8 +197,17 @@ export default function App() {
       <Route
         path="/services"
         element={
-          <ProtectedRoute allowedRoles={["Customer"]}>
+          <ProtectedRoute allowedRoles={["Customer","Company"]}>
             <ServicePlans />
+          </ProtectedRoute>
+        }
+      />
+      {/*Company */}
+      <Route
+        path="/company"
+        element={
+          <ProtectedRoute allowedRoles={["Company"]}>
+            <ResourceManagement />
           </ProtectedRoute>
         }
       />
@@ -224,7 +236,7 @@ export default function App() {
         <Route path="reports" element={<Reports />} />
       </Route>
       {/* FALLBACK */}
-      <Route path="*" element={<NotFound/>} />
+      <Route path="*" element={<NotFound />} />
       {/* ✅ */}
 
     </Routes>
