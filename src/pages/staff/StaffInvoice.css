@@ -173,3 +173,44 @@
   margin-top: 0;
   margin-bottom: 12px;
 }
+.ivp-subtitle {
+  font-size: 15px;
+  color: #6b7280;
+  font-weight: 500;
+}
+/* Ẩn phần không cần khi in */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+  }
+
+  .ivd-root {
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .ivp-card {
+    border: none;
+    page-break-inside: avoid;
+  }
+
+  h2, h3 {
+    color: #000;
+  }
+
+  table.ivp-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  table.ivp-table th,
+  table.ivp-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+  }
+}

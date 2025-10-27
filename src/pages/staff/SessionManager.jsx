@@ -27,6 +27,10 @@ export default function SessionManager() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const pageSize = 8;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -92,32 +96,23 @@ export default function SessionManager() {
         }
       }
 
-      console.log(
-        `✅ Mapped ${Object.keys(sessionToInvoiceStatus).length} sessions to invoices`
-      );
+      // Gộp dữ liệu & sắp xếp theo ID giảm dần
+      const merged = detailed
+        .map((s) => {
+          const sessionId = s.chargingSessionId || s.id;
+          const invoiceInfo = sessionToInvoiceStatus[sessionId];
+          let invoiceStatus = "UNPAID";
+          if (invoiceInfo?.status) invoiceStatus = invoiceInfo.status;
 
-      const merged = detailed.map((s) => {
-        const sessionId = s.chargingSessionId || s.id;
-        const invoiceInfo = sessionToInvoiceStatus[sessionId];
-        let invoiceStatus = "UNPAID";
-        if (invoiceInfo?.status) invoiceStatus = invoiceInfo.status;
-
-        return {
-          ...s,
-          energyKwh: s.energyKwh ?? 0,
-          total: s.total ?? 0,
-          invoiceStatus: invoiceStatus,
-          invoiceId: invoiceInfo?.invoiceId || null,
-        };
-      });
-
-      const paidCount = merged.filter(
-        (s) => s.invoiceStatus === "PAID"
-      ).length;
-      const unpaidCount = merged.filter(
-        (s) => s.invoiceStatus === "UNPAID"
-      ).length;
-      console.log(`✅ Summary: ${paidCount} PAID, ${unpaidCount} UNPAID`);
+          return {
+            ...s,
+            energyKwh: s.energyKwh ?? 0,
+            total: s.total ?? 0,
+            invoiceStatus: invoiceStatus,
+            invoiceId: invoiceInfo?.invoiceId || null,
+          };
+        })
+        .sort((a, b) => (b.chargingSessionId || 0) - (a.chargingSessionId || 0));
 
       setSessions(merged);
     } catch (e) {
@@ -128,7 +123,7 @@ export default function SessionManager() {
     }
   }
 
-  // ✅ Xử lý khi bấm nút “Dừng”
+  // ✅ Dừng phiên
   async function handleStopSession(s) {
     const confirmStop = window.confirm(
       `Bạn có chắc chắn muốn dừng phiên sạc #${s.chargingSessionId}?`
@@ -151,7 +146,6 @@ export default function SessionManager() {
         return;
       }
 
-      // ✅ Chuẩn bị payload cho invoice (đảm bảo có đủ dữ liệu)
       const orderId = `CHG${beData.chargingSessionId || Date.now()}`;
       const finalPayload = {
         orderId,
@@ -171,15 +165,9 @@ export default function SessionManager() {
         isMonthlyInvoice: false,
       };
 
-      // ✅ Lưu vào sessionStorage để StaffInvoice đọc được
-      sessionStorage.setItem(
-        `chargepay:${orderId}`,
-        JSON.stringify(finalPayload)
-      );
-
+      sessionStorage.setItem(`chargepay:${orderId}`, JSON.stringify(finalPayload));
       alert("✅ Phiên sạc đã dừng! Chuyển đến hóa đơn...");
 
-      // ✅ Điều hướng đến staff/invoice (đúng path)
       navigate(`/staff/invoice?order=${orderId}`, {
         state: finalPayload,
         replace: true,
@@ -192,13 +180,78 @@ export default function SessionManager() {
     }
   }
 
+  // ✅ Lọc & tìm kiếm
+  const filteredSessions = sessions.filter((s) => {
+    const matchSearch = search
+      ? String(s.chargingSessionId)
+          .toLowerCase()
+          .includes(search.toLowerCase())
+      : true;
+    const matchStatus =
+      filterStatus === "all"
+        ? true
+        : filterStatus === "charging"
+        ? (s.status || "").toLowerCase() === "charging"
+        : (s.status || "").toLowerCase() !== "charging";
+    return matchSearch && matchStatus;
+  });
+
+  // ✅ Thống kê
+  const total = sessions.length;
+  const chargingCount = sessions.filter(
+    (s) => (s.status || "").toLowerCase() === "charging"
+  ).length;
+  const stoppedCount = total - chargingCount;
+
+  // ✅ Phân trang
+  const totalPages = Math.ceil(filteredSessions.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedSessions = filteredSessions.slice(
+    startIndex,
+    startIndex + pageSize
+  );
+
   return (
     <div className="sess-wrap">
       <div className="sess-card">
         <div className="sess-head">
           <h3>Phiên sạc (đang chạy / lịch sử)</h3>
+
+          {/* 🔍 Thanh tìm kiếm + Lọc */}
+          <div className="sess-filters">
+            <input
+              type="text"
+              placeholder="🔍 Tìm mã phiên..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="search-input"
+            />
+            <select
+              value={filterStatus}
+              onChange={(e) => {
+                setFilterStatus(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="filter-select"
+            >
+              <option value="all">Tất cả</option>
+              <option value="charging">Đang sạc</option>
+              <option value="stopped">Đã dừng</option>
+            </select>
+          </div>
         </div>
 
+        {/* 📊 Thanh thống kê */}
+        <div className="sess-summary">
+          <span>🧾 Tổng số phiên: <strong>{total}</strong></span>
+          <span>⚡ Đang sạc: <strong>{chargingCount}</strong></span>
+          <span>✅ Đã dừng: <strong>{stoppedCount}</strong></span>
+        </div>
+
+        {/* === Bảng dữ liệu === */}
         <div className="sess-table">
           <table>
             <thead>
@@ -227,14 +280,14 @@ export default function SessionManager() {
                     {err}
                   </td>
                 </tr>
-              ) : sessions.length === 0 ? (
+              ) : filteredSessions.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="center muted">
-                    Chưa có phiên sạc nào.
+                    Không tìm thấy phiên phù hợp.
                   </td>
                 </tr>
               ) : (
-                sessions.map((s) => (
+                paginatedSessions.map((s) => (
                   <tr key={s.chargingSessionId}>
                     <td className="strong">S-{s.chargingSessionId}</td>
                     <td>{s.portId ?? "—"}</td>
@@ -256,8 +309,6 @@ export default function SessionManager() {
                         {s.invoiceStatus}
                       </span>
                     </td>
-
-                    {/* === Cột Thao Tác === */}
                     <td>
                       {s.status?.toLowerCase() === "charging" ? (
                         <button
@@ -285,6 +336,27 @@ export default function SessionManager() {
             </tbody>
           </table>
         </div>
+
+        {/* ✅ Pagination */}
+        {!loading && filteredSessions.length > pageSize && (
+          <div className="pagination">
+            <button
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+            >
+              ← Trang trước
+            </button>
+            <span>
+              Trang {currentPage} / {totalPages}
+            </span>
+            <button
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
+            >
+              Trang sau →
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -7,7 +7,8 @@ import ChargerManager from "../pages/staff/ChargerManager";
 import SessionManager from "../pages/staff/SessionManager";
 import PaymentManager from "../pages/staff/PaymentManager";
 import ReportPage from "../pages/staff/ReportPage";
-import StaffInvoice from "../pages/staff/StaffInvoice"; // ✅ thêm route nhưng không hiện trên nav
+import StaffInvoice from "../pages/staff/StaffInvoice";
+import StationManager from "../pages/staff/StationManager"; // ✅ Trang quản lý trạm sạc
 import "./StaffLayout.css";
 
 const { Content } = Layout;
@@ -25,36 +26,64 @@ export default function StaffLayout() {
     <>
       <Head />
 
-      {/* ✅ Thanh điều hướng KHÔNG có mục Hóa đơn */}
+      {/* 🔹 Thanh điều hướng chính */}
       <div className={`staff-nav ${isFixed ? "fixed" : ""}`}>
-        <NavLink to="/staff/stations" className={({ isActive }) => (isActive ? "active" : "")}>
+        <NavLink
+          to="/staff/stations"
+          className={({ isActive }) => (isActive ? "active" : "")}
+        >
+          Trạm sạc
+        </NavLink>
+        <NavLink
+          to="/staff/chargers"
+          className={({ isActive }) => (isActive ? "active" : "")}
+        >
           Trụ sạc
         </NavLink>
-        <NavLink to="/staff/sessions" className={({ isActive }) => (isActive ? "active" : "")}>
+        <NavLink
+          to="/staff/sessions"
+          className={({ isActive }) => (isActive ? "active" : "")}
+        >
           Phiên sạc
         </NavLink>
-        <NavLink to="/staff/payments" className={({ isActive }) => (isActive ? "active" : "")}>
+        <NavLink
+          to="/staff/payments"
+          className={({ isActive }) => (isActive ? "active" : "")}
+        >
           Thanh toán
         </NavLink>
-        <NavLink to="/staff/incidents" className={({ isActive }) => (isActive ? "active" : "")}>
+        <NavLink
+          to="/staff/incidents"
+          className={({ isActive }) => (isActive ? "active" : "")}
+        >
           Sự cố
         </NavLink>
-        <NavLink to="/staff/reports" className={({ isActive }) => (isActive ? "active" : "")}>
+        <NavLink
+          to="/staff/reports"
+          className={({ isActive }) => (isActive ? "active" : "")}
+        >
           Báo cáo
         </NavLink>
       </div>
 
-      {/* ✅ Layout chính */}
+      {/* 🔹 Layout nội dung */}
       <Layout className="station-info staff-layout">
         <Content className="staff-content">
           <Routes>
+            {/* ✅ Mặc định vào /staff sẽ điều hướng đến /staff/stations */}
             <Route path="/" element={<Navigate to="stations" replace />} />
-            <Route path="stations" element={<ChargerManager />} />
+
+            {/* ✅ Quản lý trạm sạc */}
+            <Route path="stations" element={<StationManager />} />
+
+            {/* ✅ Quản lý trụ sạc */}
+            <Route path="chargers" element={<ChargerManager />} />
+
+            {/* ✅ Các phần còn lại */}
             <Route path="sessions" element={<SessionManager />} />
             <Route path="payments" element={<PaymentManager />} />
             <Route path="reports" element={<ReportPage />} />
 
-            {/* ✅ Trang sự cố (tạm thời) */}
             <Route
               path="incidents"
               element={
@@ -65,10 +94,10 @@ export default function StaffLayout() {
               }
             />
 
-            {/* ✅ Route ẩn: dùng để hiển thị hóa đơn khi bấm “Chi tiết” */}
+            {/* ✅ Route ẩn — Hóa đơn */}
             <Route path="invoice" element={<StaffInvoice />} />
 
-            {/* ✅ Nếu không khớp path nào → quay về trụ sạc */}
+            {/* ✅ fallback */}
             <Route path="*" element={<Navigate to="stations" replace />} />
           </Routes>
         </Content>

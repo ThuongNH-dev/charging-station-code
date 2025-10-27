@@ -13,6 +13,8 @@ export default function StaffInvoice() {
 
   const [authUsers, setAuthUsers] = useState([]);
   const [customerName, setCustomerName] = useState("Đang tải...");
+  const [invoiceId, setInvoiceId] = useState(null);
+
   const data =
     state || JSON.parse(sessionStorage.getItem(`chargepay:${order}`) || "{}");
 
@@ -31,7 +33,7 @@ export default function StaffInvoice() {
   const formatCurrency = (n) =>
     (Number(n) || 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
 
-  // ✅ Lấy danh sách account từ /api/Auth để tìm tên khách hàng
+  // ✅ Lấy danh sách user để tìm tên khách hàng
   useEffect(() => {
     async function loadCustomerName() {
       try {
@@ -55,7 +57,44 @@ export default function StaffInvoice() {
     if (data?.customerId) loadCustomerName();
   }, [data?.customerId]);
 
-  // ✅ Nếu không có order hoặc dữ liệu bị mất
+  // ✅ Lấy mã hóa đơn nếu chưa có
+  useEffect(() => {
+    async function fetchInvoiceId() {
+      try {
+        if (data?.invoiceId) {
+          setInvoiceId(data.invoiceId);
+          return;
+        }
+
+        const res = await fetchAuthJSON(`${API_BASE}/Invoices`);
+        const invoices = res?.data ?? res?.$values ?? res ?? [];
+        if (!Array.isArray(invoices)) return;
+
+        const found = invoices.find(
+          (inv) =>
+            inv.chargingSessions?.some(
+              (s) => s.chargingSessionId === data.chargingSessionId
+            ) ||
+            inv.$values?.chargingSessions?.some(
+              (s) => s.chargingSessionId === data.chargingSessionId
+            )
+        );
+
+        if (found?.invoiceId) setInvoiceId(found.invoiceId);
+      } catch (err) {
+        console.error("❌ Không thể tìm thấy mã hóa đơn:", err);
+      }
+    }
+
+    if (data?.chargingSessionId) fetchInvoiceId();
+  }, [data?.chargingSessionId, data?.invoiceId]);
+
+  // ✅ In hóa đơn
+  function handlePrint() {
+    window.print();
+  }
+
+  // ✅ Kiểm tra dữ liệu
   if (!order || !data?.chargingSessionId) {
     return (
       <div className="ivd-root">
@@ -72,7 +111,7 @@ export default function StaffInvoice() {
   return (
     <div className="ivd-root">
       {/* Breadcrumb */}
-      <div className="crumbs">
+      <div className="crumbs no-print">
         <span className="crumb" onClick={() => navigate("/staff/sessions")}>
           Phiên sạc
         </span>
@@ -82,10 +121,20 @@ export default function StaffInvoice() {
 
       {/* Header */}
       <div className="ivp-topbar">
-        <h2>Hóa đơn Phiên sạc #{data.chargingSessionId}</h2>
-        <div className="actions">
+        <h2>
+          Hóa đơn Phiên sạc #{data.chargingSessionId}
+          {invoiceId && (
+            <span className="ivp-subtitle">
+              &nbsp;• Mã hóa đơn: INV-{invoiceId}
+            </span>
+          )}
+        </h2>
+        <div className="actions no-print">
           <button className="btn" onClick={() => navigate("/staff/sessions")}>
             ← Quay lại
+          </button>
+          <button className="btn primary" onClick={handlePrint}>
+            🖨️ In hóa đơn
           </button>
         </div>
       </div>
