@@ -2,10 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
-import { fetchAuthJSON, getApiBase } from "../../utils/api";
-// import "./style/Invoice.css"; // (tuỳ bạn thêm css)
 
-const API_BASE = getApiBase();
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " VND";
 
 export default function InvoicePage() {
@@ -15,224 +12,157 @@ export default function InvoicePage() {
 
   const orderId = state?.orderId || sp.get("order") || "";
   const [loading, setLoading] = useState(true);
-  const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
-  const [invoice, setInvoice] = useState(null);
 
-  // Lấy payload draft (từ state hoặc sessionStorage)
-  const draft = useMemo(() => {
-    if (state?.orderId) return state;
-    if (orderId) {
-      try {
-        const raw = sessionStorage.getItem(`chargepay:${orderId}`);
-        return raw ? JSON.parse(raw) : null;
-      } catch {
-        return null;
+  // ==== Lấy data BE trả về từ nhiều nguồn một cách "chịu đựng" ====
+  const endData = useMemo(() => {
+    // 1) location.state: có thể là { message, data }, hoặc { data: {...} }, hoặc để thẳng {...}
+    if (state) {
+      if (state.data && (state.data.energyKwh || state.data.total || state.data.endedAt)) {
+        return state.data;
       }
+      if (state.energyKwh || state.total || state.endedAt) {
+        return state;
+      }
+      // đôi khi wrap 2 lớp { message, data: { ... } }
+      if (state.data?.data && (state.data.data.energyKwh || state.data.data.total)) {
+        return state.data.data;
+      }
+    }
+
+    // 2) sessionStorage: thử một số key có thể đã lưu ở trang ChargingProgress
+    const candidateKeys = [];
+    if (orderId) {
+      candidateKeys.push(`charge:end:${orderId}`);
+      candidateKeys.push(`chargepay:${orderId}`);
+    }
+    candidateKeys.push("charge:end:last");
+    candidateKeys.push("charge:last");
+
+    for (const k of candidateKeys) {
+      try {
+        const raw = sessionStorage.getItem(k);
+        if (!raw) continue;
+        const obj = JSON.parse(raw);
+
+        // các khả năng shape:
+        // a) { message, data: {...} }
+        if (obj?.data && (obj.data.energyKwh || obj.data.total || obj.data.endedAt)) {
+          return obj.data;
+        }
+        // b) { ...fields }
+        if (obj?.energyKwh || obj?.total || obj?.endedAt) {
+          return obj;
+        }
+        // c) { data: { data: {...} } }
+        if (obj?.data?.data && (obj.data.data.energyKwh || obj.data.data.total)) {
+          return obj.data.data;
+        }
+      } catch (_) {}
     }
     return null;
-  }, [orderId, state]);
-
-  // Tính tiền (nếu BE không tự tính)
-  const computed = useMemo(() => {
-    if (!draft) return null;
-    const subtotal = Number(draft.energyCost || 0) + Number(draft.idlePenalty || 0);
-    const subscriptionAdjustment = 0; // mặc định không giảm
-    const taxRate = 0.10;             // VAT 10% (chỉnh nếu khác)
-    const tax = Math.round((subtotal - subscriptionAdjustment) * taxRate);
-    const total = subtotal - subscriptionAdjustment + tax;
-
-    const ended = new Date(draft.endedAt || Date.now());
-    const billingMonth = ended.getMonth() + 1; // 1..12
-    const billingYear = ended.getFullYear();
-
-    return {
-      subtotal,
-      subscriptionAdjustment,
-      tax,
-      total,
-      billingMonth,
-      billingYear,
-    };
-  }, [draft]);
-
-  // Thử nhiều endpoint hợp lý
-  async function createInvoiceOnBE(payload) {
-    const candidates = [
-      `${API_BASE}/Invoices`,
-      `${API_BASE}/Invoice`
-    ];
-
-    let lastErr = null;
-    for (const url of candidates) {
-      try {
-        const res = await fetchAuthJSON(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        // Giả định BE trả về invoice đã tạo
-        if (res && (res.invoiceId || res.InvoiceId || res.id)) {
-          return res;
-        }
-        // Nếu BE không trả id, vẫn coi là thành công và trả lại body
-        return res;
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-    throw lastErr || new Error("Không tạo được invoice trên BE.");
-  }
+  }, [state, orderId]);
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setLoading(true);
-        setError("");
+    setLoading(false);
+    if (!endData) {
+      setError(
+        "Không tìm thấy dữ liệu hóa đơn của phiên sạc. Hãy kết thúc phiên sạc và điều hướng lại, "
+        + "hoặc đảm bảo đã lưu payload BE vào sessionStorage trước khi mở trang này."
+      );
+    } else {
+      setError("");
+    }
+  }, [endData]);
 
-        if (!draft) {
-          throw new Error("Thiếu dữ liệu phiên sạc (orderId/state).");
-        }
-        if (!computed) {
-          throw new Error("Không tính được số tiền.");
-        }
+  // ==== Giá trị hiển thị (fallback an toàn) ====
+  const energyKwh     = endData?.energyKwh ?? endData?.energyKWh ?? 0;
+  const durationMin   = endData?.durationMin ?? endData?.duration ?? 0;
+  const idleMin       = endData?.idleMin ?? endData?.idleMinutes ?? 0;
 
-        // Chuẩn payload theo contract camelCase (phù hợp style các API khác của bạn)
-        // Nếu BE yêu cầu khoá PascalCase, bạn có thể map nhanh (InvoiceId, Total, ...)
-        const payload = {
-          chargingSessionId: draft.chargingSessionId ?? null,
-          subtotal: computed.subtotal,
-          subscriptionAdjustment: computed.subscriptionAdjustment,
-          tax: computed.tax,
-          total: computed.total,
-          status: "Unpaid",
-          billingMonth: computed.billingMonth,
-          billingYear: computed.billingYear,
-          isMonthlyInvoice: state?.isMonthlyInvoice ?? false,
-          subscriptionId: null,
-          customerId: draft.customerId ?? null,
+  const subtotal      = endData?.subtotal ?? 0;
+  const tax           = endData?.tax ?? 0;
+  const total         = endData?.total ?? 0;
 
-          // (Tuỳ chọn) Gửi thêm meta để BE log/debug
-          meta: {
-            orderId: draft.orderId,
-            stationId: draft.stationId,
-            chargerId: draft.chargerId,
-            portId: draft.portId,
-            startedAt: draft.startedAt,
-            endedAt: draft.endedAt,
-            energyUsedKWh: draft.energyUsedKWh,
-            pricePerKWh: draft.pricePerKWh,
-            penaltyPerMin: draft.penaltyPerMin,
-            graceSeconds: draft.graceSeconds,
-          },
-        };
-
-        setPosting(true);
-        const created = await createInvoiceOnBE(payload);
-        if (!alive) return;
-
-        setInvoice(created);
-      } catch (e) {
-        if (!alive) return;
-        setError(e?.message || "Lỗi tạo hóa đơn.");
-      } finally {
-        if (!alive) return;
-        setPosting(false);
-        setLoading(false);
-      }
-    })();
-    return () => { alive = false; };
-  }, [draft, computed, state]);
-
-  const showId = invoice?.invoiceId ?? invoice?.InvoiceId ?? invoice?.id ?? "—";
-  const showStatus = invoice?.status ?? invoice?.Status ?? "Unpaid";
-  const showCreatedAt = invoice?.createdAt ?? invoice?.CreatedAt ?? null;
+  const endedAt       = endData?.endedAt ? new Date(endData.endedAt) : null;
+  const status        = endData?.status ?? "Unpaid";
+  const billingMonth  = endData?.billingMonth ?? (endedAt ? endedAt.getMonth() + 1 : "—");
+  const billingYear   = endData?.billingYear ?? (endedAt ? endedAt.getFullYear() : "—");
 
   return (
     <MainLayout>
       <div className="invoice-root" style={{ padding: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <h2>Hóa đơn</h2>
-          <div>
+          <h2>Hóa đơn phiên sạc</h2>
+          <div style={{ display: "flex", gap: 12 }}>
             <Link to="/stations">Về danh sách trạm</Link>
+            <button onClick={() => navigate(-1)}>Quay lại</button>
           </div>
         </div>
 
         {loading ? (
-          <div className="bp-hint">Đang khởi tạo hóa đơn…</div>
+          <div>Đang tải…</div>
         ) : error ? (
-          <div className="error-text">
+          <div style={{ color: "#d4380d", background: "#fff2e8", padding: 12, borderRadius: 8 }}>
             {error}
-            <div style={{ marginTop: 8 }}>
-              <button onClick={() => navigate(-1)}>Quay lại</button>
-            </div>
           </div>
         ) : (
           <>
-            <div className="invoice-card" style={{ border: "1px solid #eee", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            {/* Thông tin chung */}
+            <div style={{ border: "1px solid #eee", borderRadius: 12, padding: 16, marginBottom: 16 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
-                  <p>Mã hoá đơn</p>
-                  <h3>{showId}</h3>
-                </div>
-                <div>
                   <p>Trạng thái</p>
-                  <h3 style={{ color: showStatus === "Unpaid" ? "#ff4d4f" : "#4caf50" }}>{showStatus}</h3>
+                  <h3 style={{ color: status === "Completed" ? "#4caf50" : status === "Unpaid" ? "#ff4d4f" : "#1677ff" }}>
+                    {status}
+                  </h3>
                 </div>
                 <div>
-                  <p>Thời gian tạo</p>
-                  <h4>{showCreatedAt ? new Date(showCreatedAt).toLocaleString("vi-VN") : "—"}</h4>
+                  <p>Thời gian kết thúc</p>
+                  <h4>{endedAt ? endedAt.toLocaleString("vi-VN") : "—"}</h4>
                 </div>
                 <div>
                   <p>Kỳ thanh toán</p>
-                  <h4>
-                    {invoice?.billingMonth ?? invoice?.BillingMonth ?? computed?.billingMonth}/
-                    {invoice?.billingYear ?? invoice?.BillingYear ?? computed?.billingYear}
-                  </h4>
+                  <h4>{billingMonth}/{billingYear}</h4>
                 </div>
               </div>
             </div>
 
-            <div className="invoice-summary" style={{ border: "1px dashed #ddd", borderRadius: 12, padding: 16 }}>
-              <h3 style={{ marginBottom: 12 }}>Chi tiết tiền sạc</h3>
+            {/* Chi tiết tiền */}
+            <div style={{ border: "1px dashed #ddd", borderRadius: 12, padding: 16 }}>
+              <h3 style={{ marginBottom: 12 }}>Chi tiết thanh toán</h3>
               <div style={{ display: "grid", gridTemplateColumns: "1fr auto", rowGap: 8 }}>
-                <div>Tạm tính (năng lượng + phí chiếm trụ)</div>
-                <div><b>{vnd((invoice?.subtotal ?? invoice?.Subtotal) ?? computed.subtotal)}</b></div>
+                <div>Năng lượng tiêu thụ</div>
+                <div><b>{energyKwh} kWh</b></div>
 
-                <div>Giảm trừ gói (Subscription)</div>
-                <div><b>- {vnd((invoice?.subscriptionAdjustment ?? invoice?.SubscriptionAdjustment) ?? computed.subscriptionAdjustment)}</b></div>
+                <div>Thời lượng sạc</div>
+                <div><b>{durationMin} phút</b></div>
+
+                <div>Phút chiếm trụ</div>
+                <div><b>{idleMin} phút</b></div>
+
+                <div style={{ borderTop: "1px solid #eee", marginTop: 8 }} />
+                <div style={{ borderTop: "1px solid #eee", marginTop: 8 }} />
+
+                <div>Tạm tính</div>
+                <div><b>{vnd(subtotal)}</b></div>
 
                 <div>Thuế (VAT)</div>
-                <div><b>{vnd((invoice?.tax ?? invoice?.Tax) ?? computed.tax)}</b></div>
+                <div><b>{vnd(tax)}</b></div>
 
                 <div style={{ borderTop: "1px solid #eee", marginTop: 8 }} />
                 <div style={{ borderTop: "1px solid #eee", marginTop: 8 }} />
 
                 <div><b>Tổng cộng</b></div>
-                <div><b style={{ fontSize: 18 }}>{vnd((invoice?.total ?? invoice?.Total) ?? computed.total)}</b></div>
+                <div><b style={{ fontSize: 18 }}>{vnd(total)}</b></div>
               </div>
             </div>
 
+            {/* Hành động */}
             <div style={{ marginTop: 16, display: "flex", gap: 8, alignItems: "center" }}>
               <button onClick={() => navigate("/payments")}>Thanh toán ngay</button>
               <button onClick={() => navigate("/history")}>Xem lịch sử</button>
-              {posting && <span>Đang gửi…</span>}
             </div>
-
-            {draft && (
-              <div style={{ marginTop: 24, opacity: 0.8 }}>
-                <h4>Thông tin phiên sạc</h4>
-                <div style={{ fontSize: 13 }}>
-                  Trạm: {draft.station?.name ?? draft.stationId ?? "—"} •
-                  Trụ: {draft.charger?.title ?? draft.chargerId ?? "—"} •
-                  Cổng: {draft.gun?.code ?? draft.portId ?? "—"} •
-                  Điện năng: {draft.energyUsedKWh} kWh •
-                  Giá/kWh: {vnd(draft.pricePerKWh)} •
-                  Phí chiếm trụ: {vnd(draft.idlePenalty)}
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>
