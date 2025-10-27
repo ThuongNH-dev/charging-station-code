@@ -5,6 +5,10 @@ import "./StationManagement.css";
 // Giả định stationApi và customerApi tồn tại
 import { stationApi } from "../../../api/stationApi";
 //import { fetchStations } from "../../../api/station";
+import { userApi } from "../../../api/userApi";
+
+// Dòng 8:
+import { message, Modal, Button, Input } from "antd";
 
 /**
  * Giả lập API tìm kiếm tên người dùng theo CustomerId (BE API)
@@ -68,12 +72,22 @@ function StationPage() {
   const [targetId, setTargetId] = useState(null);
   const [targetType, setTargetType] = useState(null);
 
+  // --- START: Session-related state (Replace old duplicated block) ---
+  const [isStarting, setIsStarting] = useState(false); // Trạng thái loading khi bắt đầu sạc
+  const [isEnding, setIsEnding] = useState(false); // Trạng thái loading khi kết thúc sạc
+
+  // Cổng hiện tại được chọn
+
+  // --- END: Session-related state ---
+
   // CHÚ THÍCH: Thêm State cho logic Bắt đầu phiên sạc
   const [currentPortId, setCurrentPortId] = useState(null);
   const [startSessionData, setStartSessionData] = useState({
-    carPlate: "",
-    userId: "", // Dùng để nhập và tìm kiếm
+    userId: "",
+    // TRƯỜNG MỚI: Dùng để lấy ID Xe
+    vehicleInput: "",
   });
+
   const [foundUserName, setFoundUserName] = useState(null); // Tên tìm thấy
   const [endSessionData, setEndSessionData] = useState(null); // Dữ liệu cho modal Tổng kết
 
@@ -88,6 +102,7 @@ function StationPage() {
   const closeModal = () => {
     setActiveModal(null);
     setStartSessionData({ carPlate: "", userId: "" });
+    setFoundUserName(null);
     setEndSessionData(null);
   };
 
@@ -233,6 +248,34 @@ function StationPage() {
   const handleStartSessionInputChange = (e) => {
     const { name, value } = e.target;
     setStartSessionData((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "userId") {
+      if (value.trim() !== "") {
+        const fetchUserName = async () => {
+          try {
+            const res = await userApi.getUserById(value); // Gọi API lấy thông tin user
+
+            // 👇 Dòng này dùng để xem dữ liệu trả về trong Console (F12)
+            console.log("API getUserById trả về:", res);
+
+            // ⚙️ Tùy cấu trúc của response mà truy cập fullName
+            if (res?.data?.fullName) {
+              setFoundUserName(res.data.fullName);
+            } else if (res?.fullName) {
+              setFoundUserName(res.fullName);
+            } else {
+              setFoundUserName("Không tìm thấy người dùng");
+            }
+          } catch (error) {
+            console.error("Lỗi khi tìm tên người dùng:", error);
+            setFoundUserName("Lỗi khi tra người dùng");
+          }
+        };
+        fetchUserName();
+      } else {
+        setFoundUserName(null);
+      }
+    }
   };
 
   // CHÚ THÍCH: Mở Modal Bắt đầu
@@ -296,82 +339,110 @@ function StationPage() {
   };
 
   // CHÚ THÍCH: Xác nhận Bắt đầu (Chuyển trạng thái cổng sang Busy)
-  const handleConfirmStartSession = () => {
-    if (!startSessionData.userId || !foundUserName) {
-      alert("Vui lòng nhập ID người dùng hợp lệ.");
+  // ✅ Bắt đầu phiên sạc
+  // StationManagement.jsx (Khoảng dòng 356)
+  const handleConfirmStartSession = async () => {
+    // Đảm bảo các ID là số, nếu không nhập thì mặc định là 0
+    // LƯU Ý: Nếu ID người dùng không hợp lệ (ví dụ: 'abc'), Number() sẽ trả về NaN,
+    // khi đó ta dùng '|| 0' để đảm bảo giá trị là 0.
+    const customerId = Number(startSessionData.userId) || 0;
+    const vehicleId = Number(startSessionData.vehicleInput) || 0;
+    const portId = Number(currentPortId) || 0;
+
+    // 1. Kiểm tra xác thực người dùng (tránh gửi 0 nếu bắt buộc có người dùng)
+    if (!foundUserName) {
+      message.warning(
+        "Vui lòng nhập và xác thực ID Người dùng trước khi bắt đầu."
+      );
       return;
     }
 
-    setStations((prevStations) =>
-      prevStations.map((station) => {
-        if (station.StationId === currentStationId) {
-          const updatedChargers = station.chargers.map((charger) => {
-            if (charger.ChargerId === currentChargerId) {
-              const updatedPorts = charger.ports.map((port) => {
-                if (port.PortId === currentPortId) {
-                  return {
-                    ...port,
-                    Status: "Busy", // Chuyển sang bận
-                    activeSession: true,
-                    sessionData: {
-                      carPlate: startSessionData.carPlate || "Unknown",
-                      userName: foundUserName,
-                      userId: startSessionData.userId,
-                      // LƯU THỜI GIAN BẮT ĐẦU VÀO sessionData
-                      startTime: new Date().toISOString(), // Dùng ISO string để dễ tính toán sau này
-                      MaxPowerKw: port.MaxPowerKw, // Lưu công suất để tính năng lượng sau này
-                      // Dữ liệu giả lập cho session đang chạy
-                      endTime: "Đang sạc",
-                      duration: "N/A",
-                      energy: "0.000",
-                      cost: "0",
-                    },
-                  };
-                }
-                return port;
-              });
-              return { ...charger, ports: updatedPorts };
-            }
-            return charger;
-          });
-          return { ...station, chargers: updatedChargers };
-        }
-        return station;
-      })
-    );
+    // 2. Xây dựng Payload
+    const sessionData = {
+      customerId: customerId,
+      vehicleId: vehicleId,
+      bookingId: null, // Giữ nguyên giá trị 0 theo cấu trúc bạn cung cấp
+      portId: portId,
+    };
 
-    setActiveModal(null);
+    // LOG để kiểm tra
+    console.log("📤 Đang gửi payload khởi tạo phiên sạc:", sessionData);
+
+    try {
+      await stationApi.startSession(sessionData);
+      message.success("✅ Bắt đầu phiên sạc từ xa thành công!");
+      setActiveModal(null); // Đóng modal
+      fetchStations(); // Cập nhật lại danh sách trạm
+    } catch (error) {
+      // Xử lý thông báo lỗi từ server, ví dụ: "Cổng sạc đang được sử dụng"
+      console.error("Lỗi khi bắt đầu phiên sạc:", error);
+
+      // Trích xuất thông báo lỗi nếu có (đã xử lý ở stationApi.js)
+      const errorMessage =
+        error.message || "Lỗi không xác định khi bắt đầu phiên sạc.";
+      message.error(`Lỗi: ${errorMessage}`);
+    }
   };
 
   // CHÚ THÍCH: Xác nhận Tổng kết (Chuyển trạng thái cổng sang Available)
-  const handleConfirmEndSession = () => {
-    setStations((prevStations) =>
-      prevStations.map((station) => {
-        if (station.StationId === currentStationId) {
-          const updatedChargers = station.chargers.map((charger) => {
-            if (charger.ChargerId === currentChargerId) {
-              const updatedPorts = charger.ports.map((port) => {
-                if (port.PortId === currentPortId) {
-                  return {
-                    ...port,
-                    Status: "Available", // Chuyển sang sẵn sàng
-                    activeSession: false,
-                    sessionData: null, // Xóa dữ liệu session
-                  };
-                }
-                return port;
-              });
-              return { ...charger, ports: updatedPorts };
-            }
-            return charger;
-          });
-          return { ...station, chargers: updatedChargers };
-        }
-        return station;
-      })
-    );
-    setActiveModal(null);
-    setEndSessionData(null);
+  // ✅ Kết thúc phiên sạc
+  const handleConfirmEndSession = async () => {
+    if (!endSessionData || !currentPortId) return;
+
+    try {
+      setIsEnding(true);
+      const { startTime } = endSessionData;
+      const endTime = new Date();
+
+      // Tính toán năng lượng và chi phí
+      const totalMinutes =
+        (endTime.getTime() - new Date(startTime).getTime()) / 60000;
+      const totalEnergy = (totalMinutes * 0.5).toFixed(2); // kWh
+      const totalCost = (totalEnergy * 3000).toFixed(0); // VNĐ
+
+      const payload = {
+        endTime: endTime.toISOString(),
+        totalEnergy,
+        totalCost,
+      };
+
+      const res = await stationApi.endSession(
+        endSessionData.sessionId,
+        payload
+      );
+
+      if (res?.success) {
+        // Hiển thị tổng kết
+        setEndSessionData({
+          ...endSessionData,
+          endTime,
+          totalEnergy,
+          totalCost,
+        });
+        setActiveModal("endSessionSummary");
+
+        // Reset trạng thái port về Available
+        setStations((prev) =>
+          prev.map((station) => ({
+            ...station,
+            chargers: station.chargers.map((charger) => ({
+              ...charger,
+              ports: charger.ports.map((port) =>
+                port.PortId === currentPortId
+                  ? { ...port, Status: "Available", sessionData: null }
+                  : port
+              ),
+            })),
+          }))
+        );
+      } else {
+        alert("❌ Không thể kết thúc phiên sạc!");
+      }
+    } catch (error) {
+      console.error("Lỗi khi kết thúc phiên sạc:", error);
+    } finally {
+      setIsEnding(false);
+    }
   };
 
   // --- MODAL HANDLERS (Giữ nguyên) ---
@@ -521,7 +592,7 @@ function StationPage() {
         Latitude: Number(editingStation.Latitude) || 0,
         Longitude: Number(editingStation.Longitude) || 0,
         Status: editingStation.Status, // Đảm bảo Status được gửi đúng
-        ImageUrl: editingStation.ImageUrl || ""
+        ImageUrl: editingStation.ImageUrl || "",
       };
 
       // Validation dữ liệu trước khi gửi
@@ -549,7 +620,7 @@ function StationPage() {
         stationId: editingStation.StationId,
         originalData: editingStation,
         preparedData: updateData,
-        status: updateData.Status
+        status: updateData.Status,
       });
 
       const updatedStation = await stationApi.updateStation(
@@ -561,35 +632,40 @@ function StationPage() {
       console.log("🔍 Kiểm tra dữ liệu:", {
         original: editingStation,
         response: updatedStation,
-        status: updatedStation.Status
+        status: updatedStation.Status,
       });
-      
+
       // 🔍 Debug: Kiểm tra dữ liệu trước khi cập nhật state
       console.log("🔍 Dữ liệu từ API:", {
         StationId: updatedStation.StationId,
         StationName: updatedStation.StationName,
         Status: updatedStation.Status,
-        Address: updatedStation.Address
+        Address: updatedStation.Address,
       });
 
       setActiveModal(null);
-      
+
       // ✅ SỬA LỖI: Cập nhật state trực tiếp
       setStations((prev) => {
-        console.log("🔍 Trước khi cập nhật state:", prev.find(s => s.StationId === updatedStation.StationId));
+        console.log(
+          "🔍 Trước khi cập nhật state:",
+          prev.find((s) => s.StationId === updatedStation.StationId)
+        );
         const updated = prev.map((s) =>
           s.StationId === updatedStation.StationId ? updatedStation : s
         );
-        console.log("🔍 Sau khi cập nhật state:", updated.find(s => s.StationId === updatedStation.StationId));
+        console.log(
+          "🔍 Sau khi cập nhật state:",
+          updated.find((s) => s.StationId === updatedStation.StationId)
+        );
         return updated;
       });
 
       alert("Cập nhật trạm thành công!");
-      
+
       // ✅ Đơn giản hóa: Không cần kiểm tra lại từ server
       // Vì backend đã cập nhật thành công (HTTP 204), UI đã được cập nhật
       console.log("✅ Cập nhật trạm hoàn tất");
-      
     } catch (err) {
       console.error("❌ Lỗi cập nhật trạm:", err);
       alert("Cập nhật trạm thất bại: " + err.message);
@@ -1006,6 +1082,46 @@ function StationPage() {
       </div>
     ));
 
+  // 🧩 Khi nhập ID người dùng để bắt đầu sạc
+  // Giả định các state đã được khai báo ở đầu component:
+  const [userInfo, setUserInfo] = useState(null);
+  // const [foundUserName, setFoundUserName] = useState(null);
+  // const [startSessionData, setStartSessionData] = useState({ userId: '', carPlate: '' });
+
+  // Trích đoạn hàm handleUserIdChange (Đã có sẵn trong code của bạn):
+
+  const handleUserIdChange = async (value) => {
+    // Cập nhật startSessionData.userId ngay lập tức (Logic đã có trong onClick)
+    // setStartSessionData((prev) => ({ ...prev, userId: value })); // KHÔNG CẦN, vì nó đã được gọi trong onChange
+
+    // Reset thông tin người dùng khi bắt đầu nhập ID mới
+    // KHUYẾN NGHỊ: Thêm setUserInfo(null) ở đây nếu giá trị thay đổi
+
+    if (!value) {
+      setUserInfo(null); // Reset nếu ID trống
+      return;
+    }
+
+    try {
+      console.log("🔍 Đang tìm user ID:", value);
+      const res = await userApi.getUserById(value);
+      console.log("✅ API trả về:", res);
+
+      if (res && res.username) {
+        setUserInfo(res); // ✅ Lưu toàn bộ object user vào state userInfo
+        message.success(`Tìm thấy user: ${res.username}`);
+      } else {
+        setUserInfo(null); // ❌ Reset userInfo nếu không tìm thấy
+        message.warning("Không tìm thấy người dùng này");
+      }
+    } catch (error) {
+      setUserInfo(null); // ❌ Reset userInfo nếu có lỗi API
+      console.error("❌ Lỗi khi tìm user:", error);
+      message.error("Không thể tìm người dùng, kiểm tra lại ID");
+    }
+  };
+  // Chú ý: Bạn cần đảm bảo bạn có state `const [userInfo, setUserInfo] = useState(null);`
+
   return (
     <div className="station-page">
       <h2 className="admin-title">Quản lý Trạm & Bộ sạc</h2>
@@ -1143,59 +1259,78 @@ function StationPage() {
                     Đóng
                   </span>
                 </div>
-                <p style={{ marginBottom: "20px", color: "#ccc" }}>
-                  Port ID: {currentPortId}
-                </p>
-                <input
-                  type="text"
-                  placeholder="Biển số xe (VD: 51A-123.45)"
-                  name="carPlate"
-                  value={startSessionData.carPlate}
-                  onChange={handleStartSessionInputChange}
-                  style={{ marginBottom: "10px" }}
-                />
 
-                {/* CHÚ THÍCH: Trường nhập ID người dùng */}
-                <input
-                  type="number"
-                  placeholder="ID người dùng *"
-                  name="userId"
-                  value={startSessionData.userId}
-                  onChange={handleStartSessionInputChange}
-                  style={{ marginBottom: "10px" }}
-                />
+                <Modal
+                  title="Bắt đầu phiên sạc (Remote)"
+                  open={activeModal === "startSession"}
+                  onClose={() => setActiveModal(null)}
+                >
+                  {/* ... Port ID Display ... */}
 
-                {/* CHÚ THÍCH: Hiển thị tên người dùng tìm được */}
-                {(foundUserName ||
-                  (startSessionData.userId && !foundUserName)) && (
-                  <p
-                    style={{
-                      color: foundUserName ? "#52c41a" : "#ff4d4f",
-                      fontWeight: "bold",
-                      padding: "5px 0",
-                      borderBottom: "1px dotted #ccc",
-                      fontSize: "14px",
-                    }}
-                  >
-                    {foundUserName
-                      ? `Tên người dùng: ${foundUserName}`
-                      : "Không tìm thấy người dùng"}
-                  </p>
-                )}
+                  {/* TRƯỜNG MỚI: ID XE (Thay thế Biển số xe) */}
+                  <div className="input-field">
+                    <label>ID Xe (Tùy chọn)</label>
+                    <input
+                      type="text"
+                      placeholder="Nhập ID xe (VD: 12345)"
+                      value={startSessionData.vehicleInput}
+                      onChange={(e) =>
+                        setStartSessionData((prev) => ({
+                          ...prev,
+                          vehicleInput: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
 
-                <div className="modal-actions" style={{ marginTop: "20px" }}>
-                  <button className="btn" onClick={() => setActiveModal(null)}>
-                    Hủy
-                  </button>
-                  <button
-                    className="btn green"
-                    onClick={handleConfirmStartSession}
-                    // CHÚ THÍCH: Vô hiệu hóa nút nếu chưa tìm thấy tên hoặc chưa nhập ID
-                    disabled={!startSessionData.userId || !foundUserName}
-                  >
-                    Bắt đầu
-                  </button>
-                </div>
+                  {/* TRƯỜNG ID NGƯỜI DÙNG (Vẫn là trường chính để xác thực) */}
+                  <div className="input-field">
+                    <label>ID Người dùng *</label>
+                    <input
+                      type="text"
+                      placeholder="Nhập ID người dùng"
+                      value={startSessionData.userId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setStartSessionData((prev) => ({
+                          ...prev,
+                          userId: val,
+                        }));
+                        handleUserIdChange(val); // Vẫn gọi hàm xác thực người dùng
+                      }}
+                    />
+                  </div>
+
+                  {/* PHẦN HIỂN THỊ TÊN NGƯỜI DÙNG VÀ XÁC MINH (Giữ nguyên logic dựa trên foundUserName) */}
+                  {startSessionData.userId &&
+                    startSessionData.userId.trim() !== "" && (
+                      <p
+                        style={{
+                          marginTop: "8px",
+                          padding: "5px 0",
+                          fontSize: "14px",
+                          fontWeight: "bold",
+                          color: foundUserName ? "#52c41a" : "#ff4d4f",
+                        }}
+                      >
+                        {foundUserName
+                          ? `Tên người dùng: ${foundUserName} (Đã xác minh)`
+                          : `Không tìm thấy ID Người dùng`}
+                      </p>
+                    )}
+
+                  <div className="modal-actions" style={{ marginTop: "20px" }}>
+                    {/* ... Nút HỦY ... */}
+                    <button
+                      className="btn green"
+                      onClick={handleConfirmStartSession}
+                      // Nút BẮT ĐẦU chỉ hoạt động khi có ID Người dùng VÀ đã xác minh thành công
+                      disabled={!startSessionData.userId || !foundUserName}
+                    >
+                      Bắt đầu
+                    </button>
+                  </div>
+                </Modal>
               </>
             )}
 
@@ -1600,6 +1735,32 @@ function StationPage() {
                   </button>
                 </div>
               </>
+            )}
+
+            {activeModal === "endSessionSummary" && endSessionData && (
+              <div className="modal">
+                <h3>Tổng kết phiên sạc</h3>
+                <p>
+                  <strong>Người dùng:</strong> {endSessionData.userName}
+                </p>
+                <p>
+                  <strong>Xe:</strong>{" "}
+                  {endSessionData.vehicleName || "Không có thông tin"}
+                </p>
+                <p>
+                  <strong>Thời gian:</strong>{" "}
+                  {new Date(endSessionData.startTime).toLocaleTimeString()} -{" "}
+                  {new Date(endSessionData.endTime).toLocaleTimeString()}
+                </p>
+                <p>
+                  <strong>Năng lượng:</strong> {endSessionData.totalEnergy} kWh
+                </p>
+                <p>
+                  <strong>Chi phí:</strong>{" "}
+                  {Number(endSessionData.totalCost).toLocaleString()} VNĐ
+                </p>
+                <button onClick={() => setActiveModal(null)}>Đóng</button>
+              </div>
             )}
           </div>
         </div>

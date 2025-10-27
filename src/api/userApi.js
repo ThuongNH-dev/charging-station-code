@@ -10,18 +10,18 @@ export const userApi = {
     return res.data;
   },
   // ✅ HÀM UPDATE ĐÃ ĐƯỢC CHỈNH SỬA ĐỂ NHẬN THÊM 'role'
-    updateUser: async (id, data, role) => {
-        let endpoint = `${BASE_URL}/Auth/update-customer`; // Mặc định là customer
+  updateUser: async (id, data, role) => {
+    let endpoint = `${BASE_URL}/Auth/update-customer`; // Mặc định là customer
 
-        if (role === "Company") {
-            // Nếu là công ty, dùng endpoint /update-company
-            endpoint = `${BASE_URL}/Auth/update-company`;
-        } 
-        
-        // Cả hai endpoint cập nhật đều là PUT (theo hình ảnh)
-        const res = await axios.put(endpoint, data); 
-        return res.data;
-    },
+    if (role === "Company") {
+      // Nếu là công ty, dùng endpoint /update-company
+      endpoint = `${BASE_URL}/Auth/update-company`;
+    }
+
+    // Cả hai endpoint cập nhật đều là PUT (theo hình ảnh)
+    const res = await axios.put(endpoint, data);
+    return res.data;
+  },
 
   updateUserStatus: async (id, data) => {
     const res = await axios.put(`${BASE_URL}/Auth/changestatus/${id}`, data);
@@ -83,5 +83,16 @@ export const userApi = {
   fetchAllSubscriptions: async () => {
     const res = await axios.get(`${BASE_URL}/Subscriptions`);
     return res.data;
+  },
+  // === GET USER BY ID ===
+  getUserById: async (id) => {
+    try {
+      const res = await axios.get(`${BASE_URL}/Auth/${id}`);
+      console.log("API getUserById trả về:", res.data); // ✅ Log để kiểm tra dữ liệu trả về
+      return res.data;
+    } catch (error) {
+      console.error("❌ Lỗi khi gọi API getUserById:", error);
+      throw error;
+    }
   },
 };

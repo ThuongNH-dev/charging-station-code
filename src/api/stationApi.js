@@ -144,7 +144,7 @@ export const stationApi = {
         url: `/Stations/${stationId}`,
         method: "PUT",
         data: stationData,
-        status: stationData.Status
+        status: stationData.Status,
       });
 
       // Đảm bảo dữ liệu được gửi đúng format
@@ -156,7 +156,7 @@ export const stationApi = {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
         body: requestBody,
       });
@@ -164,14 +164,14 @@ export const stationApi = {
       // Nếu endpoint chính không hoạt động, thử các endpoint khác
       if (!res) {
         console.warn("⚠️ Endpoint chính không hoạt động, thử endpoint khác...");
-        
+
         // Thử endpoint với tên khác
         try {
           res = await fetchAuthJSON(resolveUrl(`/stations/${stationId}`), {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
-              "Accept": "application/json",
+              Accept: "application/json",
             },
             body: requestBody,
           });
@@ -191,7 +191,9 @@ export const stationApi = {
 
       // Nếu API trả về null/undefined (HTTP 204), coi như thành công
       if (res === null || res === undefined) {
-        console.log("✅ Backend trả về HTTP 204 No Content - cập nhật thành công");
+        console.log(
+          "✅ Backend trả về HTTP 204 No Content - cập nhật thành công"
+        );
         console.log("✅ Sử dụng dữ liệu đã gửi để cập nhật UI");
         // Sử dụng dữ liệu đã gửi, kết hợp với StationId
         updatedData = { ...stationData, StationId: stationId };
@@ -389,6 +391,41 @@ export const stationApi = {
       throw new Error(
         `Xóa cổng sạc thất bại: ${error.message || "Lỗi không xác định"}`
       );
+    }
+  },
+
+  // --- 4️⃣ SESSIONS ---
+  // stationApi.js - ĐOẠN CODE ĐÃ SỬA LỖI
+  async startSession(sessionData) {
+    try {
+      // ĐÚNG: Sử dụng URL chính xác theo tài liệu Backend
+      const res = await fetchAuthJSON(
+        resolveUrl("/api/ChargingSessions/start"),
+        {
+          method: "POST",
+          body: JSON.stringify(sessionData),
+        }
+      );
+      return res || {};
+    } catch (error) {
+      console.error("API Error: Bắt đầu phiên sạc thất bại.", error);
+      throw new Error(`Bắt đầu phiên sạc thất bại: ${error.message}`);
+    }
+  },
+
+  async endSession(sessionId, data) {
+    try {
+      const res = await fetchAuthJSON(
+        resolveUrl(`/api/sessions/end/${sessionId}`),
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+        }
+      );
+      return res || {};
+    } catch (error) {
+      console.error("API Error: Kết thúc phiên sạc thất bại.", error);
+      throw new Error(`Kết thúc phiên sạc thất bại: ${error.message}`);
     }
   },
 };
