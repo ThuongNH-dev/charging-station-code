@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchAuthJSON } from "../../utils/api";
+import { useAuth } from "../../context/AuthContext";
 import "./BookingHistory.css";
 
 const API_ABS = "https://localhost:7268/api";
@@ -10,16 +11,6 @@ const PAYMENT_CREATE_URL = `${API_ABS}/Payment/create`;
 const HOLD_MINUTES_DEFAULT = 15;
 const vndNumber = (n) => (Number(n) || 0).toLocaleString("vi-VN");
 
-// === URL normalizer (string | {result|url|href} | relative) -> absolute string or ""
-// function toUrlString(val) {
-//   if (!val) return "";
-//   const s =
-//     typeof val === "string" ? val
-//       : (val.result ?? val.url ?? val.href ?? "");
-//   if (!s) return "";
-//   if (/^https?:\/\//i.test(s)) return s;
-//   try { return new URL(s, window.location.origin).toString(); } catch { return ""; }
-// }
 
 // === URL normalizer: string | {result|url|href|paymentUrl} | relative -> absolute string
 function toUrlString(val) {
@@ -108,6 +99,14 @@ function pickDateField(row, fieldKey) {
 
 export default function HistoryPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const myCustomerId = React.useMemo(() => {
+    const cid =
+      user?.customerId ??
+      Number(localStorage.getItem("customerId")) ??
+      Number(sessionStorage.getItem("customerId"));
+    return Number.isFinite(cid) ? String(cid) : "";
+  }, [user]);
 
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
@@ -135,10 +134,17 @@ export default function HistoryPage() {
       setLoading(true);
       setErr("");
       try {
+        if (!myCustomerId) {
+          setErr("Không xác định được customerId. Vui lòng đăng nhập lại.");
+          setItems([]);
+          setLoading(false);
+          return;
+        }
         // Gọi BE: cố gắng truyền tham số từ–đến nếu BE có hỗ trợ (optional, không bắt buộc)
         const url = new URL(`${API_ABS}/Booking`);
         url.searchParams.set("page", page);
         url.searchParams.set("pageSize", pageSize);
+        url.searchParams.set("customerId", myCustomerId);
 
         // Truyền kèm field + range nếu có chọn
         if (dateFrom) url.searchParams.set("from", dateFrom); // ví dụ BE chấp nhận YYYY-MM-DD
@@ -159,6 +165,7 @@ export default function HistoryPage() {
           const startTime = b.startTime ?? b.StartTime;
           const endTime = b.endTime ?? b.EndTime;
           const createdAt = b.createdAt ?? b.CreatedAt;
+          const customerId = b.customerId ?? b.CustomerId;
 
           const stub = findPaymentStubByBookingId(bookingId);
 
@@ -174,14 +181,16 @@ export default function HistoryPage() {
           const paid = status !== "Pending" || (orderId && wasFinalized(orderId));
 
           return {
-            bookingId, price, status, startTime, endTime, createdAt,
+            bookingId, price, status, startTime, endTime, createdAt, customerId,
             _orderId: orderId, _timeLeft: timeLeft,
             _hasCountdown: status === "Pending" && timeLeft > 0,
             _paid: paid,
           };
         });
 
-        setItems(normalized);
+        // Fallback: lọc đúng chủ sở hữu ở FE nếu BE chưa filter
+        const mineOnly = normalized.filter(x => String(x.customerId) === myCustomerId);
+        setItems(mineOnly);
       } catch (e) {
         setErr(e.message || "Lỗi tải lịch sử.");
       } finally {

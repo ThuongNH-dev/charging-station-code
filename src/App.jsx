@@ -26,7 +26,8 @@ import Reports from "./components/admin/pages/Reports/Reports";
 import RegisterSelect from "./pages/Register/RegisterSelect";
 import PersonalRegister from "./pages/Register/PersonalRegister";
 import BusinessRegister from "./pages/Register/BusinessRegister";
-import InvoiceCharging from "./pages/payment/InvoiceCharging";
+import InvoiceSummary from "./pages/payment/InvoiceSummary";
+import InvoiceDetail from "./pages/payment/InvoiceDetail";
 import NotFound from "./pages/NotFound";
 import OverviewKPIs from "./components/admin/pages/Reports/OverviewKPIs";
 import ReportContent from "./components/admin/pages/Reports/ReportContent";
@@ -77,14 +78,6 @@ export default function App() {
         element={
           <GuestRoute>
             <Login />
-          </GuestRoute>
-        }
-      />
-      <Route
-        path="/services"
-        element={
-          <GuestRoute>
-            <ServicePlans />
           </GuestRoute>
         }
       />
@@ -179,8 +172,28 @@ export default function App() {
         }
       />
       <Route
-        path="/invoiceCharging"
-        element={<InvoiceCharging />}
+        path="/invoiceSummary"
+        element={
+          <ProtectedRoute allowedRoles={["Customer"]}>
+            <InvoiceSummary />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/invoiceDetail/:invoiceId"
+        element={
+          <ProtectedRoute allowedRoles={["Customer"]}>
+            <InvoiceDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/services"
+        element={
+          <ProtectedRoute allowedRoles={["Customer"]}>
+            <ServicePlans />
+          </ProtectedRoute>
+        }
       />
       {/*Staff */}
       <Route

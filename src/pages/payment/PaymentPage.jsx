@@ -8,7 +8,6 @@ import "./style/PaymentPage.css";
 
 import { getApiBase, fetchAuthJSON } from "../../utils/api";
 
-//bắt lỗi xong xoá
 
 // ===== DEBUG LOGGER =====
 const DEBUG_PAY = true;
@@ -170,6 +169,8 @@ function readOrderBlob(orderId) {
 export default function PaymentPage() {
   const { state } = useLocation();
   const navigate = useNavigate();
+  const [invoiceId, setInvoiceId] = useState(state?.invoiceId ?? null);
+  const [companyId, setCompanyId] = useState(state?.companyId ?? null);
 
   // ===== Local states
   const [loading, setLoading] = useState(false);
@@ -190,12 +191,20 @@ export default function PaymentPage() {
   const [bookingId, setBookingId] = useState(state?.bookingId ?? null);
   const [bookingPrice, setBookingPrice] = useState(null); // giá thật từ BE
 
+  const [invoiceAmount, setInvoiceAmount] = useState(null); // NEW (giá từ Invoice)
+  // nếu có presetAmount từ trang confirm, dùng ngay cho UI mượt hơn
+  useEffect(() => {
+    if (state?.presetAmount != null && Number(state.presetAmount) > 0) {
+      setInvoiceAmount(Number(state.presetAmount));
+    }
+  }, [state?.presetAmount]);
+
   // Early guard
-  if (!state) {
+  if (!state || (!state.bookingId && !state.invoiceId)) {
     return (
       <div className="page-fallback">
-        <h2>Thiếu thông tin đơn hàng</h2>
-        <p>Vui lòng đặt lại từ trang danh sách trạm.</p>
+        <h2>Thiếu thông tin thanh toán</h2>
+        <p>Vui lòng chọn Booking hoặc Invoice để thanh toán.</p>
         <button className="secondary-btn" onClick={() => navigate("/stations")}>
           <ArrowLeftOutlined /> Về danh sách trạm
         </button>
@@ -272,6 +281,24 @@ export default function PaymentPage() {
 
     return () => { mounted = false; };
   }, [API_BASE]);
+
+  // Ưu tiên giá từ BE /Invoice/{id}
+  useEffect(() => {
+    if (!invoiceId) return;
+    (async () => {
+      try {
+        const inv = await fetchInvoiceById(API_BASE, invoiceId); // đã unwrap
+        const total = Number(
+          inv?.total ?? inv?.Total ??
+          inv?.amount ?? inv?.Amount ??
+          inv?.grandTotal ?? inv?.GrandTotal ?? 0
+        );
+        if (total > 0) setInvoiceAmount(total);
+      } catch {
+        // giữ presetAmount nếu có
+      }
+    })();
+  }, [invoiceId, API_BASE]);
 
   // 2) Lấy vehicle theo customerId -> licensePlate
   useEffect(() => {
@@ -375,9 +402,11 @@ export default function PaymentPage() {
   );
 
   // ===== Số tiền cuối cùng để hiển thị & thanh toán =====
-  const amount = (bookingPrice != null && bookingPrice > 0)
+  const amount = (bookingId && bookingPrice > 0)
     ? bookingPrice
-    : (amountFromVnpUrl != null ? amountFromVnpUrl : null);
+    : (invoiceId && invoiceAmount > 0)
+      ? invoiceAmount
+      : (amountFromVnpUrl != null ? amountFromVnpUrl : null);
 
   // ===== Payment method UI
   const [walletBalance, setWalletBalance] = useState(0);
@@ -424,6 +453,10 @@ export default function PaymentPage() {
       roundedHours: Math.max(1, Math.ceil((totalMinutes || 0) / 60)), // chỉ để note, không tính tiền
       pricePerHour: 0,
 
+      bookingId,
+      invoiceId,
+      companyId,
+
       paidAt: Date.now(),
       paymentMethod: selectedPayment,
       contact,
@@ -468,28 +501,43 @@ export default function PaymentPage() {
     setPayError("");
 
     try {
-      if (!bookingId) {
-        throw new Error("Thiếu bookingId. Vui lòng tạo/chọn booking trước khi thanh toán.");
+      if (!bookingId && !invoiceId) {
+        throw new Error("Thiếu bookingId hoặc invoiceId.");
       }
 
-      // (Tuỳ BE) kiểm tra booking đã có giá (có thể bỏ nếu BE tự validate)
-      try {
-        const check = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
-        const bePrice = Number(check?.price ?? check?.Price ?? 0);
-        if (!(bePrice > 0)) {
-          throw new Error("Booking chưa có giá, không thể thanh toán.");
+      // (Optional) Kiểm tra số tiền trước khi tạo phiên:
+      if (bookingId) {
+        try {
+          const check = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
+          const bePrice = Number(check?.price ?? check?.Price ?? 0);
+          if (!(bePrice > 0)) throw new Error("Booking chưa có giá, không thể thanh toán.");
+          setBookingPrice(bePrice);
+        } catch (e) {
+          throw new Error(e?.message || "Không kiểm tra được giá của booking.");
         }
-        setBookingPrice(bePrice);
-      } catch (e) {
-        throw new Error(e?.message || "Không kiểm tra được giá của booking.");
+      } else if (invoiceId) {
+        try {
+          const inv = await fetchInvoiceById(API_BASE, invoiceId);
+          const total = Number(
+            inv?.total ?? inv?.Total ??
+            inv?.amount ?? inv?.Amount ??
+            inv?.grandTotal ?? inv?.GrandTotal ?? 0
+          );
+          if (!(total > 0)) throw new Error("Invoice chưa có tổng tiền, không thể thanh toán.");
+          setInvoiceAmount(total);
+        } catch (e) {
+          throw new Error(e?.message || "Không kiểm tra được giá của invoice.");
+        }
       }
 
       // Payload tạo phiên thanh toán
       const payload = {
-        bookingId,
-        description: `Thanh toán booking #${bookingId}`,
-        invoiceId: state?.invoiceId,
-        companyId: state?.companyId,
+        bookingId: bookingId ?? null,
+        invoiceId: invoiceId ?? null,
+        companyId: companyId ?? state?.companyId ?? null,
+        description: bookingId
+          ? `Thanh toán booking #${bookingId}`
+          : `Thanh toán hóa đơn #${invoiceId}`,
         returnUrl: `${window.location.origin}/vnpay-bridge.html?order=${encodeURIComponent(orderId)}`
       };
       Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
@@ -527,8 +575,9 @@ export default function PaymentPage() {
       } catch { }
 
       setVnpayUrl(url);                                   // LƯU URL vào state
-      setPaymentRef(ref || String(bookingId));            // LƯU mã tham chiếu
-      return { url, ref: ref || String(bookingId) };      // TRẢ KẾT QUẢ (để handlePay dùng)
+      const fallbackRef = String(bookingId || invoiceId || orderId);
+      setPaymentRef(ref || fallbackRef);
+      return { url, ref: ref || fallbackRef };
     } catch (err) {
       setPayError(err?.message || "Không tạo được phiên thanh toán VNPAY. Vui lòng thử lại.");
       setVnpayUrl("");
@@ -542,35 +591,32 @@ export default function PaymentPage() {
 
   // Auto-create VNPAY URL khi chọn QR và đã xác định bookingId — nhưng chỉ khi CHƯA có url
   useEffect(() => {
-    if (selectedPayment === "qr" && bookingId && !vnpayUrl) {
+    if (selectedPayment === "qr" && (bookingId || invoiceId) && !vnpayUrl) {
       createVnpayPayment();
     }
-  }, [selectedPayment, bookingId, orderId, vnpayUrl]); // đã thêm vnpayUrl để tránh lặp
+  }, [selectedPayment, bookingId, invoiceId, orderId, vnpayUrl]);
 
   const canPayByWallet = selectedPayment === "wallet" ? walletBalance >= (amount || 0) : true;
   const payDisabled =
     loading ||
     !selectedPayment ||
     (selectedPayment === "wallet" && !canPayByWallet) ||
-    (selectedPayment === "qr" && (!bookingId || creatingVnpay || !vnpayUrl)) ||
+    (selectedPayment === "qr" && (!(bookingId || invoiceId) || creatingVnpay || !vnpayUrl)) ||
     (amount == null); // cần có giá từ BE (hoặc từ URL) để enable
 
   // ===== Helpers: kiểm tra trạng thái thanh toán/confirm từ BE =====
   function isPaidOrConfirmed(raw) {
     if (!raw || typeof raw !== "object") return false;
 
-    // Các field khả dĩ BE có thể trả
     const paid = raw.isPaid ?? raw.paid ?? raw.IsPaid ?? false;
     if (paid === true || paid === "true" || paid === 1) return true;
 
     const st = String(raw.status ?? raw.Status ?? "").toLowerCase();
     if (["paid", "completed", "confirmed", "success"].includes(st)) return true;
 
-    // Nhiều BE cập nhật booking sau callback
     const paymentStatus = String(raw.paymentStatus ?? raw.PaymentStatus ?? "").toLowerCase();
     if (["paid", "success", "completed"].includes(paymentStatus)) return true;
 
-    // Nếu có invoice gắn kèm
     const inv = raw.invoice ?? raw.Invoice;
     if (inv) {
       const ipaid = inv.isPaid ?? inv.paid ?? inv.IsPaid;
@@ -578,7 +624,6 @@ export default function PaymentPage() {
       const ist = String(inv.status ?? inv.Status ?? "").toLowerCase();
       if (["paid", "success", "completed"].includes(ist)) return true;
     }
-
     return false;
   }
 
@@ -590,13 +635,16 @@ export default function PaymentPage() {
     return b;
   }
 
-  async function pollUntilPaid({ apiBase, bookingId, timeoutMs = 300000, stepMs = 2000, onTick }) {
+  async function pollUntilPaid({ apiBase, bookingId, invoiceId, timeoutMs = 300000, stepMs = 2000, onTick }) {
     const t0 = Date.now();
     while (Date.now() - t0 < timeoutMs) {
       try {
-        const b = await fetchBookingById(apiBase, bookingId);
-        if (onTick) onTick(b);
-        if (b && isPaidOrConfirmed(b)) return { ok: true, data: b };
+        let data = null;
+        if (bookingId) data = await fetchBookingById(apiBase, bookingId);
+        else if (invoiceId) data = await fetchInvoiceById(apiBase, invoiceId);
+
+        if (onTick) onTick(data);
+        if (data && isPaidOrConfirmed(data)) return { ok: true, data };
       } catch {
         // bỏ qua lỗi lẻ
       }
@@ -605,13 +653,18 @@ export default function PaymentPage() {
     return { ok: false, data: null };
   }
 
+  async function fetchInvoiceById(apiBase, invoiceId) {
+    const res = await fetchAuthJSON(`${apiBase}/Invoices/${invoiceId}`, { method: "GET" });
+    return res?.data ?? res ?? null; // unwrap
+  }
+
   const handlePay = async () => {
     if (selectedPayment !== "qr") {
       setPayError("Hiện tại chỉ hỗ trợ VNPAY-QR.");
       return;
     }
-    if (!bookingId) {
-      setPayError("Chưa có bookingId. Vui lòng quay lại đặt chỗ.");
+    if (!bookingId && !invoiceId) {
+      setPayError("Thiếu bookingId hoặc invoiceId.");
       return;
     }
 
@@ -619,6 +672,7 @@ export default function PaymentPage() {
     setPayError("");
 
     try {
+      
       // B1: đảm bảo đã có link VNPAY
       let payUrl = vnpayUrl;
       payUrl = toUrlString(payUrl);
@@ -631,31 +685,11 @@ export default function PaymentPage() {
         payUrl = toUrlString(created.url);
       }
 
-      // B2: mở VNPAY ở tab mới
-      const payWin = window.open(payUrl, "_blank", "noopener");
-
-      // B3: poll BE tới khi thấy paid/confirmed
-      try { sessionStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }
-      try { localStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }
-
-      const res = await pollUntilPaid({
-        apiBase: API_BASE,
-        bookingId,
-        timeoutMs: 300000, // 5 phút
-        stepMs: 2500,
-      });
-
-      if (res.ok) {
-        try { if (payWin && !payWin.closed) payWin.close(); } catch { }
-        navigate(`/payment/success?bookingId=${encodeURIComponent(bookingId)}`, {
-          replace: true,
-          state: { paid: true, fromVnpay: true },
-        });
-        return;
-      }
-
-      // Hết thời gian poll mà chưa thấy paid
-      setPayError("Chưa xác nhận được thanh toán. Vui lòng kiểm tra lại hoặc làm mới trang.");
+      // B2: Đặt cờ pending (để trang bridge/success đọc được), rồi chuyển TAB HIỆN TẠI sang VNPAY
+      try { sessionStorage.setItem(`pay:${orderId}:pending`, "1"); } catch {}
+      try { localStorage.setItem(`pay:${orderId}:pending`, "1"); } catch {}
+      window.location.href = payUrl; // 👈 chuyển trong cùng tab
+      return; // dừng tại đây vì trang sẽ rẽ nhánh rời khỏi SPA hiện tại
     } finally {
       setLoading(false);
     }
@@ -692,7 +726,7 @@ export default function PaymentPage() {
 
               {selectedPayment === "qr" && (
                 <div className="os-qr">
-                  {!bookingId && (
+                  {!(bookingId || invoiceId) && (
                     <p className="os-warning">
                       Đang tìm booking phù hợp...
                     </p>
@@ -703,16 +737,16 @@ export default function PaymentPage() {
                       <QRCodeCanvas value={toUrlString(vnpayUrl)} size={180} includeMargin />
                       <p className="os-qr-hint">Quét mã QR để thanh toán qua VNPAY</p>
                       <p className="os-qr-mini">
-                        Mã giao dịch: <b>{paymentRef || bookingId || orderId}</b>
+                        Mã giao dịch: <b>{paymentRef || bookingId || invoiceId || orderId}</b>
                       </p>
                     </>
                   ) : (
                     <>
                       <div className="os-qr-skeleton" />
                       <p className="os-qr-hint">
-                        {bookingId
+                        {(bookingId || invoiceId)
                           ? "Đang khởi tạo phiên thanh toán VNPAY..."
-                          : "Chưa có bookingId"}
+                          : "Thiếu mã tham chiếu thanh toán"}
                       </p>
                     </>
                   )}
@@ -729,9 +763,7 @@ export default function PaymentPage() {
                   disabled={payDisabled}
                 >
                   {selectedPayment === "qr"
-                    ? creatingVnpay
-                      ? "Đang khởi tạo..."
-                      : "Xác nhận đã quét"
+                    ? (creatingVnpay ? "Đang khởi tạo..." : "Chuyển đến VNPAY")
                     : "Thanh Toán"}
                 </button>
 
@@ -744,34 +776,45 @@ export default function PaymentPage() {
 
           {/* RIGHT COLUMN */}
           <div className="right-panel">
-            <h2 className="os-title">Xác nhận đơn đặt trước</h2>
+            <h2 className="os-title">
+              {bookingId ? "Xác nhận đơn đặt trước" : "Xác nhận thanh toán hóa đơn"}
+            </h2>
 
             <div className="os-block">
-              <h3>1. Thông tin trụ sạc</h3>
-              <p className="os-station-line">
-                <b>{station?.name}</b> — {charger?.title} — Cổng <b>{gun?.name}</b>
-              </p>
-              <ul className="os-station-list">
-                <li>Công suất: {charger?.power || "—"}</li>
-                <li>Tình trạng trụ: {charger?.status || "—"}</li>
-                <li>Loại cổng sạc: {charger?.connector || "—"}</li>
-                <li>Tốc độ sạc:</li>
-                <ul>
-                  <li>8 – 12 tiếng cho ô tô</li>
-                  <li>4 – 6 tiếng cho xe máy điện</li>
+              <h3>1. {bookingId ? "Thông tin trụ sạc" : "Thông tin hóa đơn"}</h3>
+              {bookingId ? (
+                <>
+                  <p className="os-station-line">
+                    <b>{station?.name}</b> — {charger?.title} — Cổng <b>{gun?.name}</b>
+                  </p>
+                  <ul className="os-station-list">
+                    <li>Công suất: {charger?.power || "—"}</li>
+                    <li>Tình trạng trụ: {charger?.status || "—"}</li>
+                    <li>Loại cổng sạc: {charger?.connector || "—"}</li>
+                    <li>Tốc độ sạc:</li>
+                    <ul>
+                      <li>8 – 12 tiếng cho ô tô</li>
+                      <li>4 – 6 tiếng cho xe máy điện</li>
+                    </ul>
+                  </ul>
+                </>
+              ) : (
+                <ul className="os-station-list">
+                  <li>Mã hóa đơn: <b>{invoiceId}</b></li>
+                  <li>Công ty: {companyId ?? "—"}</li>
                 </ul>
-              </ul>
+              )}
             </div>
 
             <div className="os-block">
-              <h3>2. Chi phí (phí đặt chỗ, không phải tiền sạc)</h3>
+              <h3>2. {bookingId ? "Chi phí (phí đặt chỗ)" : "Tổng tiền hóa đơn"}</h3>
               {amount == null ? (
                 <p className="os-warning">Đang chờ hệ thống tính phí từ booking...</p>
               ) : (
                 <table className="os-table">
                   <tbody>
                     <tr>
-                      <td>Phí đặt chỗ (theo hệ thống)</td>
+                      <td>{bookingId ? "Phí đặt chỗ (theo hệ thống)" : "Số tiền phải thanh toán"}</td>
                       <td className="os-right">{vnd(amount)}</td>
                     </tr>
                     <tr className="os-total">
@@ -782,9 +825,11 @@ export default function PaymentPage() {
                 </table>
               )}
 
-              <p className="os-note">
-                Lưu ý: Đây là <b>phí đặt chỗ</b> cho khoảng thời gian bạn giữ trụ, không phải tiền điện sạc.
-              </p>
+              {bookingId ? (
+                <p className="os-note">Lưu ý: Đây là <b>phí đặt chỗ</b>, không phải tiền điện sạc.</p>
+              ) : (
+                <p className="os-note">Bạn đang thanh toán cho <b>hóa đơn</b> đã phát sinh.</p>
+              )}
             </div>
           </div>
         </div>
