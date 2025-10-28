@@ -1,6 +1,6 @@
 :root{
   --bg:#f6f7fb; --card:#fff; --line:#eef0f3; --text:#0f172a; --muted:#64748b;
-  --brand:#1677ff; --brand-weak:#e8f2ff; --radius:16px;
+  --brand:#1677ff; --brand-weak:#e8f2ff; --radius:16px padding:10px;
   --ok:#237804; --ok-b:#95de64; --ok-bg:#f6ffed;
   --warn:#ad6800; --warn-b:#ffd591; --warn-bg:#fff7e6;
   --danger:#a8071a; --danger-b:#ffa39e; --danger-bg:#fff1f0;
@@ -19,10 +19,12 @@
 .ivp-topbar{display:flex; align-items:center; justify-content:space-between; gap:12px; margin:6px 0 12px;}
 .ivp-topbar h2{margin:0; font-size:22px; font-weight:900; color:var(--text);}
 .actions{display:flex; gap:8px;}
-.btn{padding:8px 12px; border-radius:10px; border:1px solid var(--line); background:#fff; cursor:pointer}
-.btn.primary{background:var(--brand); border-color:var(--brand); color:#fff;}
+.btn{padding:10px 20px; border-radius:10px; border:1px solid var(--line); background:#fff; cursor:pointer !important}
+.btn.primary{background:var(--brand); border-color:var(--brand); color:#fff; padding: 10px;}
 .btn.primary:hover{box-shadow:0 6px 16px rgba(22,119,255,.25);}
 .btn.ghost:hover{background:#f8fafc}
+.btn.ghost{padding: 10px; }
+.btn.disabled{padding: 10px;}
 
 /* Card + customer */
 .ivp-card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px; box-shadow:0 6px 20px rgba(20,40,80,.06); margin-bottom:16px;}

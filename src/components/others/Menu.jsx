@@ -176,7 +176,10 @@ export default function AccountMenu() {
           fontWeight: 600,
           color: "text.primary",
           backgroundColor: "white",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+          p : "8px !important",
+          width : "160px !important",
+          border : "0.1px solid rgba(6, 92, 42, 0.17)",
+          boxShadow: "0 2px 50px rgba(0,0,0,0.08) ",
           "&:hover": {
             backgroundColor: "#f5f7fa",
             boxShadow: "0 3px 10px rgba(0,0,0,0.1)",

@@ -35,7 +35,7 @@
 .page.vehicles .ant-input-affix-wrapper:hover,
 .page.vehicles .ant-input:hover,
 .page.vehicles .ant-select-selector:hover {
-  border-color: #4096ff !important;
+  border-color: #006d32 !important;
   box-shadow: 0 0 0 2px rgba(64, 150, 255, 0.15);
 }
 
@@ -80,7 +80,7 @@
 /* Link ID */
 .page.vehicles .ant-table a {
   font-weight: 600;
-  color: #1677ff;
+  color: #006d32;
   text-decoration: none;
 }
 .page.vehicles .ant-table a:hover {
@@ -99,7 +99,6 @@
   background: #f2f4f8;
   color: #666;
 }
-
 /* =========== Phân trang =========== */
 .page.vehicles .ant-pagination {
   padding: 12px 8px 6px;
@@ -158,7 +157,7 @@
 .vehicle-form-grid .ant-input:hover,
 .vehicle-form-grid .ant-input-number:hover,
 .vehicle-form-grid .ant-select-selector:hover {
-  border-color: #1677ff !important;
+  border-color: #006d32 !important;
   box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.15);
 }
 

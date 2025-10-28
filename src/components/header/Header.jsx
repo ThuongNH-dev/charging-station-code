@@ -98,7 +98,11 @@ export default function Head() {
                 onClick={() => navigate("/user/history")}
               />
             </Tooltip>
-
+          </>
+        )}
+        
+        {(isCustomer || isCompany) && (
+          <>
             <Tooltip title="Hóa đơn phiên sạc">
               <FileTextOutlined
                 className="invoice-icon"
