@@ -1,33 +1,56 @@
 import React, { useEffect, useState } from "react";
-//import { getCurrentUser, updateUser } from "../../api/profileApi";
+import * as profileApi from "../../api/profileApi";
 import ProfileSidebar from "../form/Info/ProfileSidebar";
 import "./UpdateProfile.css";
 import MainLayout from "../../layouts/MainLayout";
 import ChangePassword from "./ChangePassword";
-// import VehicleInfo from "./VehicleInfo";
-// import PaymentMethods from "./PaymentMethods";
 
 export default function UpdateInfo() {
   const [activeTab, setActiveTab] = useState("update-info");
-
-  const [form, setForm] = useState({ name: "", email: "", phone: "" });
+  const [user, setUser] = useState(null);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
   useEffect(() => {
     (async () => {
+      console.groupCollapsed(
+        "%c[UpdateInfo] Init load",
+        "color:#1677ff;font-weight:bold;"
+      );
+      console.time("[UpdateInfo] total");
       try {
-        const user = await getCurrentUser();
+        const accountId = localStorage.getItem("accountId");
+        const token = localStorage.getItem("token");
+        console.debug("[UpdateInfo] localStorage:", {
+          accountId,
+          hasToken: !!token,
+        });
+
+        console.time("[UpdateInfo] profileApi.getCurrentUser");
+        const current = await profileApi.getCurrentUser({ accountId });
+        console.timeEnd("[UpdateInfo] profileApi.getCurrentUser");
+        console.debug("[UpdateInfo] current user:", current);
+
+        setUser(current);
         setForm({
-          name: user.name || "",
-          email: user.email || "",
-          phone: user.phone || "",
+          name: current.name || "",
+          email: current.email || "",
+          phone: current.phone || "",
+          address: current.address || "",
         });
       } catch (err) {
-        console.error(err);
+        console.error("[UpdateInfo] init error:", err);
       } finally {
         setLoading(false);
+        console.timeEnd("[UpdateInfo] total");
+        console.groupEnd();
       }
     })();
   }, []);
@@ -37,14 +60,46 @@ export default function UpdateInfo() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!user) return;
+    console.groupCollapsed(
+      "%c[UpdateInfo] Save",
+      "color:#52c41a;font-weight:bold;"
+    );
     setSaving(true);
     try {
-      await updateUser(form);
+      const payload = {
+        ...form,
+        role: user.role,
+        customerId: user.customerId,
+        companyId: user.companyId,
+        companyName: user.companyName,
+        taxCode: user.taxCode,
+        imageUrl: user.avatarUrl,
+      };
+      const opts = {
+        type: user.role?.toLowerCase() === "company" ? "company" : "customer",
+      };
+      console.debug("[UpdateInfo] payload:", payload, "opts:", opts);
+
+      console.time("[UpdateInfo] profileApi.updateUser");
+      const updated = await profileApi.updateUser(payload, opts);
+      console.timeEnd("[UpdateInfo] profileApi.updateUser");
+
+      console.debug("[UpdateInfo] updated user:", updated);
+      setUser(updated);
+      setForm({
+        name: updated.name || "",
+        email: updated.email || "",
+        phone: updated.phone || "",
+        address: updated.address || "",
+      });
       setMsg("Cập nhật thành công!");
     } catch (err) {
-      setMsg(err.message || "Cập nhật thất bại!");
+      console.error("[UpdateInfo] save error:", err);
+      setMsg(err?.message || "Cập nhật thất bại!");
     } finally {
       setSaving(false);
+      console.groupEnd();
     }
   };
 
@@ -76,6 +131,13 @@ export default function UpdateInfo() {
                   onChange={handleChange}
                 />
 
+                <label>Địa chỉ</label>
+                <input
+                  name="address"
+                  value={form.address}
+                  onChange={handleChange}
+                />
+
                 <div className="form-actions">
                   <button type="submit" className="btn save" disabled={saving}>
                     {saving ? "Đang lưu..." : "Lưu"}
@@ -92,12 +154,7 @@ export default function UpdateInfo() {
               </form>
             </>
           )}
-
           {activeTab === "change-password" && <ChangePassword />}
-
-          {activeTab === "vehicle-info" && <VehicleInfo />}
-
-          {activeTab === "payment-methods" && <PaymentMethods />}
         </div>
       </aside>
     </MainLayout>
