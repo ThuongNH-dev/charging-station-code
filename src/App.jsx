@@ -164,7 +164,6 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-
       <Route
         path="/charging"
         element={
@@ -213,14 +212,33 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route>
-        <Route path="/profile/update-info" element={<UpdateInfo />} />
-        {/* ✅ Dòng này sửa lại: gọi VehicleInfo thay vì CarField */}
-        <Route path="/profile/vehicle-info" element={<VehicleInfo />} />
-        <Route path="/profile/payment-info" element={<PaymentMethods />} />
-        {/* ✅ Xóa dấu cách thừa ở cuối */}
-        <Route path="/profile/change-password" element={<ChangePassword />} />
-      </Route>
+      <Route path="/profile/enterprise-info" element={<EnterpriseInfo />} />
+      {/* Profile (Customer) */}
+      <Route path="/profile/update-info" element={<UpdateInfo />} />
+      <Route
+        path="/profile/vehicle-info"
+        element={
+          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
+            <VehicleInfo />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile/payment-info"
+        element={
+          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
+            <PaymentMethods />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile/change-password"
+        element={
+          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
+            <ChangePassword />
+          </ProtectedRoute>
+        }
+      />
       {/*Company */}
       <Route
         path="/company"
