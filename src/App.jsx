@@ -25,6 +25,8 @@ import UserManagement from "./components/admin/pages/UserManagement/UserManageme
 import RegisterSelect from "./pages/Register/RegisterSelect";
 import PersonalRegister from "./pages/Register/PersonalRegister";
 import BusinessRegister from "./pages/Register/BusinessRegister";
+import BusinessPayment from "./pages/Register/BusinessPayment";
+import BusinessSuccess from "./pages/Register/BusinessSuccess";
 import InvoiceSummary from "./pages/payment/InvoiceSummary";
 import InvoiceDetail from "./pages/payment/InvoiceDetail";
 import ResourceManagement from "./pages/company/ReManagerment";
@@ -81,6 +83,8 @@ export default function App() {
       <Route path="/register/select" element={<RegisterSelect />} />
       <Route path="/register/personal" element={<PersonalRegister />} />
       <Route path="/register/business" element={<BusinessRegister />} />
+      <Route path="/register/payment" element={<BusinessPayment />} />
+      <Route path="/register/success" element={<BusinessSuccess />} />
       {/* các route khác của bạn */}
       <Route
         path="/login"
