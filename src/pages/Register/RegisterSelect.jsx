@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { ItalicOutlined, UserOutlined } from "@ant-design/icons";
-import { HiOutlineUserGroup } from "react-icons/hi2";
 import { useNavigate } from "react-router-dom";
 import "./Register.css";
 <link
