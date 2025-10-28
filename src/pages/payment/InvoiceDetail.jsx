@@ -843,11 +843,11 @@ export default function InvoiceDetail() {
                 </tfoot>
               </table>
 
-              {mismatchCharging && (
+              {/* {mismatchCharging && (
                 <div className="ivp-note">
                   Tổng các phiên ({VND(totalCharging)}) khác tổng BE ({VND(invoice.total)}).
                 </div>
-              )}
+              )} */}
             </section>
 
             {filteredSessions.length > 0 && (
