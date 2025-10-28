@@ -7,13 +7,12 @@ const { Content } = Layout;
 
 export default function MainLayout({ children }) {
   return (
-    <Layout className="station-info">
+    <Layout style={{ width: "100%", minHeight: "100vh", margin: 0 }}>
       <Head />
-      <Content>
-        {children} {/* CHỈ render children, KHÔNG import/không render StationInfo ở đây */}
+      <Content style={{ width: "100%", minWidth: 0, margin: 0, padding: 0 }}>
+        {children}
       </Content>
       <Foot />
     </Layout>
   );
 }
-
