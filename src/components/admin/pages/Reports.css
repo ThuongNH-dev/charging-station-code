@@ -6,7 +6,7 @@
   --primary-color: #007bff; /* Xanh dương (Blue) */
   --secondary-color: #6c757d; /* Xám (Gray) */
   --text-color: #333; /* Chữ đậm */
-  /* --text-light: #f1f1f1; */ /* Không sử dụng để đảm bảo tương phản */
+  --text-light: #f1f1f1; /* Chữ sáng */
 
   /* Màu nền & Đường viền */
   --background-color: #f4f7f9; /* Nền trang nhẹ */
@@ -14,10 +14,10 @@
   --border-color: #eee; /* Đường viền nhẹ */
 
   /* Màu trạng thái */
-  --success-color: #28a745;
-  --danger-color: #dc3545;
-  --warning-color: #ffc107;
-  --member-color: var(--primary-color);
+  --success-color: #28a745; /* Tốt (Trạm A, D) / Thuê bao (Service) */
+  --danger-color: #dc3545; /* Thấp (Trạm B, C) */
+  --warning-color: #ffc107; /* Trung bình (Trạm E) / Trả trước (Service) */
+  --member-color: var(--primary-color); /* Màu chính cho Hội viên */
 
   /* Heatmap (Nền tối) */
   --bg-dark: #2c2f33;
@@ -33,21 +33,23 @@ select:focus,
 textarea:focus,
 a:focus,
 *:focus {
+  /* Quan trọng: Sử dụng outline: 0 và !important để override viền vàng/xanh lam mặc định */
   outline: 0 !important;
+  /* Áp dụng border-radius của phần tử để box-shadow không bị vuông góc quá mức */
   border-radius: inherit;
 }
 
 /* 🟢 Thêm lại hiệu ứng focus TÙY CHỈNH cho người dùng bàn phím (Accessibility) */
 *:focus-visible {
-  /* Hiệu ứng focus thống nhất cho toàn bộ ứng dụng */
+  /* Sử dụng box-shadow để mô phỏng viền màu xanh lam tùy chỉnh */
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.4);
-  outline: none;
+  outline: none; /* Đảm bảo không có outline */
 }
 
 /* Khung trang chính */
 .reports-page {
   display: grid;
-  /* Giữ nguyên Grid ở đây để quản lý tiêu đề, header, view options chiếm cả 2 cột */
+  /* Cột nội dung chính (1fr) và cột sidebar (300px) */
   grid-template-columns: 1fr 300px;
   gap: 20px;
   padding: 20px;
@@ -99,9 +101,10 @@ a:focus,
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-/* Loại bỏ box-shadow: 0 0 0 3px... ở đây, chỉ dùng *:focus-visible */
+/* KHẮC PHỤC FOCUS RING: Dùng box-shadow thay cho outline mặc định khi click (dùng chuột) */
 .report-header-controls .filter-dropdown:focus {
   border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.25);
 }
 
 .report-header-controls .export-buttons .btn {
@@ -116,11 +119,12 @@ a:focus,
   transition: all 0.2s;
 }
 
-/* Loại bỏ box-shadow: 0 0 0 2px... ở đây, chỉ dùng *:focus-visible */
+/* KHẮC PHỤC FOCUS RING: Thêm hiệu ứng focus cho nút export khi click (dùng chuột) */
 .report-header-controls .export-buttons .btn:focus {
   background-color: #f1f1f1;
   color: var(--text-color);
   border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
 }
 
 .report-header-controls .export-buttons .btn:hover {
@@ -163,28 +167,20 @@ a:focus,
   box-shadow: 0 2px 5px rgba(0, 123, 255, 0.3);
 }
 
-/* Loại bỏ box-shadow: 0 0 0 3px... ở đây, chỉ dùng *:focus-visible */
+/* KHẮC PHỤC FOCUS RING: Thêm hiệu ứng focus cho view button khi click (dùng chuột) */
 .report-view-options .view-btn:focus {
-  /* Loại bỏ định nghĩa riêng cho focus chuột */
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.4);
 }
 
 /* -------------------------------------------------------- */
-/* 4. MAIN CONTENT CONTAINER (Bố cục chính: Content + Sidebar) */
+/* 4. REPORT CONTENT AREA (Khu vực biểu đồ chính) */
 /* -------------------------------------------------------- */
-/* Thêm container bọc nội dung chính và sidebar */
-.report-main-container {
-  grid-column: 1 / 3; /* Chiếm cả 2 cột của reports-page */
-  display: grid;
-  grid-template-columns: 1fr 300px; /* Định nghĩa lại bố cục 2 cột bên trong */
-  gap: 20px;
-}
-
 .report-content-area {
-  /* Không cần grid-column ở đây nữa vì nó là cột đầu tiên của .report-main-container */
+  grid-column: 1 / 2;
   background-color: var(--card-bg);
   padding: 30px;
   border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Shadow rõ ràng hơn */
 }
 
 .report-content-area h4 {
@@ -242,13 +238,13 @@ a:focus,
 /* --- HEATMAP STYLE --- */
 .heatmap-section {
   background-color: var(--bg-dark);
-  color: white; /* Đảm bảo text là màu trắng thuần */
+  color: var(--text-light);
   padding: 20px;
   border-radius: 10px;
 }
 
 .heatmap-title {
-  color: white; /* Đảm bảo text là màu trắng thuần */
+  color: var(--text-light);
   border-bottom: 1px solid #444;
   padding-bottom: 10px;
   margin-bottom: 15px;
@@ -264,10 +260,10 @@ a:focus,
   /* Cột nhãn ngày (80px) và 24 cột giờ (1fr) */
   grid-template-columns: 80px repeat(24, 1fr);
   display: grid;
-  gap: 1px;
+  gap: 1px; /* Khoảng cách nhỏ giữa các ô */
   font-size: 0.8rem;
   overflow-x: auto;
-  border: 1px solid #444;
+  border: 1px solid #444; /* Viền tổng thể cho heatmap */
 }
 
 .heatmap-row {
@@ -278,7 +274,7 @@ a:focus,
   padding: 5px 2px;
   text-align: center;
   line-height: 1;
-  height: 25px;
+  height: 25px; /* Chiều cao ô nhỏ hơn */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -287,7 +283,7 @@ a:focus,
 .day-label {
   font-weight: bold;
   background-color: var(--heatmap-day-bg);
-  color: white; /* Đảm bảo text là màu trắng thuần */
+  color: var(--text-light);
   text-align: left;
   padding-left: 10px;
 }
@@ -341,7 +337,7 @@ a:focus,
 /* 5. SIDEBAR (KPI, Cảnh báo, Danh sách trạm) */
 /* -------------------------------------------------------- */
 .report-sidebar {
-  /* Không cần grid-column ở đây nữa vì nó là cột thứ hai của .report-main-container */
+  grid-column: 2 / 3;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -442,7 +438,7 @@ a:focus,
 
 .warning-status {
   padding: 6px 12px;
-  border-radius: 50px;
+  border-radius: 50px; /* Bo tròn hoàn toàn */
   font-size: 0.85rem;
   font-weight: bold;
   color: white;
@@ -460,7 +456,7 @@ a:focus,
 
 .warning-status.warning {
   background-color: var(--warning-color);
-  color: var(--text-color);
+  color: var(--text-color); /* Chữ đen cho nền vàng */
 }
 
 .station-usage-percent {
@@ -607,6 +603,7 @@ a:focus,
 /* 7. TIME CHART (Biểu đồ Thời gian) - ĐÃ SỬA LỖI CĂN CHỈNH */
 /* ========================================================= */
 .time-chart-content {
+  /* Tương tự report-content-area */
   padding: 30px;
 }
 .time-chart-sessions {
@@ -616,8 +613,7 @@ a:focus,
 .chart-area {
   display: flex;
   position: relative;
-  /* Quan trọng: Thay đổi thành flex-direction column để chứa cả biểu đồ và trục X */
-  flex-direction: column;
+  /* Tăng padding-left để chừa đủ không gian cho trục Y lớn */
   padding-left: 60px;
   margin-bottom: 20px;
 }
@@ -628,31 +624,37 @@ a:focus,
   position: absolute;
   left: 0;
   top: 0;
-  height: calc(100% - 10px); /* Bù trừ khoảng trống trục X */
+  height: 100%;
   display: flex;
   flex-direction: column;
+  /* Quan trọng: Căn đều các nhãn */
   justify-content: space-between;
   align-items: flex-end;
   font-size: 0.8rem;
   color: var(--secondary-color);
   padding-right: 5px;
+  /* Đặt padding top/bottom bằng 0 để đảm bảo nhãn sát đỉnh và đáy */
   padding-top: 0;
   padding-bottom: 0;
 }
 
+/* SỬA LỖI: Điều chỉnh vị trí của các nhãn trên trục Y */
 .chart-y-axis span,
 .chart-y-axis-line span {
   display: block;
+  /* Dùng transform: translateY(-50%) để căn nhãn chính xác vào giữa đường kẻ (trừ nhãn 0 và nhãn max) */
   transform: translateY(-50%);
 }
 
 .chart-y-axis span:first-child,
 .chart-y-axis-line span:first-child {
+  /* Nhãn đầu (Max value) căn thẳng lên đỉnh */
   transform: translateY(0%);
 }
 
 .chart-y-axis span:last-child,
 .chart-y-axis-line span:last-child {
+  /* Nhãn cuối (Giá trị 0) căn thẳng xuống đáy trục X */
   transform: translateY(50%);
 }
 
@@ -660,9 +662,9 @@ a:focus,
 .bar-chart-area {
   border-bottom: 1px solid var(--border-color); /* Trục X */
   width: 100%;
+  /* Cần padding-top để chừa chỗ cho giá trị trên đỉnh cột */
   padding-top: 20px;
   padding-bottom: 0;
-  height: 250px; /* Thêm chiều cao cho vùng biểu đồ */
 }
 
 .chart-data-container {
@@ -678,6 +680,7 @@ a:focus,
   flex-direction: column;
   align-items: center;
   width: 10%;
+  /* Giảm margin-bottom xuống 0 để các cột sát trục X */
   margin-bottom: 0;
 }
 
@@ -691,9 +694,11 @@ a:focus,
   justify-content: center;
 }
 
+/* SỬA LỖI: Căn chỉnh giá trị cột (top value) */
 .bar-value {
   position: absolute;
   top: 0;
+  /* Dịch chuyển lên trên 100% chiều cao của chính nó */
   transform: translateY(-100%);
   padding-bottom: 3px;
   font-size: 0.8rem;
@@ -701,21 +706,25 @@ a:focus,
   font-weight: 600;
 }
 
+/* SỬA LỖI: Căn chỉnh nhãn ngày */
 .bar-label {
   font-size: 0.85rem;
   color: var(--secondary-color);
+  /* Đẩy nhãn ngày xuống dưới trục X */
   margin-top: 5px;
 }
 
 /* --- Biểu đồ Đường (Revenue) --- */
 .line-chart-area {
+  border-bottom: 1px solid var(--border-color); /* Trục X */
   width: 100%;
   position: relative;
+  /* Cần padding-top cho giá trị trên đường */
   padding-top: 20px;
   padding-bottom: 0;
-  height: 250px; /* Thêm chiều cao cho vùng biểu đồ */
 }
 
+/* Vùng tô màu dưới đường (Sử dụng clip-path để mô phỏng) */
 .chart-line-visual {
   position: absolute;
   bottom: 0;
@@ -732,6 +741,7 @@ a:focus,
   transition: clip-path 0.5s ease-out;
 }
 
+/* Data Points (Chấm tròn) */
 .data-point {
   position: absolute;
   width: 8px;
@@ -739,23 +749,24 @@ a:focus,
   background-color: var(--primary-color);
   border: 2px solid var(--card-bg);
   border-radius: 50%;
+  /* Dịch chuyển -50% theo X và 50% theo Y để tâm chấm tròn nằm đúng tọa độ */
   transform: translate(-50%, 50%);
   z-index: 2;
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
 }
 
-/* ĐIỀU CHỈNH: Trục X cho biểu đồ đường (Nằm trong .chart-area) */
 .chart-x-axis-line {
   display: flex;
   justify-content: space-between;
-  width: 100%; /* Chiếm toàn bộ chiều rộng (sau padding-left 60px) */
+  width: calc(100% - 60px); /* Bù trừ không gian trục Y đã tăng */
+  margin-left: 60px;
   font-size: 0.85rem;
   color: var(--secondary-color);
   padding-top: 5px;
 }
 
 /* ========================================================= */
-/* 8. SERVICE STRUCTURE CHART (Cơ cấu Dịch vụ) */
+/* 8. SERVICE STRUCTURE CHART (Cơ cấu Dịch vụ) - ĐÃ BỔ SUNG */
 /* ========================================================= */
 
 .service-structure-content .comparison-title {
@@ -769,14 +780,13 @@ a:focus,
   padding-left: 60px;
   padding-top: 20px;
   margin-bottom: 30px;
-  height: 300px; /* Thêm chiều cao cho vùng biểu đồ */
 }
 
 .stacked-y-axis {
   position: absolute;
   left: 0;
   top: 0;
-  height: calc(100% - 1px); /* Bù trừ border-bottom */
+  height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -793,9 +803,10 @@ a:focus,
   position: absolute;
   top: 0;
   right: 0;
-  width: calc(100% - 1px); /* Bù trừ border-left */
+  width: calc(100% - 60px);
   height: 100%;
   pointer-events: none;
+  /* Căn chỉnh để grid lines khớp với nhãn trục Y */
   transform: translateY(-10px);
 }
 
@@ -814,7 +825,7 @@ a:focus,
 }
 
 .stacked-bar-wrapper {
-  width: 15%;
+  width: 15%; /* Rộng hơn so với biểu đồ cột thường */
 }
 
 .stacked-bar {
@@ -827,6 +838,7 @@ a:focus,
   position: relative;
 }
 
+/* Giá trị tổng trên đỉnh cột */
 .total-value {
   position: absolute;
   top: 0;
@@ -837,12 +849,13 @@ a:focus,
   padding-bottom: 5px;
 }
 
+/* Các Segment bên trong cột */
 .bar-segment {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white; /* Đã sửa để đảm bảo tương phản */
+  color: var(--text-light); /* Màu chữ trắng */
 }
 
 .segment-percent {
@@ -890,6 +903,7 @@ a:focus,
   height: 250px;
   border-radius: 50%;
   position: relative;
+  /* Xoay để segment đầu tiên bắt đầu từ đỉnh */
   transform: rotate(-90deg);
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
 }
@@ -898,6 +912,7 @@ a:focus,
   position: absolute;
   top: 50%;
   left: 50%;
+  /* Đẩy nhãn ra khỏi tâm (1/2 đường kính - 1/2 kích thước nhãn) */
   transform-origin: 0 0;
   font-size: 0.85rem;
   color: white;
@@ -910,24 +925,18 @@ a:focus,
   gap: 10px;
 }
 
-/* Media Query cho Responsive */
+/* Media Query cho Responsive (Tối ưu hóa hiển thị trên màn hình nhỏ) */
 @media (max-width: 1200px) {
   .reports-page {
-    grid-template-columns: 1fr; /* Reports-page thành 1 cột */
+    grid-template-columns: 1fr; /* Sidebar xuống dưới */
   }
-
-  /* Bắt buộc các thành phần Header/Title/Controls chiếm 1 cột */
-  .admin-title,
   .report-header-controls,
+  .admin-title,
   .report-view-options,
-  .report-main-container {
+  .report-content-area,
+  .report-sidebar {
     grid-column: 1 / 2;
   }
-
-  .report-main-container {
-    grid-template-columns: 1fr; /* Nội dung chính và Sidebar thành 1 cột */
-  }
-
   .report-header-controls {
     flex-direction: column;
     align-items: flex-start;
@@ -936,6 +945,7 @@ a:focus,
   .report-chart-section {
     flex-direction: column;
   }
+  /* Bổ sung cho Mobile */
   .area-boxes-container {
     flex-direction: column;
   }

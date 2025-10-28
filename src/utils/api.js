@@ -4,17 +4,12 @@
 // Dev: dùng Vite proxy => '/api'
 // Prod: dùng biến môi trường như cũ (ví dụ 'https://your-domain/api')
 export function getApiBase() {
-  if (
-    typeof import.meta !== "undefined" &&
-    import.meta.env &&
-    import.meta.env.DEV
-  ) {
+  if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV) {
     return "/api";
   }
   const fromEnv =
-    (typeof import.meta !== "undefined"
-      ? import.meta.env.VITE_API_URL
-      : process.env.REACT_APP_API_URL) ?? "https://localhost:7268/api";
+    (typeof import.meta !== "undefined" ? import.meta.env.VITE_API_URL : process.env.REACT_APP_API_URL)
+    ?? "https://localhost:7268/api";
   return fromEnv;
 }
 
@@ -78,4 +73,3 @@ export async function fetchAuthJSON(pathOrUrl, init = {}) {
   }
   return res.status === 204 ? null : res.json();
 }
-export { resolveUrl };
