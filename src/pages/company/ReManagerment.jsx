@@ -106,6 +106,58 @@ export default function ResourceManagement() {
         if (v === "Pending") return "Pending";
         return v || "—";
     };
+    function invTimeValue(inv) {
+        // ƯU TIÊN ngày giờ nếu có
+        const tUpdated = inv?.updatedAt ? new Date(inv.updatedAt).getTime() : 0;
+        const tCreated = inv?.createdAt ? new Date(inv.createdAt).getTime() : 0;
+        const t = Math.max(tUpdated, tCreated);
+        if (t > 0) return { kind: "time", v: t };
+
+        // Fall back theo năm/tháng
+        const y = Number(inv?.billingYear) || 0;
+        const m = Number(inv?.billingMonth) || 0;
+        if (y > 0 && m > 0) return { kind: "ym", v: y * 100 + m }; // 202510…
+
+        // Cuối cùng: id
+        const id = Number(inv?.invoiceId) || 0;
+        return { kind: "id", v: id };
+    }
+
+    function num(n) { return Number.isFinite(Number(n)) ? Number(n) : 0; }
+
+    function pickLatestInvoice(list = []) {
+        if (!Array.isArray(list) || list.length === 0) return null;
+
+        // So sánh "mới hơn" theo chuỗi ưu tiên:
+        // 1) updatedAt/createdAt lớn hơn
+        // 2) billingYear,billingMonth lớn hơn
+        // 3) invoiceId lớn hơn
+        const cmp = (a, b) => {
+            const tuA = a?.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+            const tuB = b?.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+            if (tuA !== tuB) return tuB - tuA;
+
+            const tcA = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const tcB = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+            if (tcA !== tcB) return tcB - tcA;
+
+            const ymA = num(a?.billingYear) * 100 + num(a?.billingMonth);
+            const ymB = num(b?.billingYear) * 100 + num(b?.billingMonth);
+            if (ymA !== ymB) return ymB - ymA;
+
+            const idA = num(a?.invoiceId);
+            const idB = num(b?.invoiceId);
+            return idB - idA;
+        };
+
+        // Lấy phần tử “mới nhất” theo comparator trên
+        let best = list[0];
+        for (let i = 1; i < list.length; i++) {
+            if (cmp(best, list[i]) > 0) best = list[i]; // nếu list[i] mới hơn -> chọn nó
+        }
+        return best;
+    }
+
 
     // ====== STATE + FORM CHO MODAL THÊM XE ======
     const [addOpen, setAddOpen] = useState(false);
@@ -186,7 +238,11 @@ export default function ResourceManagement() {
             const data = await res.json();
             // BE trả về { message, data: [ ... ] }
             const list = Array.isArray(data?.data) ? data.data : Array.isArray(data?.items) ? data.items : [];
-            setInvoices(list);
+
+            // 👉 Chỉ giữ hóa đơn mới nhất
+            const latest = pickLatestInvoice(list);
+            setInvoices(latest ? [latest] : []);
+            // setInvoices(list);
         } catch (e) {
             console.error("[Invoices] fetch error:", e);
             setInvoices([]);
@@ -490,7 +546,7 @@ export default function ResourceManagement() {
                             })
                         }
                     >
-                        Báo cáo sử dụng
+                        Phiên sạc
                     </Button>
 
                 </Space>
@@ -579,67 +635,64 @@ export default function ResourceManagement() {
             </div>
 
             {/* ===== HÓA ĐƠN GẦN ĐÂY ===== */}
-                <div style={{ marginBottom: 12 }}>
-                    <Space style={{ width: "100%", justifyContent: "space-between" }}>
-                        <h3 style={{ margin: 0 }}>Hoá đơn của công ty</h3>
-                        <Button type="link" onClick={() => navigate("/invoiceSummary")}>
-                            Xem tất cả hoá đơn
-                        </Button>
-                    </Space>
-                    {(!Number.isFinite(companyId)) ? (
-                        <Empty description="Không tìm thấy companyId. Hãy đăng nhập lại." />
-                    ) : invLoading ? (
-                        <div style={{ padding: 20, textAlign: "center" }}>
-                            <Spin />
-                        </div>
-                    ) : invoices.length === 0 ? (
-                        <Empty description="Chưa có hoá đơn" />
-                    ) : (
-                        <div
-                            style={{
-                                display: "grid",
-                                gridTemplateColumns: "repeat(3, minmax(220px, 1fr))",
-                                gap: 16,
-                                marginTop: 12,
-                            }}
-                        >
-                            {invoices.map((inv) => {
-                                const st = normalizeInvoiceStatus(inv.status);
-                                const tag =
-                                    st === "Paid"
-                                        ? { color: "green", label: "ĐÃ THANH TOÁN" }
-                                        : st === "Unpaid"
-                                        ? { color: "red", label: "CHƯA THANH TOÁN" }
+            <div style={{ marginBottom: 12 }}>
+                <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                    <h3 style={{ margin: 0, fontSize: "20px" }}>Hoá đơn kì tới</h3>
+                </Space>
+                {(!Number.isFinite(companyId)) ? (
+                    <Empty description="Không tìm thấy companyId. Hãy đăng nhập lại." />
+                ) : invLoading ? (
+                    <div style={{ padding: 20, textAlign: "center" }}>
+                        <Spin />
+                    </div>
+                ) : invoices.length === 0 ? (
+                    <Empty description="Chưa có hoá đơn" />
+                ) : (
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(3, minmax(220px, 1fr))",
+                            gap: 16,
+                            marginTop: 12,
+                        }}
+                    >
+                        {invoices.map((inv) => {
+                            const st = normalizeInvoiceStatus(inv.status);
+                            const tag =
+                                st === "Paid"
+                                    ? { color: "green", label: "Paid" }
+                                    : st === "Unpaid"
+                                        ? { color: "red", label: "Unpaid" }
                                         : { color: "orange", label: st.toUpperCase() };
-                                return (
-                                    <Card
-                                        key={inv.invoiceId}
-                                        hoverable
-                                        nClick={() => navigate(`/invoiceDetail/${inv.invoiceId}`)}
-                                        style={{ borderRadius: 12 }}
-                                        bodyStyle={{ padding: 16 }}
-                                    >
-                                        <Space style={{ width: "100%", justifyContent: "space-between" }}>
-                                            <strong>{monthLabel(inv.billingMonth, inv.billingYear)}</strong>
-                                            <Tag color={tag.color}>{tag.label}</Tag>
-                                        </Space>
-                                        <div style={{ marginTop: 8 }}>
-                                            <Statistic title="Tổng tiền" value={fmtMoney(inv.total)} />
-                                        </div>
-                                        <div style={{ marginTop: 8 }}>
-                                            <Button type="link" onClick={(e) => {
-                                                e.stopPropagation();
-                                                navigate(`/invoiceDetail/${inv.invoiceId}`);
-                                            }}>
-                                                Xem chi tiết
-                                            </Button>
-                                        </div>
-                                    </Card>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
+                            return (
+                                <Card
+                                    key={inv.invoiceId}
+                                    hoverable
+                                    onClick={() => navigate(`/invoiceDetail/${inv.invoiceId}`)}
+                                    style={{ borderRadius: 12 }}
+                                    bodyStyle={{ padding: 16 }}
+                                >
+                                    <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                                        <strong>{monthLabel(inv.billingMonth, inv.billingYear)}</strong>
+                                        <Tag color={tag.color}>{tag.label}</Tag>
+                                    </Space>
+                                    <div style={{ marginTop: 8 }}>
+                                        <Statistic title="Tổng tiền" value={fmtMoney(inv.total)} />
+                                    </div>
+                                    <div className="DetailButton" style={{ marginTop: 8 }}>
+                                        <Button type="link" onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate(`/invoiceDetail/${inv.invoiceId}`);
+                                        }}>
+                                            Xem chi tiết
+                                        </Button>
+                                    </div>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
 
             {/* Modal thêm xe */}
             <Modal

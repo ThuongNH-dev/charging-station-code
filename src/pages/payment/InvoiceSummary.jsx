@@ -6,7 +6,6 @@ import { useAuth } from "../../context/AuthContext";
 import { sortInvoicesDesc } from "../../utils/invoiceSort";
 import "./style/InvoiceSummary.css";
 
-
 // ===== Helpers =====
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
 const fmt = (d) => (d ? new Date(d).toLocaleString("vi-VN") : "—");
@@ -86,40 +85,19 @@ function buildPages(total, current, window = 2) {
   }
   return out;
 }
-
-// ==== API helpers để hydrate ngày ====
-async function fetchInvoiceDetail(invoiceId) {
-  try {
-    // Ưu tiên endpoint chi tiết 1 hóa đơn (nếu BE có)
-    return await fetchAuthJSON(`${API_ABS}/Invoices/${invoiceId}`, { method: "GET" });
-  } catch (e) {
-    return null;
-  }
-}
-
-async function fetchInvoicesByCustomerFromAll(customerId) {
-  try {
-    // Nếu BE hỗ trợ query theo customerId trên /Invoices, dùng 1 call để lấy đủ trường
-    // (Nếu không hỗ trợ, hàm này sẽ fail và ta bỏ qua, đã có nhánh detail ở trên)
-    return await fetchAuthJSON(`${API_ABS}/Invoices?customerId=${encodeURIComponent(customerId)}`, { method: "GET" });
-  } catch (e) {
-    return null;
-  }
-}
-
-// Chạy Promise có giới hạn song song (tránh "dội" BE)
+// ---- Helpers cho hydrate ----
 async function runLimited(items, limit, worker) {
-  const ret = [];
+  const results = new Array(items.length);
   let i = 0, running = 0;
   return await new Promise((resolve) => {
     const next = () => {
-      if (i >= items.length && running === 0) return resolve(ret);
+      if (i >= items.length && running === 0) return resolve(results);
       while (running < limit && i < items.length) {
         const idx = i++;
         running++;
         Promise.resolve(worker(items[idx], idx))
-          .then((v) => { ret[idx] = v; })
-          .catch(() => { ret[idx] = null; })
+          .then((v) => { results[idx] = v; })
+          .catch(() => { results[idx] = null; })
           .finally(() => { running--; next(); });
       }
     };
@@ -127,77 +105,75 @@ async function runLimited(items, limit, worker) {
   });
 }
 
+// Endpoint chi tiết 1 hóa đơn
+async function fetchInvoiceDetail(invoiceId) {
+  try {
+    const res = await fetchAuthJSON(`${API_ABS}/Invoices/${invoiceId}`, { method: "GET" });
+    // một số BE trả { data: {...} }, một số trả {...}
+    return res?.data || res || null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Bù createdAt/updatedAt cho danh sách hóa đơn:
- * 1) Thử gọi /Invoices/{id} theo từng hóa đơn (song song giới hạn).
- * 2) Nếu còn hóa đơn thiếu, thử gọi /Invoices?customerId=...
- *    và map bằng invoiceId để điền.
+ * Điền thêm createdAt/updatedAt cho mảng hóa đơn nếu thiếu.
+ * Chỉ gọi /Invoices/{id} cho các hóa đơn thiếu ngày (song song tối đa 4).
+ * @param {Array} list
+ * @returns {Promise<Array>}
  */
-async function hydrateInvoiceDates(list, customerId) {
+async function hydrateInvoiceDates(list) {
   if (!Array.isArray(list) || list.length === 0) return list;
 
-  const needDates = list.filter(it => !(it?.createdAt) || !(it?.updatedAt));
-  if (needDates.length === 0) return list;
+  const need = list.filter(it => !(it?.createdAt) || !(it?.updatedAt));
+  if (need.length === 0) return list;
 
-  // 1) Cố lấy từ /Invoices/{id} (song song tối đa 4)
-  const detailResults = await runLimited(needDates, 4, async (it) => {
+  const details = await runLimited(need, 4, async (it) => {
     const d = await fetchInvoiceDetail(it.invoiceId);
-    const item = d?.data || d;
-    if (!item) return null;
+    if (!d) return null;
     return {
-      invoiceId: item.invoiceId,
-      createdAt: item.createdAt || item.CreatedAt || null,
-      updatedAt: item.updatedAt || item.UpdatedAt || null,
+      invoiceId: d.invoiceId,
+      createdAt: d.createdAt || d.CreatedAt || null,
+      updatedAt: d.updatedAt || d.UpdatedAt || null,
     };
   });
 
   const byId = new Map();
-  for (const r of detailResults) {
+  for (const r of details) {
     if (r?.invoiceId) byId.set(r.invoiceId, r);
   }
 
-  // 2) Nếu vẫn thiếu, thử /Invoices?customerId=...
-  let byIdFromAll = new Map();
-  const stillMissing = list.filter(it => {
-    const ok = !!(it.createdAt && it.updatedAt) || byId.has(it.invoiceId);
-    return !ok;
-  });
-  if (stillMissing.length > 0 && customerId != null) {
-    const full = await fetchInvoicesByCustomerFromAll(customerId);
-    const arr = Array.isArray(full?.data) ? full.data : (Array.isArray(full) ? full : []);
-    byIdFromAll = new Map(
-      arr
-        .filter(x => x?.invoiceId)
-        .map(x => [x.invoiceId, {
-          invoiceId: x.invoiceId,
-          createdAt: x.createdAt || x.CreatedAt || null,
-          updatedAt: x.updatedAt || x.UpdatedAt || null,
-        }])
-    );
-  }
-
-  // 3) Áp lại vào list gốc
-  const out = list.map(it => {
-    if (it?.createdAt && it?.updatedAt) return it;
-    const a = byId.get(it.invoiceId) || byIdFromAll.get(it.invoiceId) || null;
+  return list.map(it => {
+    if (it.createdAt && it.updatedAt) return it;
+    const a = byId.get(it.invoiceId);
     if (!a) return it;
     return {
       ...it,
-      createdAt: it.createdAt ?? a.createdAt ?? it.createdAt,
-      updatedAt: it.updatedAt ?? a.updatedAt ?? it.updatedAt,
+      createdAt: it.createdAt ?? a.createdAt ?? null,
+      updatedAt: it.updatedAt ?? a.updatedAt ?? null,
     };
   });
-
-  return out;
 }
 
 
 export default function InvoiceSummary() {
   const { user: authUser } = useAuth();
+  function pickIdFromCtxOrStorage(key, authUser) {
+    const fromCtx = authUser?.[key] ?? authUser?.[key.charAt(0).toUpperCase() + key.slice(1)];
+    if (Number.isFinite(Number(fromCtx)) && Number(fromCtx) > 0) return Number(fromCtx);
+
+    const ls = localStorage.getItem(key);
+    const ss = sessionStorage.getItem(key);
+    const cand = Number(ls ?? ss);
+    return Number.isFinite(cand) && cand > 0 ? cand : null;
+  }
+
   const { state } = useLocation();
   const navigate = useNavigate();
 
   const [customerId, setCustomerId] = useState(null);
+  const [companyId, setCompanyId] = useState(null);
+  const [useCompany, setUseCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [rawInvoices, setRawInvoices] = useState([]);
@@ -211,6 +187,32 @@ export default function InvoiceSummary() {
   // paging
   const [page, setPage] = useState(1);
   const pageSize = 8;
+
+  useEffect(() => {
+    // 1) lấy nhanh từ context/storage
+    const co0 = pickIdFromCtxOrStorage("companyId", authUser);
+    const cu0 = pickIdFromCtxOrStorage("customerId", authUser);
+
+    if (co0) { setCompanyId(co0); setUseCompany(true); return; }
+    if (cu0) { setCustomerId(cu0); setUseCompany(false); return; }
+
+    // 2) fallback: dùng resolver cũ bạn đã có
+    let m = true;
+    (async () => {
+      const co = await resolveCompanyIdSmart?.(authUser);
+      if (!m) return;
+      if (co) { setCompanyId(co); setUseCompany(true); return; }
+
+      const cu = await resolveCustomerIdSmart?.(authUser);
+      if (!m) return;
+      if (cu) { setCustomerId(cu); setUseCompany(false); return; }
+
+      setUseCompany(false); // cuối cùng: cố theo customer để báo lỗi rõ ràng
+    })();
+
+    return () => { m = false; };
+  }, [authUser]);
+
 
   // get customerId
   useEffect(() => {
@@ -226,31 +228,52 @@ export default function InvoiceSummary() {
   useEffect(() => {
     let m = true;
     (async () => {
-      if (customerId == null) { setLoading(false); setErr("Không xác định được khách hàng."); return; }
+      // Chưa biết phạm vi → chờ thêm xíu (đang resolve)
+      if (useCompany === null) return;
+
+      // Thiếu id phù hợp → báo lỗi sớm
+      if (useCompany && companyId == null) {
+        setLoading(false);
+        setErr("Không xác định được công ty của tài khoản.");
+        return;
+      }
+      if (!useCompany && customerId == null) {
+        setLoading(false);
+        setErr("Không xác định được khách hàng của tài khoản.");
+        return;
+      }
+
       try {
         setLoading(true); setErr("");
-        // 1) Lấy danh sách theo customer như cũ
-        const res = await fetchAuthJSON(`${API_ABS}/Invoices/by-customer/${customerId}`, { method: "GET" });
-        const list = Array.isArray(res?.data) ? res.data : [];
+
+        // 1) Lấy danh sách đúng theo đăng nhập
+        let list = [];
+        if (useCompany) {
+          const res = await fetchAuthJSON(`${API_ABS}/Invoices/by-company/${companyId}`, { method: "GET" });
+          list = Array.isArray(res?.data) ? res.data : [];
+        } else {
+          const res = await fetchAuthJSON(`${API_ABS}/Invoices/by-customer/${customerId}`, { method: "GET" });
+          list = Array.isArray(res?.data) ? res.data : [];
+        }
 
         // 2) Bù createdAt/updatedAt bằng các API khác
         const hydrated = await hydrateInvoiceDates(list, customerId);
 
-        // 3) Sắp xếp và set state
-        const sorted = sortInvoicesDesc(hydrated); // nhớ sort theo (updatedAt ?? createdAt)
+        // 3) Sắp xếp & set state
+        const sorted = sortInvoicesDesc(hydrated);
         if (!m) return;
-        setRawInvoices(hydrated);
-        try {
-          sessionStorage.setItem("charge:billing:list", JSON.stringify(sorted));
-        } catch { }
+        setRawInvoices(sorted);
+
+        try { sessionStorage.setItem("charge:billing:list", JSON.stringify(sorted)); } catch { }
       } catch (e) {
         if (m) setErr(e?.message || "Không tải được danh sách hóa đơn.");
       } finally {
         if (m) setLoading(false);
       }
     })();
+
     return () => { m = false; };
-  }, [customerId]);
+  }, [useCompany, companyId, customerId]);
 
 
   // normalize
