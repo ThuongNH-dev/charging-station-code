@@ -621,21 +621,27 @@ export default function InvoiceDetail() {
             Chi tiết hóa đơn {invoice.billingMonth}/{invoice.billingYear}
           </h2>
           <div className="actions">
-            <button
-              onClick={() =>
-                navigate("/payment", {
-                  state: {
-                    from: "invoice-detail",
-                    invoiceId: Number(invoice.invoiceId ?? invoice.id),
-                    companyId: invoice.companyId ?? state?.companyId ?? null,
-                    presetAmount: Number(invoice.total) || undefined,
-                  },
-                })
-              }
-              className="btn primary"
-            >
-              Thanh toán
-            </button>
+            {!isPaidOrConfirmed(invoice) ? (
+              <button
+                onClick={() =>
+                  navigate("/payment", {
+                    state: {
+                      from: "invoice-detail",
+                      invoiceId: Number(invoice.invoiceId ?? invoice.id),
+                      companyId: invoice.companyId ?? state?.companyId ?? null,
+                      presetAmount: Number(invoice.total) || undefined,
+                    },
+                  })
+                }
+                className="btn primary"
+              >
+                Thanh toán
+              </button>
+            ) : (
+              <button className="btn disabled" disabled>
+                Đã thanh toán
+              </button>
+            )}
             <button onClick={() => window.print()} className="btn ghost">
               In hóa đơn
             </button>
@@ -837,11 +843,11 @@ export default function InvoiceDetail() {
                 </tfoot>
               </table>
 
-              {mismatchCharging && (
+              {/* {mismatchCharging && (
                 <div className="ivp-note">
                   Tổng các phiên ({VND(totalCharging)}) khác tổng BE ({VND(invoice.total)}).
                 </div>
-              )}
+              )} */}
             </section>
 
             {filteredSessions.length > 0 && (

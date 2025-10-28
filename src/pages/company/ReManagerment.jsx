@@ -582,7 +582,7 @@ export default function ResourceManagement() {
                 <div style={{ marginBottom: 12 }}>
                     <Space style={{ width: "100%", justifyContent: "space-between" }}>
                         <h3 style={{ margin: 0 }}>Hoá đơn của công ty</h3>
-                        <Button type="link" onClick={() => navigate("/company/invoices")}>
+                        <Button type="link" onClick={() => navigate("/invoiceSummary")}>
                             Xem tất cả hoá đơn
                         </Button>
                     </Space>
@@ -615,7 +615,7 @@ export default function ResourceManagement() {
                                     <Card
                                         key={inv.invoiceId}
                                         hoverable
-                                        onClick={() => navigate(`/company/invoices/${inv.invoiceId}`)}
+                                        nClick={() => navigate(`/invoiceDetail/${inv.invoiceId}`)}
                                         style={{ borderRadius: 12 }}
                                         bodyStyle={{ padding: 16 }}
                                     >
@@ -629,7 +629,7 @@ export default function ResourceManagement() {
                                         <div style={{ marginTop: 8 }}>
                                             <Button type="link" onClick={(e) => {
                                                 e.stopPropagation();
-                                                navigate(`/company/invoices/${inv.invoiceId}`);
+                                                navigate(`/invoiceDetail/${inv.invoiceId}`);
                                             }}>
                                                 Xem chi tiết
                                             </Button>

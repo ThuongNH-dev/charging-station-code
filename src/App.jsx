@@ -21,16 +21,16 @@ import InvoicePage from "./components/charging/Invoice";
 import StaffLayout from "./layouts/StaffLayout";
 import AdminLayout from "./components/admin/layout/AdminLayout";
 import StationManagement from "./components/admin/pages/StationManagement";
-import UserManagement from "./components/admin/pages/UserManagement/UserManagement";
-import Reports from "./components/admin/pages/Reports/Reports";
+import UserManagement from "./components/admin/pages/UserManagement";
 import RegisterSelect from "./pages/Register/RegisterSelect";
 import PersonalRegister from "./pages/Register/PersonalRegister";
 import BusinessRegister from "./pages/Register/BusinessRegister";
 import InvoiceSummary from "./pages/payment/InvoiceSummary";
 import InvoiceDetail from "./pages/payment/InvoiceDetail";
+import ResourceManagement from "./pages/company/ReManagerment";
 import NotFound from "./pages/NotFound";
-import OverviewKPIs from "./components/admin/pages/Reports/OverviewKPIs";
-import ReportContent from "./components/admin/pages/Reports/ReportContent";
+import ReManagerDetail from "./pages/company/ReManagerDetail";
+import Reports from "./components/admin/pages/Reports";
 
 // Chuyển role thành path tương ứng
 
@@ -42,6 +42,8 @@ function roleToPath(role) {
       return "/admin";
     case "staff":
       return "/staff";
+    case "company":
+      return "/company";
     default:
       return "/homepage";
   }
@@ -62,8 +64,11 @@ function GuestRoute({ children }) {
   return <Navigate to={target} replace />;
 }
 
+
 export default function App() {
   return (
+
+
     <Routes>
       <Route path="/" element={<Navigate to="/homepage" replace />} />
       {/* PUBLIC */}
@@ -139,6 +144,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/payment/success"
         element={
@@ -147,6 +153,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/charging"
         element={
@@ -155,6 +162,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/user/history"
         element={
@@ -166,7 +174,7 @@ export default function App() {
       <Route
         path="/invoice"
         element={
-          <ProtectedRoute allowedRoles={["Customer"]}>
+          <ProtectedRoute allowedRoles={["Customer","Company"]}>
             <InvoicePage />
           </ProtectedRoute>
         }
@@ -174,7 +182,7 @@ export default function App() {
       <Route
         path="/invoiceSummary"
         element={
-          <ProtectedRoute allowedRoles={["Customer"]}>
+          <ProtectedRoute allowedRoles={["Customer","Company"]}>
             <InvoiceSummary />
           </ProtectedRoute>
         }
@@ -182,7 +190,7 @@ export default function App() {
       <Route
         path="/invoiceDetail/:invoiceId"
         element={
-          <ProtectedRoute allowedRoles={["Customer"]}>
+          <ProtectedRoute allowedRoles={["Customer","Company"]}>
             <InvoiceDetail />
           </ProtectedRoute>
         }
@@ -190,10 +198,27 @@ export default function App() {
       <Route
         path="/services"
         element={
-          <ProtectedRoute allowedRoles={["Customer"]}>
+          <ProtectedRoute allowedRoles={["Customer","Company"]}>
             <ServicePlans />
           </ProtectedRoute>
         }
+      />
+      {/*Company */}
+      <Route
+        path="/company"
+        element={
+          <ProtectedRoute allowedRoles={["Company"]}>
+            <ResourceManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+      path="/company/vehicles/:vehicleId/sessions"
+      element={
+        <ProtectedRoute allowedRoles={["Company"]}>
+          <ReManagerDetail/>
+        </ProtectedRoute>
+      }
       />
       {/*Staff */}
       <Route
@@ -222,6 +247,9 @@ export default function App() {
       {/* FALLBACK */}
       <Route path="*" element={<NotFound />} />
       {/* ✅ */}
+
     </Routes>
+
+
   );
 }
