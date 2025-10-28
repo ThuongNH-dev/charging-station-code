@@ -167,6 +167,7 @@
   white-space: nowrap;
 }
 
+.status-badge.active, /* Trạng thái "Active" của Trạm */
 .status-badge.online {
   background-color: #52c41a; /* Xanh lá */
 }
@@ -264,8 +265,9 @@
   white-space: nowrap;
 }
 
-.badge.ready {
-  background-color: #52c41a; /* Sẵn sàng - Xanh lá */
+/* ĐÃ SỬA: Thêm class .badge.available để gán màu xanh lá cho trạng thái Available (hiển thị là Online) */
+.badge.available {
+  background-color: #52c41a; /* Xanh lá */
 }
 .badge.busy {
   background-color: #ff4d4f; /* Đang bận - Đỏ */
@@ -360,4 +362,11 @@
 }
 .modal-actions button.delete:hover {
   background-color: #cf1322;
+}
+
+.station-img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 4px;
 }
