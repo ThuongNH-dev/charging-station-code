@@ -4,12 +4,17 @@
 // Dev: dùng Vite proxy => '/api'
 // Prod: dùng biến môi trường như cũ (ví dụ 'https://your-domain/api')
 export function getApiBase() {
-  if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV) {
+  if (
+    typeof import.meta !== "undefined" &&
+    import.meta.env &&
+    import.meta.env.DEV
+  ) {
     return "/api";
   }
   const fromEnv =
-    (typeof import.meta !== "undefined" ? import.meta.env.VITE_API_URL : process.env.REACT_APP_API_URL)
-    ?? "https://localhost:7268/api";
+    (typeof import.meta !== "undefined"
+      ? import.meta.env.VITE_API_URL
+      : process.env.REACT_APP_API_URL) ?? "https://localhost:7268/api";
   return fromEnv;
 }
 
@@ -30,7 +35,7 @@ export function clearToken() {
 // - URL tuyệt đối: http(s)://...
 // - Đường dẫn đã bắt đầu bằng '/api' (đã đúng base) -> giữ nguyên
 // - Đường dẫn tương đối: 'Booking' hoặc '/Booking' -> nối vào API_BASE
-function resolveUrl(input) {
+export function resolveUrl(input) {
   if (!input) return API_BASE;
   const abs = /^https?:\/\//i.test(input);
   if (abs) return input;

@@ -1,14 +1,12 @@
-// src/components/updateProfilePerson/EnterpriseInfo.jsx
 import React, { useEffect, useState } from "react";
 import { Form, Button, message, Spin } from "antd";
 import "../updateProfilePerson/UpdateProfile.css";
 import ProfileSidebar from "../form/Info/ProfileSidebar";
 import EnterpriseField from "../form/Info/EnterpriseField";
-
 import MainLayout from "../../layouts/MainLayout";
 
-// import API functions
-// import { getEnterpriseInfo, updateEnterpriseInfo } from "../../api/profileApi";
+// ✅ import API mới (mock + BE)
+import { getEnterpriseInfo, updateEnterpriseInfo } from "../../api/profileApi";
 
 export default function EnterpriseInfo() {
   const [form] = Form.useForm();
@@ -18,18 +16,19 @@ export default function EnterpriseInfo() {
   useEffect(() => {
     (async () => {
       try {
-        // 👇 Lấy dữ liệu từ BE
-        const data = await getEnterpriseInfo(); // trả về object
+        const data = await getEnterpriseInfo();
         form.setFieldsValue({
-          enterpriseName: data.enterpriseName || "",
-          industry: data.industry || "",
-          representativeName: data.representativeName || "",
-          phone: data.phone || "",
-          taxCode: data.taxCode || "",
-          address: data.address || "",
+          companyId: data.companyId ?? undefined,
+          name: data.name ?? "",
+          taxCode: data.taxCode ?? "",
+          email: data.email ?? "",
+          phone: data.phone ?? "",
+          address: data.address ?? "",
+          imageUrl: data.imageUrl ?? "",
         });
       } catch (err) {
         console.error(err);
+        message.error("Không tải được thông tin doanh nghiệp");
       } finally {
         setLoading(false);
       }
@@ -39,10 +38,11 @@ export default function EnterpriseInfo() {
   const onFinish = async (values) => {
     setSaving(true);
     try {
-      await updateEnterpriseInfo(values);
+      const saved = await updateEnterpriseInfo(values);
+      form.setFieldsValue(saved);
       message.success("Cập nhật thông tin doanh nghiệp thành công!");
     } catch (err) {
-      message.error(err.message || "Cập nhật thất bại!");
+      message.error(err?.message || "Cập nhật thất bại!");
     } finally {
       setSaving(false);
     }
@@ -57,18 +57,19 @@ export default function EnterpriseInfo() {
           display: "flex",
           alignItems: "flex-start",
           justifyContent: "center",
-          gap: "40px",
+          gap: 40,
           padding: "40px 0",
         }}
       >
-        {/* Cột trái: menu sidebar */}
+        {/* Sidebar trái */}
         <div style={{ flex: "0 0 280px" }}>
           <ProfileSidebar />
         </div>
 
-        {/* Cột phải: form cập nhật */}
-        <div style={{ flex: 1, maxWidth: 600 }}>
+        {/* Form phải */}
+        <div style={{ flex: 1, maxWidth: 680 }}>
           <h3 style={{ marginBottom: 24 }}>Cập nhật thông tin doanh nghiệp</h3>
+
           <Form
             form={form}
             layout="vertical"
@@ -79,10 +80,15 @@ export default function EnterpriseInfo() {
 
             <Form.Item>
               <Button type="primary" htmlType="submit" loading={saving}>
-                {saving ? "Đang lưu..." : "Lưu"}
+                {saving ? "Đang lưu..." : "Lưu thay đổi"}
               </Button>
             </Form.Item>
           </Form>
+
+          {/* Gợi ý: liên kết sang trang đổi mật khẩu cá nhân */}
+          <div style={{ marginTop: 8, opacity: 0.8 }}>
+            Muốn đổi mật khẩu? Vào mục <b>Cá nhân → Đổi mật khẩu</b>.
+          </div>
         </div>
       </div>
     </MainLayout>

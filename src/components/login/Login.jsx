@@ -36,7 +36,7 @@ function getAccountIdFromLoginResponse(data, token) {
     data?.user?.accountId ??
     data?.message?.user?.accountId;
 
-    // Các key claim có thể chứa accountId/userId
+  // Các key claim có thể chứa accountId/userId
   const claimNameId =
     p?.nameid ??
     p?.["nameid"] ??
@@ -94,12 +94,14 @@ async function resolveIdentity(token, accountId) {
         // BE của bạn thường trả 1 object có customers[]
         const c0 = j?.customers?.[0] ?? j?.Customers?.[0] ?? null;
         customerId = Number(c0?.customerId ?? c0?.CustomerId) || customerId;
-        companyId = Number(c0?.companyId ?? c0?.CompanyId ?? c0?.company?.id) || companyId;
+        companyId = Number(
+          c0?.companyId ?? c0?.CompanyId ?? c0?.company?.companyId ?? c0?.company?.id
+        ) || companyId;
 
         // Nếu object không có customers -> thử trực tiếp
         if (!customerId) {
           customerId = Number(j?.customerId ?? j?.CustomerId) || customerId;
-          companyId = Number(j?.companyId ?? j?.CompanyId ?? j?.company?.id) || companyId;
+          companyId = Number(j?.companyId ?? j?.CompanyId ?? j?.company?.companyId ?? j?.company?.id) || companyId;
         }
       } else {
         console.warn("[resolveIdentity] /Auth/{id} NOT OK:", r.status);
@@ -129,10 +131,16 @@ async function resolveIdentity(token, accountId) {
           const c0 = mine?.customers?.[0] ?? mine?.Customers?.[0] ?? null;
           if (c0) {
             customerId = Number(c0?.customerId ?? c0?.CustomerId) || customerId;
-            companyId = Number(c0?.companyId ?? c0?.CompanyId ?? c0?.company?.id) || companyId;
+            companyId = Number(
+              c0?.companyId ?? c0?.CompanyId ?? c0?.company?.companyId ?? c0?.company?.id
+            ) || companyId;
+
           } else {
             customerId = Number(mine?.customerId ?? mine?.CustomerId) || customerId;
-            companyId = Number(mine?.companyId ?? mine?.CompanyId ?? mine?.company?.id) || companyId;
+            companyId = Number(
+              mine?.companyId ?? mine?.CompanyId ?? mine?.company?.companyId ?? mine?.company?.id
+            ) || companyId;
+
           }
         } else {
           // object đơn
@@ -141,8 +149,12 @@ async function resolveIdentity(token, accountId) {
           if (!customerId && (j?.customers?.length || j?.Customers?.length)) {
             const c0 = (j.customers ?? j.Customers)[0];
             customerId = Number(c0?.customerId ?? c0?.CustomerId) || customerId;
-            companyId = Number(c0?.companyId ?? c0?.CompanyId ?? c0?.company?.id) || companyId;
+            companyId = Number(
+              c0?.companyId ?? c0?.CompanyId ?? c0?.company?.companyId ?? c0?.company?.id
+            ) || companyId;
+
           }
+          if (!companyId) companyId = Number(j?.company?.companyId ?? j?.company?.id ?? j?.companyId ?? j?.CompanyId) || companyId;
         }
       } else {
         console.warn("[resolveIdentity] /Auth NOT OK:", r.status);
@@ -161,7 +173,7 @@ async function resolveIdentity(token, accountId) {
       if (r.ok) {
         const me = await r.json();
         customerId = Number(me?.customerId ?? me?.CustomerId) || customerId;
-        companyId = Number(me?.companyId ?? me?.CompanyId ?? me?.company?.id) || companyId;
+        companyId = Number(me?.companyId ?? me?.CompanyId ?? me?.company?.companyId ?? me?.company?.id) || companyId;
       }
     } catch { }
   }
@@ -170,7 +182,7 @@ async function resolveIdentity(token, accountId) {
   if (!customerId || !companyId) {
     const p = decodeJwtPayload(token) || {};
     customerId = Number(p?.customerId ?? p?.CustomerId) || customerId;
-    companyId = Number(p?.companyId ?? p?.CompanyId ?? p?.tenantId ?? p?.AccountId) || companyId;
+    companyId = Number(p?.company?.companyId ?? p?.companyId ?? p?.CompanyId ?? p?.tenantId ?? p?.AccountId) || companyId;
   }
 
   return {
@@ -258,14 +270,15 @@ export default function Login() {
       // 🔹 LẤY customerId & companyId (Auth → Customers/me → claim)
       const { customerId, companyId } = await resolveIdentity(token, accountId);
 
-      if (customerId) {
-        localStorage.setItem("customerId", String(customerId));
-        sessionStorage.setItem("customerId", String(customerId));
-      }
-      if (companyId) {
+      if (companyId !== null && companyId !== undefined) {
         localStorage.setItem("companyId", String(companyId));
         sessionStorage.setItem("companyId", String(companyId));
       }
+      if (customerId !== null && customerId !== undefined) {
+        localStorage.setItem("customerId", String(customerId));
+        sessionStorage.setItem("customerId", String(customerId));
+      }
+
       if (Number.isFinite(accountId)) {
         localStorage.setItem("accountId", String(accountId));
         sessionStorage.setItem("accountId", String(accountId));

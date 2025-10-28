@@ -153,4 +153,12 @@
   color: #006d32;
   transform: scale(1.1);
 }
+.nav .nav-dropdown .caret {
+  margin-left: 6px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+.nav .nav-item.active.nav-dropdown .caret {
+  opacity: 1;
+}
 

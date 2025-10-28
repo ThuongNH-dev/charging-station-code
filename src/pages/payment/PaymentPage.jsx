@@ -538,7 +538,10 @@ export default function PaymentPage() {
         description: bookingId
           ? `Thanh toán booking #${bookingId}`
           : `Thanh toán hóa đơn #${invoiceId}`,
-        returnUrl: `${window.location.origin}/vnpay-bridge.html?order=${encodeURIComponent(orderId)}`
+        returnUrl: (bookingId
+          ? `${window.location.origin}/payment/success?bookingId=${encodeURIComponent(bookingId)}&order=${encodeURIComponent(orderId)}`
+          : `${window.location.origin}/invoice/summary?invoiceId=${encodeURIComponent(invoiceId)}&order=${encodeURIComponent(orderId)}`
+        )
       };
       Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
 
@@ -660,7 +663,14 @@ export default function PaymentPage() {
 
   const handlePay = async () => {
     if (selectedPayment !== "qr") {
-      setPayError("Hiện tại chỉ hỗ trợ VNPAY-QR.");
+      // Ví dụ ví nội bộ: điều hướng thẳng theo loại thanh toán
+      const payload = buildSuccessPayload({ ok: true });
+      if (bookingId) {
+        navigate("/payment/success", { replace: true, state: payload });
+      } else if (invoiceId) {
+        // navigate(`/invoice/summary?invoiceId=${encodeURIComponent(invoiceId)}`, { replace: true, state: payload });
+        navigate("/invoiceSummary");
+      }
       return;
     }
     if (!bookingId && !invoiceId) {

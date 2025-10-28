@@ -205,7 +205,8 @@ export default function BookingPorts() {
   // === User/Vehicle ===
   const [me, setMe] = useState(null);
   const [myVehicleId, setMyVehicleId] = useState(null);
-  const [myVehicleType, setMyVehicleType] = useState(""); // << thêm
+  const [myVehicleType, setMyVehicleType] = useState("");
+  const [myVehicleCompanyId, setMyVehicleCompanyId] = useState(null); // NEW
   const [authError, setAuthError] = useState("");
   const { id, cid } = useParams(); // stationId & chargerId
   const navigate = useNavigate();
@@ -479,7 +480,7 @@ export default function BookingPorts() {
 
     const bookingDto = {
       customerId: Number(me.customerId),
-      companyId: Number(user?.companyId) || null,
+      companyId: myVehicleCompanyId || null, // lấy từ Vehicle
       vehicleId: Number(myVehicleId),
       portId: Number(selectedGun.id),
       startTime: fmtUtcZ(startLocal), // gửi UTC Z
@@ -672,6 +673,15 @@ export default function BookingPorts() {
           first?.type ?? first?.Type ??
           first?.category ?? first?.Category ?? "";
         setMyVehicleType(String(vtype || "").trim());
+
+        // Lấy companyId từ chính Vehicle (ưu tiên số dương; 0/null coi như không có)
+        const rawCompanyId = first?.companyId ?? first?.CompanyId ?? null;
+        const normalizedCompanyId =
+          Number.isFinite(Number(rawCompanyId)) && Number(rawCompanyId) > 0
+            ? Number(rawCompanyId)
+            : null;
+        setMyVehicleCompanyId(normalizedCompanyId);
+        console.debug("[BookingPorts] vehicle companyId =", normalizedCompanyId);
 
         console.debug("[BookingPorts] picked vehicleId =", vid, "type =", vtype);
       } catch (e) {

@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams, Link } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
+import { sortInvoicesDesc } from "../../utils/invoiceSort";
 import "./style/InvoiceDetail.css";
 
 const VND = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
@@ -36,7 +37,7 @@ async function pollInvoicePaid(invoiceId, { timeoutMs = 300000, stepMs = 2500 } 
     try {
       const inv = await fetchInvoiceById(invoiceId);
       if (isPaidOrConfirmed(inv)) return { ok: true, data: inv };
-    } catch {}
+    } catch { }
     await new Promise((r) => setTimeout(r, stepMs));
   }
   return { ok: false };
@@ -111,24 +112,114 @@ function normalizeSession(s) {
   };
 }
 
+// ==== NEW: helper gọi chi tiết phiên & pool giới hạn song song ====
+async function fetchSessionDetail(sessionId) {
+  try {
+    const r = await fetchAuthJSON(`${API_ABS}/ChargingSessions/${sessionId}`, { method: "GET" });
+    // BE có thể bọc trong { data: {...} } hoặc trả trực tiếp object
+    return r?.data ?? r ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function runLimitedPool(items, limit, worker) {
+  const out = new Array(items.length);
+  let i = 0, running = 0;
+  return await new Promise((resolve) => {
+    const next = () => {
+      if (i >= items.length && running === 0) return resolve(out);
+      while (running < limit && i < items.length) {
+        const idx = i++;
+        running++;
+        Promise.resolve(worker(items[idx], idx))
+          .then((res) => { out[idx] = res; })
+          .catch(() => { out[idx] = null; })
+          .finally(() => { running--; next(); });
+      }
+    };
+    next();
+  });
+}
+
+/**
+ * Hydrate danh sách sessions bằng /ChargingSessions/{id}
+ * - Giữ lại các field đã có, điền/chèn các field thiếu từ detail.
+ * - Ưu tiên dữ liệu từ detail (vì là nguồn “đủ” nhất).
+ */
+async function hydrateSessionsDetails(baseSessions) {
+  const base = Array.isArray(baseSessions) ? baseSessions : [];
+  const ids = base.map(s => s?.chargingSessionId).filter(Boolean);
+  if (ids.length === 0) return base;
+
+  // gọi chi tiết theo pool để tránh dội server
+  const details = await runLimitedPool(ids, 6, (sid) => fetchSessionDetail(sid));
+
+  const byId = new Map();
+  details.forEach((d) => {
+    if (!d) return;
+    const norm = normalizeSession(d); // tận dụng mapper đã có
+    if (norm?.chargingSessionId) byId.set(norm.chargingSessionId, norm);
+  });
+
+  // merge: detail > base
+  return base.map((s) => {
+    const d = byId.get(s.chargingSessionId);
+    if (!d) return s; // không có detail thì giữ nguyên
+    return {
+      ...s,
+      // time
+      startedAt: d.startedAt ?? s.startedAt ?? null,
+      endedAt: d.endedAt ?? s.endedAt ?? null,
+      durationMin: (d.durationMin ?? s.durationMin) ?? 0,
+      idleMin: (d.idleMin ?? s.idleMin) ?? 0,
+      // energy & SoC
+      energyKwh: (d.energyKwh ?? s.energyKwh) ?? 0,
+      startSoc: d.startSoc ?? s.startSoc ?? null,
+      endSoc: d.endSoc ?? s.endSoc ?? null,
+      // money
+      subtotal: (d.subtotal ?? s.subtotal) ?? 0,
+      tax: (d.tax ?? s.tax) ?? 0,
+      total: (d.total ?? s.total) ?? 0,
+      // others
+      status: d.status ?? s.status ?? null,
+      vehicleId: d.vehicleId ?? s.vehicleId ?? null,
+      portId: d.portId ?? s.portId ?? null,
+    };
+  });
+}
+
 async function fetchSessionsForInvoice(invoiceId, context) {
+  // 1) Thử lấy sessions từ /Invoices/{id}
   try {
     const r = await fetchAuthJSON(`${API_ABS}/Invoices/${invoiceId}`, { method: "GET" });
     const inv = r?.data ?? r ?? null;
     const sessions = Array.isArray(inv?.chargingSessions)
       ? inv.chargingSessions
       : Array.isArray(inv?.items)
-      ? inv.items
-      : null;
-    if (sessions?.length) return sessions.map(normalizeSession).filter(Boolean);
-  } catch {}
+        ? inv.items
+        : null;
 
+    if (sessions?.length) {
+      const base = sessions.map(normalizeSession).filter(Boolean);
+      const hydrated = await hydrateSessionsDetails(base);     // <--- NEW
+      return hydrated;
+    }
+  } catch { }
+
+  // 2) Thử /ChargingSessions/by-invoice/{id} (LẤY HẾT TRANG)
   try {
-    const r2 = await fetchAuthJSON(`${API_ABS}/ChargingSessions/by-invoice/${invoiceId}`, { method: "GET" });
-    const arr = Array.isArray(r2?.data) ? r2.data : Array.isArray(r2) ? r2 : [];
-    if (arr.length) return arr.map(normalizeSession).filter(Boolean);
-  } catch {}
+    const baseUrl = `${API_ABS}/ChargingSessions/by-invoice/${invoiceId}`;
+    const all = await fetchAllPagesJson(baseUrl, { pageSize: 100 });
+    if (all.length) {
+      const base = all.map(normalizeSession).filter(Boolean);
+      const hydrated = await hydrateSessionsDetails(base); // giữ như bạn đã thêm
+      return hydrated;
+    }
+  } catch { }
 
+
+  // 3) Fall back theo customer + month/year (nếu có)
   const { customerId, billingYear, billingMonth } = context || {};
   if (customerId && billingYear && billingMonth) {
     try {
@@ -138,14 +229,49 @@ async function fetchSessionsForInvoice(invoiceId, context) {
       );
       let arr = Array.isArray(r3?.data) ? r3.data : Array.isArray(r3) ? r3 : [];
       arr = arr.map(normalizeSession).filter(Boolean);
+
+      // Nếu có trường invoiceId thì lọc đúng hóa đơn
       if (arr.some((s) => s.invoiceId != null)) {
         arr = arr.filter((s) => String(s.invoiceId) === String(invoiceId));
       }
-      return arr;
-    } catch {}
+
+      const hydrated = await hydrateSessionsDetails(arr);      // <--- NEW
+      return hydrated;
+    } catch { }
   }
+
+  // 4) Không có gì
   return [];
 }
+
+// đặt gần các API helpers khác
+async function fetchAllPagesJson(urlBase, { startPage = 1, pageSize = 50, maxPages = 100 } = {}) {
+  let page = startPage;
+  const all = [];
+  for (let i = 0; i < maxPages; i++) {
+    const url = `${urlBase}${urlBase.includes('?') ? '&' : '?'}page=${page}&pageSize=${pageSize}`;
+    const r = await fetchAuthJSON(url, { method: "GET" });
+
+    // Chuẩn hóa mảng items
+    const arr = Array.isArray(r?.data) ? r.data : (Array.isArray(r) ? r : (Array.isArray(r?.items) ? r.items : []));
+    all.push(...arr);
+
+    // Thoát vòng nếu không rõ total, hoặc đã hết
+    const total = Number(r?.total ?? r?.totalItems ?? 0);
+    const size = Number(r?.pageSize ?? pageSize);
+    const current = Number(r?.page ?? page);
+    if (!total || !size) {
+      if (arr.length < pageSize) break; // không phải API chuẩn → dừng khi thiếu trang
+    } else {
+      const maxPage = Math.max(1, Math.ceil(total / size));
+      if (current >= maxPage) break;
+    }
+    page++;
+  }
+  return all;
+}
+
+
 
 // small utils
 const inventorySafe = (arr) => (Array.isArray(arr) ? arr : []);
@@ -237,7 +363,7 @@ export default function InvoiceDetail() {
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
-  const [invoice, setInvoice] = useState(null); 
+  const [invoice, setInvoice] = useState(null);
 
   // id mục tiêu
   const targetId = useMemo(() => {
@@ -254,8 +380,10 @@ export default function InvoiceDetail() {
         } else {
           const raw = sessionStorage.getItem("charge:billing:list");
           if (raw) {
-            const list = JSON.parse(raw);
+            let list = JSON.parse(raw);
             if (Array.isArray(list)) {
+              // sort phòng trường hợp cache cũ chưa sắp xếp
+              list = sortInvoicesDesc(list);
               const found = list.find((i, idx) => {
                 const id = i?.id || `${i?.billingYear}-${i?.billingMonth}-${idx}`;
                 return id?.toString() === targetId?.toString();
@@ -264,7 +392,7 @@ export default function InvoiceDetail() {
             }
           }
         }
-      } catch {}
+      } catch { }
       if (mounted) setLoading(false);
     })();
     return () => {
@@ -368,7 +496,7 @@ export default function InvoiceDetail() {
 
   // ===== filter + pagination for sessions =====
   const [sessStatus, setSessStatus] = useState("all");
-  const [timeField, setTimeField] = useState("startedAt");
+  const [timeField, setTimeField] = useState("endedAt");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
@@ -376,6 +504,8 @@ export default function InvoiceDetail() {
 
   const filteredSessions = useMemo(() => {
     let arr = sessions.slice();
+
+    // 1) Lọc theo trạng thái
     if (sessStatus !== "all") {
       arr = arr.filter((s) => {
         const v = String(s.status || "").toLowerCase();
@@ -386,11 +516,16 @@ export default function InvoiceDetail() {
         return true;
       });
     }
+
+    // 2) Lọc theo khoảng ngày theo field đang chọn
     const dFrom = parseDate(from);
     const dTo = to ? endOfDay(parseDate(to)) : null;
     if (dFrom || dTo) {
       arr = arr.filter((s) => {
-        const t = s[timeField];
+        // Ưu tiên field đang chọn; nếu null thì fallback qua field còn lại
+        const primary = s?.[timeField];
+        const fallbackField = timeField === "startedAt" ? "endedAt" : "startedAt";
+        const t = primary ?? s?.[fallbackField];
         if (!t) return false;
         const d = new Date(t);
         if (dFrom && d < dFrom) return false;
@@ -398,8 +533,29 @@ export default function InvoiceDetail() {
         return true;
       });
     }
+
+    // 3) SẮP XẾP MỚI → CŨ
+    arr.sort((a, b) => {
+      // Lấy timestamp theo field đang chọn, nếu trống thì fallback
+      const fallbackField = timeField === "startedAt" ? "endedAt" : "startedAt";
+      const ta = a?.[timeField] ? new Date(a[timeField]).getTime()
+        : a?.[fallbackField] ? new Date(a[fallbackField]).getTime()
+          : 0;
+      const tb = b?.[timeField] ? new Date(b[timeField]).getTime()
+        : b?.[fallbackField] ? new Date(b[fallbackField]).getTime()
+          : 0;
+
+      if (tb !== ta) return tb - ta; // desc theo thời gian
+
+      // Tie-breaker: ưu tiên phiên có id lớn hơn (có xu hướng mới hơn)
+      const ida = Number(a.chargingSessionId ?? 0);
+      const idb = Number(b.chargingSessionId ?? 0);
+      return idb - ida;
+    });
+
     return arr;
   }, [sessions, sessStatus, timeField, from, to]);
+
 
   useEffect(() => {
     setPage(1);
@@ -465,21 +621,27 @@ export default function InvoiceDetail() {
             Chi tiết hóa đơn {invoice.billingMonth}/{invoice.billingYear}
           </h2>
           <div className="actions">
-            <button
-              onClick={() =>
-                navigate("/payment", {
-                  state: {
-                    from: "invoice-detail",
-                    invoiceId: Number(invoice.invoiceId ?? invoice.id),
-                    companyId: invoice.companyId ?? state?.companyId ?? null,
-                    presetAmount: Number(invoice.total) || undefined,
-                  },
-                })
-              }
-              className="btn primary"
-            >
-              Thanh toán
-            </button>
+            {!isPaidOrConfirmed(invoice) ? (
+              <button
+                onClick={() =>
+                  navigate("/payment", {
+                    state: {
+                      from: "invoice-detail",
+                      invoiceId: Number(invoice.invoiceId ?? invoice.id),
+                      companyId: invoice.companyId ?? state?.companyId ?? null,
+                      presetAmount: Number(invoice.total) || undefined,
+                    },
+                  })
+                }
+                className="btn primary"
+              >
+                Thanh toán
+              </button>
+            ) : (
+              <button className="btn disabled" disabled>
+                Đã thanh toán
+              </button>
+            )}
             <button onClick={() => window.print()} className="btn ghost">
               In hóa đơn
             </button>
@@ -681,11 +843,11 @@ export default function InvoiceDetail() {
                 </tfoot>
               </table>
 
-              {mismatchCharging && (
+              {/* {mismatchCharging && (
                 <div className="ivp-note">
                   Tổng các phiên ({VND(totalCharging)}) khác tổng BE ({VND(invoice.total)}).
                 </div>
-              )}
+              )} */}
             </section>
 
             {filteredSessions.length > 0 && (
