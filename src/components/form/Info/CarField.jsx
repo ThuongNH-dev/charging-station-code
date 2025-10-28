@@ -1,6 +1,6 @@
 // src/components/form/Info/CarField.jsx
 import React from "react";
-import { Row, Col, Form, Input, Select, Typography } from "antd";
+import { Row, Col, Form, Input, InputNumber, Select, Typography } from "antd";
 
 const { Option } = Select;
 const { Title } = Typography;
@@ -17,18 +17,18 @@ export default function CarField() {
         <Col xs={24} md={12}>
           <Form.Item
             label={<strong>Loại xe</strong>}
-            name="type"
+            name="vehicleType" // ✅ trùng với VehicleInfo
             rules={[{ required: true, message: "Vui lòng chọn loại xe" }]}
           >
             <Select placeholder="Chọn loại xe">
-              <Option value="car">Ô tô</Option>
-              <Option value="motorbike">Xe máy</Option>
+              <Option value="Car">Ô tô</Option>
+              <Option value="Motorbike">Xe máy</Option>
             </Select>
           </Form.Item>
 
           <Form.Item
             label={<strong>Hãng xe</strong>}
-            name="brand"
+            name="carMaker" // ✅
             rules={[{ required: true, message: "Vui lòng nhập hãng xe" }]}
           >
             <Input placeholder="VD: VinFast" />
@@ -36,7 +36,7 @@ export default function CarField() {
 
           <Form.Item
             label={<strong>Dòng xe</strong>}
-            name="model"
+            name="model" // ✅
             rules={[{ required: true, message: "Vui lòng nhập dòng xe" }]}
           >
             <Input placeholder="VD: VF8" />
@@ -44,40 +44,40 @@ export default function CarField() {
 
           <Form.Item
             label={<strong>Năm sản xuất</strong>}
-            name="year"
-            rules={[
-              { required: true, message: "Vui lòng nhập năm sản xuất" },
-              { pattern: /^(19|20)\d{2}$/, message: "Năm hợp lệ dạng 4 số (VD: 2025)" },
-            ]}
+            name="manufactureYear" // ✅
+            rules={[{ required: true, message: "Vui lòng nhập năm sản xuất" }]}
           >
-            <Input placeholder="VD: 2025" maxLength={4} inputMode="numeric" />
+            <InputNumber
+              style={{ width: "100%" }}
+              placeholder="VD: 2025"
+              min={1900}
+              max={2100}
+            />
           </Form.Item>
         </Col>
 
         {/* Cột phải */}
         <Col xs={24} md={12}>
           <Form.Item
-            label={<strong>Đầu sạc</strong>}
-            name="charger"
-            rules={[{ required: true, message: "Vui lòng chọn đầu sạc" }]}
+            name="connectorType" // ✅ Input text
+            label="Cổng sạc"
+            rules={[
+              { required: true, message: "Nhập cổng sạc (VD: CCS2, Type2…)" },
+              { max: 50, message: "Tối đa 50 ký tự" },
+            ]}
           >
-            <Select placeholder="Chọn đầu sạc">
-              <Option value="GX16">GX16 (48–60V / 3–5A)</Option>
-              <Option value="GX20">GX20 (48–72V / 5–10A)</Option>
-              <Option value="Smart charging">Smart charging (48–72V)</Option>
-              <Option value="AC">AC</Option>
-              <Option value="DC">DC</Option>
-            </Select>
+            <Input placeholder="VD: CCS2, Type2, CHAdeMO…" allowClear />
           </Form.Item>
 
           <Form.Item
             label={<strong>Biển số xe</strong>}
-            name="license"
+            name="licensePlate" // ✅
             rules={[
+              { required: true, message: "Vui lòng nhập biển số" },
+              // Nếu regex cũ quá chặt, dùng regex nhẹ hơn:
               {
-                required: true,
-                pattern: /^[0-9]{2}[A-Z]-[0-9]{3}\.[0-9]{2}$/i,
-                message: "Biển số không hợp lệ! VD: 51A-123.45",
+                pattern: /^[A-Z0-9.\-\s]{4,20}$/i,
+                message: "Biển số không hợp lệ",
               },
             ]}
           >
@@ -86,13 +86,47 @@ export default function CarField() {
 
           <Form.Item
             label={<strong>Dung lượng pin (kWh)</strong>}
-            name="battery"
-            rules={[
-              { required: true, message: "Vui lòng nhập dung lượng pin" },
-              { pattern: /^[0-9]+(\.[0-9]+)?$/, message: "Chỉ nhập số (VD: 82 hoặc 82.5)" },
-            ]}
+            name="batteryCapacity" // ✅
+            rules={[{ required: true, message: "Nhập dung lượng pin" }]}
           >
-            <Input placeholder="VD: 82" inputMode="decimal" />
+            <InputNumber
+              style={{ width: "100%" }}
+              placeholder="VD: 82"
+              min={0}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label={<strong>Pin hiện tại (%)</strong>}
+            name="currentSoc" // ✅
+            rules={[{ required: true, message: "Nhập SOC hiện tại" }]}
+          >
+            <InputNumber
+              style={{ width: "100%" }}
+              placeholder="VD: 40"
+              min={0}
+              max={100}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label={<strong>Ảnh (URL)</strong>}
+            name="imageUrl" // ✅ optional
+          >
+            <Input placeholder="https://..." allowClear />
+          </Form.Item>
+
+          <Form.Item
+            label={<strong>Trạng thái</strong>}
+            name="status" // ✅
+            rules={[{ required: true, message: "Chọn trạng thái" }]}
+          >
+            <Select placeholder="Chọn trạng thái" disabled>
+              <Option value="Active">Hoạt động</Option>
+              <Option value="Inactive">Vô hiệu hóa</Option>
+              <Option value="Blacklisted">Cấm</Option>
+              <Option value="Retired">Ngừng sử dụng</Option>
+            </Select>
           </Form.Item>
         </Col>
       </Row>

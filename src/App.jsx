@@ -32,6 +32,13 @@ import NotFound from "./pages/NotFound";
 import ReManagerDetail from "./pages/company/ReManagerDetail";
 import Reports from "./components/admin/pages/Reports/Reports";
 import ChargingSessionStart from "./components/charging/ChargingSessionStart";
+
+import UpdateInfo from "./components/updateProfilePerson/UpdateInfo";
+import VehicleInfo from "./components/updateProfilePerson/VehicleInfo";
+import PaymentMethods from "./components/updateProfilePerson/PaymentMethods";
+import ChangePassword from "./components/updateProfilePerson/ChangePassword";
+import EnterpriseInfo from "./components/updateProfileBusiness/EnterpriseInfo";
+
 // Chuyển role thành path tương ứng
 
 function roleToPath(role) {
@@ -206,6 +213,14 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route>
+        <Route path="/profile/update-info" element={<UpdateInfo />} />
+        {/* ✅ Dòng này sửa lại: gọi VehicleInfo thay vì CarField */}
+        <Route path="/profile/vehicle-info" element={<VehicleInfo />} />
+        <Route path="/profile/payment-info" element={<PaymentMethods />} />
+        {/* ✅ Xóa dấu cách thừa ở cuối */}
+        <Route path="/profile/change-password" element={<ChangePassword />} />
+      </Route>
       {/*Company */}
       <Route
         path="/company"
