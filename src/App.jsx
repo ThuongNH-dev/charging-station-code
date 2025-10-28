@@ -30,6 +30,7 @@ import InvoiceSummary from "./pages/payment/InvoiceSummary";
 import InvoiceDetail from "./pages/payment/InvoiceDetail";
 import ResourceManagement from "./pages/company/ReManagerment";
 import NotFound from "./pages/NotFound";
+import ReManagerDetail from "./pages/company/ReManagerDetail";
 
 // Chuyển role thành path tương ứng
 
@@ -210,6 +211,14 @@ export default function App() {
             <ResourceManagement />
           </ProtectedRoute>
         }
+      />
+      <Route
+      path="/company/vehicles/:vehicleId/sessions"
+      element={
+        <ProtectedRoute allowedRoles={["Company"]}>
+          <ReManagerDetail/>
+        </ProtectedRoute>
+      }
       />
       {/*Staff */}
       <Route

@@ -213,3 +213,43 @@
 .page.vehicles ::-webkit-scrollbar-track {
   background: transparent;
 }
+@media print {
+  /* Ẩn toàn bộ phần không cần in */
+  .ant-pagination,
+  .ant-btn,
+  .ant-input,
+  .ant-select,
+  .ant-space,
+  h2,
+  .ant-modal {
+    display: none !important;
+  }
+
+  /* Giữ lại bảng dữ liệu */
+  .ant-table {
+    border: 1px solid #000;
+  }
+
+  .ant-table td,
+  .ant-table th {
+    border: 1px solid #000 !important;
+    padding: 4px !important;
+  }
+
+  /* In chỉ phần chính */
+  body * {
+    visibility: hidden;
+  }
+
+  .page.vehicles,
+  .page.vehicles * {
+    visibility: visible;
+  }
+
+  .page.vehicles {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

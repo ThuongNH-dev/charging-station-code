@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
     Table, Input, Select, Button, Tag, Space, Pagination, Spin, Empty,
-    Modal, Form, InputNumber, notification
+    Modal, Form, InputNumber, notification, Card, Statistic
 } from "antd";
-import { PlusOutlined, DownloadOutlined, SearchOutlined, EyeOutlined } from "@ant-design/icons";
+import { PlusOutlined, DownloadOutlined, SearchOutlined, EyeOutlined, EditOutlined } from "@ant-design/icons";
 import { useAuth } from "../../context/AuthContext";
 import { getApiBase } from "../../utils/api";
 import MainLayout from "../../layouts/MainLayout";
@@ -50,6 +51,7 @@ function getAuthTokenAndCompanyId(authUser) {
 
 export default function ResourceManagement() {
     const { user: authUser } = useAuth();
+    const navigate = useNavigate();
     const { token, companyId } = getAuthTokenAndCompanyId(authUser);
     // ===== Trạng thái hợp lệ (mirror BE) =====
     const ALLOWED_STATUSES = ["Active", "Inactive", "Blacklisted", "Retired"];
@@ -57,6 +59,25 @@ export default function ResourceManagement() {
     function normalizeStatusFE(s) {
         const v = String(s || "").trim();
         return ALLOWED_STATUSES.indexOf(v) !== -1 ? v : "Active";
+    }
+    // Chuyển record BE -> giá trị form (đảm bảo kiểu số/chuỗi đúng)
+    function normalizeVehicleForForm(r) {
+        if (!r) return {};
+        return {
+            customerId: Number(r.customerId),
+            // companyId trên form chỉ để hiển thị (disabled), lấy từ login (companyId) cho chắc
+            companyId: Number(getVehicleCompanyId(r)) || Number(companyId) || undefined,
+            carMaker: r.carMaker ?? "",
+            model: r.model ?? "",
+            licensePlate: r.licensePlate ?? "",
+            batteryCapacity: Number(r.batteryCapacity),
+            currentSoc: Number(r.currentSoc),
+            connectorType: r.connectorType ?? "",
+            manufactureYear: Number(r.manufactureYear),
+            imageUrl: r.imageUrl ?? "",
+            vehicleType: r.vehicleType ?? "Car",
+            status: normalizeStatusFE(r.status),
+        };
     }
 
     // ====== STATE CHÍNH ======
@@ -68,10 +89,33 @@ export default function ResourceManagement() {
     const [kw, setKw] = useState("");
     const [status, setStatus] = useState(""); // "", Active, Inactive, Suspended...
 
+    // ====== HOÁ ĐƠN ======
+    const [invoices, setInvoices] = useState([]);
+    const [invLoading, setInvLoading] = useState(false);
+
+    const fmtMoney = (n) =>
+        (Number(n) || 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
+
+    const monthLabel = (m, y) =>
+        `Tháng ${String(m).padStart(2, "0")}/${y}`;
+
+    const normalizeInvoiceStatus = (s) => {
+        const v = String(s || "").trim();
+        if (v === "Paid") return "Paid";
+        if (v === "Unpaid") return "Unpaid";
+        if (v === "Pending") return "Pending";
+        return v || "—";
+    };
+
     // ====== STATE + FORM CHO MODAL THÊM XE ======
     const [addOpen, setAddOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [form] = Form.useForm();
+    // ====== STATE + FORM CHO MODAL SỬA XE ======
+    const [editOpen, setEditOpen] = useState(false);
+    const [editing, setEditing] = useState(false);
+    const [editForm] = Form.useForm();
+    const [editRecord, setEditRecord] = useState(null);
 
     async function fetchVehicles(p = page, ps = pageSize, keyword = kw, st = status) {
         if (!Number.isFinite(companyId)) return;
@@ -122,8 +166,38 @@ export default function ResourceManagement() {
         }
     }
 
+    // Lấy danh sách hoá đơn theo companyId
+    async function fetchInvoices() {
+        if (!Number.isFinite(companyId)) return;
+        setInvLoading(true);
+        try {
+            const url = `${API_BASE}/Invoices/by-company/${encodeURIComponent(companyId)}`;
+            const res = await fetch(url, {
+                method: "GET",
+                headers: {
+                    accept: "application/json",
+                    ...(token ? { authorization: `Bearer ${token}` } : {}),
+                },
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(`GET /Invoices/by-company ${res.status}: ${text}`);
+            }
+            const data = await res.json();
+            // BE trả về { message, data: [ ... ] }
+            const list = Array.isArray(data?.data) ? data.data : Array.isArray(data?.items) ? data.items : [];
+            setInvoices(list);
+        } catch (e) {
+            console.error("[Invoices] fetch error:", e);
+            setInvoices([]);
+        } finally {
+            setInvLoading(false);
+        }
+    }
+
     useEffect(() => {
         fetchVehicles(page, pageSize);
+        fetchInvoices();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, pageSize, companyId]);
 
@@ -250,13 +324,90 @@ export default function ResourceManagement() {
         }
     }
 
+    // ====== HANDLERS CHO MODAL SỬA XE ======
+    function openEditModal(record) {
+        setEditRecord(record || null);
+        const initial = normalizeVehicleForForm(record);
+        // Đổ dữ liệu cũ vào form
+        editForm.resetFields();
+        editForm.setFieldsValue(initial);
+        setEditOpen(true);
+    }
+
+    function closeEditModal() {
+        setEditOpen(false);
+        setEditRecord(null);
+        editForm.resetFields();
+    }
+
+    async function submitEdit() {
+        try {
+            if (!editRecord?.vehicleId) {
+                notification.error({ message: "Thiếu ID xe để sửa" });
+                return;
+            }
+            if (!token) {
+                notification.error({ message: "Thiếu token", description: "Vui lòng đăng nhập lại." });
+                return;
+            }
+            // Validate form (lưu ý: trường disabled sẽ không có trong values)
+            const values = await editForm.validateFields();
+
+            // Gộp payload: lấy từ form + ghép thêm các trường disabled/không submit
+            const payload = {
+                customerId: Number(editRecord.customerId),              // disabled -> lấy từ record cũ
+                companyId: Number(companyId),                           // lấy từ tài khoản/logged in
+                carMaker: String(values.carMaker ?? ""),
+                model: String(values.model ?? ""),
+                licensePlate: String(values.licensePlate ?? ""),
+                batteryCapacity: Number(values.batteryCapacity),
+                currentSoc: Number(values.currentSoc),
+                connectorType: String(values.connectorType ?? ""),
+                manufactureYear: Number(values.manufactureYear),
+                imageUrl: values.imageUrl ? String(values.imageUrl) : "",
+                vehicleType: String(values.vehicleType ?? "Car"),
+                status: normalizeStatusFE(values.status),               // Select 4 trạng thái
+            };
+
+            setEditing(true);
+            const url = `${API_BASE}/Vehicles/${encodeURIComponent(editRecord.vehicleId)}`;
+            const res = await fetch(url, {
+                method: "PUT",
+                headers: {
+                    accept: "application/json",
+                    "Content-Type": "application/json",
+                    ...(token ? { authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(`PUT /Vehicles ${res.status}: ${text}`);
+            }
+
+            notification.success({ message: "Cập nhật xe thành công" });
+            await fetchVehicles(page, pageSize, kw, status);
+            closeEditModal();
+        } catch (err) {
+            if (err?.errorFields) return; // lỗi validate form
+            console.error("Update vehicle error:", err);
+            notification.error({
+                message: "Sửa xe thất bại",
+                description: String(err?.message || err),
+            });
+        } finally {
+            setEditing(false);
+        }
+    }
+
     const columns = [
         {
             title: "ID Xe",
             dataIndex: "vehicleId",
             key: "vehicleId",
             render: (id) => <a>A{id?.toString().padStart(3, "0")}</a>,
-            width: 100,
+            width: 60,
         },
         { title: "Biển số", dataIndex: "licensePlate", key: "licensePlate", width: 130 },
         {
@@ -264,7 +415,7 @@ export default function ResourceManagement() {
             dataIndex: "customerId",
             key: "customerId",
             render: (cid) => <span>Người dùng #{cid}</span>,
-            width: 160,
+            width: 100,
         },
         {
             title: "Model",
@@ -274,7 +425,7 @@ export default function ResourceManagement() {
                     {r?.carMaker} {r?.model}
                 </span>
             ),
-            width: 180,
+            width: 90,
         },
         {
             title: "Pin (kWh)",
@@ -288,7 +439,7 @@ export default function ResourceManagement() {
             dataIndex: "maxChargePower",
             key: "maxChargePower",
             align: "right",
-            width: 130,
+            width: 100,
             render: (_, r) =>
                 r?.maxChargePower ?? r?.chargingPower ?? r?.batteryCapacity ?? "-",
         },
@@ -296,7 +447,7 @@ export default function ResourceManagement() {
             title: "Trạng thái",
             dataIndex: "status",
             key: "status",
-            width: 130,
+            width: 100,
             render: (s) => {
                 const v = normalizeStatusFE(s);
                 const map = {
@@ -310,18 +461,39 @@ export default function ResourceManagement() {
             },
         },
         {
-            title: "Chi tiết",
+            title: "Hành động",
             key: "actions",
             fixed: "right",
-            width: 90,
+            width: 160,
             render: (_, r) => (
-                <Button
-                    type="link"
-                    icon={<EyeOutlined />}
-                    onClick={() => alert(`Xem xe #${r.vehicleId}`)}
-                >
-                    Xem
-                </Button>
+                <Space>
+                    <Button
+                        type="link"
+                        icon={<EditOutlined />}
+                        onClick={() => openEditModal(r)}
+                    >
+                        Sửa
+                    </Button>
+                    <Button
+                        type="link"
+                        icon={<EyeOutlined />}
+                        onClick={() =>
+                            navigate(`/company/vehicles/${r.vehicleId}/sessions`, {
+                                state: {
+                                    vehicle: {
+                                        vehicleId: r.vehicleId,
+                                        licensePlate: r.licensePlate,
+                                        carMaker: r.carMaker,
+                                        model: r.model,
+                                    },
+                                },
+                            })
+                        }
+                    >
+                        Báo cáo sử dụng
+                    </Button>
+
+                </Space>
             ),
         },
     ];
@@ -368,8 +540,8 @@ export default function ResourceManagement() {
                         Thêm xe
                     </Button>
 
-                    <Button icon={<DownloadOutlined />} onClick={() => alert("Tải file về…")}>
-                        Tải file về
+                    <Button onClick={() => window.print()}>
+                        In dữ liệu
                     </Button>
                 </Space>
 
@@ -405,6 +577,69 @@ export default function ResourceManagement() {
                     </>
                 )}
             </div>
+
+            {/* ===== HÓA ĐƠN GẦN ĐÂY ===== */}
+                <div style={{ marginBottom: 12 }}>
+                    <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                        <h3 style={{ margin: 0 }}>Hoá đơn của công ty</h3>
+                        <Button type="link" onClick={() => navigate("/company/invoices")}>
+                            Xem tất cả hoá đơn
+                        </Button>
+                    </Space>
+                    {(!Number.isFinite(companyId)) ? (
+                        <Empty description="Không tìm thấy companyId. Hãy đăng nhập lại." />
+                    ) : invLoading ? (
+                        <div style={{ padding: 20, textAlign: "center" }}>
+                            <Spin />
+                        </div>
+                    ) : invoices.length === 0 ? (
+                        <Empty description="Chưa có hoá đơn" />
+                    ) : (
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(3, minmax(220px, 1fr))",
+                                gap: 16,
+                                marginTop: 12,
+                            }}
+                        >
+                            {invoices.map((inv) => {
+                                const st = normalizeInvoiceStatus(inv.status);
+                                const tag =
+                                    st === "Paid"
+                                        ? { color: "green", label: "ĐÃ THANH TOÁN" }
+                                        : st === "Unpaid"
+                                        ? { color: "red", label: "CHƯA THANH TOÁN" }
+                                        : { color: "orange", label: st.toUpperCase() };
+                                return (
+                                    <Card
+                                        key={inv.invoiceId}
+                                        hoverable
+                                        onClick={() => navigate(`/company/invoices/${inv.invoiceId}`)}
+                                        style={{ borderRadius: 12 }}
+                                        bodyStyle={{ padding: 16 }}
+                                    >
+                                        <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                                            <strong>{monthLabel(inv.billingMonth, inv.billingYear)}</strong>
+                                            <Tag color={tag.color}>{tag.label}</Tag>
+                                        </Space>
+                                        <div style={{ marginTop: 8 }}>
+                                            <Statistic title="Tổng tiền" value={fmtMoney(inv.total)} />
+                                        </div>
+                                        <div style={{ marginTop: 8 }}>
+                                            <Button type="link" onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigate(`/company/invoices/${inv.invoiceId}`);
+                                            }}>
+                                                Xem chi tiết
+                                            </Button>
+                                        </div>
+                                    </Card>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
 
             {/* Modal thêm xe */}
             <Modal
@@ -514,6 +749,137 @@ export default function ResourceManagement() {
                     </div>
                 </Form>
             </Modal>
+            {/* Modal sửa xe */}
+            <Modal
+                title={`Sửa xe${editRecord?.vehicleId ? ` #${editRecord.vehicleId}` : ""}`}
+                open={editOpen}
+                onOk={submitEdit}
+                onCancel={closeEditModal}
+                confirmLoading={editing}
+                okText="Lưu"
+                cancelText="Hủy"
+                destroyOnClose
+                width={900}
+            >
+                <Form
+                    layout="vertical"
+                    form={editForm}
+                    preserve={false}
+                    onValuesChange={() => {
+                        // ép re-render để Tag hiển thị đúng status hiện tại
+                        // (không cần setState, chỉ để kích vẽ lại)
+                        setEditOpen((v) => v);
+                    }}
+                >
+                    {/* Tag trạng thái hiện tại */}
+                    <div style={{ marginBottom: 8 }}>
+                        <Tag color={normalizeStatusFE(editForm.getFieldValue("status")) === "Active" ? "green" : "default"}>
+                            {normalizeStatusFE(editForm.getFieldValue("status"))}
+                        </Tag>
+                    </div>
+
+                    {/* Lưới 3 cột */}
+                    <div
+                        style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(3, 1fr)",
+                            gap: 16,
+                        }}
+                    >
+                        {/* customerId: hiển thị, không cho sửa */}
+                        <Form.Item label="Mã Nhân Viên">
+                            <InputNumber
+                                style={{ width: "100%" }}
+                                value={editRecord?.customerId}
+                                disabled
+                            />
+                        </Form.Item>
+
+                        {/* companyId: hiển thị, không cho sửa */}
+                        <Form.Item label="Mã công ty">
+                            <InputNumber
+                                style={{ width: "100%" }}
+                                value={companyId}
+                                disabled
+                            />
+                        </Form.Item>
+
+                        <Form.Item name="carMaker" label="Hãng xe" rules={[{ required: true }]}>
+                            <Input placeholder="VD: Vin" />
+                        </Form.Item>
+
+                        <Form.Item name="model" label="Model" rules={[{ required: true }]}>
+                            <Input placeholder="VD: VF2" />
+                        </Form.Item>
+
+                        <Form.Item name="licensePlate" label="Biển số" rules={[{ required: true }]}>
+                            <Input placeholder="VD: 1548877" />
+                        </Form.Item>
+
+                        <Form.Item
+                            name="batteryCapacity"
+                            label="Dung lượng pin"
+                            rules={[{ required: true }]}
+                        >
+                            <InputNumber style={{ width: "100%" }} placeholder="VD: 100" />
+                        </Form.Item>
+
+                        <Form.Item
+                            name="currentSoc"
+                            label="Lượng pin hiện tại"
+                            rules={[{ required: true }]}
+                        >
+                            <InputNumber style={{ width: "100%" }} placeholder="VD: 100" />
+                        </Form.Item>
+
+                        <Form.Item
+                            name="connectorType"
+                            label="Cổng sạc"
+                            rules={[{ required: true }]}
+                        >
+                            <Input placeholder="VD: CCS2" />
+                        </Form.Item>
+
+                        <Form.Item
+                            name="manufactureYear"
+                            label="Năm sản xuất"
+                            rules={[{ required: true }]}
+                        >
+                            <InputNumber style={{ width: "100%" }} placeholder="VD: 2024" />
+                        </Form.Item>
+
+                        <Form.Item name="imageUrl" label="Ảnh">
+                            <Input placeholder="https://..." />
+                        </Form.Item>
+
+                        <Form.Item
+                            name="vehicleType"
+                            label="Loại phương tiện"
+                            rules={[{ required: true, message: "Chọn loại xe" }]}
+                        >
+                            <Select placeholder="Chọn loại xe">
+                                <Option value="Car">Car</Option>
+                                <Option value="Motorbike">Motorbike</Option>
+                            </Select>
+                        </Form.Item>
+
+                        {/* status: Select 4 trạng thái, cho phép đổi */}
+                        <Form.Item
+                            name="status"
+                            label="Trạng thái"
+                            rules={[{ required: true }]}
+                        >
+                            <Select placeholder="Chọn trạng thái">
+                                <Option value="Active">Hoạt động</Option>
+                                <Option value="Inactive">Vô hiệu hóa</Option>
+                                <Option value="Blacklisted">Cấm</Option>
+                                <Option value="Retired">Ngừng sử dụng</Option>
+                            </Select>
+                        </Form.Item>
+                    </div>
+                </Form>
+            </Modal>
+
         </MainLayout>
     );
 }
