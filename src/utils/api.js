@@ -35,7 +35,7 @@ export function clearToken() {
 // - URL tuyệt đối: http(s)://...
 // - Đường dẫn đã bắt đầu bằng '/api' (đã đúng base) -> giữ nguyên
 // - Đường dẫn tương đối: 'Booking' hoặc '/Booking' -> nối vào API_BASE
-function resolveUrl(input) {
+export function resolveUrl(input) {
   if (!input) return API_BASE;
   const abs = /^https?:\/\//i.test(input);
   if (abs) return input;
@@ -78,4 +78,3 @@ export async function fetchAuthJSON(pathOrUrl, init = {}) {
   }
   return res.status === 204 ? null : res.json();
 }
-export { resolveUrl };

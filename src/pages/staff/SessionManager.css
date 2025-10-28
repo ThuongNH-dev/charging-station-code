@@ -1,150 +1,181 @@
-/* ===== Tổng thể ===== */
+/* Tổng thể */
 .sess-wrap {
+  background: #f8fafc;
+  min-height: 85vh;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   padding: 30px;
-  background-color: #f8fafc;
-  min-height: 80vh;
   font-family: "Inter", system-ui, sans-serif;
 }
 
+/* Card chính */
 .sess-card {
-  background: white;
+  background: #ffffff;
   border-radius: 14px;
+  border: 1px solid #e5e7eb;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
   width: 100%;
   max-width: 1000px;
-  padding: 20px 25px 30px;
-  border: 1px solid #e5e7eb;
+  padding: 20px 25px;
 }
 
+/* Header */
+.sess-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
 .sess-head h3 {
   font-size: 18px;
   font-weight: 600;
-  color: #111827;
-  margin-bottom: 16px;
+  margin: 0;
 }
 
-/* ===== Bảng ===== */
+/* Bảng */
 .sess-table table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
 }
 
-.sess-table th {
-  background-color: #f1f5f9;
-  text-align: left;
-  font-weight: 600;
-  color: #374151;
-  padding: 10px 12px;
-}
-
+.sess-table th,
 .sess-table td {
   padding: 10px 12px;
-  border-bottom: 1px solid #f1f5f9;
-  color: #1f2937;
-  vertical-align: middle;
+  border: 1px solid #d1d5db;
+  text-align: left;
+  color: #111827;
 }
 
-.strong {
+.sess-table th {
   font-weight: 600;
+  background-color: #f9fafb;
 }
 
-/* ===== Badge trạng thái ===== */
+/* Trạng thái */
 .pill {
   display: inline-block;
   padding: 4px 10px;
-  border-radius: 9999px;
-  font-weight: 500;
-  font-size: 13px;
-}
-.pill.unpaid {
-  background-color: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
-/* ===== Nút ===== */
+.pill.unpaid {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+.pill.paid {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.pill.charging {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+/* Nút */
 .btn-dark {
-  background-color: #0f172a;
+  background-color: #111827;
   color: #fff;
   border: none;
   border-radius: 8px;
+  font-weight: 500;
   padding: 6px 12px;
   cursor: pointer;
-  font-weight: 500;
-  transition: all 0.15s ease;
+  transition: background 0.2s;
 }
 .btn-dark:hover {
   background-color: #1e293b;
 }
 
 .btn-light {
-  background-color: #f9fafb;
-  border: 1px solid #e5e7eb;
+  background-color: #f3f4f6;
+  color: #111827;
+  border: none;
   border-radius: 8px;
+  font-weight: 500;
   padding: 6px 12px;
   cursor: pointer;
-  font-weight: 500;
-  transition: all 0.15s ease;
+  transition: background 0.2s;
 }
 .btn-light:hover {
   background-color: #e5e7eb;
 }
 
-.small {
-  padding: 5px 10px;
-  font-size: 13px;
+/* Trạng thái rỗng/lỗi */
+.center {
+  text-align: center;
 }
+.muted {
+  color: #9ca3af;
+  font-style: italic;
+}
+.error {
+  color: #dc2626;
+}
+/* ... (giữ nguyên phần cũ) ... */
 
-.inline-actions {
+/* Nút xác nhận dừng */
+.confirm-box {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 
-.relative {
-  position: relative;
-}
-
-/* ===== Dropdown chọn phương thức ===== */
-.popup-payment {
-  position: absolute;
-  top: calc(100% + 6px); /* ✅ Canh đúng dưới nút Thu tiền */
-  right: 0;
-  width: 180px;
-  background-color: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  z-index: 100;
-}
-
-.popup-header {
-  font-weight: 600;
-  font-size: 13px;
-  color: #111827;
-  padding: 8px 12px;
-  border-bottom: 1px solid #e5e7eb;
-  background-color: #f9fafb;
-}
-
-.popup-item {
-  padding: 8px 12px;
+.btn-green {
+  background-color: #16a34a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  padding: 6px 10px;
   cursor: pointer;
-  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.btn-green:hover {
+  background-color: #15803d;
+}
+
+.btn-red {
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-red:hover {
+  background-color: #b91c1c;
+}
+.sess-filters {
   display: flex;
   align-items: center;
-  gap: 8px;
-  transition: background-color 0.15s ease;
+  gap: 10px;
+  margin-top: 8px;
 }
 
-.popup-item:hover {
-  background-color: #f1f5f9;
+.sess-summary {
+  display: flex;
+  gap: 20px;
+  padding: 8px 12px;
+  margin: 10px 0;
+  background: #f9fafb;
+  border-radius: 8px;
+  font-size: 15px;
 }
 
-.popup-item.active {
-  background-color: #e0e7ff;
-  font-weight: 600;
+.search-input,
+.filter-select {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
 }
