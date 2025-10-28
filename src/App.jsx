@@ -31,6 +31,7 @@ import InvoiceDetail from "./pages/payment/InvoiceDetail";
 import NotFound from "./pages/NotFound";
 import OverviewKPIs from "./components/admin/pages/Reports/OverviewKPIs";
 import ReportContent from "./components/admin/pages/Reports/ReportContent";
+import ReManagerDetail from "./pages/company/ReManagerDetail";
 
 // Chuyển role thành path tương ứng
 
