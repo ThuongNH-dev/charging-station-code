@@ -28,7 +28,6 @@ import PersonalRegister from "./pages/Register/PersonalRegister";
 import BusinessRegister from "./pages/Register/BusinessRegister";
 import InvoiceSummary from "./pages/payment/InvoiceSummary";
 import InvoiceDetail from "./pages/payment/InvoiceDetail";
-import ResourceManagement from "./pages/company/ReManagerment";
 import NotFound from "./pages/NotFound";
 import OverviewKPIs from "./components/admin/pages/Reports/OverviewKPIs";
 import ReportContent from "./components/admin/pages/Reports/ReportContent";
@@ -43,8 +42,6 @@ function roleToPath(role) {
       return "/admin";
     case "staff":
       return "/staff";
-    case "company":
-      return "/company";
     default:
       return "/homepage";
   }
@@ -193,25 +190,8 @@ export default function App() {
       <Route
         path="/services"
         element={
-          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
+          <ProtectedRoute allowedRoles={["Customer"]}>
             <ServicePlans />
-          </ProtectedRoute>
-        }
-      />
-      {/*Company */}
-      <Route
-        path="/company"
-        element={
-          <ProtectedRoute allowedRoles={["Company"]}>
-            <ResourceManagement />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/company/vehicles/:vehicleId/sessions"
-        element={
-          <ProtectedRoute allowedRoles={["Company"]}>
-            <ReManagerDetail />
           </ProtectedRoute>
         }
       />
