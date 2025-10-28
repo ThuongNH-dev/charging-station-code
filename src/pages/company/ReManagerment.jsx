@@ -1,4 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
+import dayjs from "dayjs";
+import { DatePicker } from "antd";
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, LineChart, Line, Legend,
+} from "recharts";
+import { buildMonthlyStats } from "../../utils/billingStats";
 import { useNavigate } from "react-router-dom";
 import {
     Table, Input, Select, Button, Tag, Space, Pagination, Spin, Empty,
@@ -93,8 +99,29 @@ export default function ResourceManagement() {
     const [invoices, setInvoices] = useState([]);
     const [invLoading, setInvLoading] = useState(false);
 
+    // ====== THỐNG KÊ THEO THÁNG ======
+    const [statsLoading, setStatsLoading] = useState(false);
+    const [year, setYear] = useState(dayjs()); // chọn năm bằng Year Picker
+    const [spendByMonth, setSpendByMonth] = useState(Array(12).fill(0));
+    const [kwhByMonth, setKwhByMonth] = useState(Array(12).fill(0));
+
     const fmtMoney = (n) =>
         (Number(n) || 0).toLocaleString("vi-VN", { style: "currency", currency: "VND" });
+
+    const fmtKwh = (n) => `${(Number(n) || 0).toLocaleString("vi-VN")} kWh`;
+    const monthsLabel = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
+    const chartData = useMemo(() => {
+        return monthsLabel.map((label, i) => ({
+            name: label,
+            kwh: Number(kwhByMonth[i] || 0),
+            spend: Number(spendByMonth[i] || 0),
+        }));
+    }, [kwhByMonth, spendByMonth]);
+
+    const currentMonthIndex = dayjs().month(); // 0-11
+    const selectedYear = year.year();
+    const totalSpendThisMonth = spendByMonth[currentMonthIndex] || 0;
+    const totalKwhThisMonth = kwhByMonth[currentMonthIndex] || 0;
 
     const monthLabel = (m, y) =>
         `Tháng ${String(m).padStart(2, "0")}/${y}`;
@@ -168,6 +195,25 @@ export default function ResourceManagement() {
     const [editing, setEditing] = useState(false);
     const [editForm] = Form.useForm();
     const [editRecord, setEditRecord] = useState(null);
+
+
+    async function fetchMonthlyStats() {
+        if (!Number.isFinite(companyId)) return;
+        setStatsLoading(true);
+        try {
+            // (tuỳ API có lọc theo năm không; ở đây mình lấy hết rồi tự cộng theo tháng)
+            const { spendByMonth, kwhByMonth } = await buildMonthlyStats(companyId);
+            setSpendByMonth(spendByMonth);
+            setKwhByMonth(kwhByMonth);
+        } catch (e) {
+            console.error("[MonthlyStats] error:", e);
+            setSpendByMonth(Array(12).fill(0));
+            setKwhByMonth(Array(12).fill(0));
+        } finally {
+            setStatsLoading(false);
+        }
+    }
+
 
     async function fetchVehicles(p = page, ps = pageSize, keyword = kw, st = status) {
         if (!Number.isFinite(companyId)) return;
@@ -254,6 +300,7 @@ export default function ResourceManagement() {
     useEffect(() => {
         fetchVehicles(page, pageSize);
         fetchInvoices();
+        fetchMonthlyStats();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, pageSize, companyId]);
 
@@ -558,6 +605,80 @@ export default function ResourceManagement() {
         <MainLayout>
             <div className="page vehicles">
                 <h2 style={{ marginBottom: 16 }}>Quản lý xe</h2>
+
+                +{/* ===== THỐNG KÊ THEO THÁNG ===== */}
+                <div className="monthly-stats-card" style={{ marginBottom: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                        <h3 style={{ margin: 0 }}>Thống kê theo tháng</h3>
+                        <DatePicker
+                            picker="year"
+                            value={year}
+                            onChange={(d) => { setYear(d || dayjs()); /* nếu cần lọc theo năm, gọi fetchMonthlyStats() */ }}
+                        />
+                    </div>
+
+                    {/* 2 ô số liệu tổng quát */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(220px, 1fr))", gap: 16, marginBottom: 16 }}>
+                        <Card style={{ borderRadius: 12 }} bodyStyle={{ padding: 16 }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                <div>
+                                    <div style={{ fontWeight: 600 }}>Tổng giá trị chi tiêu</div>
+                                    <div style={{ fontSize: 22, marginTop: 6 }}>{fmtMoney(totalSpendThisMonth)}</div>
+                                </div>
+                                <Tag>Tháng này</Tag>
+                            </div>
+                        </Card>
+
+                        <Card style={{ borderRadius: 12 }} bodyStyle={{ padding: 16 }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                <div>
+                                    <div style={{ fontWeight: 600 }}>Tổng chỉ số sử dụng</div>
+                                    <div style={{ fontSize: 22, marginTop: 6 }}>{fmtKwh(totalKwhThisMonth)}</div>
+                                </div>
+                                <Tag>Tháng này</Tag>
+                            </div>
+                        </Card>
+                    </div>
+
+                    {/* Biểu đồ cột kWh theo tháng */}
+                    <Card style={{ borderRadius: 12, marginBottom: 16 }} bodyStyle={{ padding: 16 }}>
+                        <div style={{ marginBottom: 8, fontWeight: 600 }}>kWh theo tháng</div>
+                        <div style={{ width: "100%", height: 240 }}>
+                            <ResponsiveContainer>
+                                <BarChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis />
+                                    <RTooltip formatter={(v) => fmtKwh(v)} />
+                                    <Legend />
+                                    <Bar dataKey="kwh" name="kWh" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </Card>
+
+                    {/* Biểu đồ đường chi tiêu theo tháng */}
+                    <Card style={{ borderRadius: 12 }} bodyStyle={{ padding: 16 }}>
+                        <div style={{ marginBottom: 8, fontWeight: 600 }}>Biểu đồ khoản chi</div>
+                        <div style={{ width: "100%", height: 260 }}>
+                            <ResponsiveContainer>
+                                <LineChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis />
+                                    <RTooltip formatter={(v) => fmtMoney(v)} />
+                                    <Legend />
+                                    <Line type="monotone" dataKey="spend" name="Khoản chi" dot />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </Card>
+                    {statsLoading && (
+                        <div style={{ padding: 12, textAlign: "center" }}>
+                            <Spin />
+                        </div>
+                    )}
+                </div>
 
                 <Space style={{ marginBottom: 16 }} wrap>
                     <Input
