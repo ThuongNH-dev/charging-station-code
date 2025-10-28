@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ItalicOutlined, UserOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { HiOutlineUserGroup } from "react-icons/hi";
 import "./Register.css";
 <link
   href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&display=swap"
