@@ -294,7 +294,7 @@ const ChargingProgress = () => {
 
       try {
         const url = `${API_ABS}/ChargingSessions/start`;
-        const body = { customerId: Number(customerId), vehicleId: Number(vehicleId), bookingId: Number(bookingId), portId: Number(portIdToUse) };
+        const body = { customerId: Number(customerId), vehicleId: Number(vehicleId), bookingId: bookingId == null ? null : Number(bookingId), portId: Number(portIdToUse) };
         console.debug("[Charging] start payload", body);
         const res = await fetchAuthJSON(url, {
           method: "POST",
@@ -533,6 +533,19 @@ const ChargingProgress = () => {
   const liveTax = Math.round(liveSubtotal * 0.1); // BE 10%
   const liveTotal = liveSubtotal + liveTax;
 
+  // ✅ Helper: lấy sessionId theo thứ tự session → state → sessionStorage (cache từ lúc start)
+  function getChargingSessionIdSafe() {
+    let sid = session?.chargingSessionId ?? state?.chargingSessionId ?? null;
+    if (!sid) {
+      try {
+        const cached = JSON.parse(sessionStorage.getItem("charging:start:data") || "null");
+        sid = cached?.data?.chargingSessionId ?? cached?.chargingSessionId ?? null;
+      } catch { }
+    }
+    return sid;
+  }
+
+
   const buildChargingPaymentPayload = () => {
     const endedAt = Date.now();
     const sessionSeconds = Math.max(1, Math.round((endedAt - startedAtRef.current) / 1000));
@@ -611,17 +624,55 @@ const ChargingProgress = () => {
       return null;
     }
   }
-
+  //sửa for no Booking
+  // const goToInvoicePage = async () => {
+  //   const beData = await endSessionOnServer({
+  //     endSoc: Math.round(battery),
+  //     chargingSessionId: state?.chargingSessionId,
+  //   });
+  //   if (!beData) {
+  //     message.error("Không kết thúc phiên sạc được. Vui lòng thử lại.");
+  //     return;
+  //   }
+  //   // Lưu số liệu từ BE + một ít info hiển thị
+  //   const orderId = `CHG${beData.chargingSessionId || Date.now()}`;
+  //   const finalPayload = {
+  //     orderId,
+  //     ...beData,
+  //     station: state.station,
+  //     charger: state.charger,
+  //     gun: state.gun,
+  //     invoiceStatus: "Unpaid",
+  //     isMonthlyInvoice: false,
+  //   };
+  //   sessionStorage.setItem(`chargepay:${orderId}`, JSON.stringify(finalPayload));
+  //   navigate(`/invoice?order=${orderId}`, {
+  //     state: { ...finalPayload, customerId: session?.customerId ?? state?.customerId ?? null },
+  //     replace: true
+  //   });
+  // };
   const goToInvoicePage = async () => {
-    const beData = await endSessionOnServer({
-      endSoc: Math.round(battery),
-      chargingSessionId: state?.chargingSessionId,
-    });
-    if (!beData) {
-      message.error("Không kết thúc phiên sạc được. Vui lòng thử lại.");
+    // ✅ Lấy id chắc chắn
+    const sid = getChargingSessionIdSafe();
+    if (!sid) {
+      message.error("Chưa có mã phiên sạc (chargingSessionId). Hãy chờ vài giây rồi thử lại.");
       return;
     }
-    // Lưu số liệu từ BE + một ít info hiển thị
+
+    const cid = session?.customerId ?? state?.customerId ?? null;
+
+    const beData = await endSessionOnServer({
+      endSoc: Math.round(battery),
+      chargingSessionId: sid,
+      customerId: cid, // optional
+    });
+
+    if (!beData) {
+      message.error("Không kết thúc được phiên sạc. Thử lại nhé.");
+      return;
+    }
+
+    // Lưu & điều hướng
     const orderId = `CHG${beData.chargingSessionId || Date.now()}`;
     const finalPayload = {
       orderId,
@@ -629,15 +680,19 @@ const ChargingProgress = () => {
       station: state.station,
       charger: state.charger,
       gun: state.gun,
-      invoiceStatus: "Unpaid",
-      isMonthlyInvoice: false,
+      invoiceStatus: beData?.invoice?.status ?? "Unpaid",
+      isMonthlyInvoice: Boolean(beData?.invoice?.subscription),
     };
     sessionStorage.setItem(`chargepay:${orderId}`, JSON.stringify(finalPayload));
+
+    // ✅ Luôn đi về trang tổng hợp hóa đơn (InvoicePage)
     navigate(`/invoice?order=${orderId}`, {
-      state: { ...finalPayload, customerId: session?.customerId ?? state?.customerId ?? null },
-      replace: true
+      state: { ...finalPayload, customerId: cid },
+      replace: true,
     });
+
   };
+
 
 
   const handleStopCharging = async () => {
@@ -652,6 +707,13 @@ const ChargingProgress = () => {
     clearInterval(penaltyInterval.current);
     await goToInvoicePage();
   };
+  // ✅ Chỉ cho phép kết thúc khi đã có id
+  const canEnd = Boolean(session?.chargingSessionId || state?.chargingSessionId || (() => {
+    try {
+      const cached = JSON.parse(sessionStorage.getItem("charging:start:data") || "null");
+      return cached?.data?.chargingSessionId ?? cached?.chargingSessionId;
+    } catch { return null; }
+  })());
 
   return (
     <MainLayout>
@@ -756,9 +818,10 @@ const ChargingProgress = () => {
             <div className="charging-buttons">
               {roundedBattery < 100 && isCharging ? (
                 <>
-                  <button className="btn-stop" onClick={handleStopCharging}>
+                  <button className="btn-stop" onClick={handleStopCharging} disabled={!canEnd}>
                     Dừng sạc
                   </button>
+
                   <button className="btn-error">
                     <WarningOutlined /> Báo cáo sự cố
                   </button>
@@ -778,9 +841,10 @@ const ChargingProgress = () => {
                       {(Number.isFinite(dynPenaltyPerMin) ? dynPenaltyPerMin : 10000).toLocaleString("vi-VN")} VND/phút
                     </p>
                   )}
-                  <button className="btn-finish" onClick={handleFinishCharging}>
+                  <button className="btn-finish" onClick={handleFinishCharging} disabled={!canEnd}>
                     Rút sạc
                   </button>
+
                 </div>
               )}
             </div>
