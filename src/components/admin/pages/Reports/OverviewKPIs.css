@@ -1,0 +1,227 @@
+/*
+ * =========================================================
+ * OverviewKPIs.css - BẢN HOÀN CHỈNH (Phong cách Danh sách Phẳng)
+ * Áp dụng bo góc cho khối lớn, dùng border-bottom cho các mục con.
+ * =========================================================
+ */
+
+/* 1. LAYOUT CHUNG CỦA SIDEBAR */
+.report-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px; /* Khoảng cách giữa các section */
+  padding: 16px;
+  background-color: #f0f2f5;
+  width: 280px;
+  box-shadow: 1px 0 5px rgba(0, 0, 0, 0.05);
+
+  overflow-y: auto;
+  max-height: calc(500vh - 40px);
+  overflow-x: hidden;
+}
+
+/* 2. KHU VỰC CHÍNH (KPI, CẢNH BÁO, TRẠM) - CỠ LỚN, CUỘN, CÓ BO GÓC */
+.kpi-total-section,
+.warnings-section,
+.station-list-section {
+  background: #ffffff;
+  border-radius: 12px; /* Bo góc khối lớn */
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+
+  /* KÍCH THƯỚC LỚN & CUỘN DỌC */
+  max-height: 350px; /* Chiều cao tối đa hợp lý */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 🔹 Tiêu đề các section */
+.report-sidebar h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 0;
+  padding-bottom: 12px;
+}
+
+/* 3. CHI TIẾT KPI TỔNG QUAN (Dùng Border-bottom để phân tách) */
+
+/* 🔹 Hộp KPI (Chỉnh lại thành danh sách phẳng bên trong khối) */
+.kpi-box {
+  /* LOẠI BỎ VIỀN, BO GÓC, SHADOW, MARGIN để sát nhau */
+  background: transparent; /* Nền trong suốt để khớp với nền khối lớn */
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  margin-bottom: 0;
+
+  /* Dùng border-bottom để chia tách */
+  border-bottom: 1px solid #eee;
+  padding: 12px 0; /* Padding trên dưới */
+
+  /* Các thuộc tính flex còn lại */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+/* Bỏ border-bottom ở mục KPI cuối cùng */
+.kpi-total-section .kpi-box:last-of-type {
+  border-bottom: none;
+}
+
+/* 4. CHI TIẾT CẢNH BÁO (Dùng Border-bottom để phân tách) */
+
+.warning-item {
+  /* LOẠI BỎ VIỀN, BO GÓC, SHADOW, MARGIN */
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+
+  /* Dùng border-bottom để chia tách */
+  border-bottom: 1px solid #eee;
+  padding: 12px 0;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.warnings-section .warning-item:last-of-type {
+  border-bottom: none;
+}
+
+/* 5. CHI TIẾT DANH SÁCH TRẠM (Dùng Border-bottom để phân tách) */
+
+.station-list-item {
+  /* LOẠI BỎ VIỀN, BO GÓC, SHADOW, MARGIN */
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+
+  /* Dùng border-bottom để chia tách */
+  border-bottom: 1px solid #eee;
+  padding: 12px 0;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background-color 0.1s;
+}
+.station-list-section .station-list-item:last-of-type {
+  border-bottom: none;
+}
+.station-list-item:hover {
+  background-color: #f7f7f7;
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------- */
+/* CÁC THUỘC TÍNH CHI TIẾT KHÁC (GIỮ NGUYÊN) */
+/* ---------------------------------------------------- */
+
+/* Kiểu chữ KPI */
+.kpi-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #555;
+}
+.kpi-icon {
+  font-size: 16px;
+}
+.kpi-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111;
+}
+.kpi-change {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kpi-change.positive {
+  color: #28a745;
+  background-color: #e6ffec;
+}
+.kpi-change.negative {
+  color: #dc3545;
+  background-color: #ffeaea;
+}
+
+/* Chi tiết Cảnh báo */
+.warning-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 70%;
+}
+.warning-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+}
+.warning-usage {
+  font-size: 12px;
+  color: #777;
+}
+.warning-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  min-width: 60px;
+  text-align: center;
+}
+.warning-status.green {
+  background-color: #e6ffec;
+  color: #28a745;
+}
+.warning-status.red {
+  background-color: #ffeaea;
+  color: #dc3545;
+}
+.warning-status.yellow {
+  background-color: #fff8e1;
+  color: #ffc107;
+}
+
+/* Chi tiết Trạm */
+.station-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 70%;
+}
+.station-name {
+  font-weight: 600;
+  color: #222;
+  font-size: 14px;
+  word-break: break-word;
+}
+.station-capacity {
+  font-size: 13px;
+  color: #777;
+}
+.station-usage-percent {
+  font-weight: 700;
+  color: #0078ff;
+  font-size: 15px;
+  min-width: 50px;
+  text-align: right;
+}
+
+/* Xử lý cho thông báo rỗng */
+.empty-msg {
+  color: #888;
+  font-style: italic;
+  text-align: center;
+  padding: 10px;
+}
