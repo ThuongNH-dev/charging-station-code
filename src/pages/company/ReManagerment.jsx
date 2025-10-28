@@ -615,7 +615,7 @@ export default function ResourceManagement() {
                                     <Card
                                         key={inv.invoiceId}
                                         hoverable
-                                        onClick={() => navigate(`/company/invoices/${inv.invoiceId}`)}
+                                        nClick={() => navigate(`/invoiceDetail/${inv.invoiceId}`)}
                                         style={{ borderRadius: 12 }}
                                         bodyStyle={{ padding: 16 }}
                                     >
@@ -629,7 +629,7 @@ export default function ResourceManagement() {
                                         <div style={{ marginTop: 8 }}>
                                             <Button type="link" onClick={(e) => {
                                                 e.stopPropagation();
-                                                navigate(`/invoiceDetail/:invoiceId/${inv.invoiceId}`);
+                                                navigate(`/invoiceDetail/${inv.invoiceId}`);
                                             }}>
                                                 Xem chi tiết
                                             </Button>
