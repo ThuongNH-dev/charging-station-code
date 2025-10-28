@@ -21,6 +21,7 @@ export default function Head() {
   const isStaff = role === "staff";
   const isAdmin = role === "admin";
   const isCustomer = role === "customer";
+  const isCompany = role === "company";
   const userName = user?.name || user?.userName || ctxName || "User";
 
   const items = isStaff
@@ -30,27 +31,40 @@ export default function Head() {
       { key: "s3", label: "Thanh toán", path: "/staff/payments" },
       { key: "s4", label: "Báo cáo", path: "/staff/reports" },
     ]
-    : [
-      { key: "1", label: "Trang chủ", path: "/" },
-      { key: "2", label: "Danh mục", path: "/stations" },
-      { key: "3", label: "Dịch vụ", path: "/services" },
-      { key: "4", label: "Liên hệ", path: "/contact" },
-    ];
+    : isCompany
+      ? [
+        { key: "c1", label: "Quản lý nguồn lực", path: "/company" },
+        { key: "3", label: "Dịch vụ", path: "/services" },
+        { key: "4", label: "Liên hệ", path: "/contact" },
+      ]
+      : [
+        { key: "1", label: "Trang chủ", path: "/" },
+        { key: "2", label: "Danh mục", path: "/stations" },
+        { key: "3", label: "Dịch vụ", path: "/services" },
+        { key: "4", label: "Liên hệ", path: "/contact" },
+      ];
+
 
   const path = location.pathname;
-  let activeKey = isStaff ? "s1" : "1";
+  let activeKey = "1";
 
   if (isStaff) {
     if (path.startsWith("/staff/stations")) activeKey = "s1";
     else if (path.startsWith("/staff/sessions")) activeKey = "s2";
     else if (path.startsWith("/staff/payments")) activeKey = "s3";
     else if (path.startsWith("/staff/reports")) activeKey = "s4";
+  } else if (isCompany) {
+    if (path.startsWith("/company")) activeKey = "c1"; // <- thêm nhánh này
+    else if (path.startsWith("/services")) activeKey = "3";
+    else if (path.startsWith("/contact")) activeKey = "4";
+    else if (path === "/") activeKey = "1";
   } else {
     if (/^\/(stations|booking|payment|charging)/.test(path)) activeKey = "2";
     else if (path.startsWith("/services")) activeKey = "3";
     else if (path.startsWith("/contact")) activeKey = "4";
     else if (path === "/") activeKey = "1";
   }
+
 
   const renderRight = () => {
     if (!isAuthenticated) {
@@ -107,7 +121,6 @@ export default function Head() {
             src="/logoV2.png"
             alt="logo"
             className="logo"
-            onClick={() => navigate(isStaff ? "/staff/stations" : "/homepage")}
           />
 
           {!isAdmin && (

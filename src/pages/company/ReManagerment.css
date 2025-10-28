@@ -1,0 +1,255 @@
+/* =========== Trang Quản lý xe =========== */
+.page.vehicles {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px 30px;
+  background: #ffffff;
+  min-height: 100%;
+  color: #1e2a3b;
+  font-family: "Inter", "Segoe UI", Arial, sans-serif;
+}
+
+/* Tiêu đề */
+.page.vehicles h2 {
+  margin: 0 0 8px 0 !important;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e2a3b;
+}
+
+/* Thanh công cụ tìm kiếm + nút */
+.page.vehicles .ant-space {
+  row-gap: 10px !important;
+}
+
+.page.vehicles .ant-input-affix-wrapper,
+.page.vehicles .ant-input,
+.page.vehicles .ant-select-selector {
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  border-color: #d9e3f1 !important;
+  transition: all 0.2s ease;
+}
+
+.page.vehicles .ant-input-affix-wrapper:hover,
+.page.vehicles .ant-input:hover,
+.page.vehicles .ant-select-selector:hover {
+  border-color: #4096ff !important;
+  box-shadow: 0 0 0 2px rgba(64, 150, 255, 0.15);
+}
+
+.page.vehicles .ant-btn {
+  border-radius: 10px;
+}
+
+.page.vehicles .ant-btn-primary {
+  background: #1677ff;
+  box-shadow: 0 4px 10px rgba(22, 119, 255, 0.25);
+}
+
+.page.vehicles .ant-btn:not(.ant-btn-primary)[icon] {
+  background: #ffffff;
+  border-color: #e6edf7;
+}
+
+/* =========== Bảng dữ liệu =========== */
+.page.vehicles .ant-table-wrapper {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e8eff8;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.page.vehicles .ant-table-thead > tr > th {
+  background: #f3f7ff !important;
+  font-weight: 600;
+  color: #1e2a3b;
+  border-bottom: 1px solid #e8eff8;
+}
+
+.page.vehicles .ant-table-tbody > tr > td {
+  border-bottom: 1px dashed #eef3fa;
+}
+
+.page.vehicles .ant-table-tbody > tr:hover > td {
+  background: #f7fbff !important;
+}
+
+/* Link ID */
+.page.vehicles .ant-table a {
+  font-weight: 600;
+  color: #1677ff;
+  text-decoration: none;
+}
+.page.vehicles .ant-table a:hover {
+  text-decoration: underline;
+}
+
+/* Tag trạng thái */
+.page.vehicles .ant-tag {
+  border: none;
+  border-radius: 999px;
+  font-weight: 600;
+  padding: 2px 10px;
+}
+
+.page.vehicles .ant-tag-default {
+  background: #f2f4f8;
+  color: #666;
+}
+
+/* =========== Phân trang =========== */
+.page.vehicles .ant-pagination {
+  padding: 12px 8px 6px;
+}
+
+.page.vehicles .ant-pagination .ant-select-selector {
+  border-radius: 10px !important;
+  border-color: #d9e3f1 !important;
+  background: #fff !important;
+}
+
+/* =========== Modal thêm xe =========== */
+.page.vehicles .ant-modal-content {
+  border-radius: 16px !important;
+  background: #ffffff;
+  border: 1px solid #e8eff8;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.page.vehicles .ant-modal-header {
+  border-radius: 16px 16px 0 0 !important;
+  background: #f3f7ff;
+  border-bottom: 1px solid #e8eff8;
+}
+
+.page.vehicles .ant-modal-title {
+  font-weight: 700;
+  color: #1e2a3b;
+}
+
+.page.vehicles .ant-modal-footer .ant-btn {
+  border-radius: 10px;
+}
+
+/* Tag Active ở đầu form */
+.page.vehicles .ant-modal-body > div > .ant-tag {
+  transform: translateY(-2px);
+}
+
+/* Lưới form 3 cột */
+.vehicle-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+/* Form item bo góc input/number/select */
+.vehicle-form-grid .ant-input,
+.vehicle-form-grid .ant-input-number,
+.vehicle-form-grid .ant-select-selector {
+  border-radius: 10px !important;
+  border-color: #d9e3f1 !important;
+  background: #ffffff !important;
+}
+
+.vehicle-form-grid .ant-input:hover,
+.vehicle-form-grid .ant-input-number:hover,
+.vehicle-form-grid .ant-select-selector:hover {
+  border-color: #1677ff !important;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.15);
+}
+
+/* Label form */
+.vehicle-form-grid .ant-form-item-label > label {
+  font-weight: 600;
+  color: #1e2a3b;
+}
+
+/* Input disabled (companyId, status) rõ ràng hơn */
+.vehicle-form-grid .ant-input[disabled],
+.vehicle-form-grid .ant-input-number-disabled .ant-input-number-input,
+.vehicle-form-grid .ant-select-disabled .ant-select-selector {
+  color: #555 !important;
+  -webkit-text-fill-color: #555;
+  background: #f5f7fa !important;
+  border-color: #e6edf7 !important;
+}
+
+/* =========== Responsive =========== */
+@media (max-width: 1200px) {
+  .vehicle-form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .page.vehicles {
+    padding: 12px;
+  }
+  .vehicle-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .page.vehicles .ant-table-wrapper {
+    box-shadow: none;
+    border-radius: 10px;
+  }
+}
+
+/* =========== Scrollbar tinh tế (WebKit) =========== */
+.page.vehicles ::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+.page.vehicles ::-webkit-scrollbar-thumb {
+  background-clip: padding-box;
+  background: #cfd8e7;
+  border-radius: 999px;
+}
+.page.vehicles ::-webkit-scrollbar-thumb:hover {
+  background: #b8c8e5;
+}
+.page.vehicles ::-webkit-scrollbar-track {
+  background: transparent;
+}
+@media print {
+  /* Ẩn toàn bộ phần không cần in */
+  .ant-pagination,
+  .ant-btn,
+  .ant-input,
+  .ant-select,
+  .ant-space,
+  h2,
+  .ant-modal {
+    display: none !important;
+  }
+
+  /* Giữ lại bảng dữ liệu */
+  .ant-table {
+    border: 1px solid #000;
+  }
+
+  .ant-table td,
+  .ant-table th {
+    border: 1px solid #000 !important;
+    padding: 4px !important;
+  }
+
+  /* In chỉ phần chính */
+  body * {
+    visibility: hidden;
+  }
+
+  .page.vehicles,
+  .page.vehicles * {
+    visibility: visible;
+  }
+
+  .page.vehicles {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}

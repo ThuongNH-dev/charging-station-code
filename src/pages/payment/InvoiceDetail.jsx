@@ -112,7 +112,85 @@ function normalizeSession(s) {
   };
 }
 
+// ==== NEW: helper gọi chi tiết phiên & pool giới hạn song song ====
+async function fetchSessionDetail(sessionId) {
+  try {
+    const r = await fetchAuthJSON(`${API_ABS}/ChargingSessions/${sessionId}`, { method: "GET" });
+    // BE có thể bọc trong { data: {...} } hoặc trả trực tiếp object
+    return r?.data ?? r ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function runLimitedPool(items, limit, worker) {
+  const out = new Array(items.length);
+  let i = 0, running = 0;
+  return await new Promise((resolve) => {
+    const next = () => {
+      if (i >= items.length && running === 0) return resolve(out);
+      while (running < limit && i < items.length) {
+        const idx = i++;
+        running++;
+        Promise.resolve(worker(items[idx], idx))
+          .then((res) => { out[idx] = res; })
+          .catch(() => { out[idx] = null; })
+          .finally(() => { running--; next(); });
+      }
+    };
+    next();
+  });
+}
+
+/**
+ * Hydrate danh sách sessions bằng /ChargingSessions/{id}
+ * - Giữ lại các field đã có, điền/chèn các field thiếu từ detail.
+ * - Ưu tiên dữ liệu từ detail (vì là nguồn “đủ” nhất).
+ */
+async function hydrateSessionsDetails(baseSessions) {
+  const base = Array.isArray(baseSessions) ? baseSessions : [];
+  const ids = base.map(s => s?.chargingSessionId).filter(Boolean);
+  if (ids.length === 0) return base;
+
+  // gọi chi tiết theo pool để tránh dội server
+  const details = await runLimitedPool(ids, 6, (sid) => fetchSessionDetail(sid));
+
+  const byId = new Map();
+  details.forEach((d) => {
+    if (!d) return;
+    const norm = normalizeSession(d); // tận dụng mapper đã có
+    if (norm?.chargingSessionId) byId.set(norm.chargingSessionId, norm);
+  });
+
+  // merge: detail > base
+  return base.map((s) => {
+    const d = byId.get(s.chargingSessionId);
+    if (!d) return s; // không có detail thì giữ nguyên
+    return {
+      ...s,
+      // time
+      startedAt: d.startedAt ?? s.startedAt ?? null,
+      endedAt: d.endedAt ?? s.endedAt ?? null,
+      durationMin: (d.durationMin ?? s.durationMin) ?? 0,
+      idleMin: (d.idleMin ?? s.idleMin) ?? 0,
+      // energy & SoC
+      energyKwh: (d.energyKwh ?? s.energyKwh) ?? 0,
+      startSoc: d.startSoc ?? s.startSoc ?? null,
+      endSoc: d.endSoc ?? s.endSoc ?? null,
+      // money
+      subtotal: (d.subtotal ?? s.subtotal) ?? 0,
+      tax: (d.tax ?? s.tax) ?? 0,
+      total: (d.total ?? s.total) ?? 0,
+      // others
+      status: d.status ?? s.status ?? null,
+      vehicleId: d.vehicleId ?? s.vehicleId ?? null,
+      portId: d.portId ?? s.portId ?? null,
+    };
+  });
+}
+
 async function fetchSessionsForInvoice(invoiceId, context) {
+  // 1) Thử lấy sessions từ /Invoices/{id}
   try {
     const r = await fetchAuthJSON(`${API_ABS}/Invoices/${invoiceId}`, { method: "GET" });
     const inv = r?.data ?? r ?? null;
@@ -121,15 +199,27 @@ async function fetchSessionsForInvoice(invoiceId, context) {
       : Array.isArray(inv?.items)
         ? inv.items
         : null;
-    if (sessions?.length) return sessions.map(normalizeSession).filter(Boolean);
+
+    if (sessions?.length) {
+      const base = sessions.map(normalizeSession).filter(Boolean);
+      const hydrated = await hydrateSessionsDetails(base);     // <--- NEW
+      return hydrated;
+    }
   } catch { }
 
+  // 2) Thử /ChargingSessions/by-invoice/{id} (LẤY HẾT TRANG)
   try {
-    const r2 = await fetchAuthJSON(`${API_ABS}/ChargingSessions/by-invoice/${invoiceId}`, { method: "GET" });
-    const arr = Array.isArray(r2?.data) ? r2.data : Array.isArray(r2) ? r2 : [];
-    if (arr.length) return arr.map(normalizeSession).filter(Boolean);
+    const baseUrl = `${API_ABS}/ChargingSessions/by-invoice/${invoiceId}`;
+    const all = await fetchAllPagesJson(baseUrl, { pageSize: 100 });
+    if (all.length) {
+      const base = all.map(normalizeSession).filter(Boolean);
+      const hydrated = await hydrateSessionsDetails(base); // giữ như bạn đã thêm
+      return hydrated;
+    }
   } catch { }
 
+
+  // 3) Fall back theo customer + month/year (nếu có)
   const { customerId, billingYear, billingMonth } = context || {};
   if (customerId && billingYear && billingMonth) {
     try {
@@ -139,14 +229,49 @@ async function fetchSessionsForInvoice(invoiceId, context) {
       );
       let arr = Array.isArray(r3?.data) ? r3.data : Array.isArray(r3) ? r3 : [];
       arr = arr.map(normalizeSession).filter(Boolean);
+
+      // Nếu có trường invoiceId thì lọc đúng hóa đơn
       if (arr.some((s) => s.invoiceId != null)) {
         arr = arr.filter((s) => String(s.invoiceId) === String(invoiceId));
       }
-      return arr;
+
+      const hydrated = await hydrateSessionsDetails(arr);      // <--- NEW
+      return hydrated;
     } catch { }
   }
+
+  // 4) Không có gì
   return [];
 }
+
+// đặt gần các API helpers khác
+async function fetchAllPagesJson(urlBase, { startPage = 1, pageSize = 50, maxPages = 100 } = {}) {
+  let page = startPage;
+  const all = [];
+  for (let i = 0; i < maxPages; i++) {
+    const url = `${urlBase}${urlBase.includes('?') ? '&' : '?'}page=${page}&pageSize=${pageSize}`;
+    const r = await fetchAuthJSON(url, { method: "GET" });
+
+    // Chuẩn hóa mảng items
+    const arr = Array.isArray(r?.data) ? r.data : (Array.isArray(r) ? r : (Array.isArray(r?.items) ? r.items : []));
+    all.push(...arr);
+
+    // Thoát vòng nếu không rõ total, hoặc đã hết
+    const total = Number(r?.total ?? r?.totalItems ?? 0);
+    const size = Number(r?.pageSize ?? pageSize);
+    const current = Number(r?.page ?? page);
+    if (!total || !size) {
+      if (arr.length < pageSize) break; // không phải API chuẩn → dừng khi thiếu trang
+    } else {
+      const maxPage = Math.max(1, Math.ceil(total / size));
+      if (current >= maxPage) break;
+    }
+    page++;
+  }
+  return all;
+}
+
+
 
 // small utils
 const inventorySafe = (arr) => (Array.isArray(arr) ? arr : []);
