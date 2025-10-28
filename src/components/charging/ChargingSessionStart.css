@@ -1,0 +1,155 @@
+/* ===== Layout tổng ===== */
+.cs-root {
+  --card-bg: #fff;
+  --card-bd: #e8e8e8;
+  --muted: #6b7280;
+  --muted-2: #9ca3af;
+  --brand: #0b7a6f;         /* xanh ngọc đậm cho tiêu đề */
+  --pill-bg: #f6f8fa;       /* nền nhạt cho tiêu đề khối con */
+  --radius-lg: 14px;
+  --radius-md: 12px;
+
+  padding: 20px;
+  display: grid;
+  gap: 20px;
+  max-width: 920px;         /* canh giữa & giới hạn dòng */
+  margin: 0 auto;
+}
+
+/* ===== Card chính ===== */
+.cs-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-bd);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.05);
+}
+
+/* Tiêu đề phần lớn */
+.cs-section-title {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--brand);
+}
+
+/* ===== Card con (Trạm sạc / Trụ sạc) ===== */
+.cs-subcard {
+  border: 1px dashed #ebedf0;
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-bottom: 12px;
+  background: #fff;
+}
+
+/* Thanh tiêu đề nhánh – dạng pill */
+.cs-subtitle {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--pill-bg);
+  color: #111827;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+/* Lưới key-value */
+.cs-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.cs-row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.cs-label {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.cs-value {
+  font-weight: 700;
+  color: #111827;
+  text-align: right;          /* value canh phải giống ảnh */
+  word-break: break-word;
+}
+
+/* ===== Khối bắt đầu sạc ===== */
+.cs-start {
+  background: var(--card-bg);
+  border: 1px solid var(--card-bd);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.05);
+}
+
+.cs-input-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* Hàng input + button */
+.cs-input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+}
+
+/* Tăng bo tròn cho Ant Input trong khối này */
+.cs-start .ant-input-affix-wrapper,
+.cs-start .ant-input,
+.cs-start .ant-input-lg {
+  border-radius: 12px !important;
+}
+
+/* Nút primary xanh ngọc nhạt – chỉ áp trong khối start */
+.cs-start .ant-btn-primary {
+  background: #6dbab3;
+  border-color: #6dbab3;
+  border-radius: 12px;
+  padding: 8px 16px;
+  box-shadow: 0 4px 12px rgba(109, 186, 179, 0.35);
+}
+.cs-start .ant-btn-primary:hover,
+.cs-start .ant-btn-primary:focus {
+  filter: brightness(0.95);
+}
+
+/* Hints dưới input */
+.cs-hints {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.cs-hint {
+  text-decoration: underline;
+  cursor: pointer;
+}
+.cs-hint:hover {
+  text-decoration: none;
+}
+
+.cs-dot {
+  color: var(--muted-2);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 560px) {
+  .cs-row {
+    grid-template-columns: 120px 1fr;
+  }
+  .cs-value {
+    text-align: left;        /* mobile đọc dễ hơn */
+  }
+  .cs-root {
+    padding: 16px;
+    gap: 16px;
+  }
+}

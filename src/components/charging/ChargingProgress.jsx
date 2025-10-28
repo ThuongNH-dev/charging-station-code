@@ -289,7 +289,8 @@ const ChargingProgress = () => {
       const bookingId = state?.bookingId ?? state?.booking?.id ?? state?.booking?.bookingId;
       const portIdToUse = state?.gun?.id ?? state?.gun?.portId ?? state?.gun?.PortId ?? state?.portId;
 
-      if (!customerId || !vehicleId || !bookingId || !portIdToUse) return;
+      // ✅ bookingId có thể null
+      if (!customerId || !vehicleId || !portIdToUse) return;
 
       try {
         const url = `${API_ABS}/ChargingSessions/start`;

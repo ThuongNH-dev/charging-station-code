@@ -31,7 +31,7 @@ import ResourceManagement from "./pages/company/ReManagerment";
 import NotFound from "./pages/NotFound";
 import ReManagerDetail from "./pages/company/ReManagerDetail";
 import Reports from "./components/admin/pages/Reports/Reports";
-
+import ChargingSessionStart from "./components/charging/ChargingSessionStart";
 // Chuyển role thành path tương ứng
 
 function roleToPath(role) {
@@ -149,6 +149,15 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/charging/start"
+        element={
+          <ProtectedRoute allowedRoles={["Customer"]}>
+            <ChargingSessionStart />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/charging"
         element={
