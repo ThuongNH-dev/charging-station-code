@@ -258,7 +258,7 @@ export default function App() {
       <Route
         path="/profile/change-password"
         element={
-          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
+          <ProtectedRoute allowedRoles={["Customer", "Company", "Staff"]}>
             <ChangePassword />
           </ProtectedRoute>
         }

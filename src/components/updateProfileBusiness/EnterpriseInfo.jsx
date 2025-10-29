@@ -135,10 +135,6 @@ export default function EnterpriseInfo() {
               </Button>
             </div>
           </Form>
-
-          <div className="msg" style={{ marginTop: 8 }}>
-            Muốn đổi mật khẩu? Vào mục <b>Cá nhân → Đổi mật khẩu</b>.
-          </div>
         </div>
       </aside>
     </MainLayout>

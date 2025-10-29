@@ -81,8 +81,20 @@ function normalizeCompany(c = {}) {
 }
 
 function normalizeStaff(s = {}) {
+  // 🚀 THAY THẾ staffId bằng customerId
+  const customerId =
+    s.customerId ?? // Lấy customerId nếu có
+    s.CustomerId ??
+    s.accountId ?? // Lấy accountId (giá trị 3) làm dự phòng
+    s.AccountId ??
+    s.id ??
+    s.Id ??
+    null;
+
   return {
-    staffId: s.staffId ?? s.StaffId ?? s.id ?? s.Id ?? null,
+    // ❌ Xóa staffId
+    // ✅ Dùng customerId thay thế cho Mã NV
+    customerId: customerId,
     fullName: s.fullName ?? s.FullName ?? s.name ?? s.Name ?? "",
     email: s.email ?? s.Email ?? "",
     phone: s.phone ?? s.Phone ?? "",
@@ -151,6 +163,8 @@ export const getStaffInfo = async () => {
           (Array.isArray(res?.Customers) && res.Customers[0]) ||
           {};
         return normalizeStaff({
+          AccountId: u.accountId,
+          CustomerId: c0.customerId,
           StaffId: null,
           FullName: u.name || c0.fullName || res.userName || "",
           Email: u.email || "",
@@ -197,7 +211,7 @@ export const getStaffInfo = async () => {
  * Cập nhật Staff (cần StaffId). Nếu BE khác, đổi URL/body cho khớp.
  */
 export const updateStaffInfo = async (payload = {}) => {
-  if (!payload.staffId) {
+  if (!payload.customerId) {
     throw new Error("Thiếu StaffId – không thể cập nhật thông tin nhân viên.");
   }
 
@@ -206,16 +220,16 @@ export const updateStaffInfo = async (payload = {}) => {
   const avatarUrl = rawImg || DEFAULT_IMAGE_URL;
 
   const body = {
-    StaffId: payload.staffId,
+    CustomerId: payload.customerId,
     FullName: payload.fullName ?? "",
     Phone: payload.phone ?? "",
     Address: payload.address ?? "",
     AvatarUrl: avatarUrl,
   };
 
-  const url = `${API_BASE}/Auth/update-staff`;
-  __logFetch("[profileApi.updateStaffInfo]", url, {
-    method: "PUT",
+  const url = `${API_BASE}/Auth/update-customer`; // 🚀 GỌI ĐÚNG ENDPOINT
+  __logFetch("[profileApi.updateStaffInfo] via /update-customer", url, {
+    method: "PUT", // 🚀 SỬ DỤNG METHOD PUT
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -246,8 +260,6 @@ export const updateStaffInfo = async (payload = {}) => {
     }
     throw new Error(errText || `Cập nhật thất bại (HTTP ${res.status})`);
   }
-
-  if (res.status === 204) return normalizeStaff(body);
 
   let data = null;
   try {

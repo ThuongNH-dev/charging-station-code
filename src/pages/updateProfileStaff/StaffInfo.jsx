@@ -14,27 +14,24 @@ export default function StaffInfo() {
   const [saving, setSaving] = useState(false);
   const [hasStaff, setHasStaff] = useState(false);
 
-  // ✅ Load thông tin khi mount
   useEffect(() => {
     console.log("[DEBUG] StaffInfo mounted");
     (async () => {
       try {
         const data = await getStaffInfo();
-        console.log("[DEBUG] API getStaffInfo:", data);
-
-        const customer = data.customers?.[0] || {};
-        const staffId = data.staffId ?? customer.customerId ?? undefined;
+        console.log("[DEBUG] API getStaffInfo (normalized):", data);
 
         form.setFieldsValue({
-          staffId,
-          fullName: data.fullName ?? customer.fullName ?? "",
-          email: data.email ?? data.userName ?? "",
-          phone: data.phone ?? customer.phone ?? "",
-          address: data.address ?? customer.address ?? "",
+          // 🚀 Giờ data.customerId đã có giá trị 3
+          customerId: data.customerId ?? "",
+          fullName: data.fullName ?? "",
+          phone: data.phone ?? "",
+          address: data.address ?? "",
           avatarUrl: data.avatarUrl ?? "",
         });
 
-        setHasStaff(!!staffId);
+        // 🚀 Kiểm tra hasStaff dựa trên customerId đã chuẩn hóa
+        setHasStaff(!!data.customerId);
       } catch (err) {
         console.error("[StaffInfo] load error:", err);
         message.error("Không tải được thông tin nhân viên");
@@ -44,11 +41,12 @@ export default function StaffInfo() {
     })();
   }, [form]);
 
-  // ✅ Khi nhấn "Lưu"
   const onFinish = async (values) => {
     console.log("[DEBUG] onFinish values:", values);
-    if (!values.staffId) {
-      message.error("Tài khoản chưa gắn StaffId. Không thể cập nhật.");
+    if (!values.customerId) {
+      message.error(
+        "Không tìm thấy mã nhân viên (customerId). Không thể cập nhật."
+      );
       return;
     }
 
@@ -58,12 +56,11 @@ export default function StaffInfo() {
 
     try {
       const payload = {
-        staffId: values.staffId,
+        customerId: values.customerId, // 🚀 Gửi customerId
         fullName: (values.fullName || "").trim(),
         phone: (values.phone || "").trim(),
         address: (values.address || "").trim(),
         avatarUrl: (values.avatarUrl || "").trim(),
-        email: (values.email || "").trim(),
       };
 
       console.log("[DEBUG] Gửi updateStaffInfo:", payload);
@@ -73,7 +70,7 @@ export default function StaffInfo() {
       form.setFieldsValue(saved);
       message.success({
         key,
-        content: "Đã lưu thông tin nhân viên!",
+        content: "Đã lưu thông tin nhân viên!", // Hoặc "Lưu thành công!"
         duration: 2,
       });
     } catch (err) {
@@ -133,10 +130,6 @@ export default function StaffInfo() {
               </Button>
             </div>
           </Form>
-
-          <div className="msg" style={{ marginTop: 8 }}>
-            Muốn đổi mật khẩu? Vào mục <b>Cá nhân → Đổi mật khẩu</b>.
-          </div>
         </div>
       </aside>
     </MainLayout>

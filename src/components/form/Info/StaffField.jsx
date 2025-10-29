@@ -32,7 +32,7 @@ export default function StaffField() {
 
       <Row gutter={[24, 0]}>
         <Col xs={24} md={12}>
-          <Form.Item label="Mã nhân viên" name="staffId">
+          <Form.Item label="Mã nhân viên" name="customerId">
             <InputNumber style={{ width: "100%" }} disabled />
           </Form.Item>
 
