@@ -1,7 +1,36 @@
+// ✅ src/pages/form/Info/EnterpriseField.jsx
 import React from "react";
-import { Row, Col, Form, Input, InputNumber, Select, Typography } from "antd";
+import { Row, Col, Form, Input, InputNumber, Typography } from "antd";
 
 const { Title } = Typography;
+
+/* ---------- Validators ---------- */
+const trim = (v) => (typeof v === "string" ? v.trim() : v);
+
+const urlValidator = async (_, v) => {
+  const val = trim(v) || "";
+  if (!val) return; // cho phép để trống
+  const ok = /^https?:\/\/\S+$/i.test(val);
+  if (!ok) throw new Error("URL phải bắt đầu bằng http:// hoặc https://");
+};
+
+const taxCodeValidator = async (_, v) => {
+  const val = trim(v) || "";
+  if (!val) throw new Error("Nhập mã số thuế");
+  // 10 hoặc 13 chữ số
+  if (!/^\d{10}(\d{3})?$/.test(val)) {
+    throw new Error("Mã số thuế phải 10 hoặc 13 chữ số");
+  }
+};
+
+const phoneValidator = async (_, v) => {
+  const val = trim(v) || "";
+  if (!val) throw new Error("Nhập số điện thoại");
+  // +84xxxxxxxxx... hoặc 0xxxxxxxxx...
+  if (!/^(\+?84|0)\d{8,10}$/.test(val)) {
+    throw new Error("SĐT không hợp lệ. Ví dụ: +84901234567 hoặc 0901234567");
+  }
+};
 
 export default function EnterpriseField() {
   return (
@@ -19,6 +48,7 @@ export default function EnterpriseField() {
           <Form.Item
             label="Tên công ty"
             name="name"
+            normalize={trim}
             rules={[{ required: true, message: "Nhập tên công ty" }]}
           >
             <Input placeholder="Công ty TNHH ABC" />
@@ -27,7 +57,9 @@ export default function EnterpriseField() {
           <Form.Item
             label="Mã số thuế"
             name="taxCode"
-            rules={[{ required: true, message: "Nhập mã số thuế" }]}
+            normalize={trim}
+            rules={[{ validator: taxCodeValidator }]}
+            tooltip="Chỉ chấp nhận 10 hoặc 13 chữ số"
           >
             <Input placeholder="10 hoặc 13 số" />
           </Form.Item>
@@ -35,6 +67,7 @@ export default function EnterpriseField() {
           <Form.Item
             label="Email"
             name="email"
+            normalize={trim}
             rules={[{ type: "email", message: "Email không hợp lệ" }]}
           >
             <Input placeholder="user@example.com" />
@@ -45,17 +78,25 @@ export default function EnterpriseField() {
           <Form.Item
             label="SĐT"
             name="phone"
-            rules={[{ required: true, message: "Nhập số điện thoại" }]}
+            normalize={trim}
+            rules={[{ validator: phoneValidator }]}
+            tooltip="Bắt đầu bằng +84 hoặc 0"
           >
-            <Input placeholder="+84xxxxxxxxxx" />
+            <Input placeholder="+84xxxxxxxxxx hoặc 0xxxxxxxxx" />
           </Form.Item>
 
-          <Form.Item label="Địa chỉ" name="address">
+          <Form.Item label="Địa chỉ" name="address" normalize={trim}>
             <Input placeholder="Số 1, Đường A, Quận B" />
           </Form.Item>
 
-          <Form.Item label="Logo / Ảnh" name="imageUrl">
-            <Input placeholder="https://..." allowClear />
+          <Form.Item
+            label="Logo / Ảnh"
+            name="imageUrl"
+            normalize={trim}
+            rules={[{ validator: urlValidator }]}
+            tooltip="Để trống hoặc dùng link http(s) hợp lệ"
+          >
+            <Input placeholder="https://example.com/logo.png" allowClear />
           </Form.Item>
         </Col>
       </Row>

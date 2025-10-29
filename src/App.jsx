@@ -1,4 +1,3 @@
-// src/App.jsx
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -15,8 +14,8 @@ import PaymentInvoice from "./components/charging/PaymentInvoice";
 import Login from "./components/login/Login";
 import Homepage from "./pages/homepage/homepage";
 import ServicePlans from "./components/subscription/ServicePlans";
-import Unauthorized from "./pages/Unauthorized"; // ✅ thêm trang này (mục 2)
-import BookingHistory from "./pages/booking/BookingHisory"; // ✅ thêm trang lịch sử đặt chỗ
+import Unauthorized from "./pages/Unauthorized";
+import BookingHistory from "./pages/booking/BookingHisory";
 import InvoicePage from "./components/charging/Invoice";
 import StaffLayout from "./layouts/StaffLayout";
 import AdminLayout from "./components/admin/layout/AdminLayout";
@@ -38,8 +37,7 @@ import VehicleInfo from "./components/updateProfilePerson/VehicleInfo";
 import PaymentMethods from "./components/updateProfilePerson/PaymentMethods";
 import ChangePassword from "./components/updateProfilePerson/ChangePassword";
 import EnterpriseInfo from "./components/updateProfileBusiness/EnterpriseInfo";
-
-// Chuyển role thành path tương ứng
+import StaffInfo from "./pages/updateProfileStaff/StaffInfo";
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
@@ -64,8 +62,6 @@ function GuestRoute({ children }) {
 
   const from = location.state?.from?.pathname;
   const target = from || roleToPath(user.role);
-
-  // ❗ Nếu đang ở đúng target rồi, không redirect nữa (tránh loop trắng trang)
   if (location.pathname === target) return children;
 
   return <Navigate to={target} replace />;
@@ -76,12 +72,10 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/homepage" replace />} />
       {/* PUBLIC */}
-      <Route path="/homepage" element={<Homepage />} />{" "}
-      {/* ✅ KHÔNG bọc GuestRoute */}
+      <Route path="/homepage" element={<Homepage />} />
       <Route path="/register/select" element={<RegisterSelect />} />
       <Route path="/register/personal" element={<PersonalRegister />} />
       <Route path="/register/business" element={<BusinessRegister />} />
-      {/* các route khác của bạn */}
       <Route
         path="/login"
         element={
@@ -90,7 +84,8 @@ export default function App() {
           </GuestRoute>
         }
       />
-      <Route path="/unauthorized" element={<Unauthorized />} /> {/* ✅ */}
+      <Route path="/unauthorized" element={<Unauthorized />} />
+
       {/* PROTECTED (Customer) */}
       <Route
         path="/stations"
@@ -180,6 +175,8 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* Invoices & Services */}
       <Route
         path="/invoice"
         element={
@@ -212,9 +209,36 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route path="/profile/enterprise-info" element={<EnterpriseInfo />} />
-      {/* Profile (Customer) */}
-      <Route path="/profile/update-info" element={<UpdateInfo />} />
+
+      {/* ✅ Profile (Company) – HÌNH 2 */}
+      <Route
+        path="/profile/enterprise-info"
+        element={
+          <ProtectedRoute allowedRoles={["Company"]}>
+            <EnterpriseInfo />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ✅ Profile (Staff) */}
+      <Route
+        path="/profile/staff-info"
+        element={
+          <ProtectedRoute allowedRoles={["Staff"]}>
+            <StaffInfo />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ✅ Profile (Customer) – HÌNH 3 */}
+      <Route
+        path="/profile/update-info"
+        element={
+          <ProtectedRoute allowedRoles={["Customer"]}>
+            <UpdateInfo />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/profile/vehicle-info"
         element={
@@ -239,7 +263,8 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      {/*Company */}
+
+      {/* Company */}
       <Route
         path="/company"
         element={
@@ -256,7 +281,8 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      {/*Staff */}
+
+      {/* Staff */}
       <Route
         path="/staff/*"
         element={
@@ -265,6 +291,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
       {/* Admin */}
       <Route
         path="admin"
@@ -274,15 +301,14 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        {/* LƯU Ý: path con là tương đối, KHÔNG dùng "/admin/..." */}
         <Route index element={<StationManagement />} />
         <Route path="stations" element={<StationManagement />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="reports" element={<Reports />} />
       </Route>
+
       {/* FALLBACK */}
       <Route path="*" element={<NotFound />} />
-      {/* ✅ */}
     </Routes>
   );
 }

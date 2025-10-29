@@ -11,11 +11,7 @@ import {
   Box,
 } from "@mui/material";
 
-// ✅ icon hiện đại, màu mềm
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import AccountCircleRoundedIcon from "@mui/icons-material/AccountCircleRounded";
-import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
-import DashboardRoundedIcon from "@mui/icons-material/DashboardRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 
 import { useAuth } from "../../context/AuthContext";
@@ -30,7 +26,6 @@ function getInitials(name = "") {
     .map((w) => w[0]?.toUpperCase())
     .join("");
 }
-
 function pickName(obj = {}) {
   return (
     obj.fullName ||
@@ -98,7 +93,6 @@ export default function AccountMenu() {
     async function fetchMe() {
       if (!token) return;
       if (displayName && roleText) return;
-
       try {
         const res = await fetch(ME_URL, {
           method: "GET",
@@ -108,7 +102,6 @@ export default function AccountMenu() {
           },
         });
         if (!res.ok) return;
-
         let data = null;
         const ct = res.headers.get("content-type") || "";
         if (ct.includes("application/json")) data = await res.json();
@@ -158,6 +151,23 @@ export default function AccountMenu() {
   const handleClick = (e) => setAnchorEl(e.currentTarget);
   const handleClose = () => setAnchorEl(null);
 
+  const manageAccountPath = () => {
+    const role = (roleText || userRole || user?.role || "")
+      .toString()
+      .toLowerCase();
+
+    switch (role) {
+      case "company":
+        return "/profile/enterprise-info";
+      case "staff":
+        return "/profile/staff-info";
+      case "customer":
+        return "/profile/update-info";
+      default:
+        return "/profile/update-info";
+    }
+  };
+
   return (
     <Box>
       <Button
@@ -176,9 +186,9 @@ export default function AccountMenu() {
           fontWeight: 600,
           color: "text.primary",
           backgroundColor: "white",
-          p : "8px !important",
-          width : "160px !important",
-          border : "0.1px solid rgba(6, 92, 42, 0.17)",
+          p: "8px !important",
+          width: "160px !important",
+          border: "0.1px solid rgba(6, 92, 42, 0.17)",
           boxShadow: "0 2px 50px rgba(0,0,0,0.08) ",
           "&:hover": {
             backgroundColor: "#f5f7fa",
@@ -249,7 +259,7 @@ export default function AccountMenu() {
         <MenuItem
           onClick={() => {
             handleClose();
-            navigate("/profile/update-info");
+            navigate(manageAccountPath()); // ✅ dùng hàm chọn theo role
           }}
           sx={{
             borderRadius: "10px",

@@ -1,72 +1,95 @@
 // src/context/AuthContext.js
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { setToken as storeToken, clearToken as wipeToken } from "../utils/api";
 
 const AuthContext = createContext(null);
 
-// Ánh xạ role => route đích
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
-    case "customer": return "/stations";        // ✅ có trong App.jsx
-    case "admin":    return "/homepage";        // tạm thời chưa có trang admin
-    case "staff":    return "/homepage";        // tạm thời chưa có trang staff
-    default:         return "/homepage";
+    case "customer":
+      return "/stations";
+    case "admin":
+      return "/admin";
+    case "staff":
+      return "/staff";
+    case "company":
+      return "/company";
+    default:
+      return "/homepage";
   }
 }
 
-// Helper: lấy user đã lưu
+// ✅ lấy user trong storage
 function getStoredUser() {
   try {
     const rawLocal = localStorage.getItem("user");
     if (rawLocal) return JSON.parse(rawLocal);
     const rawSession = sessionStorage.getItem("user");
     if (rawSession) return JSON.parse(rawSession);
-  } catch {}
+  } catch (err) {
+    console.warn("[AuthContext] getStoredUser error:", err);
+  }
   return null;
 }
 
 export function AuthProvider({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
-
   const [user, setUser] = useState(() => getStoredUser());
+
+  // 🟢 log khi khởi tạo
+  useEffect(() => {
+    console.groupCollapsed(
+      "%c[AuthContext] INIT/UPDATE",
+      "color:#1677ff;font-weight:bold;"
+    );
+    console.log("Stored user:", user);
+    console.log("User role:", user?.role);
+    console.log("Token:", user?.token?.slice(0, 40) + "...");
+    console.log("isAuthenticated:", !!user?.token);
+    console.groupEnd();
+  }, [user]);
 
   const value = useMemo(
     () => ({
       user,
       isAuthenticated: !!user?.token,
 
-      /**
-       * Đăng nhập và điều hướng theo vai trò
-       * @param {Object} userObj - dữ liệu từ BE (cần có token, role)
-       * @param {boolean} remember - true => lưu localStorage, false => sessionStorage
-       */
       login: (userObj, remember = true) => {
-        // 1) Lưu token cho các call API
-        storeToken(userObj.token);
+        console.groupCollapsed(
+          "%c[AuthContext] LOGIN",
+          "color:#52c41a;font-weight:bold;"
+        );
+        console.log("Received userObj from BE:", userObj);
+        console.groupEnd();
 
-        // 2) Lưu thông tin user
+        // ✅ xoá dữ liệu cũ
+        wipeToken();
+        localStorage.removeItem("user");
+        sessionStorage.removeItem("user");
+
+        // ✅ lưu token và user mới
+        storeToken(userObj.token);
         if (remember) {
           localStorage.setItem("user", JSON.stringify(userObj));
-          sessionStorage.removeItem("user");
         } else {
           sessionStorage.setItem("user", JSON.stringify(userObj));
-          localStorage.removeItem("user");
         }
+
         setUser(userObj);
 
-        // 3) Điều hướng
-        const target = roleToPath(userObj.role);
-        const from = location.state?.from; // nếu bị chặn ở ProtectedRoute
-        if (from && typeof from === "string") {
-          navigate(from, { replace: true });
-        } else {
-          navigate(target, { replace: true });
-        }
+        // ✅ debug sau khi lưu
+        console.log("[AuthContext] After login, role:", userObj.role);
+        console.log("[AuthContext] Redirecting to:", roleToPath(userObj.role));
+
+        // ✅ điều hướng
+        const from = location.state?.from;
+        navigate(from || roleToPath(userObj.role), { replace: true });
       },
 
       logout: () => {
+        console.warn("[AuthContext] LOGOUT");
         wipeToken();
         localStorage.removeItem("user");
         sessionStorage.removeItem("user");

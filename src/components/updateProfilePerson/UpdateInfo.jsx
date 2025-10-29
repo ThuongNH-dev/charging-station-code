@@ -1,4 +1,6 @@
+// src/components/updateProfilePerson/UpdateInfo.jsx
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import * as profileApi from "../../api/profileApi";
 import ProfileSidebar from "../form/Info/ProfileSidebar";
 import "./UpdateProfile.css";
@@ -6,6 +8,7 @@ import MainLayout from "../../layouts/MainLayout";
 import ChangePassword from "./ChangePassword";
 
 export default function UpdateInfo() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("update-info");
   const [user, setUser] = useState(null);
   const [form, setForm] = useState({
@@ -38,6 +41,12 @@ export default function UpdateInfo() {
         console.timeEnd("[UpdateInfo] profileApi.getCurrentUser");
         console.debug("[UpdateInfo] current user:", current);
 
+        // Nếu là Staff → chuyển sang trang StaffInfo
+        if ((current.role || "").toLowerCase() === "staff") {
+          navigate("/profile/staff-info", { replace: true });
+          return;
+        }
+
         setUser(current);
         setForm({
           name: current.name || "",
@@ -53,7 +62,7 @@ export default function UpdateInfo() {
         console.groupEnd();
       }
     })();
-  }, []);
+  }, [navigate]);
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -122,6 +131,7 @@ export default function UpdateInfo() {
                   name="email"
                   value={form.email}
                   onChange={handleChange}
+                  disabled
                 />
 
                 <label>Số điện thoại</label>
