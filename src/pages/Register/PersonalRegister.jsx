@@ -1,42 +1,47 @@
 import React, { useState } from "react";
-import { Form, Input, Button, message } from "antd";
-import { UserOutlined, MailOutlined, LockOutlined, PhoneOutlined } from "@ant-design/icons";
-import { fetchJSON, getApiBase } from "../../utils/api";
-import MainLayout from "../../layouts/MainLayout";
+import { getApiBase, fetchAuthJSON } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
+import MainLayout from "../../layouts/MainLayout";
+import "./PersonalRegister.css";
 
 const API_BASE = getApiBase();
 
-const PersonalRegister = () => {
-  const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
+export default function PersonalRegister() {
   const navigate = useNavigate();
+  const [form, setForm] = useState({
+    userName: "",
+    fullName: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (values) => {
+  const handleChange = (e) =>
+    setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
     try {
-      setLoading(true);
-
-      const payload = {
-        userName: values.userName,
-        password: values.password,
-        confirmPassword: values.confirmPassword,
-        fullName: values.fullName,
-        phone: values.phone,
-        email: values.email,
-      };
-
-      await fetchJSON(`${API_BASE}/Auth/register-customer`, {
+      const res = await fetchAuthJSON(`${API_BASE}/Auth/register-customer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(form),
       });
 
-      message.success("🎉 Đăng ký tài khoản cá nhân thành công!");
-      form.resetFields();
-      setTimeout(() => navigate("/login"), 1000);
+      if (!res || !res.message?.includes("thành công")) {
+        alert("Đăng ký thất bại. Vui lòng kiểm tra lại thông tin!");
+        setLoading(false);
+        return;
+      }
+
+      alert("🎉 Đăng ký tài khoản cá nhân thành công!");
+      navigate("/login");
     } catch (err) {
       console.error("❌ Register error:", err);
-      message.error("Đăng ký thất bại. Vui lòng kiểm tra lại thông tin!");
+      alert("Lỗi kết nối đến máy chủ!");
     } finally {
       setLoading(false);
     }
@@ -44,228 +49,101 @@ const PersonalRegister = () => {
 
   return (
     <MainLayout>
-    <div
-      style={{
-        width: "100%",
-        display: "flex",
-        justifyContent: "center",
-        padding: "60px 0",
-        background: "#f2f6f9",
-        fontFamily: "Inter, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: 14,
-          boxShadow: "0 3px 10px rgba(0, 0, 0, 0.08)",
-          padding: "40px 50px",
-          width: "90%",
-          maxWidth: 480,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: 22,
-            fontWeight: 700,
-            textAlign: "center",
-            marginBottom: 30,
-            color: "#111827",
-          }}
-        >
-          Đăng ký cá nhân
-        </h2>
+      <div className="personal-register">
+        <div className="personal-container">
+          <h2 className="personal-title">Đăng ký cá nhân</h2>
 
-        <Form
-          layout="vertical"
-          form={form}
-          onFinish={handleSubmit}
-          autoComplete="off"
-          requiredMark={false}
-        >
-          {/* Tên đăng nhập */}
-          <Form.Item
-            label={<span style={{ fontWeight: 600, color: "#374151" }}>Tên đăng nhập</span>}
-            name="userName"
-            rules={[{ required: true, message: "Vui lòng nhập tên đăng nhập!" }]}
-          >
-            <Input
-              placeholder="Tên đăng nhập"
-              prefix={<UserOutlined />}
-              style={{
-                borderRadius: 6,
-                height: 42,
-                fontSize: 15,
-                border: "1px solid #d1d5db",
-              }}
-            />
-          </Form.Item>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">Tên đăng nhập</label>
+              <input
+                className="form-input"
+                name="userName"
+                value={form.userName}
+                onChange={handleChange}
+                required
+                placeholder="Nhập tên đăng nhập"
+              />
+            </div>
 
-          {/* Họ và tên */}
-          <Form.Item
-            label={<span style={{ fontWeight: 600, color: "#374151" }}>Họ và tên</span>}
-            name="fullName"
-            rules={[{ required: true, message: "Vui lòng nhập họ và tên!" }]}
-          >
-            <Input
-              placeholder="Họ và tên đầy đủ"
-              prefix={<UserOutlined />}
-              style={{
-                borderRadius: 6,
-                height: 42,
-                fontSize: 15,
-                border: "1px solid #d1d5db",
-              }}
-            />
-          </Form.Item>
+            <div className="form-group">
+              <label className="form-label">Họ và tên</label>
+              <input
+                className="form-input"
+                name="fullName"
+                value={form.fullName}
+                onChange={handleChange}
+                required
+                placeholder="Nhập họ và tên đầy đủ"
+              />
+            </div>
 
-          {/* Email */}
-          <Form.Item
-            label={<span style={{ fontWeight: 600, color: "#374151" }}>Email</span>}
-            name="email"
-            rules={[
-              { required: true, message: "Vui lòng nhập email!" },
-              { type: "email", message: "Email không hợp lệ!" },
-            ]}
-          >
-            <Input
-              placeholder="Địa chỉ email"
-              prefix={<MailOutlined />}
-              style={{
-                borderRadius: 6,
-                height: 42,
-                fontSize: 15,
-                border: "1px solid #d1d5db",
-              }}
-            />
-          </Form.Item>
+            <div className="form-group">
+              <label className="form-label">Email</label>
+              <input
+                className="form-input"
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={handleChange}
+                required
+                placeholder="example@email.com"
+              />
+            </div>
 
-          {/* Số điện thoại */}
-          <Form.Item
-            label={<span style={{ fontWeight: 600, color: "#374151" }}>Số điện thoại</span>}
-            name="phone"
-            rules={[{ required: true, message: "Vui lòng nhập số điện thoại!" }]}
-          >
-            <Input
-              placeholder="Số điện thoại"
-              prefix={<PhoneOutlined />}
-              style={{
-                borderRadius: 6,
-                height: 42,
-                fontSize: 15,
-                border: "1px solid #d1d5db",
-              }}
-            />
-          </Form.Item>
+            <div className="form-group">
+              <label className="form-label">Số điện thoại</label>
+              <input
+                className="form-input"
+                name="phone"
+                value={form.phone}
+                onChange={handleChange}
+                required
+                placeholder="+84xxxxxxxxx"
+              />
+            </div>
 
-          {/* Mật khẩu */}
-          <Form.Item
-            label={<span style={{ fontWeight: 600, color: "#374151" }}>Mật khẩu</span>}
-            name="password"
-            rules={[
-              { required: true, message: "Vui lòng nhập mật khẩu!" },
-              { min: 8, message: "Mật khẩu phải có ít nhất 8 ký tự!" },
-            ]}
-          >
-            <Input.Password
-              placeholder="Nhập mật khẩu"
-              prefix={<LockOutlined />}
-              style={{
-                borderRadius: 6,
-                height: 42,
-                fontSize: 15,
-                border: "1px solid #d1d5db",
-              }}
-            />
-          </Form.Item>
+            <div className="form-group">
+              <label className="form-label">Mật khẩu</label>
+              <input
+                className="form-input"
+                type="password"
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                required
+                placeholder="Tạo mật khẩu"
+              />
+            </div>
 
-          <p
-            style={{
-              fontSize: 13,
-              color: "#6b7280",
-              marginTop: -8,
-              marginBottom: 10,
-            }}
-          >
-            Sử dụng ít nhất 8 chữ cái, số và ký hiệu
-          </p>
+            <div className="form-group">
+              <label className="form-label">Xác nhận mật khẩu</label>
+              <input
+                className="form-input"
+                type="password"
+                name="confirmPassword"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                required
+                placeholder="Nhập lại mật khẩu"
+              />
+            </div>
 
-          {/* Xác nhận mật khẩu */}
-          <Form.Item
-            label={<span style={{ fontWeight: 600, color: "#374151" }}>Xác nhận mật khẩu</span>}
-            name="confirmPassword"
-            dependencies={["password"]}
-            rules={[
-              { required: true, message: "Vui lòng xác nhận mật khẩu!" },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (!value || getFieldValue("password") === value) return Promise.resolve();
-                  return Promise.reject(new Error("Mật khẩu không khớp!"));
-                },
-              }),
-            ]}
-          >
-            <Input.Password
-              placeholder="Nhập lại mật khẩu"
-              prefix={<LockOutlined />}
-              style={{
-                borderRadius: 6,
-                height: 42,
-                fontSize: 15,
-                border: "1px solid #d1d5db",
-              }}
-            />
-          </Form.Item>
-
-          {/* Nút đăng ký */}
-          <Form.Item>
-            <Button
-              type="primary"
-              block
-              htmlType="submit"
-              size="large"
-              loading={loading}
-              style={{
-                background: "#111827",
-                border: "none",
-                borderRadius: 8,
-                height: 44,
-                fontWeight: 600,
-                fontSize: 15,
-              }}
-              onMouseOver={(e) => (e.target.style.background = "#000")}
-              onMouseOut={(e) => (e.target.style.background = "#111827")}
+            <button
+              type="submit"
+              className="primary-btn"
+              disabled={loading}
             >
-              Đăng ký
-            </Button>
-          </Form.Item>
+              {loading ? "Đang xử lý..." : "Đăng ký"}
+            </button>
 
-          <div
-            style={{
-              textAlign: "center",
-              color: "#374151",
-              fontSize: 14,
-            }}
-          >
-            Đã có tài khoản?{" "}
-            <b
-              onClick={() => navigate("/login")}
-              style={{
-                cursor: "pointer",
-                color: "#111827",
-                fontWeight: 600,
-              }}
-            >
-              Đăng nhập
-            </b>
-          </div>
-        </Form>
+            <div className="signup-link">
+              Đã có tài khoản?{" "}
+              <a onClick={() => navigate("/login")}>Đăng nhập</a>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
     </MainLayout>
   );
-};
-
-export default PersonalRegister;
+}

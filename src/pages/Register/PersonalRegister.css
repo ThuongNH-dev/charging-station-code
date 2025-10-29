@@ -1,5 +1,5 @@
 /* ====== TOÀN TRANG ====== */
-.business-register {
+.personal-register {
   position: relative;
   min-height: 100vh;
   display: flex;
@@ -7,10 +7,11 @@
   align-items: center;
   overflow: hidden;
   isolation: isolate;
+  font-family: "Inter", sans-serif;
 }
 
-/* Ảnh nền phủ mờ phía sau */
-.business-register::before {
+/* Ảnh nền phủ mờ */
+.personal-register::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -22,19 +23,19 @@
   transform: scale(1.05);
 }
 
-/* ====== FORM CONTAINER ====== */
-.register-container.single-column {
+/* ====== FORM CARD ====== */
+.personal-container {
   background: rgba(255, 255, 255, 0.95);
   border-radius: 16px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
   padding: 40px;
   width: 100%;
-  max-width: 500px;
+  max-width: 480px;
   backdrop-filter: blur(6px);
   animation: fadeInUp 0.5s ease-out;
 }
 
-/* Hiệu ứng xuất hiện */
+/* Hiệu ứng fade-in */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -47,7 +48,7 @@
 }
 
 /* ====== TIÊU ĐỀ ====== */
-.form-title {
+.personal-title {
   text-align: center;
   font-size: 26px;
   font-weight: 700;
@@ -55,45 +56,34 @@
   margin-bottom: 24px;
 }
 
-/* ====== FORM ====== */
-.register-form.single {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+/* ====== INPUT ====== */
+.form-group {
+  margin-bottom: 16px;
 }
 
-.form-group label {
-  font-weight: 600;
-  color: #334155;
-  margin-bottom: 6px;
+.form-label {
   display: block;
+  margin-bottom: 6px;
+  color: #475569;
+  font-weight: 600;
 }
 
-.form-group input {
+.form-input {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   outline: none;
   background-color: #fff;
-  transition: all 0.2s ease;
   font-size: 15px;
+  transition: all 0.2s ease;
 }
-.form-group input:focus {
+.form-input:focus {
   border-color: #0f766e;
   box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.2);
 }
 
-/* ====== CHECKBOX ====== */
-.checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: #475569;
-}
-
-/* ====== NÚT ĐĂNG KÝ ====== */
+/* ====== BUTTON ====== */
 .primary-btn {
   width: 100%;
   background-color: #0f766e;
@@ -112,4 +102,20 @@
 .primary-btn:disabled {
   background: #aaa;
   cursor: not-allowed;
+}
+
+/* ====== LINK ====== */
+.signup-link {
+  text-align: center;
+  margin-top: 12px;
+  font-size: 14px;
+  color: #374151;
+}
+.signup-link a {
+  color: #0f766e;
+  font-weight: 600;
+  cursor: pointer;
+}
+.signup-link a:hover {
+  text-decoration: underline;
 }
