@@ -23,7 +23,7 @@ function __logFetch(label, url, options) {
   });
 }
 
-/* =============== PROFILE =============== */
+/* =============== NORMALIZERS =============== */
 function normalizeUser(u = {}) {
   const customers = u.customers ?? u.Customers ?? [];
   const customerObj =
@@ -64,9 +64,24 @@ function normalizeUser(u = {}) {
   };
 }
 
+// Chuẩn hoá đối tượng Doanh nghiệp về schema FE dùng
+function normalizeCompany(c = {}) {
+  return {
+    companyId: c.companyId ?? c.CompanyId ?? c.id ?? c.Id ?? null,
+    name: c.name ?? c.Name ?? "",
+    taxCode: c.taxCode ?? c.TaxCode ?? "",
+    email: c.email ?? c.Email ?? "",
+    phone: c.phone ?? c.Phone ?? "",
+    address: c.address ?? c.Address ?? "",
+    imageUrl: c.imageUrl ?? c.ImageUrl ?? c.logoUrl ?? c.LogoUrl ?? "",
+  };
+}
+
 console.log("[profileApi] API_BASE =", API_BASE);
 
+/* =============== PROFILE (USER) =============== */
 export const getCurrentUser = async ({ accountId, userName } = {}) => {
+  // Thử /Auth/{id} trước (nếu có accountId)
   if (accountId && accountId !== "null" && accountId !== "undefined") {
     try {
       const url = `${API_BASE}/Auth/${encodeURIComponent(accountId)}`;
@@ -83,6 +98,7 @@ export const getCurrentUser = async ({ accountId, userName } = {}) => {
     }
   }
 
+  // Fallback: /Auth (có thể trả list/object)
   const listUrl = `${API_BASE}/Auth`;
   __logFetch("[profileApi.getCurrentUser] /Auth", listUrl, { method: "GET" });
   const res = await fetchAuthJSON(listUrl, { method: "GET" });
@@ -205,148 +221,47 @@ export const uploadAvatar = async ({ accountId, file }) => {
   return normalizeUser(data);
 };
 
-/* =============== VEHICLE (gộp vào profileApi) =============== */
-function normalizeVehicle(v = {}) {
-  return {
-    id: v.vehicleId ?? v.VehicleId ?? v.id ?? v.Id,
-    customerId: v.customerId ?? v.CustomerId,
-    companyId: v.companyId ?? v.CompanyId,
-    carMaker: v.carMaker ?? v.CarMaker ?? "",
-    model: v.model ?? v.Model ?? "",
-    licensePlate: v.licensePlate ?? v.LicensePlate ?? "",
-    batteryCapacity: v.batteryCapacity ?? v.BatteryCapacity ?? null,
-    currentSoc: v.currentSoc ?? v.CurrentSoc ?? null,
-    connectorType: v.connectorType ?? v.ConnectorType ?? "",
-    manufactureYear: v.manufactureYear ?? v.ManufactureYear ?? null,
-    status: v.status ?? v.Status ?? "Active",
-    imageUrl: v.imageUrl ?? v.ImageUrl ?? "",
-    vehicleType: v.vehicleType ?? v.VehicleType ?? "",
-    createdAt: v.createdAt ?? v.CreatedAt,
-    updatedAt: v.updatedAt ?? v.UpdatedAt,
+/* =============== ENTERPRISE (COMPANY) =============== */
+/**
+ * Trả về object:
+ * {
+ *   companyId, name, taxCode, email, phone, address, imageUrl
+ * }
+ * Nguồn dữ liệu: /Auth (hoặc /Auth/{id}) → lấy company trong đó và chuẩn hoá.
+ */
+export const getEnterpriseInfo = async () => {
+  const u = await getCurrentUser();
+  const companyObj = {
+    CompanyId: u.companyId,
+    Name: u.companyName || u.name,
+    TaxCode: u.taxCode,
+    Email: u.email,
+    Phone: u.phone,
+    Address: u.address,
+    ImageUrl: u.avatarUrl,
   };
-}
-
-export const listVehicles = async ({
-  page = 1,
-  pageSize = 100,
-  filters = {},
-} = {}) => {
-  const qs = new URLSearchParams({
-    page,
-    pageSize,
-    licensePlate: filters.licensePlate ?? "",
-    carMaker: filters.carMaker ?? "",
-    model: filters.model ?? "",
-    status: filters.status ?? "",
-    yearFrom: filters.yearFrom ?? "",
-    yearTo: filters.yearTo ?? "",
-    vehicleType: filters.vehicleType ?? "",
-  }).toString();
-
-  const url = `${API_BASE}/Vehicles?${qs}`;
-  __logFetch("[profileApi.listVehicles] Request", url, { method: "GET" });
-
-  const res = await fetchAuthJSON(url, { method: "GET" }).catch((e) => {
-    console.error("[profileApi.listVehicles] fetch error:", e);
-    throw e;
-  });
-
-  console.debug("[profileApi.listVehicles] Raw response:", res);
-
-  const items = Array.isArray(res)
-    ? res
-    : Array.isArray(res?.items)
-    ? res.items
-    : Array.isArray(res?.Items)
-    ? res.Items
-    : res && typeof res === "object"
-    ? [res]
-    : [];
-
-  if (!Array.isArray(items) || items.length === 0) {
-    console.warn(
-      "[profileApi.listVehicles] Không có vehicle nào trong response."
-    );
-  } else {
-    console.table(
-      items.map((x) => ({
-        id: x.vehicleId ?? x.VehicleId ?? x.id ?? x.Id,
-        CustomerId: x.customerId ?? x.CustomerId,
-        CompanyId: x.companyId ?? x.CompanyId,
-        LicensePlate: x.licensePlate ?? x.LicensePlate,
-      }))
-    );
-  }
-
-  const normalized = items.map(normalizeVehicle);
-  console.debug("[profileApi.listVehicles] Normalized:", normalized);
-  return normalized;
+  return normalizeCompany(companyObj);
 };
 
-export const getVehicleById = async (id) => {
-  const url = `${API_BASE}/Vehicles/${encodeURIComponent(id)}`;
-  __logFetch("[profileApi.getVehicleById] Request", url, { method: "GET" });
-
-  const res = await fetchAuthJSON(url, { method: "GET" });
-  console.debug("[profileApi.getVehicleById] Raw response:", res);
-
-  const n = normalizeVehicle(res);
-  console.debug("[profileApi.getVehicleById] Normalized:", n);
-  return n;
-};
-
-export const createVehicle = async (payload) => {
+/**
+ * Cập nhật thông tin doanh nghiệp:
+ * body BE yêu cầu:
+ * {
+ *   CompanyId, Name, TaxCode, Email, Phone, Address, ImageUrl
+ * }
+ */
+export const updateEnterpriseInfo = async (payload = {}) => {
   const body = {
-    CustomerId: payload.customerId,
     CompanyId: payload.companyId,
-    CarMaker: payload.carMaker,
-    Model: payload.model,
-    LicensePlate: payload.licensePlate?.trim().toUpperCase(),
-    BatteryCapacity: payload.batteryCapacity,
-    CurrentSoc: payload.currentSoc,
-    ConnectorType: payload.connectorType,
-    ManufactureYear: payload.manufactureYear,
-    ImageUrl: payload.imageUrl,
-    VehicleType: payload.vehicleType,
-    Status: payload.status,
+    Name: payload.name ?? "",
+    TaxCode: payload.taxCode ?? "",
+    Email: payload.email ?? "",
+    Phone: payload.phone ?? "",
+    Address: payload.address ?? "",
+    ImageUrl: payload.imageUrl ?? "",
   };
-  const url = `${API_BASE}/Vehicles`;
-  __logFetch("[profileApi.createVehicle] Request", url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  const res = await fetchAuthJSON(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  console.debug("[profileApi.createVehicle] Raw response:", res);
-
-  const n = normalizeVehicle(res);
-  console.debug("[profileApi.createVehicle] Normalized:", n);
-  return n;
-};
-
-export const updateVehicle = async (id, payload) => {
-  const body = {
-    // Nếu BE yêu cầu cả CustomerId khi update, mở dòng dưới:
-    // CustomerId: payload.customerId,
-    CompanyId: payload.companyId,
-    CarMaker: payload.carMaker,
-    Model: payload.model,
-    LicensePlate: payload.licensePlate?.trim().toUpperCase(),
-    BatteryCapacity: payload.batteryCapacity,
-    CurrentSoc: payload.currentSoc,
-    ConnectorType: payload.connectorType,
-    ManufactureYear: payload.manufactureYear,
-    ImageUrl: payload.imageUrl,
-    VehicleType: payload.vehicleType,
-    Status: payload.status,
-  };
-  const url = `${API_BASE}/Vehicles/${encodeURIComponent(id)}`;
-  __logFetch("[profileApi.updateVehicle] Request", url, {
+  const url = `${API_BASE}/Auth/update-company`;
+  __logFetch("[profileApi.updateEnterpriseInfo]", url, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -357,64 +272,19 @@ export const updateVehicle = async (id, payload) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  console.debug("[profileApi.updateVehicle] Raw response:", res);
 
-  const n = normalizeVehicle(res);
-  console.debug("[profileApi.updateVehicle] Normalized:", n);
-  return n;
+  // Nhiều BE trả về user kèm company; cố gắng bóc company, nếu không có thì dùng body
+  const companyRaw =
+    res?.company ??
+    res?.Company ??
+    res?.message?.company ??
+    res?.Message?.Company ??
+    res ??
+    body;
+
+  return normalizeCompany(companyRaw);
 };
 
-export const deleteVehicle = async (id) => {
-  const url = `${API_BASE}/Vehicles/${encodeURIComponent(id)}`;
-  __logFetch("[profileApi.deleteVehicle] Request", url, { method: "DELETE" });
-  return fetchAuthJSON(url, { method: "DELETE" });
-};
-
-export const updateVehicleStatus = async (id, status) => {
-  const url = `${API_BASE}/Vehicles/${encodeURIComponent(id)}/status`;
-  const body = { status };
-  __logFetch("[profileApi.updateVehicleStatus] Request", url, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  return fetchAuthJSON(url, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-};
-
-export const uploadVehicleImage = async ({ id, file }, opts = {}) => {
-  const fd = new FormData();
-  fd.append("file", file);
-  if (!opts.usePathId) fd.append("vehicleId", id);
-
-  const url = opts.usePathId
-    ? `${API_BASE}/Vehicles/${encodeURIComponent(id)}/image/upload`
-    : `${API_BASE}/Vehicles/image/upload`;
-
-  console.debug("[profileApi.uploadVehicleImage] Request:", {
-    url,
-    usePathId: !!opts.usePathId,
-    hasFile: !!file,
-    vehicleId: id,
-  });
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
-    body: fd,
-  });
-
-  console.debug("[profileApi.uploadVehicleImage] Response status:", res.status);
-  if (!res.ok) throw new Error("Upload ảnh xe thất bại");
-
-  const data = await res.json().catch(() => ({}));
-  console.debug("[profileApi.uploadVehicleImage] Raw response:", data);
-
-  const n = normalizeVehicle(data);
-  console.debug("[profileApi.uploadVehicleImage] Normalized:", n);
-  return n;
-};
+/* =====================================================
+   ❌ ĐÃ GỠ CÁC API VỀ VEHICLE theo yêu cầu (không sử dụng)
+   ===================================================== */
