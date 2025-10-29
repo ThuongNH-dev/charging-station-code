@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Form, Input, Button, message } from "antd";
 import { UserOutlined, MailOutlined, LockOutlined, PhoneOutlined } from "@ant-design/icons";
 import { fetchJSON, getApiBase } from "../../utils/api";
+import MainLayout from "../../layouts/MainLayout";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE = getApiBase();
@@ -42,6 +43,7 @@ const PersonalRegister = () => {
   };
 
   return (
+    <MainLayout>
     <div
       style={{
         width: "100%",
@@ -262,6 +264,7 @@ const PersonalRegister = () => {
         </Form>
       </div>
     </div>
+    </MainLayout>
   );
 };
 
