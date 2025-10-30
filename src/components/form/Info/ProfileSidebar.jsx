@@ -40,7 +40,7 @@ export default function ProfileSidebar() {
     return [
       { to: "/profile/update-info", label: "Cập nhật thông tin" },
       { to: "/profile/vehicle-info", label: "Thông số xe" },
-      { to: "/profile/payment-info", label: "Phương thức thanh toán" },
+
       { to: "/profile/change-password", label: "Đổi mật khẩu" },
     ];
   }, [roleNorm]);

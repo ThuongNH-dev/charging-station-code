@@ -26,7 +26,7 @@ body,
 /* ===== Form chính ===== */
 .profile-main-card {
   width: 600px;
-  height: 500px;
+  height: 650px;
   background-color: #fff;
   border-radius: 12px;
   padding: px 36px;
@@ -50,7 +50,7 @@ body,
   gap: 16px;
   margin-left: 52px;
   margin-top: 25px;
-  height: 350px;
+  height: 500px;
   width: 500px;
 }
 
