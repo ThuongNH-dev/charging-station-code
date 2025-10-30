@@ -59,6 +59,7 @@ export default function StaffInfo() {
         customerId: values.customerId, // 🚀 Gửi customerId
         fullName: (values.fullName || "").trim(),
         phone: (values.phone || "").trim(),
+        email: (values.email || "").trim(),
         address: (values.address || "").trim(),
         avatarUrl: (values.avatarUrl || "").trim(),
       };
@@ -115,18 +116,18 @@ export default function StaffInfo() {
               <Button
                 type="primary"
                 htmlType="submit"
-                className="btn save"
+                className="nn btn-save"
                 loading={saving}
                 disabled={!hasStaff}
               >
-                {saving ? "Đang lưu..." : "Lưu"}
+                {saving ? "Đang lưu..." : "LƯU"}
               </Button>
               <Button
                 danger
-                className="btn cancel"
+                className="nn btn-cancel"
                 onClick={() => window.location.reload()}
               >
-                Hủy
+                HỦY
               </Button>
             </div>
           </Form>
