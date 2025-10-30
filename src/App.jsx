@@ -40,6 +40,8 @@ import VehicleInfo from "./components/updateProfilePerson/VehicleInfo";
 import PaymentMethods from "./components/updateProfilePerson/PaymentMethods";
 import ChangePassword from "./components/updateProfilePerson/ChangePassword";
 import EnterpriseInfo from "./components/updateProfileBusiness/EnterpriseInfo";
+import MonthlyStats from "./pages/company/MonthlyStats";
+import Notification from "./pages/notification/Notification";
 
 // Chuyển role thành path tương ứng
 
@@ -123,7 +125,7 @@ export default function App() {
       <Route
         path="/payment"
         element={
-          <ProtectedRoute allowedRoles={["Customer"]}>
+          <ProtectedRoute allowedRoles={["Customer","Company"]}>
             <PaymentPage />
           </ProtectedRoute>
         }
@@ -147,7 +149,7 @@ export default function App() {
       <Route
         path="/payment/invoice"
         element={
-          <ProtectedRoute allowedRoles={["Customer"]}>
+          <ProtectedRoute allowedRoles={["Customer","Company"]}>
             <PaymentInvoice />
           </ProtectedRoute>
         }
@@ -260,6 +262,14 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/company/reports"
+        element={
+          <ProtectedRoute allowedRoles={["Company"]}>
+            <MonthlyStats/>
+          </ProtectedRoute>
+        }
+        />
       {/*Staff */}
       <Route
         path="/staff/*"
@@ -284,6 +294,15 @@ export default function App() {
         <Route path="users" element={<UserManagement />} />
         <Route path="reports" element={<Reports />} />
       </Route>
+       {/*Notification */}
+       <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute allowedRoles={["Customer","Company"]}>
+            <Notification/>
+          </ProtectedRoute>
+        }
+      />
       {/* FALLBACK */}
       <Route path="*" element={<NotFound />} />
       {/* ✅ */}

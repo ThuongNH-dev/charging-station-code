@@ -540,7 +540,7 @@ export default function PaymentPage() {
           : `Thanh toán hóa đơn #${invoiceId}`,
         returnUrl: (bookingId
           ? `${window.location.origin}/payment/success?bookingId=${encodeURIComponent(bookingId)}&order=${encodeURIComponent(orderId)}`
-          : `${window.location.origin}/invoice/summary?invoiceId=${encodeURIComponent(invoiceId)}&order=${encodeURIComponent(orderId)}`
+          : `${window.location.origin}/invoiceSummary`
         )
       };
       Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);

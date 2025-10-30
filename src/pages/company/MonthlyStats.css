@@ -1,0 +1,99 @@
+.page.monthly {
+  background: #e9eef5;
+  min-height: 100vh;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: #0f1b2d;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+/* Header */
+.monthly-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.monthly-head h2 {
+  margin: 0 !important;
+  font-size: 20px;
+  font-weight: 800;
+  color: #0b4385;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.monthly-toolbar {
+  margin-left: auto;
+}
+
+/* KPI */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 16px;
+}
+.kpi-card {
+  border-radius: 16px;
+}
+.kpi-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.kpi-label {
+  font-weight: 600;
+}
+.kpi-value {
+  font-size: 22px;
+  margin-top: 6px;
+}
+
+/* Invoice */
+.invoice-panel {
+  background: #fff;
+  border: 1px solid #e6ebf3;
+  border-radius: 16px;
+  padding: 16px;
+}
+.section-title {
+  margin: 0;
+  font-size: 16px;
+}
+.center-pad {
+  padding: 20px;
+  text-align: center;
+}
+.invoice-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+.invoice-card {
+  border-radius: 12px;
+}
+
+/* Charts */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.chart-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #0f1b2d;
+}
+.chart-wrap {
+  height: 260px;              /* Quan trọng: ResponsiveContainer cần chiều cao cha */
+  width: 100%;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+  .charts-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+}
