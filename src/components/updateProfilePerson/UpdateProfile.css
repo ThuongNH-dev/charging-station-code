@@ -16,7 +16,7 @@ body,
   align-items: flex-start;
   margin-top: 40px;
   /* align-items: center; căn top */
-  gap: 138px; khoảng cách giữa sidebar và form
+  gap: 138px; /* khoảng cách giữa sidebar và form */
   padding: 10px 0; /* chỉ có khoảng cách trên dưới thôi */
   background-color: #f5f7f8;
   min-height: 100vh;
@@ -26,20 +26,23 @@ body,
 /* ===== Form chính ===== */
 .profile-main-card {
   width: 600px;
-  height: 650px;
+  /* bỏ height cố định để form tự giãn */
   background-color: #fff;
   border-radius: 12px;
-  padding: px 36px;
+  padding: 0 36px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+
+  /* tuỳ chọn: giữ form không quá nhỏ */
+  min-height: 400px;
 }
 
 .profile-main-card h3 {
   font-size: 22px;
+  color: #0b615a;
   width: max-content;
   font-weight: bold;
   margin-top: 45px;
-  margin-left: 50px;
-  /* margin: 25px auto 30px; */
+  margin-left: 14px;
 }
 
 /* ===== Bên trong form ===== */
@@ -47,19 +50,28 @@ body,
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 16px;
-  margin-left: 52px;
+  gap: 12px;
+  margin-left: 14px;
   margin-top: 25px;
-  height: 500px;
   width: 500px;
+  /* bỏ height cố định */
+  /* height: 500px; */
+  min-height: 300px; /* tuỳ chọn – giữ form không quá thấp */
+}
+
+.profile-form .field-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .profile-form label {
   font-size: 14px;
   color: #333;
-  font-weight: 900;
+  font-weight: 650;
   line-height: 22px;
-  
+  min-width: 110px; /* giữ label không đẩy input */
 }
 
 .profile-form input {
@@ -75,9 +87,29 @@ body,
   outline: none;
 }
 
+/* Input co/giãn theo nội dung (size attr) + giới hạn để không vỡ layout */
+.profile-form input.input-auto {
+  width: auto; /* theo size */
+  min-width: 220px; /* không quá nhỏ */
+  max-width: 520px; /* không vượt khung */
+}
+
+.input-disabled {
+  background: #f5f5f5;
+  color: #888;
+  cursor: not-allowed;
+}
+
+/* Lỗi dưới mỗi trường */
+.field-error {
+  margin: -6px 0 6px 120px; /* đẩy lỗi thẳng hàng dưới input (tính cả min-width label) */
+  font-size: 12px;
+  color: #c62828;
+}
+
 /* ===== Nút hành động ===== */
 .form-actions {
-  margin: 30px auto 0px;
+  margin: 24px auto 50px;
   display: flex;
   justify-content: center;
   gap: 14px;
@@ -92,23 +124,86 @@ body,
   transition: all 0.25s ease;
 }
 
+.btn {
+  display: inline-block;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px 26px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+/* === Nút Lưu (Save) === */
 .btn.save {
-  background: #111;
+  background: linear-gradient(135deg, #0b702e, #1da750);
+  border: none;
   color: #fff;
-  margin-right: 50px;
+  box-shadow: 0 3px 8px rgba(11, 112, 46, 0.25);
 }
 
 .btn.save:hover {
-  background: #222;
+  background: linear-gradient(135deg, #10b158, #22c76a);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 12px rgba(11, 112, 46, 0.3);
 }
 
+/* === Nút Hủy (Cancel) === */
 .btn.cancel {
-  background: #c0392b;
-  color: #fff;
+  background: #fff;
+  border: 1.5px solid #ccc;
+  color: #555;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
 .btn.cancel:hover {
-  background: #99231f;
+  color: #0b702e;
+  border-color: #0b702e;
+  background: #f7faf8;
+  transform: translateY(-1px);
+}
+.nn {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 20px 26px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.25s ease;
+}
+
+.nn.btn-save {
+  background: linear-gradient(135deg, #0b702e, #1da750) !important;
+  border: none;
+  color: #fff !important;
+  box-shadow: 0 3px 8px rgba(11, 112, 46, 0.25);
+  margin: 10px, 26px;
+}
+.nn.btn-save:hover {
+  background: linear-gradient(135deg, #10b158, #22c76a) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 5px 12px rgba(11, 112, 46, 0.3) !important;
+}
+
+/* === Nút Hủy (Cancel) === */
+.btn-cancel {
+  background: #fff !important;
+  border: 1.5px solid #ccc !important;
+  color: #555 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05) !important;
+}
+
+.btn-cancel:hover {
+  color: #0b702e !important;
+  border-color: #0b702e !important;
+  background: #f7faf8 !important;
+  transform: translateY(-1px);
+}
+
+/* === Khoảng cách giữa nút === */
+.btn + .btn {
+  margin-left: 12px;
 }
 
 /* ===== Thông báo nhỏ ===== */
@@ -116,4 +211,21 @@ body,
   margin-top: 12px;
   color: #0b702e;
   font-weight: 600;
+}
+
+/* Alert khung */
+.alert {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.alert-success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.alert-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
 }

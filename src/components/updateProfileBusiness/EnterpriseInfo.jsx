@@ -118,20 +118,18 @@ export default function EnterpriseInfo() {
 
             <div className="form-actions" style={{ marginTop: 24 }}>
               <Button
-                type="primary"
                 htmlType="submit"
-                className="btn save"
+                className="nn btn-save"
                 loading={saving}
                 disabled={!hasCompany}
               >
-                {saving ? "Đang lưu..." : "Lưu"}
+                {saving ? "Đang lưu..." : "LƯU"}
               </Button>
               <Button
-                danger
-                className="btn cancel"
+                className="nn btn-cancel"
                 onClick={() => window.location.reload()}
               >
-                Hủy
+                HỦY
               </Button>
             </div>
           </Form>

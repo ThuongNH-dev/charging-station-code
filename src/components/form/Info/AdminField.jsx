@@ -15,6 +15,13 @@ export default function AdminField() {
       >
         <Input />
       </Form.Item>
+      <Form.Item
+        name="email"
+        label="Email"
+        rules={[{ type: "email", message: "Email không hợp lệ" }]}
+      >
+        <Input />
+      </Form.Item>
 
       <Form.Item
         name="phone"
