@@ -1,5 +1,5 @@
 // src/components/form/Info/ProfileSidebar.jsx
-import React from "react";
+import React, { useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { UserOutlined } from "@ant-design/icons";
 import "./ProfileSidebar.css";
@@ -11,25 +11,50 @@ export default function ProfileSidebar() {
 
   const role = String(user?.role || "");
   const roleNorm = role.toLowerCase();
-  const isCompany = roleNorm === "company";
-  const isCustomer = roleNorm === "customer";
 
-  // Customer: 4 mục | Company: 2 mục (Thông tin + Đổi mật khẩu)
-  const items = isCompany
-    ? [
-        { to: "/profile/enterprise-info", label: "Thông tin doanh nghiệp" },
-        { to: "/profile/change-password", label: "Đổi mật khẩu" },
-      ]
-    : [
-        { to: "/profile/update-info", label: "Cập nhật thông tin" },
-        { to: "/profile/vehicle-info", label: "Thông số xe" },
-        { to: "/profile/payment-info", label: "Phương thức thanh toán" },
-        { to: "/profile/change-password", label: "Đổi mật khẩu" },
-      ];
-
-  // helper: active khi đường dẫn khớp đầu (để không bị mất active ở route con)
   const isActive = (to) =>
     location.pathname === to || location.pathname.startsWith(to + "/");
+
+  // Menu theo role
+  const items = useMemo(() => {
+    if (roleNorm === "staff") {
+      return [
+        { to: "/profile/staff-info", label: "Thông tin nhân viên" },
+        { to: "/profile/change-password", label: "Đổi mật khẩu" },
+      ];
+    }
+    if (roleNorm === "company") {
+      return [
+        { to: "/profile/enterprise-info", label: "Thông tin doanh nghiệp" },
+        { to: "/profile/change-password", label: "Đổi mật khẩu" },
+      ];
+    }
+    if (roleNorm === "admin") {
+      return [
+        { to: "/profile/admin-info", label: "Cập nhật thông tin" },
+        { to: "/profile/change-password", label: "Đổi mật khẩu" },
+      ];
+    }
+
+    // default: customer
+    return [
+      { to: "/profile/update-info", label: "Cập nhật thông tin" },
+      { to: "/profile/vehicle-info", label: "Thông số xe" },
+      { to: "/profile/payment-info", label: "Phương thức thanh toán" },
+      { to: "/profile/change-password", label: "Đổi mật khẩu" },
+    ];
+  }, [roleNorm]);
+
+  const roleLabel =
+    roleNorm === "company"
+      ? "Doanh nghiệp"
+      : roleNorm === "staff"
+      ? "Nhân viên"
+      : roleNorm === "admin"
+      ? "Quản trị viên"
+      : roleNorm === "customer"
+      ? "Khách hàng"
+      : role || "—";
 
   return (
     <div className="profile-sidebar">
@@ -38,9 +63,7 @@ export default function ProfileSidebar() {
           <UserOutlined style={{ fontSize: 34 }} />
         </div>
         <div className="profile-title">{user?.name || "Tài khoản"}</div>
-        <div className="profile-role">
-          {isCompany ? "Doanh nghiệp" : isCustomer ? "Khách hàng" : role || "—"}
-        </div>
+        <div className="profile-role">{roleLabel}</div>
       </div>
 
       <nav className="profile-nav">

@@ -1,10 +1,9 @@
-// ✅ src/pages/form/Info/EnterpriseField.jsx
+// ✅ src/components/form/Info/StaffField.jsx
 import React from "react";
 import { Row, Col, Form, Input, InputNumber, Typography } from "antd";
 
 const { Title } = Typography;
 
-/* ---------- Validators ---------- */
 const trim = (v) => (typeof v === "string" ? v.trim() : v);
 
 const urlValidator = async (_, v) => {
@@ -14,54 +13,36 @@ const urlValidator = async (_, v) => {
   if (!ok) throw new Error("URL phải bắt đầu bằng http:// hoặc https://");
 };
 
-const taxCodeValidator = async (_, v) => {
-  const val = trim(v) || "";
-  if (!val) throw new Error("Nhập mã số thuế");
-  // 10 hoặc 13 chữ số
-  if (!/^\d{10}(\d{3})?$/.test(val)) {
-    throw new Error("Mã số thuế phải 10 hoặc 13 chữ số");
-  }
-};
-
 const phoneValidator = async (_, v) => {
   const val = trim(v) || "";
   if (!val) throw new Error("Nhập số điện thoại");
-  // +84xxxxxxxxx... hoặc 0xxxxxxxxx...
   if (!/^(\+?84|0)\d{8,10}$/.test(val)) {
     throw new Error("SĐT không hợp lệ. Ví dụ: +84901234567 hoặc 0901234567");
   }
 };
 
-export default function EnterpriseField() {
+export default function StaffField() {
+  console.log("[DEBUG] StaffField rendered"); // ✅ Debug
+
   return (
     <>
       <Title level={5} style={{ marginBottom: 12 }}>
-        Thông tin doanh nghiệp
+        Thông tin nhân viên
       </Title>
 
-      <Row gutter={24}>
+      <Row gutter={[24, 0]}>
         <Col xs={24} md={12}>
-          <Form.Item label="Mã công ty" name="companyId">
+          <Form.Item label="Mã nhân viên" name="customerId">
             <InputNumber style={{ width: "100%" }} disabled />
           </Form.Item>
 
           <Form.Item
-            label="Tên công ty"
-            name="name"
+            label="Họ và tên"
+            name="fullName"
             normalize={trim}
-            rules={[{ required: true, message: "Nhập tên công ty" }]}
+            rules={[{ required: true, message: "Nhập họ và tên" }]}
           >
-            <Input placeholder="Công ty TNHH ABC" />
-          </Form.Item>
-
-          <Form.Item
-            label="Mã số thuế"
-            name="taxCode"
-            normalize={trim}
-            rules={[{ validator: taxCodeValidator }]}
-            tooltip="Chỉ chấp nhận 10 hoặc 13 chữ số"
-          >
-            <Input placeholder="10 hoặc 13 số" />
+            <Input placeholder="Nguyễn Văn A" />
           </Form.Item>
 
           <Form.Item
@@ -90,13 +71,13 @@ export default function EnterpriseField() {
           </Form.Item>
 
           <Form.Item
-            label="Logo / Ảnh"
-            name="imageUrl"
+            label="Avatar URL"
+            name="avatarUrl"
             normalize={trim}
             rules={[{ validator: urlValidator }]}
             tooltip="Để trống hoặc dùng link http(s) hợp lệ"
           >
-            <Input placeholder="https://example.com/logo.png" allowClear />
+            <Input placeholder="https://example.com/avatar.png" allowClear />
           </Form.Item>
         </Col>
       </Row>

@@ -1,4 +1,3 @@
-// src/App.jsx
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
@@ -15,8 +14,8 @@ import PaymentInvoice from "./components/charging/PaymentInvoice";
 import Login from "./components/login/Login";
 import Homepage from "./pages/homepage/homepage";
 import ServicePlans from "./components/subscription/ServicePlans";
-import Unauthorized from "./pages/Unauthorized"; // ✅ thêm trang này (mục 2)
-import BookingHistory from "./pages/booking/BookingHisory"; // ✅ thêm trang lịch sử đặt chỗ
+import Unauthorized from "./pages/Unauthorized";
+import BookingHistory from "./pages/booking/BookingHisory";
 import InvoicePage from "./components/charging/Invoice";
 import StaffLayout from "./layouts/StaffLayout";
 import AdminLayout from "./components/admin/layout/AdminLayout";
@@ -45,6 +44,8 @@ import Notification from "./pages/notification/Notification";
 
 // Chuyển role thành path tương ứng
 
+import StaffInfo from "./pages/updateProfileStaff/StaffInfo";
+import AdminInfo from "./pages/updateProfileAdmin/AdminInfo";
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
     case "customer":
@@ -68,8 +69,6 @@ function GuestRoute({ children }) {
 
   const from = location.state?.from?.pathname;
   const target = from || roleToPath(user.role);
-
-  // ❗ Nếu đang ở đúng target rồi, không redirect nữa (tránh loop trắng trang)
   if (location.pathname === target) return children;
 
   return <Navigate to={target} replace />;
@@ -80,8 +79,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/homepage" replace />} />
       {/* PUBLIC */}
-      <Route path="/homepage" element={<Homepage />} />{" "}
-      {/* ✅ KHÔNG bọc GuestRoute */}
+      <Route path="/homepage" element={<Homepage />} />
       <Route path="/register/select" element={<RegisterSelect />} />
       <Route path="/register/personal" element={<PersonalRegister />} />
       <Route path="/register/business" element={<BusinessRegister />} />
@@ -96,7 +94,8 @@ export default function App() {
           </GuestRoute>
         }
       />
-      <Route path="/unauthorized" element={<Unauthorized />} /> {/* ✅ */}
+      <Route path="/unauthorized" element={<Unauthorized />} />
+
       {/* PROTECTED (Customer) */}
       <Route
         path="/stations"
@@ -186,6 +185,8 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* Invoices & Services */}
       <Route
         path="/invoice"
         element={
@@ -218,9 +219,46 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route path="/profile/enterprise-info" element={<EnterpriseInfo />} />
-      {/* Profile (Customer) */}
-      <Route path="/profile/update-info" element={<UpdateInfo />} />
+
+      {/* ✅ Profile (Admin) */}
+      <Route
+        path="/profile/admin-info"
+        element={
+          <ProtectedRoute allowedRoles={["Admin"]}>
+            <AdminInfo />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ✅ Profile (Company) – HÌNH 2 */}
+      <Route
+        path="/profile/enterprise-info"
+        element={
+          <ProtectedRoute allowedRoles={["Company"]}>
+            <EnterpriseInfo />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ✅ Profile (Staff) */}
+      <Route
+        path="/profile/staff-info"
+        element={
+          <ProtectedRoute allowedRoles={["Staff"]}>
+            <StaffInfo />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* ✅ Profile (Customer) – HÌNH 3 */}
+      <Route
+        path="/profile/update-info"
+        element={
+          <ProtectedRoute allowedRoles={["Customer"]}>
+            <UpdateInfo />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/profile/vehicle-info"
         element={
@@ -240,12 +278,15 @@ export default function App() {
       <Route
         path="/profile/change-password"
         element={
-          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
+          <ProtectedRoute
+            allowedRoles={["Customer", "Company", "Staff", "Admin"]}
+          >
             <ChangePassword />
           </ProtectedRoute>
         }
       />
-      {/*Company */}
+
+      {/* Company */}
       <Route
         path="/company"
         element={
@@ -271,6 +312,8 @@ export default function App() {
         }
         />
       {/*Staff */}
+
+      {/* Staff */}
       <Route
         path="/staff/*"
         element={
@@ -279,6 +322,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
       {/* Admin */}
       <Route
         path="admin"
@@ -288,7 +332,6 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        {/* LƯU Ý: path con là tương đối, KHÔNG dùng "/admin/..." */}
         <Route index element={<StationManagement />} />
         <Route path="stations" element={<StationManagement />} />
         <Route path="users" element={<UserManagement />} />
@@ -303,9 +346,9 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+
       {/* FALLBACK */}
       <Route path="*" element={<NotFound />} />
-      {/* ✅ */}
     </Routes>
   );
 }
