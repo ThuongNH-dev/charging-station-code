@@ -50,8 +50,8 @@ export default function PersonalRegister() {
   return (
     <MainLayout>
       <div className="personal-register">
-        <div className="personal-container">
-          <h2 className="personal-title">Đăng ký cá nhân</h2>
+        <div className="register-card">
+          <h2 className="register-title">Đăng ký cá nhân</h2>
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">

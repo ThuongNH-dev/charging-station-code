@@ -1,115 +1,97 @@
-/* ====== TOÀN TRANG ====== */
 .business-register {
   position: relative;
   min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  overflow: hidden;
   isolation: isolate;
+  overflow: hidden;
 }
 
-/* Ảnh nền phủ mờ phía sau */
 .business-register::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: 
-    linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)),
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.35)),
     url("/Parking_lotV4.png") center / cover no-repeat;
   filter: brightness(0.9);
   transform: scale(1.05);
+  pointer-events: none;
 }
 
-/* ====== FORM CONTAINER ====== */
-.register-container.single-column {
-  background: rgba(255, 255, 255, 0.95);
+.register-container {
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 16px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
-  padding: 40px;
-  width: 100%;
-  max-width: 500px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(6px);
-  animation: fadeInUp 0.5s ease-out;
+  padding: 40px 50px;
+  width: 100%;
+  max-width: 600px;
+  animation: fadeInUp 0.5s ease;
 }
 
-/* Hiệu ứng xuất hiện */
+.form-title {
+  text-align: center;
+  color: #dcdcdcff;
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  color: #dcdcdcff;
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.form-group input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.form-group input::placeholder {
+  color: #aaa;
+}
+
+.checkbox {
+  color: #dcdcdcff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.primary-btn {
+  margin-top: 20px;
+  width: 100%;
+  background: #dcdcdcff;
+  color: #111;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.primary-btn:hover {
+  background: #fff;
+}
+
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(40px);
+    transform: translateY(30px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-/* ====== TIÊU ĐỀ ====== */
-.form-title {
-  text-align: center;
-  font-size: 26px;
-  font-weight: 700;
-  color: #0f172a;
-  margin-bottom: 24px;
-}
-
-/* ====== FORM ====== */
-.register-form.single {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.form-group label {
-  font-weight: 600;
-  color: #334155;
-  margin-bottom: 6px;
-  display: block;
-}
-
-.form-group input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  outline: none;
-  background-color: #fff;
-  transition: all 0.2s ease;
-  font-size: 15px;
-}
-.form-group input:focus {
-  border-color: #0f766e;
-  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.2);
-}
-
-/* ====== CHECKBOX ====== */
-.checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: #475569;
-}
-
-/* ====== NÚT ĐĂNG KÝ ====== */
-.primary-btn {
-  width: 100%;
-  background-color: #0f766e;
-  color: white;
-  font-weight: 600;
-  border: none;
-  border-radius: 8px;
-  padding: 12px;
-  margin-top: 10px;
-  cursor: pointer;
-  transition: background-color 0.25s ease;
-}
-.primary-btn:hover {
-  background-color: #0b615a;
-}
-.primary-btn:disabled {
-  background: #aaa;
-  cursor: not-allowed;
 }

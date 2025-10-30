@@ -63,7 +63,7 @@ export default function BusinessRegister() {
   return (
     <MainLayout>
       <div className="business-register">
-        <div className="register-container single-column">
+        <div className="register-container">
           <h1 className="form-title">Đăng ký doanh nghiệp</h1>
 
           <form className="register-form single" onSubmit={handleSubmit}>
