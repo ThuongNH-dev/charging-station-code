@@ -235,9 +235,9 @@ export default function HistoryPage() {
   const goDetail = (row) => {
     const qs = new URLSearchParams();
     if (row.bookingId) qs.set("bookingId", String(row.bookingId));
-    if (row._orderId) qs.set("order", String(row._orderId));
     navigate(`/payment/success?${qs.toString()}`);
   };
+
 
   const onPay = async (row) => {
     try {

@@ -55,24 +55,33 @@ const pillClass = (status) => {
 };
 
 // ---- Subscription normalize (format 199,000 đ nếu BE trả 199) ----
+// ---- Subscription normalize (đọc được cả {plan:{...}} lẫn {subscriptionPlan:{...}})
 function normalizeSubscription(s) {
   if (!s) return null;
-  const plan = s.subscriptionPlan || {};
-  const rawPrice = Number(plan.priceMonthly ?? s.priceMonthly ?? 0) || 0;
+  // API có thể trả "plan" hoặc "subscriptionPlan"
+  const plan = s.plan || s.subscriptionPlan || {};
+
+  // Giá: BE có thể trả 199 → chuẩn hoá thành 199000
+  const rawPrice =
+    Number(plan.priceMonthly ?? s.priceMonthly ?? 0) || 0;
   const priceMonthly = rawPrice >= 1000 ? rawPrice : rawPrice * 1000;
 
   return {
     subscriptionId: s.subscriptionId ?? s.id ?? null,
-    planId: s.subscriptionPlanId ?? plan.subscriptionPlanId ?? null,
+    planId: s.subscriptionPlanId ?? plan.subscriptionPlanId ?? plan.id ?? null,
     planName: plan.planName ?? s.planName ?? null,
-    planCategory: plan.category ?? null,
+    planCategory: plan.category ?? plan.planCategory ?? null,
+
     priceMonthly,
     discountPercent: Number(plan.discountPercent ?? s.discountPercent ?? 0) || 0,
     freeIdleMinutes: Number(plan.freeIdleMinutes ?? s.freeIdleMinutes ?? 0) || 0,
     benefits: plan.benefits ?? null,
-    isForCompany: !!plan.isForCompany,
-    billingCycle: s.billingCycle ?? null,
+    isForCompany: !!(plan.isForCompany ?? s.isForCompany),
+
+    // Nếu BE không trả, mặc định Monthly để UI có chữ
+    billingCycle: s.billingCycle || "Monthly",
     autoRenew: !!s.autoRenew,
+
     startDate: s.startDate ?? null,
     endDate: s.endDate ?? s.nextBillingDate ?? null,
     nextBillingDate: s.nextBillingDate ?? s.endDate ?? null,
@@ -80,14 +89,22 @@ function normalizeSubscription(s) {
   };
 }
 
+
 // >>> Quy tắc chọn loại invoice: ưu tiên Charging nếu có sessions
 function pickInvoiceType(inv) {
   const hasSessions = Array.isArray(inv?.chargingSessions) && inv.chargingSessions.length > 0;
   if (hasSessions) return "charging";
+
   const sub = inv?.subscription;
   const hasSub =
     !!(inv?.subscriptionId || inv?.isMonthlyInvoice) ||
-    !!(sub && (sub.subscriptionId || sub.subscriptionPlanId || sub.planName));
+    !!(sub && (
+      sub.subscriptionId ||
+      sub.subscriptionPlanId ||
+      sub.planName ||
+      sub?.plan?.planName // <— thêm dòng này
+    ));
+
   return hasSub ? "subscription" : "charging";
 }
 
@@ -690,7 +707,6 @@ export default function InvoiceDetail() {
             <div className="ivp-meta" style={{ display: "flex", flexWrap: "wrap", gap: "18px 28px" }}>
               <div>
                 Gói: <b>{invoice?.subscription?.planName || "—"}</b>{" "}
-                ({invoice?.subscription?.planCategory || "—"})
               </div>
               <div>
                 Chu kỳ: <b>{invoice?.subscription?.billingCycle || "—"}</b>{" "}

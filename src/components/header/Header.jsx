@@ -1,48 +1,62 @@
-import React from "react";
-import { Layout, Button, Tooltip, Dropdown, Badge } from "antd";
+import React, { useEffect, useMemo, useState } from "react";
+import { Layout, Button, Tooltip, Dropdown, Badge, List, Avatar } from "antd";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import AccountMenu from "../others/Menu";
-import { FileSearchOutlined, FileTextOutlined, BellOutlined } from "@ant-design/icons";
-import { getApiBase } from "../../utils/api";           // 👈 thêm
+import {
+  FileSearchOutlined,
+  FileTextOutlined,
+  BellOutlined,
+} from "@ant-design/icons";
+import { getApiBase } from "../../utils/api";
+import dayjs from "dayjs";
+import relativeTime from "dayjs/plugin/relativeTime";
+import "dayjs/locale/vi";
 import "./Header.css";
+
+dayjs.extend(relativeTime);
+dayjs.locale("vi");
 
 const { Header } = Layout;
 const RAW_BASE = (getApiBase() || "").replace(/\/+$/, "");
 const API_BASE = RAW_BASE.endsWith("/api") ? RAW_BASE : `${RAW_BASE}/api`;
 
-
-// ---- Helpers: cố gắng lấy token và id an toàn ----
+/* ===== Helpers ===== */
 function getTokenFromAnywhere(authUser) {
   if (authUser?.token) return authUser.token;
   try {
-    const u = JSON.parse(localStorage.getItem("user") || sessionStorage.getItem("user") || "null");
+    const u = JSON.parse(
+      localStorage.getItem("user") ||
+      sessionStorage.getItem("user") ||
+      "null"
+    );
     return u?.token || null;
   } catch {
     return null;
   }
 }
 function getCustomerId(user) {
-  return user?.id || user?.userId || user?.customerId || user?.accountId || null;
+  return (
+    user?.id || user?.userId || user?.customerId || user?.accountId || null
+  );
 }
 function getCompanyId(user) {
   return user?.companyId || user?.company?.id || null;
 }
-
-// Lấy timestamp/dấu mốc từ 1 notification (ưu tiên trường thời gian)
 function getNotiTime(n) {
-  // 1) các tên phổ biến
   const t =
-    n?.createdAt || n?.createdDate || n?.createdOn ||
-    n?.createTime || n?.timestamp ||
-    n?.updatedAt || n?.time || n?.date;
-
+    n?.createdAt ||
+    n?.createdDate ||
+    n?.createdOn ||
+    n?.createTime ||
+    n?.timestamp ||
+    n?.updatedAt ||
+    n?.time ||
+    n?.date;
   if (t) {
     const d = new Date(t);
     if (!isNaN(d.getTime())) return d.getTime();
   }
-
-  // 2) quét mọi key có chữ date/time/at
   try {
     for (const k of Object.keys(n || {})) {
       if (/(date|time|at)$/i.test(k)) {
@@ -51,19 +65,16 @@ function getNotiTime(n) {
       }
     }
   } catch { }
-
-  // 3) fallback theo id tăng dần
   if (typeof n?.id === "number") return n.id;
-
   return 0;
 }
 
-
-
+/* ===== Component ===== */
 export default function Head() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, user, userRole: ctxRole, userName: ctxName } = useAuth();
+  const { isAuthenticated, user, userRole: ctxRole, userName: ctxName } =
+    useAuth();
 
   const role = (user?.role || ctxRole || "").toLowerCase();
   const isStaff = role === "staff";
@@ -74,13 +85,14 @@ export default function Head() {
 
   const showBell = isAuthenticated && !isAdmin && !isStaff;
 
-  const [hasNew, setHasNew] = React.useState(false); // có thông báo mới?
-  const [latestMark, setLatestMark] = React.useState(0); // mốc mới nhất hiện có
+  const [hasNew, setHasNew] = useState(false);
+  const [latestMark, setLatestMark] = useState(0);
+  const [notifications, setNotifications] = useState([]);
 
-  const token = React.useMemo(() => getTokenFromAnywhere(user), [user]);
+  const token = useMemo(() => getTokenFromAnywhere(user), [user]);
 
-  // ---- Kiểm tra có thông báo MỚI (không phụ thuộc read/unread) ----
-  React.useEffect(() => {
+  /* ---- Load/poll notifications ---- */
+  useEffect(() => {
     if (!showBell || !token) return;
 
     let timerId;
@@ -113,41 +125,33 @@ export default function Head() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
 
-        const list = Array.isArray(data) ? data : (data?.items || []);
-        if (!Array.isArray(list) || list.length === 0) {
+        const list = Array.isArray(data) ? data : data?.items || [];
+        setNotifications(list);
+
+        if (!list.length) {
           setHasNew(false);
           setLatestMark(0);
           return;
         }
 
-        // mốc mới nhất
         const latest = list.reduce((m, n) => Math.max(m, getNotiTime(n)), 0);
         setLatestMark(latest);
 
-        // nếu chưa từng xem => có data là hiện chấm
         const raw = localStorage.getItem(storageKey);
         const lastSeen = raw ? Number(raw) : 0;
 
-        if (!raw) {
-          setHasNew(true);
-        } else {
-          setHasNew(latest > lastSeen);
-        }
-
+        setHasNew(!raw || latest > lastSeen);
       } catch (e) {
-        // console.error("Error loading notifications:", e);
+        // console.error(e);
       }
     };
 
     loadHasNew();
-    // Poll nhẹ mỗi 45s
     timerId = setInterval(loadHasNew, 45000);
     return () => clearInterval(timerId);
   }, [showBell, token, isCustomer, isCompany, user]);
 
-
-
-  // ====== NAV ITEMS ======
+  /* ===== NAV items ===== */
   const items = isStaff
     ? [
       { key: "s1", label: "Quản lý trụ sạc", path: "/staff/stations" },
@@ -187,7 +191,6 @@ export default function Head() {
     else if (path === "/") activeKey = "1";
   }
 
-  // Dropdowns
   const danhMucMenuItems = [
     { key: "dm-1", label: "Tìm trạm sạc", onClick: () => navigate("/stations") },
     { key: "dm-2", label: "Phiên sạc", onClick: () => navigate("/charging/start") },
@@ -197,6 +200,7 @@ export default function Head() {
     { key: "rl-2", label: "Thống kê theo tháng", onClick: () => navigate("/company/reports") },
   ];
 
+  /* ===== Right cluster ===== */
   const renderRight = () => {
     if (!isAuthenticated) {
       return (
@@ -215,38 +219,86 @@ export default function Head() {
       <div className="header-right">
         {isCustomer && (
           <Tooltip title="Phiên đặt chỗ">
-            <FileSearchOutlined className="history-icon" onClick={() => navigate("/user/history")} />
+            <FileSearchOutlined
+              className="history-icon"
+              onClick={() => navigate("/user/history")}
+            />
           </Tooltip>
         )}
 
         {(isCustomer || isCompany) && (
           <Tooltip title="Hóa đơn phiên sạc">
-            <FileTextOutlined className="invoice-icon" onClick={() => navigate("/invoiceSummary")} />
+            <FileTextOutlined
+              className="invoice-icon"
+              onClick={() => navigate("/invoiceSummary")}
+            />
           </Tooltip>
         )}
 
         {showBell && (
-          <Tooltip title="Thông báo">
+          <Dropdown
+            trigger={["click"]}
+            placement="bottomRight"
+            overlayClassName="noti-dropdown"
+            dropdownRender={() => (
+              <div className="noti-panel">
+                <div className="noti-header">Thông báo</div>
+
+                {notifications.length === 0 ? (
+                  <div className="noti-empty">Không có thông báo mới</div>
+                ) : (
+                  <List
+                    // hiển thị đúng 4 tin, không cuộn
+                    dataSource={notifications.slice(0, 4)}
+                    renderItem={(item, idx) => (
+                      <List.Item className={`noti-item ${idx === 0 ? "first" : ""}`}>
+                        <div className="noti-content">
+                          <div className="noti-title">
+                            {item.title || item.message || "Thông báo"}
+                          </div>
+                          <div className="noti-time">
+                            {dayjs(item.createdAt || item.timestamp || item.date).fromNow()}
+                          </div>
+                        </div>
+                      </List.Item>
+                    )}
+                  />
+                )}
+
+                <div
+                  className="noti-footer"
+                  onClick={() => {
+                    navigate("/notifications");
+                    try {
+                      if (isCustomer) {
+                        const cid = getCustomerId(user);
+                        if (cid)
+                          localStorage.setItem(
+                            `NOTI_LAST_SEEN_CUSTOMER_${cid}`,
+                            String(latestMark || Date.now())
+                          );
+                      } else if (isCompany) {
+                        const compId = getCompanyId(user);
+                        if (compId)
+                          localStorage.setItem(
+                            `NOTI_LAST_SEEN_COMPANY_${compId}`,
+                            String(latestMark || Date.now())
+                          );
+                      }
+                    } catch { }
+                    setHasNew(false);
+                  }}
+                >
+                  Xem tất cả
+                </div>
+              </div>
+            )}
+          >
             <Badge dot={hasNew} offset={[-2, 2]}>
-              <BellOutlined
-                className="bell-icon"
-                onClick={() => {
-                  navigate("/notifications");
-                  // Đánh dấu đã xem đến mốc mới nhất, để lần sau chỉ hiện khi có cái mới hơn
-                  try {
-                    if (isCustomer) {
-                      const cid = getCustomerId(user);
-                      if (cid) localStorage.setItem(`NOTI_LAST_SEEN_CUSTOMER_${cid}`, String(latestMark || Date.now()));
-                    } else if (isCompany) {
-                      const compId = getCompanyId(user);
-                      if (compId) localStorage.setItem(`NOTI_LAST_SEEN_COMPANY_${compId}`, String(latestMark || Date.now()));
-                    }
-                  } catch { }
-                  setHasNew(false);
-                }}
-              />
+              <BellOutlined className="bell-icon" />
             </Badge>
-          </Tooltip>
+          </Dropdown>
+
         )}
 
         <AccountMenu />
@@ -272,10 +324,14 @@ export default function Head() {
                       <Dropdown
                         trigger={["hover", "click"]}
                         placement="bottom"
-                        menu={{ items: danhMucMenuItems, onClick: ({ domEvent }) => domEvent.stopPropagation() }}
+                        menu={{
+                          items: danhMucMenuItems,
+                          onClick: ({ domEvent }) => domEvent.stopPropagation(),
+                        }}
                       >
                         <div
-                          className={`nav-item ${activeKey === item.key ? "active" : ""} nav-dropdown`}
+                          className={`nav-item ${activeKey === item.key ? "active" : ""
+                            } nav-dropdown`}
                           onClick={(e) => e.preventDefault()}
                         >
                           {item.label} <span className="caret">▾</span>
@@ -291,10 +347,14 @@ export default function Head() {
                       <Dropdown
                         trigger={["hover", "click"]}
                         placement="bottom"
-                        menu={{ items: quanLyNguonLucItems, onClick: ({ domEvent }) => domEvent.stopPropagation() }}
+                        menu={{
+                          items: quanLyNguonLucItems,
+                          onClick: ({ domEvent }) => domEvent.stopPropagation(),
+                        }}
                       >
                         <div
-                          className={`nav-item ${activeKey === item.key ? "active" : ""} nav-dropdown`}
+                          className={`nav-item ${activeKey === item.key ? "active" : ""
+                            } nav-dropdown`}
                           onClick={(e) => e.preventDefault()}
                         >
                           {item.label} <span className="caret">▾</span>
@@ -306,7 +366,11 @@ export default function Head() {
 
                 return (
                   <li key={item.key}>
-                    <div className={`nav-item ${activeKey === item.key ? "active" : ""}`} onClick={() => navigate(item.path)}>
+                    <div
+                      className={`nav-item ${activeKey === item.key ? "active" : ""
+                        }`}
+                      onClick={() => navigate(item.path)}
+                    >
                       {item.label}
                     </div>
                   </li>

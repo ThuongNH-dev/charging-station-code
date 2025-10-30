@@ -262,3 +262,27 @@
     line-height: 30px;
   }
 }
+
+/* Bỏ mọi cuộn nội bộ, để trang tự cuộn */
+.page.notifications,
+.noti-container,
+.noti-list,
+.noti-list .ant-spin-nested-loading,
+.noti-list .ant-spin-container,
+.noti-list .ant-list,
+.noti-list .ant-list-items {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+/* Nếu trước đó có đặt chiều cao cố định cho panel bên phải */
+.noti-side { overflow: visible; }
+
+/* (tuỳ chọn) tạo khoảng cách giữa các item thay vì lệ thuộc cuộn */
+.noti-list .ant-list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+

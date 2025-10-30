@@ -27,7 +27,7 @@
   gap: 32px;
 }
 
-/* Logo vừa với header 64px */
+/* Logo vừa với header 64px (nếu muốn nhỏ hơn thì giảm height) */
 .logo {
   height: 100px;
   width: auto;
@@ -61,7 +61,8 @@
 .nav-item::after {
   content: "";
   position: absolute;
-  left: 0; right: 0;
+  left: 0;
+  right: 0;
   bottom: 0;
   height: 2px;
   background-color: var(--head-main);
@@ -74,15 +75,28 @@
 .nav-item:hover {
   color: var(--head-main);
 }
+
 .nav-item:hover::after {
   transform: scaleX(1);
 }
+
 .nav-item.active {
   color: var(--head-main);
   font-weight: 600;
 }
+
 .nav-item.active::after {
   transform: scaleX(1);
+}
+
+.nav .nav-dropdown .caret {
+  margin-left: 6px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.nav .nav-item.active.nav-dropdown .caret {
+  opacity: 1;
 }
 
 /* Right cluster */
@@ -92,7 +106,29 @@
   gap: 12px;
 }
 
-/* Outline button style (không phá antd, chỉ override nhẹ) */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.history-icon,
+.invoice-icon,
+.bell-icon {
+  font-size: 26px;
+  color: #000;
+  cursor: pointer;
+  transition: color .2s ease, transform .15s ease;
+}
+
+.history-icon:hover,
+.invoice-icon:hover,
+.bell-icon:hover {
+  color: #006d32;
+  transform: scale(1.06);
+}
+
+/* Outline button */
 .btn-outline {
   border: 1px solid var(--head-main) !important;
   color: var(--head-main) !important;
@@ -109,67 +145,214 @@
   border-color: var(--head-main) !important;
 }
 
-/* User chip */
-.user-chip {
-  color: var(--head-text);
-  font-weight: 500;
-}
-
-/* Responsive nhỏ gọn */
+/* Responsive */
 @media (max-width: 768px) {
-  .nav { gap: 18px; font-size: 15px; }
-  .logo { height: 30px; }
+  .nav {
+    gap: 18px;
+    font-size: 15px;
+  }
+
+  .logo {
+    height: 32px;
+  }
 }
 
 @media (max-width: 560px) {
-  .nav { display: none; } /* Ẩn menu khi quá hẹp, có thể thay bằng Drawer sau */
+  .nav {
+    display: none;
+  }
 }
 
-.header-right {
+/* =========================
+   Notification dropdown (compact)
+   ========================= */
+.noti-dropdown {
+  width: 260px;
+}
+
+.noti-panel {
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+  overflow: hidden;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.noti-header {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 18px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #f9fafb;
+}
+
+.noti-empty {
+  padding: 18px;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+}
+
+.noti-list {
+  max-height: 240px;
+  overflow: auto;
+}
+
+.noti-item {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background .15s ease;
 }
 
-.history-icon {
-  font-size: 33px;
-  color: rgb(0, 0, 0);
-  cursor: pointer;
-  transition: color 0.2s ease, transform 0.15s ease;
+.noti-item+.noti-item {
+  border-top: 1px solid #f5f5f5;
 }
 
-.history-icon:hover {
-  color: #006d32;
-  transform: scale(1.1);
+.noti-item:hover {
+  background: #f6f7fb;
 }
 
-.invoice-icon {
-  font-size: 31px;
-  color: rgb(0, 0, 0);
-  cursor: pointer;
-  transition: color 0.2s ease, transform 0.15s ease;
+.noti-content {
+  flex: 1;
+  min-width: 0;
 }
-.bell-icon{
-  font-size: 33px;
-  color: rgb(0, 0, 0);
-  cursor: pointer;
-  transition: color 0.2s ease, transform 0.15s ease;
-}
-.bell-icon:hover{
-  color: #006d32;
-  transform: scale(1.1);
-}
-.invoice-icon:hover {
-  color: #006d32;
-  transform: scale(1.1);
-}
-.nav .nav-dropdown .caret {
-  margin-left: 6px;
+
+/* Tiêu đề nhỏ gọn theo yêu cầu */
+.noti-title {
   font-size: 12px;
-  opacity: 0.7;
-}
-.nav .nav-item.active.nav-dropdown .caret {
-  opacity: 1;
+  /* nhỏ lại */
+  line-height: 16px;
+  /* gọn chiều cao */
+  font-weight: 500;
+  /* bớt đậm */
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: 10px !important;
 }
 
+.noti-time {
+  font-size: 11px;
+  color: #8b8f98;
+  margin-top: 2px;
+  margin-left: 10px !important;
+}
 
+.noti-footer {
+  text-align: center;
+  padding: 8px 10px;
+  border-top: 1px solid #f0f0f0;
+  color: #0b5ed7;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+
+.noti-footer:hover {
+  background: #eef4ff;
+}
+
+.noti-title {
+  font-size: 14px !important;
+  /* ↓ nhỏ hơn (trước là 14px) */
+  line-height: 16px;
+  /* gọn chiều cao hơn */
+  font-weight: 500 !important;
+  /* giảm độ đậm */
+  color: #1f2937;
+  /* màu xám đậm, không đen hẳn */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* === Notification dropdown (4 items, no scroll) === */
+.noti-dropdown {
+  width: 280px;
+}
+
+.noti-panel {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.15);
+  border: 1px solid #eef2f7;
+  /* viền mảnh cho sắc nét */
+  overflow: hidden;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.noti-header {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 18px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #f8fafc, #f6f7fb);
+  border-bottom: 1px solid #eef2f7;
+}
+
+.noti-empty {
+  padding: 18px;
+  text-align: center;
+  color: #8b8f98;
+  font-size: 13px;
+}
+
+/* Item + divider */
+.noti-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background .15s ease;
+  border-top: 1px solid #eef2f7;
+  /* divider giữa các tin */
+}
+
+.noti-item.first {
+  border-top: none;
+}
+
+/* bỏ divider dòng đầu */
+.noti-item:hover {
+  background: #f7f9fc;
+}
+
+.noti-content {
+  min-width: 0;
+}
+
+.noti-title {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.noti-time {
+  font-size: 11px;
+  color: #8b8f98;
+  margin-top: 2px;
+}
+
+/* Footer */
+.noti-footer {
+  text-align: center;
+  padding: 10px 12px;
+  border-top: 1px solid #eef2f7;
+  color: #0b5ed7;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+
+.noti-footer:hover {
+  background: #eef4ff;
+}

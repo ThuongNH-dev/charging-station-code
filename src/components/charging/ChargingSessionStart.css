@@ -1,18 +1,18 @@
 /* ===== Layout tổng ===== */
 .cs-root {
   --card-bg: #fff;
-  --card-bd: #e8e8e8;
-  --muted: #6b7280;
-  --muted-2: #9ca3af;
-  --brand: #0b7a6f;         /* xanh ngọc đậm cho tiêu đề */
-  --pill-bg: #f6f8fa;       /* nền nhạt cho tiêu đề khối con */
+  --card-bd: #dceeea;
+  --muted: #5d6e68;
+  --muted-2: #8ea9a3;
+  --brand: #6dbab3;          /* 🌿 xanh ngọc sáng */
+  --pill-bg: #e9f8f6;        /* nền nhạt xanh ngọc */
   --radius-lg: 14px;
   --radius-md: 12px;
 
   padding: 20px;
   display: grid;
   gap: 20px;
-  max-width: 920px;         /* canh giữa & giới hạn dòng */
+  max-width: 920px;
   margin: 0 auto;
 }
 
@@ -22,7 +22,7 @@
   border: 1px solid var(--card-bd);
   border-radius: var(--radius-lg);
   padding: 16px;
-  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.05);
+  box-shadow: 0 6px 18px rgba(109, 186, 179, 0.08);
 }
 
 /* Tiêu đề phần lớn */
@@ -33,22 +33,22 @@
   color: var(--brand);
 }
 
-/* ===== Card con (Trạm sạc / Trụ sạc) ===== */
+/* ===== Card con ===== */
 .cs-subcard {
-  border: 1px dashed #ebedf0;
+  border: 1px dashed #cde5e1;
   border-radius: var(--radius-md);
   padding: 12px;
   margin-bottom: 12px;
   background: #fff;
 }
 
-/* Thanh tiêu đề nhánh – dạng pill */
+/* Thanh tiêu đề nhánh */
 .cs-subtitle {
   display: inline-block;
   padding: 6px 10px;
   border-radius: 999px;
   background: var(--pill-bg);
-  color: #111827;
+  color: #075e55;
   font-weight: 700;
   margin-bottom: 10px;
 }
@@ -74,7 +74,7 @@
 .cs-value {
   font-weight: 700;
   color: #111827;
-  text-align: right;          /* value canh phải giống ảnh */
+  text-align: right;
   word-break: break-word;
 }
 
@@ -84,7 +84,7 @@
   border: 1px solid var(--card-bd);
   border-radius: var(--radius-lg);
   padding: 16px;
-  box-shadow: 0 6px 18px rgba(16, 24, 40, 0.05);
+  box-shadow: 0 6px 18px rgba(109, 186, 179, 0.08);
 }
 
 .cs-input-label {
@@ -101,27 +101,63 @@
   gap: 12px;
 }
 
-/* Tăng bo tròn cho Ant Input trong khối này */
+/* Bo tròn input */
 .cs-start .ant-input-affix-wrapper,
 .cs-start .ant-input,
 .cs-start .ant-input-lg {
   border-radius: 12px !important;
+  transition: all 0.2s;
 }
 
-/* Nút primary xanh ngọc nhạt – chỉ áp trong khối start */
-.cs-start .ant-btn-primary {
-  background: #6dbab3;
-  border-color: #6dbab3;
+/* Viền input khi focus xanh ngọc */
+.cs-start .ant-input:focus,
+.cs-start .ant-input-focused,
+.cs-start .ant-input-affix-wrapper-focused {
+  border-color: #6dbab3 !important;
+  box-shadow: 0 0 0 2px rgba(109, 186, 179, 0.25) !important;
+}
+
+/* ===== Nút xanh ngọc chuẩn như hình ===== */
+.cs-btn-green.ant-btn,
+.cs-btn-green.ant-btn-primary {
+  background: #6dbab3 !important;
+  border-color: #6dbab3 !important;
+  color: #fff !important;
   border-radius: 12px;
   padding: 8px 16px;
+  font-weight: 600;
   box-shadow: 0 4px 12px rgba(109, 186, 179, 0.35);
-}
-.cs-start .ant-btn-primary:hover,
-.cs-start .ant-btn-primary:focus {
-  filter: brightness(0.95);
+  transition: all 0.2s ease;
 }
 
-/* Hints dưới input */
+/* Hover & focus */
+.cs-btn-green.ant-btn:hover,
+.cs-btn-green.ant-btn:focus,
+.cs-btn-green.ant-btn-primary:hover,
+.cs-btn-green.ant-btn-primary:focus {
+  background: #5aa8a0 !important;
+  border-color: #5aa8a0 !important;
+  box-shadow: 0 4px 14px rgba(90, 168, 160, 0.45);
+}
+
+/* Active */
+.cs-btn-green.ant-btn:active,
+.cs-btn-green.ant-btn-primary:active {
+  background: #4a958f !important;
+  border-color: #4a958f !important;
+  box-shadow: 0 2px 8px rgba(74, 149, 143, 0.4);
+}
+
+/* Disabled */
+.cs-btn-green.ant-btn[disabled],
+.cs-btn-green.ant-btn:disabled {
+  background: #b7e0dc !important;
+  border-color: #b7e0dc !important;
+  color: #3f5f5c !important;
+  box-shadow: none !important;
+}
+
+/* Hints */
 .cs-hints {
   margin-top: 10px;
   color: var(--muted);
@@ -131,9 +167,11 @@
 .cs-hint {
   text-decoration: underline;
   cursor: pointer;
+  color: #3a8f87;
 }
 .cs-hint:hover {
   text-decoration: none;
+  color: #2f7b73;
 }
 
 .cs-dot {
@@ -146,7 +184,7 @@
     grid-template-columns: 120px 1fr;
   }
   .cs-value {
-    text-align: left;        /* mobile đọc dễ hơn */
+    text-align: left;
   }
   .cs-root {
     padding: 16px;

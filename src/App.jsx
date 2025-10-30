@@ -121,7 +121,7 @@ export default function App() {
       <Route
         path="/payment"
         element={
-          <ProtectedRoute allowedRoles={["Customer"]}>
+          <ProtectedRoute allowedRoles={["Customer","Company"]}>
             <PaymentPage />
           </ProtectedRoute>
         }
@@ -145,7 +145,7 @@ export default function App() {
       <Route
         path="/payment/invoice"
         element={
-          <ProtectedRoute allowedRoles={["Customer"]}>
+          <ProtectedRoute allowedRoles={["Customer","Company"]}>
             <PaymentInvoice />
           </ProtectedRoute>
         }
