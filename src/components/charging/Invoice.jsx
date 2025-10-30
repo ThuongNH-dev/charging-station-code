@@ -17,7 +17,7 @@ export default function InvoicePage() {
 
   // ==== Lấy data BE trả về từ nhiều nguồn một cách "chịu đựng" ====
   const endData = useMemo(() => {
-    // 1) location.state: có thể là { message, data }, hoặc { data: {...} }, hoặc để thẳng {...}
+    // 1) location.state
     if (state) {
       if (state.data && (state.data.energyKwh || state.data.total || state.data.endedAt)) {
         return state.data;
@@ -25,13 +25,12 @@ export default function InvoicePage() {
       if (state.energyKwh || state.total || state.endedAt) {
         return state;
       }
-      // đôi khi wrap 2 lớp { message, data: { ... } }
       if (state.data?.data && (state.data.data.energyKwh || state.data.data.total)) {
         return state.data.data;
       }
     }
 
-    // 2) sessionStorage: thử một số key có thể đã lưu ở trang ChargingProgress
+    // 2) sessionStorage
     const candidateKeys = [];
     if (orderId) {
       candidateKeys.push(`charge:end:${orderId}`);
@@ -46,20 +45,16 @@ export default function InvoicePage() {
         if (!raw) continue;
         const obj = JSON.parse(raw);
 
-        // các khả năng shape:
-        // a) { message, data: {...} }
         if (obj?.data && (obj.data.energyKwh || obj.data.total || obj.data.endedAt)) {
           return obj.data;
         }
-        // b) { ...fields }
         if (obj?.energyKwh || obj?.total || obj?.endedAt) {
           return obj;
         }
-        // c) { data: { data: {...} } }
         if (obj?.data?.data && (obj.data.data.energyKwh || obj.data.data.total)) {
           return obj.data.data;
         }
-      } catch (_) { }
+      } catch (_) {}
     }
     return null;
   }, [state, orderId]);
@@ -68,8 +63,8 @@ export default function InvoicePage() {
     setLoading(false);
     if (!endData) {
       setError(
-        "Không tìm thấy dữ liệu hóa đơn của phiên sạc. Hãy kết thúc phiên sạc và điều hướng lại, "
-        + "hoặc đảm bảo đã lưu payload BE vào sessionStorage trước khi mở trang này."
+        "Không tìm thấy dữ liệu hóa đơn của phiên sạc. Hãy kết thúc phiên sạc và điều hướng lại, " +
+          "hoặc đảm bảo đã lưu payload BE vào sessionStorage trước khi mở trang này."
       );
     } else {
       setError("");
@@ -77,8 +72,16 @@ export default function InvoicePage() {
   }, [endData]);
 
   // ==== Giá trị hiển thị (fallback an toàn) ====
+  const customerId = endData?.customerId ?? "—";
+  const companyId = endData?.companyId ?? "—";
+  const vehicleId = endData?.vehicleId ?? "—";
+  const portId = endData?.portId ?? "—";
+
+  const startSoc = endData?.startSoc ?? endData?.socStart ?? null;
+  const endSoc = endData?.endSoc ?? endData?.socEnd ?? null;
+
   const energyKwh = endData?.energyKwh ?? endData?.energyKWh ?? 0;
-  const durationMin = endData?.durationMin ?? endData?.duration ?? 0;
+  const durationMin = endData?.durationMin ?? endData?.duration ?? 0; // đang ẩn UI
   const idleMin = endData?.idleMin ?? endData?.idleMinutes ?? 0;
 
   const subtotal = endData?.subtotal ?? 0;
@@ -90,14 +93,20 @@ export default function InvoicePage() {
   const billingMonth = endData?.billingMonth ?? (endedAt ? endedAt.getMonth() + 1 : "—");
   const billingYear = endData?.billingYear ?? (endedAt ? endedAt.getFullYear() : "—");
 
-  // Extract nested ternary for status CSS into an independent statement
+  // Gói đăng ký áp dụng (appliedSubscription)
+  const sub = endData?.appliedSubscription ?? null;
+  const subPlanName = sub?.planName ?? "—";
+  const subDiscountPercent = sub?.discountPercent ?? 0;
+  const subFreeIdleMinutes = sub?.freeIdleMinutes ?? 0;
+
+  // CSS trạng thái phiên sạc
   const statusClass = (() => {
     if (status === "Completed") return "status status--completed";
     if (status === "Unpaid") return "status status--unpaid";
     return "status status--paid";
   })();
 
-  // Extract the nested loading/error/content ternary into a single renderContent variable
+  // Render chính
   let renderContent;
   if (loading) {
     renderContent = <div className="loading">Đang tải…</div>;
@@ -106,17 +115,16 @@ export default function InvoicePage() {
   } else {
     renderContent = (
       <>
-        {/* Chi tiết tiền */}
+        {/* Chi tiết phiên sạc (đã gộp gói đăng ký và đặt trước phần tính tiền) */}
         <div className="invoice-card invoice-card--p24 invoice-card--dashed" style={{ marginTop: 16 }}>
           <h3 className="h3" style={{ marginBottom: 12 }}>Chi tiết phiên sạc</h3>
+
           {/* Thông tin chung */}
           <div className="details">
             <div className="grid-2">
               <div>
                 <p className="k">Trạng thái</p>
-                <span className={statusClass}>
-                  {status}
-                </span>
+                <span className={statusClass}>{status}</span>
               </div>
               <div>
                 <p className="k">Thời gian kết thúc</p>
@@ -128,7 +136,30 @@ export default function InvoicePage() {
               </div>
             </div>
           </div>
+
+          {/* Bảng thông tin */}
           <div className="grid-kv">
+            {/* <div className="k">Khách hàng</div>
+            <div className="v">#{customerId}</div>
+
+            <div className="k">Công ty</div>
+            <div className="v">{companyId ?? "—"}</div>
+
+            <div className="k">Xe</div>
+            <div className="v">#{vehicleId}</div>
+
+            <div className="k">Cổng sạc</div>
+            <div className="v">#{portId}</div> */}
+
+            <div className="hr-thin"></div>
+            <div className="hr-thin"></div>
+
+            {/* SoC dạng "33% → 100%" */}
+            <div className="k">SoC</div>
+            <div className="v">
+              {startSoc == null || endSoc == null ? "—" : `${startSoc}% \u2192 ${endSoc}%`}
+            </div>
+
             <div className="k">Năng lượng tiêu thụ</div>
             <div className="v">{energyKwh} kWh</div>
 
@@ -138,6 +169,20 @@ export default function InvoicePage() {
             <div className="k">Phút chiếm trụ</div>
             <div className="v">{idleMin} phút</div>
 
+            {/* === Gói đăng ký áp dụng (đặt trước phần tính tiền) === */}
+            <div className="hr-thin"></div>
+            <div className="hr-thin"></div>
+
+            <div className="k">Gói đăng ký áp dụng</div>
+            <div className="v">{subPlanName}</div>
+
+            <div className="k">Giảm giá</div>
+            <div className="v">{subDiscountPercent}%</div>
+
+            <div className="k">Miễn phí phút chiếm trụ</div>
+            <div className="v">{subFreeIdleMinutes} phút</div>
+
+            {/* === Tính tiền === */}
             <div className="hr-thin"></div>
             <div className="hr-thin"></div>
 
@@ -147,23 +192,29 @@ export default function InvoicePage() {
             <div className="k">Thuế (VAT)</div>
             <div className="v">{vnd(tax)}</div>
 
-            <div className="hr-thin"></div>
-            <div className="hr-thin"></div>
-
             <div className="v">Tổng cộng</div>
             <div className="v total">{vnd(total)}</div>
           </div>
         </div>
 
         {/* Hành động */}
-        <div style={{ marginTop: 16, display: "flex", flexDirection: "row", gap: 1170, alignItems: "center" }}>
-           <div className="invoice-actions">
+        <div
+          style={{
+            marginTop: 16,
+            display: "flex",
+            flexDirection: "row",
+            gap: 16,
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div className="invoice-actions">
             <Link to="/stations" className="invoice-link">Về danh sách trạm</Link>
-          </div><button className="btn btn--primary" onClick={() => navigate("/invoiceSummary")}>
+          </div>
+          <button className="btn btn--primary" onClick={() => navigate("/invoiceSummary")}>
             Xem tất cả hoá đơn
           </button>
         </div>
-       
       </>
     );
   }
@@ -178,6 +229,5 @@ export default function InvoicePage() {
         {renderContent}
       </div>
     </MainLayout>
-
   );
 }

@@ -273,8 +273,6 @@ export default function StationDetail() {
         try {
           // Thử nhiều route cho chắc (tùy BE đặt)
           const ruleRoutes = [
-            `${API_BASE}/PricingRules`,
-            `${API_BASE}/Pricing/rules`,
             `${API_BASE}/PricingRule`,
           ];
           // const ruleRoutes = []; // để trống nếu BE không có endpoint này
@@ -294,7 +292,8 @@ export default function StationDetail() {
             if (_low(r.status) !== "active") continue;
             const key = _mkKey(r.chargerType, r.powerKw);
             const bucket = byKey.get(key) || {};
-            bucket[_low(r.timeRange)] = r; // bucket.normal / bucket.peak
+            const tr = _low(r.timeRange);  // 'low' | 'normal' | 'peak'
+            bucket[tr] = r;
             byKey.set(key, bucket);
           }
 
@@ -313,21 +312,27 @@ export default function StationDetail() {
             const rr = byKey.get(key);
             if (!rr) return ch;
 
+            const low = rr.low;
             const normal = rr.normal;
             const peak = rr.peak;
 
             let priceText = "";
-            if (normal && peak) {
-              priceText = `${vnd(normal.pricePerKwh)}/kWh - ${vnd(peak.pricePerKwh)}/kWh `;
+            if (low && normal && peak) {
+              priceText = `${vnd(low.pricePerKwh)} - ${vnd(peak.pricePerKwh)} / kWh`;
+            } else if (normal && peak) {
+              priceText = `${vnd(normal.pricePerKwh)} - ${vnd(peak.pricePerKwh)} / kWh`;
+            } else if (low && normal) {
+              priceText = `${vnd(low.pricePerKwh)} - ${vnd(normal.pricePerKwh)} / kWh`;
+            } else if (low) {
+              priceText = `${vnd(low.pricePerKwh)} / kWh`;
             } else if (normal) {
-              priceText = `${vnd(normal.pricePerKwh)}/kWh`;
+              priceText = `${vnd(normal.pricePerKwh)} / kWh`;
             } else if (peak) {
-              priceText = `${vnd(peak.pricePerKwh)}/kWh`;
+              priceText = `${vnd(peak.pricePerKwh)} / kWh`;
             }
-
-            const priceValue = (normal?.pricePerKwh ?? peak?.pricePerKwh ?? ch.priceValue);
+            const priceValue = (normal?.pricePerKwh ?? low?.pricePerKwh ?? peak?.pricePerKwh ?? ch.priceValue);
             const priceUnit = "kWh";
-            const idleFeePerMin = normal?.idleFeePerMin ?? peak?.idleFeePerMin ?? ch.idleFeePerMin;
+            const idleFeePerMin = normal?.idleFeePerMin ?? low?.idleFeePerMin ?? peak?.idleFeePerMin ?? ch.idleFeePerMin;
 
             return {
               ...ch,
@@ -345,7 +350,7 @@ export default function StationDetail() {
           try {
             // const priceUrl = `${API_BASE}/Pricing/by-station/${st.id}`;
             // const pricing = await fetchJSONAuth(priceUrl).catch(() => null);
-            const rows = Array.isArray(pricing?.items) ? pricing.items : (Array.isArray(pricing) ? pricing : []);
+            const rows = []; // tạm thời không dùng endpoint này
             if (rows?.length) {
               const map = new Map(rows.map(r => [String(r.chargerId ?? r.ChargerId), r]));
               chargersList = chargersList.map(ch => {

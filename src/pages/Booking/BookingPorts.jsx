@@ -9,6 +9,8 @@ import { fetchJSON, fetchAuthJSON, getToken, getApiBase } from "../../utils/api"
 const API_BASE = getApiBase();
 
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
+const VI_TIME_RANGE = { Low: "Thấp điểm", Normal: "Bình thường", Peak: "Cao điểm" };
+const viTimeRange = (tr) => VI_TIME_RANGE[tr] || tr;
 
 // ---------- Helpers nhận diện loại xe ----------
 function isCarType(t = "") {
@@ -49,8 +51,11 @@ function normalizeCharger(c = {}) {
     id,
     stationId: c.stationId ?? c.StationId,
     title: c.code ?? c.Code ?? `Trụ #${id}`,
-    connector: c.type ?? c.Type ?? "",
+    // typeRaw: AC/DC (BE hay đặt ở field "type" hoặc "Type")
+    typeRaw: c.type ?? c.Type ?? "",
+    connector: c.connector ?? c.Connector ?? "", // connector thực từ BE nếu có
     power: powerText,
+    powerKw: Number(p ?? 0) || undefined,
     status,
     price: c.price ?? c.Price ?? "",
     imageUrl: c.imageUrl ?? c.ImageUrl ?? "",
@@ -201,6 +206,24 @@ function checkTimeConflict(newStart, newEnd, existingBookings) {
   return { conflict: false };
 }
 
+const low = (s) => String(s ?? "").trim().toLowerCase();
+const mkKey = (typeRaw, powerKw) => `${low(typeRaw)}|${Number(powerKw) || 0}`;
+
+function parseKwFromText(txt) {
+  const m = String(txt ?? "").match(/([\d.]+)/);
+  return m ? Number(m[1]) : undefined;
+}
+
+// Xác định khung giờ theo H:M (local)
+// Low: 22:00–06:00 ; Peak: 17:00–22:00 ; còn lại Normal
+function timeRangeOfHM(h, m) {
+  const t = h * 60 + m;
+  const inRange = (a, b, x) => (a <= b ? (x >= a && x < b) : (x >= a || x < b));
+  if (inRange(22 * 60, 6 * 60, t)) return "Low";
+  if (inRange(17 * 60, 22 * 60, t)) return "Peak";
+  return "Normal";
+}
+
 export default function BookingPorts() {
   // === User/Vehicle ===
   const [me, setMe] = useState(null);
@@ -222,6 +245,9 @@ export default function BookingPorts() {
   const [portsError, setPortsError] = useState("");
 
   const [selectedGun, setSelectedGun] = useState(null);
+  // ---- PricingRule state ----
+  const [pricingRules, setPricingRules] = useState([]);
+  const [pricingMap, setPricingMap] = useState(() => new Map());
 
   // ====== EXISTING BOOKINGS & CONFLICT DETECTION ======
   const [existingBookings, setExistingBookings] = useState([]);
@@ -332,6 +358,29 @@ export default function BookingPorts() {
     return Math.max(0, gap);
   }, [startHour, startMinute, endHour, endMinute]);
 
+  // ---- Xác định rule áp dụng cho (typeRaw, powerKw) và thời điểm bắt đầu đã chọn ----
+  const currentPricing = useMemo(() => {
+    if (!charger) return null;
+
+    const typeRaw = charger.typeRaw || "";
+    const kw = charger.powerKw ?? parseKwFromText(charger.power);
+    if (!typeRaw || !Number.isFinite(kw)) return null;
+
+    const key = mkKey(typeRaw, kw);
+    const bucket = pricingMap.get(key);
+    if (!bucket) return null;
+
+    const tr = timeRangeOfHM(startHour, startMinute); // "Low" | "Normal" | "Peak"
+    const r = bucket[low(tr)];
+    if (!r) return null;
+
+    return {
+      ...r,
+      timeRange: tr,
+      label: `${viTimeRange(tr)} • ${vnd(r.pricePerKwh)}/kWh`,
+    };
+  }, [charger, pricingMap, startHour, startMinute]);
+
   // ====== LOAD STATION + CHARGER ======
   useEffect(() => {
     let alive = true;
@@ -347,6 +396,22 @@ export default function BookingPorts() {
         const chRaw = await fetchJSON(`${API_BASE}/Chargers/${cid}`);
         if (!alive) return;
         setCharger(normalizeCharger(chRaw));
+        // ---------- Tải PricingRule ----------
+        // Dùng fetchAuthJSON cho chắc (nếu API cần token)
+        const pr = await fetchAuthJSON(`/PricingRule`);
+        const items = Array.isArray(pr?.items) ? pr.items : (Array.isArray(pr) ? pr : []);
+        const active = items.filter(r => low(r.status) === "active");
+        setPricingRules(active);
+
+        // Build map: key = "ac|120", value = { low, normal, peak }
+        const mp = new Map();
+        for (const r of active) {
+          const key = mkKey(r.chargerType, r.powerKw);
+          const bucket = mp.get(key) || {};
+          bucket[low(r.timeRange)] = r;
+          mp.set(key, bucket);
+        }
+        setPricingMap(mp);
       } catch (e) {
         if (!alive) return;
         const msg = /404|không tìm/i.test(String(e?.message))
@@ -359,6 +424,8 @@ export default function BookingPorts() {
     })();
     return () => { alive = false; };
   }, [id, cid]);
+
+
 
   // ====== LOAD PORTS THEO CHARGER ======
   useEffect(() => {
@@ -746,7 +813,14 @@ export default function BookingPorts() {
               <div className="bp-charger-grid">
                 <div className="bp-panel-note">
                   <div className="bp-note">Biểu giá dịch vụ sạc điện</div>
-                  <div className="bp-price">{charger.price || "—"}</div>
+                  <div className="bp-price">
+                    {currentPricing ? currentPricing.label : (charger.price || "—")}
+                  </div>
+                  {currentPricing && (
+                    <div className="bp-subtle">
+                      Áp dụng theo giờ bắt đầu: <b>{String(startHour).padStart(2, "0")}:{String(startMinute).padStart(2, "0")}</b>
+                    </div>
+                  )}
                   <div className="bp-footnote">© Biểu giá có thể thay đổi theo từng trạm và khung giờ.</div>
                 </div>
 
@@ -783,10 +857,10 @@ export default function BookingPorts() {
                     <tr><th>Loại giá</th><th>Thời gian</th><th>Ngày</th></tr>
                   </thead>
                   <tbody>
-                    <tr><td>Giờ thấp điểm</td><td>22:00 – 06:00</td><td>Tất cả các ngày</td></tr>
-                    <tr><td>Giờ bình thường</td><td>06:00 – 17:00</td><td>Thứ 2–7</td></tr>
-                    <tr><td>Giờ cao điểm</td><td>17:00 – 22:00</td><td>Thứ 2–7</td></tr>
-                    <tr><td>Giờ CN</td><td>08:00 – 17:00</td><td>Chủ nhật</td></tr>
+                    <tr><td><b>Thấp điểm</b></td><td>22:00 – 06:00</td><td>Tất cả các ngày</td></tr>
+                    <tr><td><b>Bình thường</b></td><td>06:00 – 17:00</td><td>Thứ 2 – Thứ 7</td></tr>
+                    <tr><td><b>Cao điểm</b></td><td>17:00 – 22:00</td><td>Thứ 2 – Thứ 7</td></tr>
+                    <tr><td><b>CN</b></td><td>08:00 – 17:00</td><td>Chủ nhật</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -933,6 +1007,10 @@ export default function BookingPorts() {
                 <RowKV
                   k="Tổng thời gian (phút)"
                   v={`${totalMinutes} phút (${(totalMinutes / 60).toFixed(2)} giờ)`}
+                />
+                <RowKV
+                  k="Giá áp dụng"
+                  v={currentPricing ? `${vnd(currentPricing.pricePerKwh)}/kWh (${viTimeRange(currentPricing.timeRange)})` : "—"}
                 />
                 <RowKV k="Chi phí" v={<i>Sẽ tính và hiển thị ở bước thanh toán</i>} />
               </div>

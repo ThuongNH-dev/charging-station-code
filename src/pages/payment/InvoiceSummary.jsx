@@ -22,40 +22,124 @@ function decodeJwtPayload(token) {
     const base64Url = token.split(".")[1];
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
     const jsonPayload = decodeURIComponent(
-      atob(base64).split("").map(c => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join("")
     );
     return JSON.parse(jsonPayload || "{}");
-  } catch { return {}; }
+  } catch {
+    return {};
+  }
+}
+
+// ===== NEW: Resolve Company smart =====
+async function resolveCompanyIdSmart(authUser) {
+  // 1) Từ context
+  if (authUser?.companyId != null) return Number(authUser.companyId);
+
+  // 2) /Auth (nếu BE có trả)
+  try {
+    const meRes = await fetchAuthJSON("/Auth", { method: "GET" });
+    let cid =
+      meRes?.companyId ??
+      meRes?.CompanyId ??
+      meRes?.id ??
+      meRes?.userId ??
+      meRes?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+    if (cid != null) return Number(cid);
+  } catch { }
+
+  // 3) Token claims
+  try {
+    const token =
+      getToken?.() ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("access_token") ||
+      "";
+    if (token) {
+      const p = decodeJwtPayload(token);
+      const claimCompany =
+        p.companyId ??
+        p.CompanyId ??
+        p.compId ??
+        p["company_id"] ??
+        p["comp_id"] ??
+        null;
+      if (claimCompany != null && !Number.isNaN(Number(claimCompany)))
+        return Number(claimCompany);
+    }
+  } catch { }
+
+  // 4) /Companies/me
+  try {
+    const me = await fetchAuthJSON(`${API_ABS}/Companies/me`, { method: "GET" });
+    const id1 = me?.data?.companyId ?? me?.companyId ?? null;
+    if (id1 != null) return Number(id1);
+  } catch { }
+
+  // 5) Storage
+  const stored =
+    sessionStorage.getItem("companyId") || localStorage.getItem("companyId");
+  if (stored) return Number(stored);
+
+  return null;
 }
 
 async function resolveCustomerIdSmart(authUser) {
   if (authUser?.customerId != null) return Number(authUser.customerId);
   try {
     const meRes = await fetchAuthJSON("/Auth", { method: "GET" });
-    let cid = meRes?.customerId ?? meRes?.id ?? meRes?.userId ?? meRes?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+    let cid =
+      meRes?.customerId ??
+      meRes?.id ??
+      meRes?.userId ??
+      meRes?.[
+      "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
+      ];
     if (!cid) {
       const t = getToken?.() || "";
       const p = t ? decodeJwtPayload(t) : {};
-      cid = p?.customerId ?? p?.sub ?? p?.["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
+      cid =
+        p?.customerId ??
+        p?.sub ??
+        p?.[
+        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
+        ];
     }
     if (cid != null) return Number(cid);
   } catch { }
-  const token = getToken?.() || localStorage.getItem("token") || localStorage.getItem("access_token") || "";
+  const token =
+    getToken?.() ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("access_token") ||
+    "";
   if (token) {
     const p = decodeJwtPayload(token);
     const claimCust =
-      p.customerId ?? p.CustomerId ?? p.custId ?? p.custID ??
-      p["customer_id"] ?? p["cust_id"] ?? p.sub ??
-      p["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"];
-    if (claimCust != null && !Number.isNaN(Number(claimCust))) return Number(claimCust);
+      p.customerId ??
+      p.CustomerId ??
+      p.custId ??
+      p.custID ??
+      p["customer_id"] ??
+      p["cust_id"] ??
+      p.sub ??
+      p[
+      "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
+      ];
+    if (claimCust != null && !Number.isNaN(Number(claimCust)))
+      return Number(claimCust);
 
     try {
-      const me = await fetchAuthJSON(`${API_ABS}/Customers/me`, { method: "GET" });
+      const me = await fetchAuthJSON(`${API_ABS}/Customers/me`, {
+        method: "GET",
+      });
       const id1 = me?.data?.customerId ?? me?.customerId ?? null;
       if (id1 != null) return Number(id1);
     } catch { }
   }
-  const stored = sessionStorage.getItem("customerId") || localStorage.getItem("customerId");
+  const stored =
+    sessionStorage.getItem("customerId") || localStorage.getItem("customerId");
   if (stored) return Number(stored);
   return null;
 }
@@ -67,13 +151,16 @@ const parseDate = (s) => {
   if (!y || !m || !d) return null;
   return new Date(y, m - 1, d, 0, 0, 0, 0);
 };
-const endOfDay = (d) => { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; };
+const endOfDay = (d) => {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+};
 
 // build pagination window with ellipses
 function buildPages(total, current, window = 2) {
   if (total <= 1) return [1];
   const pages = new Set([1, total]);
-  // neighbors
   for (let i = current - window; i <= current + window; i++) {
     if (i >= 1 && i <= total) pages.add(i);
   }
@@ -85,10 +172,12 @@ function buildPages(total, current, window = 2) {
   }
   return out;
 }
+
 // ---- Helpers cho hydrate ----
 async function runLimited(items, limit, worker) {
   const results = new Array(items.length);
-  let i = 0, running = 0;
+  let i = 0,
+    running = 0;
   return await new Promise((resolve) => {
     const next = () => {
       if (i >= items.length && running === 0) return resolve(results);
@@ -96,9 +185,16 @@ async function runLimited(items, limit, worker) {
         const idx = i++;
         running++;
         Promise.resolve(worker(items[idx], idx))
-          .then((v) => { results[idx] = v; })
-          .catch(() => { results[idx] = null; })
-          .finally(() => { running--; next(); });
+          .then((v) => {
+            results[idx] = v;
+          })
+          .catch(() => {
+            results[idx] = null;
+          })
+          .finally(() => {
+            running--;
+            next();
+          });
       }
     };
     next();
@@ -108,8 +204,9 @@ async function runLimited(items, limit, worker) {
 // Endpoint chi tiết 1 hóa đơn
 async function fetchInvoiceDetail(invoiceId) {
   try {
-    const res = await fetchAuthJSON(`${API_ABS}/Invoices/${invoiceId}`, { method: "GET" });
-    // một số BE trả { data: {...} }, một số trả {...}
+    const res = await fetchAuthJSON(`${API_ABS}/Invoices/${invoiceId}`, {
+      method: "GET",
+    });
     return res?.data || res || null;
   } catch {
     return null;
@@ -119,13 +216,11 @@ async function fetchInvoiceDetail(invoiceId) {
 /**
  * Điền thêm createdAt/updatedAt cho mảng hóa đơn nếu thiếu.
  * Chỉ gọi /Invoices/{id} cho các hóa đơn thiếu ngày (song song tối đa 4).
- * @param {Array} list
- * @returns {Promise<Array>}
  */
 async function hydrateInvoiceDates(list) {
   if (!Array.isArray(list) || list.length === 0) return list;
 
-  const need = list.filter(it => !(it?.createdAt) || !(it?.updatedAt));
+  const need = list.filter((it) => !(it?.createdAt) || !(it?.updatedAt));
   if (need.length === 0) return list;
 
   const details = await runLimited(need, 4, async (it) => {
@@ -143,7 +238,7 @@ async function hydrateInvoiceDates(list) {
     if (r?.invoiceId) byId.set(r.invoiceId, r);
   }
 
-  return list.map(it => {
+  return list.map((it) => {
     if (it.createdAt && it.updatedAt) return it;
     const a = byId.get(it.invoiceId);
     if (!a) return it;
@@ -155,19 +250,8 @@ async function hydrateInvoiceDates(list) {
   });
 }
 
-
 export default function InvoiceSummary() {
   const { user: authUser } = useAuth();
-  function pickIdFromCtxOrStorage(key, authUser) {
-    const fromCtx = authUser?.[key] ?? authUser?.[key.charAt(0).toUpperCase() + key.slice(1)];
-    if (Number.isFinite(Number(fromCtx)) && Number(fromCtx) > 0) return Number(fromCtx);
-
-    const ls = localStorage.getItem(key);
-    const ss = sessionStorage.getItem(key);
-    const cand = Number(ls ?? ss);
-    return Number.isFinite(cand) && cand > 0 ? cand : null;
-  }
-
   const { state } = useLocation();
   const navigate = useNavigate();
 
@@ -180,7 +264,7 @@ export default function InvoiceSummary() {
 
   // filters
   const [statusFilter, setStatusFilter] = useState("all");
-  const [dateField, setDateField] = useState("updatedAt");
+  const [dateField, setDateField] = useState("createdAt");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
@@ -188,50 +272,119 @@ export default function InvoiceSummary() {
   const [page, setPage] = useState(1);
   const pageSize = 8;
 
+  function pickIdFromCtxOrStorage(key, authUser) {
+    const fromCtx =
+      authUser?.[key] ?? authUser?.[key.charAt(0).toUpperCase() + key.slice(1)];
+    if (Number.isFinite(Number(fromCtx)) && Number(fromCtx) > 0)
+      return Number(fromCtx);
+
+    const ls = localStorage.getItem(key);
+    const ss = sessionStorage.getItem(key);
+    const cand = Number(ls ?? ss);
+    return Number.isFinite(cand) && cand > 0 ? cand : null;
+  }
+
+  // === Quyết định phạm vi (Company/Customer) theo role & id khả dụng ===
   useEffect(() => {
-    // 1) lấy nhanh từ context/storage
-    const co0 = pickIdFromCtxOrStorage("companyId", authUser);
-    const cu0 = pickIdFromCtxOrStorage("customerId", authUser);
-
-    if (co0) { setCompanyId(co0); setUseCompany(true); return; }
-    if (cu0) { setCustomerId(cu0); setUseCompany(false); return; }
-
-    // 2) fallback: dùng resolver cũ bạn đã có
-    let m = true;
+    let alive = true;
     (async () => {
-      const co = await resolveCompanyIdSmart?.(authUser);
-      if (!m) return;
-      if (co) { setCompanyId(co); setUseCompany(true); return; }
+      // Gợi ý theo role
+      const roleRaw = String(authUser?.role || "").toLowerCase();
+      const roleSuggestCompany = /company/.test(roleRaw);
+      const roleSuggestCustomer = /customer|khach|client|user/.test(roleRaw);
 
-      const cu = await resolveCustomerIdSmart?.(authUser);
-      if (!m) return;
-      if (cu) { setCustomerId(cu); setUseCompany(false); return; }
+      // Lấy nhanh từ context/storage
+      const co0 = pickIdFromCtxOrStorage("companyId", authUser);
+      const cu0 = pickIdFromCtxOrStorage("customerId", authUser);
 
-      setUseCompany(false); // cuối cùng: cố theo customer để báo lỗi rõ ràng
+      // Nếu role rõ ràng → ưu tiên role
+      if (roleSuggestCompany) {
+        // nếu có sẵn companyId
+        if (co0) {
+          if (!alive) return;
+          setCompanyId(co0);
+          setUseCompany(true);
+          return;
+        }
+        // resolve companyId
+        const co = await resolveCompanyIdSmart(authUser);
+        if (!alive) return;
+        if (co) {
+          setCompanyId(co);
+          setUseCompany(true);
+          return;
+        }
+        // fallback cuối cùng: thử customer (tránh trắng trang)
+        const cu = cu0 || (await resolveCustomerIdSmart(authUser));
+        if (!alive) return;
+        setCustomerId(cu ?? null);
+        setUseCompany(false);
+        return;
+      }
+
+      if (roleSuggestCustomer) {
+        if (cu0) {
+          if (!alive) return;
+          setCustomerId(cu0);
+          setUseCompany(false);
+          return;
+        }
+        const cu = await resolveCustomerIdSmart(authUser);
+        if (!alive) return;
+        if (cu) {
+          setCustomerId(cu);
+          setUseCompany(false);
+          return;
+        }
+        // fallback: thử company
+        const co = co0 || (await resolveCompanyIdSmart(authUser));
+        if (!alive) return;
+        setCompanyId(co ?? null);
+        setUseCompany(Boolean(co));
+        return;
+      }
+
+      // Nếu role không rõ → ưu tiên company nếu có id, không thì customer
+      if (co0) {
+        if (!alive) return;
+        setCompanyId(co0);
+        setUseCompany(true);
+        return;
+      }
+      if (cu0) {
+        if (!alive) return;
+        setCustomerId(cu0);
+        setUseCompany(false);
+        return;
+      }
+
+      // Không có gì trong storage/context → resolve cả hai, ưu tiên company nếu có
+      const [co, cu] = await Promise.all([
+        resolveCompanyIdSmart(authUser),
+        resolveCustomerIdSmart(authUser),
+      ]);
+      if (!alive) return;
+      if (co) {
+        setCompanyId(co);
+        setUseCompany(true);
+      } else if (cu) {
+        setCustomerId(cu);
+        setUseCompany(false);
+      } else {
+        setUseCompany(false); // để báo lỗi rõ ràng phía dưới
+      }
     })();
-
-    return () => { m = false; };
+    return () => {
+      alive = false;
+    };
   }, [authUser]);
 
-
-  // get customerId
+  // fetch from API (dựa theo useCompany + id tương ứng)
   useEffect(() => {
     let m = true;
     (async () => {
-      const id = await resolveCustomerIdSmart(authUser);
-      if (m) setCustomerId(id);
-    })();
-    return () => { m = false; };
-  }, [authUser]);
+      if (useCompany === null) return; // chờ xác định phạm vi
 
-  // fetch from API
-  useEffect(() => {
-    let m = true;
-    (async () => {
-      // Chưa biết phạm vi → chờ thêm xíu (đang resolve)
-      if (useCompany === null) return;
-
-      // Thiếu id phù hợp → báo lỗi sớm
       if (useCompany && companyId == null) {
         setLoading(false);
         setErr("Không xác định được công ty của tài khoản.");
@@ -244,27 +397,30 @@ export default function InvoiceSummary() {
       }
 
       try {
-        setLoading(true); setErr("");
+        setLoading(true);
+        setErr("");
 
-        // 1) Lấy danh sách đúng theo đăng nhập
         let list = [];
         if (useCompany) {
-          const res = await fetchAuthJSON(`${API_ABS}/Invoices/by-company/${companyId}`, { method: "GET" });
+          const res = await fetchAuthJSON(
+            `${API_ABS}/Invoices/by-company/${companyId}`,
+            { method: "GET" }
+          );
           list = Array.isArray(res?.data) ? res.data : [];
         } else {
-          const res = await fetchAuthJSON(`${API_ABS}/Invoices/by-customer/${customerId}`, { method: "GET" });
+          const res = await fetchAuthJSON(
+            `${API_ABS}/Invoices/by-customer/${customerId}`,
+            { method: "GET" }
+          );
           list = Array.isArray(res?.data) ? res.data : [];
         }
 
-        // 2) Bù createdAt/updatedAt bằng các API khác
-        const hydrated = await hydrateInvoiceDates(list, customerId);
-
-        // 3) Sắp xếp & set state
-        const sorted = sortInvoicesDesc(hydrated);
+        const hydrated = await hydrateInvoiceDates(list);
         if (!m) return;
-        setRawInvoices(sorted);
-
-        try { sessionStorage.setItem("charge:billing:list", JSON.stringify(sorted)); } catch { }
+        setRawInvoices(hydrated);
+        try {
+          sessionStorage.setItem("charge:billing:list", JSON.stringify(sorted));
+        } catch { }
       } catch (e) {
         if (m) setErr(e?.message || "Không tải được danh sách hóa đơn.");
       } finally {
@@ -272,25 +428,33 @@ export default function InvoiceSummary() {
       }
     })();
 
-    return () => { m = false; };
+    return () => {
+      m = false;
+    };
   }, [useCompany, companyId, customerId]);
-
 
   // normalize
   const normalized = useMemo(() => {
-    return (rawInvoices || []).filter(Boolean).map((it, idx) => ({
-      id: it.invoiceId?.toString?.() || `${it.billingYear}-${it.billingMonth}-${idx}`,
-      keyForDedupe: it.invoiceId?.toString?.() || `${it.billingYear}-${it.billingMonth}`,
-      invoiceId: it.invoiceId,
-      billingMonth: it.billingMonth,
-      billingYear: it.billingYear,
-      total: it.total,
-      status: it.status,
-      createdAt: it.createdAt,
-      updatedAt: it.updatedAt,
-      chargingSessions: it.chargingSessions || [],
-      customer: it.customer || null,
-    }));
+    return (rawInvoices || [])
+      .filter(Boolean)
+      .map((it, idx) => ({
+        id:
+          it.invoiceId?.toString?.() ||
+          `${it.billingYear}-${it.billingMonth}-${idx}`,
+        keyForDedupe:
+          it.invoiceId?.toString?.() ||
+          `${it.billingYear}-${it.billingMonth}`,
+        invoiceId: it.invoiceId,
+        billingMonth: it.billingMonth,
+        billingYear: it.billingYear,
+        total: it.total,
+        status: it.status,
+        createdAt: it.createdAt,
+        updatedAt: it.updatedAt,
+        subscriptionPlan: it.subscriptionPlan ?? null, // giữ nếu BE trả về
+        chargingSessions: it.chargingSessions || [],
+        customer: it.customer || null,
+      }));
   }, [rawInvoices]);
 
   // dedupe by keyForDedupe (keep latest updatedAt)
@@ -301,17 +465,14 @@ export default function InvoiceSummary() {
       if (!map.has(k)) map.set(k, it);
       else {
         const cur = map.get(k);
-        const a = new Date(cur.updatedAt || cur.createdAt || 0).getTime();
-        const b = new Date(it.updatedAt || it.createdAt || 0).getTime();
+        const a = new Date(cur.createdAt || 0).getTime();
+        const b = new Date(it.createdAt || 0).getTime();
         if (b > a) map.set(k, it);
       }
     }
-    // đảm bảo unique cũng theo thứ tự mới → cũ
-    return sortInvoicesDesc(Array.from(map.values()));
+    // Trả về chưa sort; để bước 3 sort ổn định theo createdAt
+    return Array.from(map.values());
   }, [normalized]);
-
-
-  // sau const unique = useMemo(...)
 
   useEffect(() => {
     try {
@@ -319,14 +480,13 @@ export default function InvoiceSummary() {
     } catch { }
   }, [unique]);
 
-
   // filter + sort
   const filtered = useMemo(() => {
     let arr = unique.slice();
 
     if (statusFilter !== "all") {
       const key = statusFilter.toLowerCase();
-      arr = arr.filter(inv => {
+      arr = arr.filter((inv) => {
         const s = String(inv.status || "").toLowerCase();
         if (key === "paid") return s.includes("paid");
         if (key === "unpaid") return s.includes("unpaid");
@@ -338,7 +498,7 @@ export default function InvoiceSummary() {
     const dFrom = parseDate(from);
     const dTo = to ? endOfDay(parseDate(to)) : null;
     if (dFrom || dTo) {
-      arr = arr.filter(inv => {
+      arr = arr.filter((inv) => {
         const v = inv[dateField];
         if (!v) return false;
         const d = new Date(v);
@@ -348,28 +508,32 @@ export default function InvoiceSummary() {
       });
     }
 
-    return arr.sort((a, b) => (new Date(b[dateField] || 0)) - (new Date(a[dateField] || 0)));
+    // Thứ tự hiển thị luôn theo thời điểm TẠO
+    return arr.sort(
+      (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+    );
   }, [unique, statusFilter, dateField, from, to]);
 
-  useEffect(() => { setPage(1); }, [statusFilter, dateField, from, to]);
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, dateField, from, to]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const start = (page - 1) * pageSize;
   const pageItems = filtered.slice(start, start + pageSize);
 
-  const clearDate = () => { setFrom(""); setTo(""); };
+  const clearDate = () => {
+    setFrom("");
+    setTo("");
+  };
 
   const pillClass = (status) => {
     const s = String(status || "").toLowerCase().trim();
-
-    // so khớp theo thứ tự an toàn hoặc dùng regex biên từ
     if (/(^|[^a-z])overdue([^a-z]|$)/.test(s)) return "pill danger";
     if (/(^|[^a-z])unpaid([^a-z]|$)/.test(s)) return "pill warn";
     if (/(^|[^a-z])paid([^a-z]|$)/.test(s)) return "pill ok";
-
     return "pill neutral";
   };
-
 
   const pageList = buildPages(totalPages, page, 2);
 
@@ -380,7 +544,11 @@ export default function InvoiceSummary() {
         <div className="sum-topbar">
           <h2>Hóa Đơn</h2>
           <div className="sum-actions">
-            <select className="sum-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <select
+              className="sum-select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
               <option value="all">Tất cả trạng thái</option>
               <option value="paid">Đã thanh toán</option>
               <option value="unpaid">Chưa thanh toán</option>
@@ -388,49 +556,99 @@ export default function InvoiceSummary() {
             </select>
 
             <div className="sum-datefilter">
-              <select className="df-field" value={dateField} onChange={(e) => setDateField(e.target.value)}>
+              <select
+                className="df-field"
+                value={dateField}
+                onChange={(e) => setDateField(e.target.value)}
+              >
                 <option value="createdAt">Tạo lúc</option>
                 <option value="updatedAt">Cập nhật</option>
               </select>
-              <input className="df-date" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+              <input
+                className="df-date"
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+              />
               <span className="df-sep">—</span>
-              <input className="df-date" type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} />
-              {(from || to) && <button className="df-clear" title="Xóa lọc ngày" onClick={clearDate}>✕</button>}
+              <input
+                className="df-date"
+                type="date"
+                value={to}
+                min={from || undefined}
+                onChange={(e) => setTo(e.target.value)}
+              />
+              {(from || to) && (
+                <button
+                  className="df-clear"
+                  title="Xóa lọc ngày"
+                  onClick={clearDate}
+                >
+                  ✕
+                </button>
+              )}
             </div>
           </div>
         </div>
 
         {loading && <div className="sum-empty">Đang tải…</div>}
         {!loading && err && <div className="sum-error">{err}</div>}
-        {!loading && !err && filtered.length === 0 && <div className="sum-empty">Không có hóa đơn phù hợp.</div>}
+        {!loading && !err && filtered.length === 0 && (
+          <div className="sum-empty">Không có hóa đơn phù hợp.</div>
+        )}
 
         {!loading && !err && pageItems.length > 0 && (
           <div className="sum-list">
             {pageItems.map((inv, idx) => {
-              const id = inv.invoiceId || inv.id || `${inv.billingYear}-${inv.billingMonth}-${idx}`;
+              const id =
+                inv.invoiceId ||
+                inv.id ||
+                `${inv.billingYear}-${inv.billingMonth}-${idx}`;
               return (
                 <button
                   key={id}
                   className="sum-card"
-                  onClick={() => navigate(`/invoiceDetail/${encodeURIComponent(inv.invoiceId || id)}`, {
-                    state: {
-                      invoiceId: inv.invoiceId || id,
-                      invoice: inv,
-                      period: { month: inv.billingMonth, year: inv.billingYear }
-                    }
-                  })}
+                  onClick={() =>
+                    navigate(
+                      `/invoiceDetail/${encodeURIComponent(inv.invoiceId || id)}`,
+                      {
+                        state: {
+                          invoiceId: inv.invoiceId || id,
+                          invoice: inv,
+                          period: {
+                            month: inv.billingMonth,
+                            year: inv.billingYear,
+                          },
+                        },
+                      }
+                    )
+                  }
                 >
                   {/* Top row: left title, right status */}
                   <div className="sum-row top">
-                    <div className="sum-title">Hóa đơn kỳ {inv.billingMonth}/{inv.billingYear}</div>
-                    <span className={pillClass(inv.status)}>{inv.status || "—"}</span>
+                    {/* Top row: left title, right status */}
+                    <div className="sum-row top">
+                      <div className="sum-title">
+                        Hóa đơn kỳ {inv.billingMonth}/{inv.billingYear}
+                      </div>
+                    </div>
+
+                    <span className={pillClass(inv.status)}>
+                      {inv.status || "—"}
+                    </span>
                   </div>
 
                   {/* Bottom row: meta left, total right */}
                   <div className="sum-row bottom">
                     <div className="sum-meta">
-                      <div className="kv"><span className="k">Tạo lúc:</span><span className="v light">{fmt(inv.createdAt)}</span></div>
-                      <div className="kv"><span className="k">Cập nhật:</span><span className="v light">{fmt(inv.updatedAt)}</span></div>
+                      <div className="kv">
+                        <span className="k">Tạo lúc:</span>
+                        <span className="v light">{fmt(inv.createdAt)}</span>
+                      </div>
+                      <div className="kv">
+                        <span className="k">Cập nhật:</span>
+                        <span className="v light">{fmt(inv.updatedAt)}</span>
+                      </div>
                     </div>
                     <div className="sum-total">
                       <div className="label">Tổng hóa đơn</div>
@@ -447,13 +665,23 @@ export default function InvoiceSummary() {
         {!loading && !err && filtered.length > 0 && (
           <>
             <div className="bp-hint">
-              Đang hiển thị {Math.min(filtered.length, start + 1)}–{Math.min(filtered.length, start + pageItems.length)} / {filtered.length} hóa đơn
+              Đang hiển thị {Math.min(filtered.length, start + 1)}–
+              {Math.min(filtered.length, start + pageItems.length)} /{" "}
+              {filtered.length} hóa đơn
             </div>
             <nav className="bp-nav" aria-label="Phân trang">
-              <button className="bp-item nav" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>← Trước</button>
+              <button
+                className="bp-item nav"
+                disabled={page === 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ← Trước
+              </button>
               {pageList.map((p, i) =>
                 p === "..." ? (
-                  <span key={`e${i}`} className="bp-ellipsis">…</span>
+                  <span key={`e${i}`} className="bp-ellipsis">
+                    …
+                  </span>
                 ) : (
                   <button
                     key={p}
@@ -465,11 +693,17 @@ export default function InvoiceSummary() {
                   </button>
                 )
               )}
-              <button className="bp-item nav" disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Sau →</button>
+              <button
+                className="bp-item nav"
+                disabled={page === totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Sau →
+              </button>
             </nav>
           </>
         )}
       </div>
-    </MainLayout >
+    </MainLayout>
   );
 }

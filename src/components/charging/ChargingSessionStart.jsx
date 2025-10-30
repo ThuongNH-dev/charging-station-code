@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react"; // NEW: +useEffect
 import { useNavigate, useLocation } from "react-router-dom";
 import { Input, Button, message } from "antd";
-import { ThunderboltOutlined, SearchOutlined } from "@ant-design/icons";
+import { ThunderboltOutlined, CheckOutlined } from "@ant-design/icons";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import { resolveCustomerIdFromAuth } from "../../api/authHelpers";
@@ -24,8 +24,7 @@ const toNumId = (v) => {
 const normId = (x) =>
     x?.id ?? x?.Id ?? x?.stationId ?? x?.StationId ?? x?.chargerId ?? x?.ChargerId ?? x?.portId ?? x?.PortId;
 const normText = (x) => (x == null || x === "" ? "—" : x);
-const fmtAddress = (s = {}) =>
-    s.address || s.Address || s.fullAddress || s.FullAddress || "—";
+const fmtAddress = (s = {}) => s.address || s.Address || s.fullAddress || s.FullAddress || "—";
 
 async function fetchOne(paths) {
     const list = Array.isArray(paths) ? paths : [paths];
@@ -34,7 +33,7 @@ async function fetchOne(paths) {
             const url = p.startsWith("http") ? p : `${API_ABS}${p.startsWith("/") ? "" : "/"}${p}`;
             const res = await fetchAuthJSON(url, { method: "GET" });
             if (res) return res;
-        } catch { /* try next */ }
+        } catch { }
     }
     throw new Error("Not found");
 }
@@ -46,6 +45,27 @@ const pickCompanyId = (st, ch, g) => {
     return Number.isFinite(n) ? n : null;
 };
 
+/* ===== Pricing helpers (copied/adapted from BookingPorts) ===== */
+// NEW ↓↓↓
+const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
+const VI_TIME_RANGE = { Low: "Thấp điểm", Normal: "Bình thường", Peak: "Cao điểm" };
+const viTimeRange = (tr) => VI_TIME_RANGE[tr] || tr;
+const low = (s) => String(s ?? "").trim().toLowerCase();
+const mkKey = (typeRaw, powerKw) => `${low(typeRaw)}|${Number(powerKw) || 0}`;
+function parseKwFromText(txt) {
+    const m = String(txt ?? "").match(/([\d.]+)/);
+    return m ? Number(m[1]) : undefined;
+}
+// Low: 22:00–06:00 ; Peak: 17:00–22:00 ; còn lại Normal
+function timeRangeOfHM(h, m) {
+    const t = h * 60 + m;
+    const inRange = (a, b, x) => (a <= b ? (x >= a && x < b) : (x >= a || x < b));
+    if (inRange(22 * 60, 6 * 60, t)) return "Low";
+    if (inRange(17 * 60, 22 * 60, t)) return "Peak";
+    return "Normal";
+}
+// NEW ↑↑↑
+
 /* ===== Component ===== */
 export default function ChargingSessionStart() {
     const navigate = useNavigate();
@@ -55,8 +75,11 @@ export default function ChargingSessionStart() {
     const [charger, setCharger] = useState(state?.charger || {});
     const [gun, setGun] = useState(state?.gun || state?.port || {});
     const [infoReady, setInfoReady] = useState(!!normId(gun) || !!normId(charger));
+    const [showInfo, setShowInfo] = useState(false); // 👈 chỉ hiện card sau khi xác nhận
 
-    const stationName = normText(station.name || station.StationName || station.title);
+    const stationName = normText(
+        station.stationName || station.StationName || station.name || station.title
+    );
     const stationAddress = fmtAddress(station);
     const chargerCode = normText(charger.code || charger.Code);
     const chargerType = normText(charger.type || charger.Type);
@@ -81,7 +104,66 @@ export default function ChargingSessionStart() {
     const [loadingLookup, setLoadingLookup] = useState(false);
     const [starting, setStarting] = useState(false);
 
-    // === STEP 1: Tra cứu từ BE (Port -> Charger -> Station)
+    /* ===== Pricing states & timers ===== */
+    // NEW ↓↓↓
+    const [pricingMap, setPricingMap] = useState(() => new Map());
+    const [now, setNow] = useState(new Date());
+    useEffect(() => {
+        const t = setInterval(() => setNow(new Date()), 60_000);
+        return () => clearInterval(t);
+    }, []);
+    // Tải PricingRule 1 lần khi mở trang (hoặc khi đã có token)
+    useEffect(() => {
+        let alive = true;
+        (async () => {
+            try {
+                const pr = await fetchAuthJSON(`/PricingRule`);
+                const items = Array.isArray(pr?.items) ? pr.items : (Array.isArray(pr) ? pr : []);
+                const active = items.filter(r => low(r.status) === "active");
+
+                const mp = new Map();
+                for (const r of active) {
+                    const key = mkKey(r.chargerType, r.powerKw);
+                    const bucket = mp.get(key) || {};
+                    bucket[low(r.timeRange)] = r;
+                    mp.set(key, bucket);
+                }
+                if (alive) setPricingMap(mp);
+            } catch (e) {
+                console.warn("[ChargingSessionStart] Không tải được PricingRule:", e?.message);
+                if (alive) setPricingMap(new Map());
+            }
+        })();
+        return () => { alive = false; };
+    }, []);
+    // Xác định pricing hiện tại theo giờ “bắt đầu sạc ngay bây giờ”
+    const currentPricing = useMemo(() => {
+        if (!charger) return null;
+        const typeRaw = charger.type ?? charger.Type ?? "";
+        const kw = Number.isFinite(charger.powerKw)
+            ? charger.powerKw
+            : parseKwFromText(chargerPower);
+        if (!typeRaw || !Number.isFinite(kw)) return null;
+
+        const key = mkKey(typeRaw, kw);
+        const bucket = pricingMap.get(key);
+        if (!bucket) return null;
+
+        const h = now.getHours();
+        const m = now.getMinutes();
+        const tr = timeRangeOfHM(h, m); // "Low" | "Normal" | "Peak"
+        const r = bucket[low(tr)];
+        if (!r) return null;
+
+        return {
+            ...r,
+            timeRange: tr,
+            label: `${viTimeRange(tr)} • ${vnd(r.pricePerKwh)}/kWh`,
+        };
+    }, [charger, chargerPower, pricingMap, now]);
+    // NEW ↑↑↑
+
+    // === XÁC NHẬN + TRA CỨU ===
     async function lookupInfo() {
         const parsePort = (s) => {
             if (!s) return null;
@@ -114,10 +196,12 @@ export default function ChargingSessionStart() {
             setStation(st || {});
 
             setInfoReady(true);
-            message.success("Đã tải thông tin trụ/đầu sạc từ máy chủ.");
+            setShowInfo(true); // 👈 hiện card sau khi xác nhận thành công
+            message.success("Đã xác nhận và tải thông tin từ máy chủ.");
         } catch (e) {
             console.error("[lookupInfo]", e);
             setInfoReady(false);
+            setShowInfo(false);
             setStation({});
             setCharger({});
             setGun({});
@@ -127,11 +211,9 @@ export default function ChargingSessionStart() {
         }
     }
 
-    // === STEP 2: Bắt đầu sạc (BE only)
-    // Thêm helper nhẹ trong ChargingSessionStart:
+    // === BẮT ĐẦU SẠC (điều hướng để trang /charging tự POST /start) ===
     async function resolveFirstVehicleIdForCustomer(customerId) {
         try {
-            // Nếu BE có filter theo customerId thì ưu tiên:
             const tryUrls = [
                 `${API_ABS}/Vehicles?page=1&pageSize=10&customerId=${encodeURIComponent(customerId)}`,
                 `${API_ABS}/Vehicles?page=1&pageSize=50`,
@@ -141,9 +223,7 @@ export default function ChargingSessionStart() {
                 const items = Array.isArray(r?.items) ? r.items : Array.isArray(r) ? r : [];
                 if (!items.length) continue;
                 const mine =
-                    items.find(v =>
-                        String(v?.customerId ?? v?.CustomerId) === String(customerId)
-                    ) || items[0];
+                    items.find((v) => String(v?.customerId ?? v?.CustomerId) === String(customerId)) || items[0];
                 const vid = Number(mine?.vehicleId ?? mine?.VehicleId ?? mine?.id ?? mine?.Id);
                 if (Number.isFinite(vid) && vid > 0) return vid;
             }
@@ -153,17 +233,14 @@ export default function ChargingSessionStart() {
 
     async function handleStart() {
         if (!infoReady) {
-            message.error("Vui lòng tra cứu ID trước khi bắt đầu sạc.");
+            message.error("Vui lòng xác nhận ID trước khi bắt đầu sạc.");
             return;
         }
 
         const portId = toNumId(normId(gun));
-        let vehicleId =
-            toNumId(state?.vehicleId ?? state?.vehicle?.id ?? state?.vehicle?.vehicleId);
+        let vehicleId = toNumId(state?.vehicleId ?? state?.vehicle?.id ?? state?.vehicle?.vehicleId);
         let customerId = toNumId(
-            state?.customerId ??
-            state?.customer?.id ??
-            (await resolveCustomerIdFromAuth(API_ABS))
+            state?.customerId ?? state?.customer?.id ?? (await resolveCustomerIdFromAuth(API_ABS))
         );
         const bookingRaw = state?.bookingId ?? state?.booking?.id ?? state?.booking?.bookingId ?? null;
         const nBooking = toNumId(bookingRaw);
@@ -173,7 +250,6 @@ export default function ChargingSessionStart() {
         if (!Number.isFinite(portId)) return message.error("Thiếu portId hợp lệ.");
         if (!Number.isFinite(customerId)) return message.error("Thiếu customerId hợp lệ.");
 
-        // Nếu chưa có vehicleId thì cố lấy chiếc đầu tiên của customer:
         if (!Number.isFinite(vehicleId)) {
             vehicleId = await resolveFirstVehicleIdForCustomer(customerId);
         }
@@ -181,21 +257,17 @@ export default function ChargingSessionStart() {
             return message.error("Không tìm được vehicleId cho khách hàng này.");
         }
 
-        // ✅ Không gọi BE ở đây; chỉ điều hướng kèm state để ChargingProgress tự POST /start
         navigate("/charging", {
             replace: true,
             state: {
-                // context hiển thị
                 station,
                 charger,
                 gun,
-                // ids cần cho POST
                 customerId,
                 companyId: Number.isFinite(companyId) ? companyId : undefined,
                 vehicleId,
-                bookingId,          // có thể null
+                bookingId,
                 portId,
-                // optional: thông tin UI
                 carModel: state?.carModel ?? undefined,
                 plate: state?.plate ?? undefined,
                 startedAt: Date.now(),
@@ -203,32 +275,45 @@ export default function ChargingSessionStart() {
         });
     }
 
-
     return (
         <MainLayout>
             <div className="cs-root">
-                {/* Form nhập ID + TRA CỨU */}
+                {/* Ô nhập + XÁC NHẬN */}
                 <div className="cs-start">
-                    <label className="cs-input-label">Nhập ID trụ hoặc súng để tra cứu</label>
+                    <label className="cs-input-label">Nhập ID trụ hoặc súng để bắt đầu phiên sạc</label>
                     <div className="cs-input-row">
                         <Input
-                            placeholder={`VD: ${idHints[0] || "P-1"}`}
+                            placeholder={`VD: ${idHints[0] || "1"}`}
                             value={typedId}
                             onChange={(e) => setTypedId(e.target.value)}
-                            onPressEnter={lookupInfo}  // Enter chỉ tra cứu
+                            onPressEnter={() => {
+                                if (typedId.trim()) lookupInfo();
+                            }}
                             size="large"
                         />
-                        <Button size="large" icon={<SearchOutlined />} loading={loadingLookup} onClick={lookupInfo}>
-                            Tra cứu
+                        <Button
+                            className="cs-btn-green"
+                            size="large"
+                            icon={<CheckOutlined />}
+                            loading={loadingLookup}
+                            onClick={lookupInfo}
+                            disabled={!typedId.trim()}
+                            type="primary"
+                        >
+                            Xác nhận
                         </Button>
                     </div>
+
                     <div className="cs-hints">
                         Gợi ý:&nbsp;
                         {idHints.map((h, i) => (
                             <React.Fragment key={h}>
                                 <a
                                     href="#!"
-                                    onClick={(e) => { e.preventDefault(); setTypedId(h); }}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        setTypedId(h);
+                                    }}
                                     className="cs-hint"
                                 >
                                     {h}
@@ -239,59 +324,78 @@ export default function ChargingSessionStart() {
                     </div>
                 </div>
 
-                {/* Thông tin sau khi tra cứu */}
-                <div className="cs-card">
-                    <h3 className="cs-section-title">Thông tin đặt chỗ</h3>
+                {/* Thông tin: chỉ hiện sau khi XÁC NHẬN thành công */}
+                {showInfo && infoReady && (
+                    <div className="cs-card">
+                        <h3 className="cs-section-title">Xác nhận thông tin</h3>
 
-                    <div className="cs-subcard">
-                        <div className="cs-subtitle">Trạm sạc</div>
-                        <div className="cs-rows">
-                            <div className="cs-row">
-                                <div className="cs-label">Trạm</div>
-                                <div className="cs-value">{stationName}</div>
-                            </div>
-                            <div className="cs-row">
-                                <div className="cs-label">Địa chỉ</div>
-                                <div className="cs-value">{stationAddress}</div>
+                        <div className="cs-subcard">
+                            <div className="cs-subtitle">Trạm sạc</div>
+                            <div className="cs-rows">
+                                <div className="cs-row">
+                                    <div className="cs-label">Trạm</div>
+                                    <div className="cs-value">{stationName}</div>
+                                </div>
+                                <div className="cs-row">
+                                    <div className="cs-label">Địa chỉ</div>
+                                    <div className="cs-value">{stationAddress}</div>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div className="cs-subcard">
-                        <div className="cs-subtitle">Trụ sạc</div>
-                        <div className="cs-rows">
-                            <div className="cs-row">
-                                <div className="cs-label">Mã trụ</div>
-                                <div className="cs-value">{normText(chargerCode)}</div>
-                            </div>
-                            <div className="cs-row">
-                                <div className="cs-label">Loại</div>
-                                <div className="cs-value">{normText(chargerType)}</div>
-                            </div>
-                            <div className="cs-row">
-                                <div className="cs-label">Công suất</div>
-                                <div className="cs-value">{normText(chargerPower)}</div>
-                            </div>
-                            <div className="cs-row">
-                                <div className="cs-label">Súng/Cổng</div>
-                                <div className="cs-value">{normText(gunDisplay)}</div>
+                        <div className="cs-subcard">
+                            <div className="cs-subtitle">Trụ sạc</div>
+                            <div className="cs-rows">
+                                <div className="cs-row">
+                                    <div className="cs-label">Mã trụ</div>
+                                    <div className="cs-value">{normText(chargerCode)}</div>
+                                </div>
+                                <div className="cs-row">
+                                    <div className="cs-label">Loại</div>
+                                    <div className="cs-value">{normText(chargerType)}</div>
+                                </div>
+                                <div className="cs-row">
+                                    <div className="cs-label">Công suất</div>
+                                    <div className="cs-value">{normText(chargerPower)}</div>
+                                </div>
+                                <div className="cs-row">
+                                    <div className="cs-label">Súng/Cổng</div>
+                                    <div className="cs-value">{normText(gunDisplay)}</div>
+                                </div>
+
+                                {/* NEW: Giá áp dụng */}
+                                <div className="cs-row">
+                                    <div className="cs-label">Giá áp dụng</div>
+                                    <div className="cs-value">
+                                        {currentPricing
+                                            ? `${vnd(currentPricing.pricePerKwh)}/kWh (${viTimeRange(currentPricing.timeRange)})`
+                                            : (charger.price ? charger.price : "—")}
+                                    </div>
+                                </div>
+                                {currentPricing && (
+                                    <div className="cs-footnote">
+                                        Áp dụng theo thời điểm bắt đầu sạc: <b>{String(now.getHours()).padStart(2, "0")}:{String(now.getMinutes()).padStart(2, "0")}</b>. Giá chỉ mang tính tham khảo; hệ thống sẽ tính cuối cùng.
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    </div>
 
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-                        <Button
-                            type="primary"
-                            size="large"
-                            icon={<ThunderboltOutlined />}
-                            disabled={!infoReady}
-                            loading={starting}
-                            onClick={handleStart}
-                        >
-                            Bắt đầu sạc
-                        </Button>
+                        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+                            {/* Nút Bắt đầu sạc */}
+                            <Button
+                                className="cs-btn-green"
+                                type="primary"
+                                size="large"
+                                icon={<ThunderboltOutlined />}
+                                disabled={!infoReady}
+                                loading={starting}
+                                onClick={handleStart}
+                            >
+                                Bắt đầu sạc
+                            </Button>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         </MainLayout>
     );
