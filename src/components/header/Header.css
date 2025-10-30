@@ -149,6 +149,16 @@
   cursor: pointer;
   transition: color 0.2s ease, transform 0.15s ease;
 }
+.bell-icon{
+  font-size: 33px;
+  color: rgb(0, 0, 0);
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.15s ease;
+}
+.bell-icon:hover{
+  color: #006d32;
+  transform: scale(1.1);
+}
 .invoice-icon:hover {
   color: #006d32;
   transform: scale(1.1);
@@ -161,4 +171,5 @@
 .nav .nav-item.active.nav-dropdown .caret {
   opacity: 1;
 }
+
 
