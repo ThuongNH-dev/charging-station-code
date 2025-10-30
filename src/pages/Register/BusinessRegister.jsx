@@ -1,170 +1,197 @@
 import React, { useState } from "react";
-import { Form, Input, Button, message } from "antd";
-import {
-  MailOutlined,
-  LockOutlined,
-  BankOutlined,
-  PhoneOutlined,
-} from "@ant-design/icons";
-import "./Register.css"; // import chung
+import { useNavigate } from "react-router-dom";
+import { getApiBase, fetchAuthJSON } from "../../utils/api";
+import "./BusinessRegister.css";
 
-const API_URL = "https://68e336488e14f4523dacc3c1.mockapi.io/hehe/Business";
+const API_BASE = getApiBase();
 
-const BusinessRegister = () => {
-  const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false); // trạng thái gửi
+export default function BusinessRegister() {
+  const navigate = useNavigate();
 
-  // ✅ Hàm xử lý gửi dữ liệu lên MockAPI
-  const handleSubmit = async (values) => {
+  const [form, setForm] = useState({
+    userName: "",
+    password: "",
+    confirmPassword: "",
+    companyName: "",
+    taxCode: "",
+    companyEmail: "",
+    companyPhone: "",
+    address: "",
+  });
+
+  const [plan, setPlan] = useState("small");
+  const [loading, setLoading] = useState(false);
+  const [agree, setAgree] = useState(false);
+
+  const planPrices = {
+    small: 99000,
+    medium: 399000,
+    large: 799000,
+  };
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!agree) {
+      alert("Vui lòng đồng ý với điều khoản & chính sách.");
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      setLoading(true);
+      // ✅ Payload chính xác với backend
+      const payload = {
+        userName: form.userName,
+        password: form.password,
+        confirmPassword: form.confirmPassword,
+        companyName: form.companyName,
+        taxCode: form.taxCode,
+        companyEmail: form.companyEmail,
+        companyPhone: form.companyPhone,
+        address: form.address,
+        imageUrl: "string", // bắt buộc có
+      };
 
-      const res = await fetch(API_URL, {
+      console.log("[REGISTER PAYLOAD]", payload);
+
+      const registerRes = await fetchAuthJSON(`${API_BASE}/Auth/register-company`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error("Không thể gửi dữ liệu!");
+      console.log("[REGISTER RESPONSE]", registerRes);
 
-      const data = await res.json();
-      console.log("MockAPI response:", data);
+      if (!registerRes || !registerRes.message?.includes("thành công")) {
+        alert(registerRes?.message || "Đăng ký thất bại. Vui lòng kiểm tra thông tin và thử lại.");
+        setLoading(false);
+        return;
+      }
 
-      message.success("Đăng ký thành công 🎉");
-      form.resetFields(); // reset form
+      // 🔹 Lấy companyId vừa tạo
+      const accounts = await fetchAuthJSON(`${API_BASE}/Auth`);
+      const newCompany = Array.isArray(accounts)
+        ? accounts.find((a) => a.userName === form.userName && a.role === "Company")
+        : null;
+
+      const companyId = newCompany?.company?.companyId ?? null;
+
+      if (!companyId) {
+        alert("Không thể xác định mã doanh nghiệp. Vui lòng thử lại.");
+        setLoading(false);
+        return;
+      }
+
+      // 🔹 Điều hướng sang thanh toán
+      navigate("/register/payment", {
+        state: {
+          companyId,
+          presetAmount: planPrices[plan],
+          description: `Phí mở tài khoản doanh nghiệp (${
+            plan === "small"
+              ? "Quy mô nhỏ"
+              : plan === "medium"
+              ? "Quy mô vừa"
+              : "Quy mô lớn"
+          })`,
+        },
+      });
     } catch (error) {
-      console.error(error);
-      message.error("Đăng ký thất bại. Vui lòng thử lại!");
+      console.error("Lỗi đăng ký doanh nghiệp:", error);
+      alert("Có lỗi xảy ra. Vui lòng thử lại sau.");
     } finally {
       setLoading(false);
     }
   };
+
   return (
-    <div className="register-bg">
-      <div className="register-card w-[450px]">
-        <h2
-          className="font-semibold mb-6 text-center"
-          style={{ fontSize: 28, color: "#fff" }}
-        >
-          Đăng ký doanh nghiệp
-        </h2>
+    <div className="business-register">
+      <div className="business-container">
+        <h1 className="title">Thông tin doanh nghiệp và đăng ký gói</h1>
 
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-          autoComplete="off"
-        >
-          <Form.Item
-            label={<span style={{ color: "#fff" }}>Tên công ty</span>}
-            name="company"
-            rules={[{ required: true, message: "Vui lòng nhập tên công ty" }]}
-          >
-            <Input placeholder="Nhập tên công ty" prefix={<BankOutlined />} />
-          </Form.Item>
+        <form className="form-section" onSubmit={handleSubmit}>
+          <div className="left-col">
+            <div className="section-box">
+              <h3>Thông tin doanh nghiệp</h3>
 
-          <Form.Item
-            label={<span style={{ color: "#fff" }}>Email liên hệ</span>}
-            name="email"
-            rules={[
-              { required: true, message: "Vui lòng nhập email" },
-              { type: "email", message: "Email không hợp lệ" },
-            ]}
-          >
-            <Input placeholder="Nhập email" prefix={<MailOutlined />} />
-          </Form.Item>
-
-          <Form.Item
-            label={<span style={{ color: "#fff" }}>Số điện thoại</span>}
-            name="phone"
-            rules={[{ required: true, message: "Vui lòng nhập số điện thoại" }]}
-          >
-            <Input
-              placeholder="Nhập số điện thoại"
-              prefix={<PhoneOutlined />}
-            />
-          </Form.Item>
-
-          <Form.Item
-            label={<span style={{ color: "#fff" }}>Mật khẩu</span>}
-            name="password"
-            rules={[
-              { required: true, message: "Vui lòng nhập mật khẩu" },
-              { min: 8, message: "Mật khẩu phải có ít nhất 8 ký tự" },
-            ]}
-          >
-            <Input.Password
-              placeholder="Nhập mật khẩu"
-              prefix={<LockOutlined />}
-            />
-          </Form.Item>
-
-          <div
-            style={{
-              fontSize: "13px",
-              color: "#ccc",
-              marginTop: -10,
-              marginBottom: 10,
-              textAlign: "left",
-            }}
-          >
-            Sử dụng ít nhất 8 chữ cái, số và ký hiệu
+              {[
+                { label: "Tên đăng nhập", name: "userName", placeholder: "Nhập tên đăng nhập" },
+                { label: "Mật khẩu", name: "password", type: "password", placeholder: "Nhập mật khẩu" },
+                { label: "Xác nhận mật khẩu", name: "confirmPassword", type: "password", placeholder: "Nhập lại mật khẩu" },
+                { label: "Tên công ty", name: "companyName", placeholder: "Công ty TNHH ABC" },
+                { label: "Mã số thuế", name: "taxCode", placeholder: "10 hoặc 13 chữ số" },
+                { label: "Email công ty", name: "companyEmail", placeholder: "example@company.com" },
+                { label: "Số điện thoại công ty", name: "companyPhone", placeholder: "+84xxxxxxxxx" },
+                { label: "Địa chỉ", name: "address", placeholder: "Số 1, Đường A, Quận B" },
+              ].map((field) => (
+                <div className="form-group" key={field.name}>
+                  <label>{field.label}</label>
+                  <input
+                    type={field.type || "text"}
+                    name={field.name}
+                    value={form[field.name]}
+                    onChange={handleChange}
+                    required
+                    placeholder={field.placeholder}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
 
-          <Form.Item
-            label={<span style={{ color: "#fff" }}>Nhập lại mật khẩu</span>}
-            name="confirmPassword"
-            dependencies={["password"]}
-            rules={[
-              { required: true, message: "Vui lòng xác nhận mật khẩu!" },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (!value || getFieldValue("password") === value) {
-                    return Promise.resolve();
-                  }
-                  return Promise.reject(new Error("Mật khẩu không khớp!"));
-                },
-              }),
-            ]}
-          >
-            <Input.Password
-              placeholder="Nhập lại mật khẩu"
-              prefix={<LockOutlined />}
-            />
-          </Form.Item>
+          <div className="right-col">
+            <div className="section-box plan-section">
+              <h3>Phí mở tài khoản</h3>
 
-          <Form.Item>
-            <Button
-              type="primary"
-              block
-              size="large"
-              htmlType="submit"
-              style={{
-                backgroundColor: "#1677ff",
-                borderRadius: 8,
-                fontWeight: "bold",
-              }}
-            >
-              Đăng ký
-            </Button>
-          </Form.Item>
+              <div className="plan-grid">
+                {Object.entries(planPrices).map(([key, price]) => (
+                  <div
+                    key={key}
+                    className={`plan-box ${plan === key ? "selected" : ""}`}
+                    onClick={() => setPlan(key)}
+                  >
+                    <div className="plan-title">
+                      {key === "small"
+                        ? "Quy mô nhỏ"
+                        : key === "medium"
+                        ? "Quy mô vừa"
+                        : "Quy mô lớn"}
+                    </div>
+                    <div className="plan-price">
+                      {price.toLocaleString("vi-VN")} đ
+                    </div>
+                    <p className="plan-desc">
+                      ({key === "small"
+                        ? "Tối đa 9 thành viên"
+                        : key === "medium"
+                        ? "Tối đa 50 thành viên"
+                        : "Tối đa 100 thành viên"})
+                    </p>
+                  </div>
+                ))}
+              </div>
 
-          <div
-            style={{
-              fontSize: "15px",
-              color: "#ffffff",
-              textAlign: "center",
-            }}
-          >
-            Đã có tài khoản?{" "}
-            <u>
-              <b>Đăng nhập</b>
-            </u>
+              <div className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={agree}
+                  onChange={() => setAgree(!agree)}
+                />
+                Tôi đồng ý với điều khoản & Chính sách
+              </div>
+
+              <button type="submit" className="primary-btn" disabled={loading}>
+                {loading ? "Đang xử lý..." : "Xác nhận"}
+              </button>
+            </div>
           </div>
-        </Form>
+        </form>
       </div>
     </div>
   );
-};
-
-export default BusinessRegister;
+}
