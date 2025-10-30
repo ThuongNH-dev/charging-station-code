@@ -34,21 +34,24 @@ function normalizeUser(u = {}) {
     Array.isArray(customers) && customers.length ? customers[0] : {};
   const companyObj = u.company ?? u.Company ?? {};
 
+  const name =
+    u.fullName ??
+    u.FullName ??
+    customerObj.fullName ??
+    customerObj.FullName ??
+    companyObj.name ??
+    companyObj.Name ??
+    u.name ??
+    "";
+
   return {
     accountId: u.accountId ?? u.id ?? u.AccountId ?? u.Id,
     userName: u.userName ?? u.UserName ?? "",
     role: u.role ?? u.Role ?? "",
     status: u.status ?? u.Status ?? "",
     avatarUrl: u.avatarUrl ?? u.AvatarUrl ?? "",
-    name:
-      u.fullName ??
-      u.FullName ??
-      customerObj.fullName ??
-      customerObj.FullName ??
-      companyObj.name ??
-      companyObj.Name ??
-      u.name ??
-      "",
+    name, // ← tên chuẩn
+    fullName: name, // ← alias cho FE nào đọc fullName
     email: u.email ?? u.Email ?? customerObj.email ?? companyObj.email ?? "",
     phone: u.phone ?? u.Phone ?? customerObj.phone ?? companyObj.phone ?? "",
     address:
@@ -81,21 +84,21 @@ function normalizeCompany(c = {}) {
 }
 
 function normalizeStaff(s = {}) {
-  // 🚀 THAY THẾ staffId bằng customerId
+  // Dùng customerId làm mã nhận diện cho nhân viên (thay staffId)
   const customerId =
-    s.customerId ?? // Lấy customerId nếu có
+    s.customerId ??
     s.CustomerId ??
-    s.accountId ?? // Lấy accountId (giá trị 3) làm dự phòng
+    s.accountId ??
     s.AccountId ??
     s.id ??
     s.Id ??
     null;
 
+  const fullName = s.fullName ?? s.FullName ?? s.name ?? s.Name ?? "";
+
   return {
-    // ❌ Xóa staffId
-    // ✅ Dùng customerId thay thế cho Mã NV
-    customerId: customerId,
-    fullName: s.fullName ?? s.FullName ?? s.name ?? s.Name ?? "",
+    customerId,
+    fullName,
     email: s.email ?? s.Email ?? "",
     phone: s.phone ?? s.Phone ?? "",
     address: s.address ?? s.Address ?? "",
@@ -110,6 +113,7 @@ function normalizeStaff(s = {}) {
   };
 }
 
+/* =============== STAFF =============== */
 /**
  * Lấy staff-info:
  * - Ưu tiên /Auth/{id} (nếu trả kèm Staff).
@@ -165,7 +169,6 @@ export const getStaffInfo = async () => {
         return normalizeStaff({
           AccountId: u.accountId,
           CustomerId: c0.customerId,
-          StaffId: null,
           FullName: u.name || c0.fullName || res.userName || "",
           Email: u.email || "",
           Phone: u.phone || c0.phone || "",
@@ -192,7 +195,6 @@ export const getStaffInfo = async () => {
     }
     if ((u.role || "").toLowerCase() === "staff") {
       return normalizeStaff({
-        StaffId: null,
         FullName: u.name || u.userName || "",
         Email: u.email || "",
         Phone: u.phone || "",
@@ -208,11 +210,13 @@ export const getStaffInfo = async () => {
 };
 
 /**
- * Cập nhật Staff (cần StaffId). Nếu BE khác, đổi URL/body cho khớp.
+ * Cập nhật Staff: yêu cầu CustomerId; Body theo BE /Auth/update-customer
  */
 export const updateStaffInfo = async (payload = {}) => {
   if (!payload.customerId) {
-    throw new Error("Thiếu StaffId – không thể cập nhật thông tin nhân viên.");
+    throw new Error(
+      "Thiếu CustomerId – không thể cập nhật thông tin nhân viên."
+    );
   }
 
   const rawImg =
@@ -227,9 +231,9 @@ export const updateStaffInfo = async (payload = {}) => {
     AvatarUrl: avatarUrl,
   };
 
-  const url = `${API_BASE}/Auth/update-customer`; // 🚀 GỌI ĐÚNG ENDPOINT
-  __logFetch("[profileApi.updateStaffInfo] via /update-customer", url, {
-    method: "PUT", // 🚀 SỬ DỤNG METHOD PUT
+  const url = `${API_BASE}/Auth/update-customer`;
+  __logFetch("[profileApi.updateStaffInfo] /update-customer", url, {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -278,7 +282,7 @@ export const updateStaffInfo = async (payload = {}) => {
 
   let normalized = normalizeStaff(candidate || {});
   const isEmpty =
-    !normalized.staffId &&
+    !normalized.customerId &&
     !normalized.fullName &&
     !normalized.email &&
     !normalized.phone &&
@@ -335,8 +339,8 @@ export const updateUser = async (payload = {}, opts = {}) => {
     (payload.role && String(payload.role).toLowerCase() === "company");
 
   if (isCompany) {
-    const rawImg = (payload.imageUrl ?? payload.avatarUrl ?? "").trim();
-    const imageUrl = rawImg ? rawImg : DEFAULT_IMAGE_URL;
+    const rawImg = (payload.imageUrl ?? payload.avatarUrl ?? "").trim?.() || "";
+    const imageUrl = rawImg || DEFAULT_IMAGE_URL;
 
     const body = {
       CompanyId: payload.companyId,
@@ -557,6 +561,108 @@ export const updateEnterpriseInfo = async (payload = {}) => {
   return normalized;
 };
 
-/* =====================================================
-   ❌ ĐÃ GỠ API VEHICLE theo yêu cầu
-   ===================================================== */
+/* =============== ADMIN =============== */
+// Lấy thông tin Admin (đọc từ /Auth/{accountId}). FE dùng data.name hoặc data.fullName.
+export const getAdminInfo = async () => {
+  const accountId = localStorage.getItem("accountId");
+  if (!accountId || accountId === "null" || accountId === "undefined") {
+    throw new Error("Không xác định được Admin hiện tại");
+  }
+
+  const url = `${API_BASE}/Auth/${encodeURIComponent(accountId)}`;
+  __logFetch("[profileApi.getAdminInfo] /Auth/{id}", url, { method: "GET" });
+
+  const res = await fetchAuthJSON(url, { method: "GET" });
+  return normalizeUser(res);
+};
+
+// Cập nhật thông tin Admin qua /Auth/update-customer (yêu cầu CustomerId)
+export const updateAdminInfo = async (payload = {}) => {
+  // Ưu tiên lấy từ form: adminId (mã hiển thị) thực chất là CustomerId
+  const customerId = payload.customerId ?? payload.adminId ?? null;
+
+  if (!customerId) {
+    throw new Error("Thiếu CustomerId – không thể cập nhật thông tin admin.");
+  }
+
+  const rawImg =
+    typeof payload.avatarUrl === "string" ? payload.avatarUrl.trim() : "";
+  const avatarUrl = rawImg || DEFAULT_IMAGE_URL;
+
+  const body = {
+    CustomerId: customerId, // ← đúng schema của /update-customer
+    FullName: payload.fullName ?? "",
+    Phone: payload.phone ?? "",
+    Address: payload.address ?? "",
+    AvatarUrl: avatarUrl,
+  };
+
+  const url = `${API_BASE}/Auth/update-customer`;
+  __logFetch("[profileApi.updateAdminInfo] /update-customer", url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  // dùng fetch thô để tự handle 204
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    let errText = "";
+    try {
+      const j = await res.json();
+      if (j?.errors) {
+        const parts = Object.entries(j.errors).flatMap(([k, arr]) =>
+          (arr || []).map((m) => `${k}: ${m}`)
+        );
+        errText = parts.join("\n");
+      } else {
+        errText = j?.title || j?.message || "";
+      }
+    } catch {
+      errText = await res.text().catch(() => "");
+    }
+    throw new Error(errText || `Cập nhật thất bại (HTTP ${res.status})`);
+  }
+
+  if (res.status === 204) {
+    // Fallback: BE không trả gì → trả lại theo body vừa gửi
+    return {
+      customerId,
+      fullName: body.FullName,
+      phone: body.Phone,
+      address: body.Address,
+      avatarUrl: body.AvatarUrl,
+      name: body.FullName, // alias
+    };
+  }
+
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+    data = null;
+  }
+
+  // Có thể BE trả customer/user; chuẩn hoá rồi luôn có name/fullName/phone...
+  const normalized = normalizeUser(data || {});
+  // Nếu vẫn trống, fallback theo body
+  if (!normalized.phone && !normalized.address && !normalized.name) {
+    return {
+      customerId,
+      fullName: body.FullName,
+      phone: body.Phone,
+      address: body.Address,
+      avatarUrl: body.AvatarUrl,
+      name: body.FullName,
+    };
+  }
+  return normalized;
+};

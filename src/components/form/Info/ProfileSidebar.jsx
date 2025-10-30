@@ -29,6 +29,13 @@ export default function ProfileSidebar() {
         { to: "/profile/change-password", label: "Đổi mật khẩu" },
       ];
     }
+    if (roleNorm === "admin") {
+      return [
+        { to: "/profile/admin-info", label: "Cập nhật thông tin" },
+        { to: "/profile/change-password", label: "Đổi mật khẩu" },
+      ];
+    }
+
     // default: customer
     return [
       { to: "/profile/update-info", label: "Cập nhật thông tin" },
@@ -43,6 +50,8 @@ export default function ProfileSidebar() {
       ? "Doanh nghiệp"
       : roleNorm === "staff"
       ? "Nhân viên"
+      : roleNorm === "admin"
+      ? "Quản trị viên"
       : roleNorm === "customer"
       ? "Khách hàng"
       : role || "—";

@@ -161,6 +161,8 @@ export default function AccountMenu() {
         return "/profile/enterprise-info";
       case "staff":
         return "/profile/staff-info";
+      case "admin":
+        return "/profile/admin-info";
       case "customer":
         return "/profile/update-info";
       default:

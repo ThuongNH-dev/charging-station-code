@@ -38,7 +38,7 @@ import PaymentMethods from "./components/updateProfilePerson/PaymentMethods";
 import ChangePassword from "./components/updateProfilePerson/ChangePassword";
 import EnterpriseInfo from "./components/updateProfileBusiness/EnterpriseInfo";
 import StaffInfo from "./pages/updateProfileStaff/StaffInfo";
-
+import AdminInfo from "./pages/updateProfileAdmin/AdminInfo";
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
     case "customer":
@@ -210,6 +210,16 @@ export default function App() {
         }
       />
 
+      {/* ✅ Profile (Admin) */}
+      <Route
+        path="/profile/admin-info"
+        element={
+          <ProtectedRoute allowedRoles={["Admin"]}>
+            <AdminInfo />
+          </ProtectedRoute>
+        }
+      />
+
       {/* ✅ Profile (Company) – HÌNH 2 */}
       <Route
         path="/profile/enterprise-info"
@@ -258,7 +268,9 @@ export default function App() {
       <Route
         path="/profile/change-password"
         element={
-          <ProtectedRoute allowedRoles={["Customer", "Company", "Staff"]}>
+          <ProtectedRoute
+            allowedRoles={["Customer", "Company", "Staff", "Admin"]}
+          >
             <ChangePassword />
           </ProtectedRoute>
         }
