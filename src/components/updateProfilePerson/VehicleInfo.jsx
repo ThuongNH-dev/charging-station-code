@@ -485,8 +485,8 @@ export default function VehicleInfo() {
 
               {!currentVehicle && !initLoading && (
                 <p style={{ marginTop: 8, opacity: 0.7 }}>
-                  Bạn chưa có xe nào. Hãy điền thông tin và bấm “Lưu thay đổi”
-                  để tạo mới.
+                  Bạn chưa có xe nào. Hãy điền thông tin và bấm “Lưu” để tạo
+                  mới.
                 </p>
               )}
 
@@ -497,7 +497,7 @@ export default function VehicleInfo() {
                   loading={loading}
                   className="save-btn"
                 >
-                  Lưu thay đổi
+                  LƯU
                 </Button>
                 <Button
                   htmlType="button"
@@ -508,7 +508,7 @@ export default function VehicleInfo() {
                       : form.resetFields()
                   }
                 >
-                  Hủy
+                  HỦY
                 </Button>
               </div>
             </Form>

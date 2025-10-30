@@ -36,7 +36,7 @@ import ChargingSessionStart from "./components/charging/ChargingSessionStart";
 
 import UpdateInfo from "./components/updateProfilePerson/UpdateInfo";
 import VehicleInfo from "./components/updateProfilePerson/VehicleInfo";
-import PaymentMethods from "./components/updateProfilePerson/PaymentMethods";
+
 import ChangePassword from "./components/updateProfilePerson/ChangePassword";
 import EnterpriseInfo from "./components/updateProfileBusiness/EnterpriseInfo";
 import MonthlyStats from "./pages/company/MonthlyStats";
@@ -46,6 +46,9 @@ import Notification from "./pages/notification/Notification";
 
 import StaffInfo from "./pages/updateProfileStaff/StaffInfo";
 import AdminInfo from "./pages/updateProfileAdmin/AdminInfo";
+import ForgotPassword from "./pages/password/ForgotPassword";
+import ResetPassword from "./pages/password/ResetPassword";
+
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
     case "customer":
@@ -95,6 +98,12 @@ export default function App() {
         }
       />
       <Route path="/unauthorized" element={<Unauthorized />} />
+
+      {/* PUBLIC: Forgot/Reset password */}
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      {/* Hỗ trợ cả dạng có token trên path */}
+      <Route path="/reset-password/:token" element={<ResetPassword />} />
 
       {/* PROTECTED (Customer) */}
       <Route
@@ -267,14 +276,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/profile/payment-info"
-        element={
-          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
-            <PaymentMethods />
-          </ProtectedRoute>
-        }
-      />
+
       <Route
         path="/profile/change-password"
         element={

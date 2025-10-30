@@ -2,18 +2,20 @@
 
 .profile-sidebar {
   display: flex;
-  padding-top: 30px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+
+  padding: 30px 20px; /* thêm padding ngang cho cân đối */
   border-radius: 12px;
   background: #fff;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  justify-content: flex-start;
+
   box-sizing: border-box;
-  gap: 5px;
-  height: 540px;
-  width: 360px;
+  gap: 10px;
+  width: 360px; /* vẫn có thể giữ cố định chiều rộng */
+
+  /* ❌ bỏ height để tự động giãn theo nội dung */
 }
 
 /* ===== Thông tin người dùng ===== */
@@ -57,7 +59,7 @@
 .profile-nav {
   display: flex;
   width: 250px;
-  margin: 0;
+  margin-bottom: 32px;
   padding: 0;
   text-align: center;
   justify-content: center;

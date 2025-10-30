@@ -42,8 +42,11 @@
 
 /* Style cho form */
 .vehicle-info-form .ant-form-item-label > label {
-  font-weight: 600;
+  font-weight: 500;
   color: #333;
+}
+.connectorType {
+  font-weight: 500 !important;
 }
 
 .vehicle-info-form input,
@@ -58,31 +61,86 @@
   box-shadow: 0 0 0 2px rgba(11, 112, 46, 0.1);
 }
 
-/* Nút hành động */
+/* ===== Nút hành động ===== */
 .form-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center; /* căn giữa 2 nút */
   gap: 16px;
-  margin-top: 28px;
+  margin-top: 33px;
 }
 
+/* === Nút Lưu (Save) === */
 .save-btn {
-  background: #0b702e !important;
+  background: linear-gradient(135deg, #0b702e, #1da750) !important;
   border: none;
+  color: #fff !important;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 20px 26px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 3px 8px rgba(11, 112, 46, 0.25);
 }
 
 .save-btn:hover {
-  background: #0f8d3c !important;
+  background: linear-gradient(135deg, #10b158, #22c76a) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 5px 12px rgba(11, 112, 46, 0.3);
 }
 
+.save-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 4px rgba(11, 112, 46, 0.2);
+}
+
+.save-btn:focus {
+  outline: 2px solid #34c759;
+  outline-offset: 2px;
+}
+
+.save-btn:disabled {
+  background: #bcd9c5 !important;
+  cursor: not-allowed;
+  opacity: 0.8;
+  box-shadow: none;
+}
+
+/* === Nút Hủy (Cancel) === */
 .cancel-btn {
-  border-color: #ccc;
-  color: #555;
+  background: #fff !important;
+  border: 1.5px solid #ccc;
+  color: #555 !important;
+  font-weight: 500;
+  font-size: 15px;
+  padding: 20px 26px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
 .cancel-btn:hover {
-  color: #0b702e;
+  color: #0b702e !important;
   border-color: #0b702e;
+  background: #f7faf8 !important;
+  transform: translateY(-1px);
+}
+
+.cancel-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.cancel-btn:focus {
+  outline: 2px solid #34c75933;
+  outline-offset: 2px;
+}
+
+/* === Khoảng cách giữa nút === */
+.save-btn + .cancel-btn,
+.cancel-btn + .save-btn {
+  margin-left: 12px;
 }
 
 /* Responsive */

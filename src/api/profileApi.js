@@ -229,6 +229,7 @@ export const updateStaffInfo = async (payload = {}) => {
     Phone: payload.phone ?? "",
     Address: payload.address ?? "",
     AvatarUrl: avatarUrl,
+    Email: payload.email ?? "",
   };
 
   const url = `${API_BASE}/Auth/update-customer`;
@@ -339,6 +340,7 @@ export const updateUser = async (payload = {}, opts = {}) => {
     (payload.role && String(payload.role).toLowerCase() === "company");
 
   if (isCompany) {
+    // === NHÁNH COMPANY: GIỮ Y NGUYÊN NHƯ BẠN ĐANG CÓ ===
     const rawImg = (payload.imageUrl ?? payload.avatarUrl ?? "").trim?.() || "";
     const imageUrl = rawImg || DEFAULT_IMAGE_URL;
 
@@ -357,19 +359,40 @@ export const updateUser = async (payload = {}, opts = {}) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const res = await fetchAuthJSON(url, {
+    const res = await fetch(url, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+      },
       body: JSON.stringify(body),
     });
-    return normalizeUser(res);
+    if (!res.ok)
+      throw new Error(await res.text().catch(() => "Update company failed"));
+    if (res.status === 204) {
+      // fallback nếu BE không trả gì
+      return normalizeUser({
+        CompanyId: body.CompanyId,
+        Name: body.Name,
+        TaxCode: body.TaxCode,
+        Email: body.Email,
+        Phone: body.Phone,
+        Address: body.Address,
+        ImageUrl: body.ImageUrl,
+        role: "Company",
+      });
+    }
+    const data = await res.json().catch(() => ({}));
+    return normalizeUser(data);
   }
 
+  // === NHÁNH CUSTOMER: HANDLE 204 + FALLBACK ===
   const body = {
     CustomerId: payload.customerId,
-    FullName: payload.name ?? payload.fullName ?? "",
+    FullName: payload.fullName ?? payload.name ?? "",
     Phone: payload.phone ?? "",
     Address: payload.address ?? "",
+    Email: payload.email ?? "",
   };
   const url = `${API_BASE}/Auth/update-customer`;
   __logFetch("[profileApi.updateUser] customer", url, {
@@ -377,12 +400,69 @@ export const updateUser = async (payload = {}, opts = {}) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const res = await fetchAuthJSON(url, {
+
+  const res = await fetch(url, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
+    },
     body: JSON.stringify(body),
   });
-  return normalizeUser(res);
+
+  if (!res.ok) {
+    let msg = "";
+    try {
+      const j = await res.json();
+      if (j?.errors) {
+        msg = Object.entries(j.errors)
+          .flatMap(([k, arr]) => (arr || []).map((m) => `${k}: ${m}`))
+          .join("\n");
+      } else {
+        msg = j?.title || j?.message || "";
+      }
+    } catch {
+      msg = await res.text().catch(() => "");
+    }
+    throw new Error(msg || `Cập nhật thất bại (HTTP ${res.status})`);
+  }
+
+  // BE không trả body → 204
+  if (res.status === 204) {
+    // Trả về theo những gì FE vừa gửi để FE hiển thị lại không bị trống
+    return normalizeUser({
+      CustomerId: body.CustomerId,
+      FullName: body.FullName,
+      Email: body.Email,
+      Phone: body.Phone,
+      Address: body.Address,
+    });
+  }
+
+  // Có body JSON
+  const data = await res.json().catch(() => ({}));
+  const normalized = normalizeUser(data || {});
+
+  // Nếu vẫn rỗng (một số BE trả message khác), fallback theo body
+  const isEmpty =
+    !normalized.customerId &&
+    !normalized.fullName &&
+    !normalized.name &&
+    !normalized.email &&
+    !normalized.phone &&
+    !normalized.address;
+
+  if (isEmpty) {
+    return normalizeUser({
+      CustomerId: body.CustomerId,
+      FullName: body.FullName,
+      Email: body.Email,
+      Phone: body.Phone,
+      Address: body.Address,
+    });
+  }
+
+  return normalized;
 };
 
 export const changeAccountStatus = async (accountId, newStatus) => {
@@ -595,6 +675,7 @@ export const updateAdminInfo = async (payload = {}) => {
     Phone: payload.phone ?? "",
     Address: payload.address ?? "",
     AvatarUrl: avatarUrl,
+    Email: payload.email ?? "",
   };
 
   const url = `${API_BASE}/Auth/update-customer`;
