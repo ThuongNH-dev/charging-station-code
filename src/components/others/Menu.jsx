@@ -276,7 +276,7 @@ export default function AccountMenu() {
         <MenuItem
           onClick={() => {
             handleClose();
-            navigate("/settings");
+            navigate("/company/reports");
           }}
           sx={{
             borderRadius: "10px",
@@ -285,13 +285,13 @@ export default function AccountMenu() {
             "&:hover": { background: "#f5f7fa" },
           }}
         >
-          Cài đặt tài khoản
+          Thống kê theo tháng
         </MenuItem>
 
         <MenuItem
           onClick={() => {
             handleClose();
-            navigate("/dashboard");
+            navigate("/manageSubcription");
           }}
           sx={{
             borderRadius: "10px",
@@ -300,7 +300,7 @@ export default function AccountMenu() {
             "&:hover": { background: "#f5f7fa" },
           }}
         >
-          Bảng điều khiển
+          Quản lý gói dịch vụ
         </MenuItem>
 
         <Divider sx={{ my: 0.5 }} />

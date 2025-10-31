@@ -48,6 +48,7 @@ import StaffInfo from "./pages/updateProfileStaff/StaffInfo";
 import AdminInfo from "./pages/updateProfileAdmin/AdminInfo";
 import ForgotPassword from "./pages/password/ForgotPassword";
 import ResetPassword from "./pages/password/ResetPassword";
+import ManageSubscriptions from "./components/subscription/ManageSubcription";
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
@@ -308,7 +309,7 @@ export default function App() {
       <Route
         path="/company/reports"
         element={
-          <ProtectedRoute allowedRoles={["Company"]}>
+          <ProtectedRoute allowedRoles={["Company","Customer"]}>
             <MonthlyStats/>
           </ProtectedRoute>
         }
@@ -347,6 +348,14 @@ export default function App() {
             <Notification/>
           </ProtectedRoute>
         }
+      />
+      <Route
+      path="/manageSubcription"
+      element={
+        <ProtectedRoute allowedRoles={["Customer","Company"]}>
+          <ManageSubscriptions/>
+        </ProtectedRoute>
+      }
       />
 
       {/* FALLBACK */}
