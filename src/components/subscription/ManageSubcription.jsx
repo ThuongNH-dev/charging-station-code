@@ -12,6 +12,7 @@ import {
   Empty,
   Spin,
   Tooltip,
+  Popconfirm,
 } from "antd";
 import { ReloadOutlined, StopOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
@@ -37,7 +38,7 @@ function getAuthTokenAndIds(authUser) {
       const s = localStorage.getItem("companyId") || sessionStorage.getItem("companyId");
       if (s) companyId = Number(s);
     }
-  } catch { }
+  } catch {}
   return { token, customerId, companyId };
 }
 
@@ -50,6 +51,8 @@ function statusColor(s) {
     case "canceled":
     case "cancelled":
       return "red";
+    case "inactive":
+      return "default";
     default:
       return "default";
   }
@@ -58,7 +61,7 @@ function statusColor(s) {
 export default function ManageSubscriptions() {
   const { user } = useAuth();
 
-  // ---- Safe message helper (tránh lỗi khi thiếu warning) ----
+  // ---- Safe message helper ----
   const antApp = App.useApp?.();
   const _msg = antApp?.message;
   const msg = {
@@ -68,12 +71,11 @@ export default function ManageSubscriptions() {
       _msg?.warning
         ? _msg.warning(t)
         : _msg?.open
-          ? _msg.open({ type: "warning", content: t })
-          : alert(t),
+        ? _msg.open({ type: "warning", content: t })
+        : alert(t),
     loading: (t, key = "__loading") =>
       _msg?.loading ? _msg.loading({ content: t, key }) : null,
-    dismiss: (key = "__loading") =>
-      _msg?.destroy ? _msg.destroy(key) : null,
+    dismiss: (key = "__loading") => (_msg?.destroy ? _msg.destroy(key) : null),
   };
 
   const navigate = useNavigate();
@@ -82,14 +84,12 @@ export default function ManageSubscriptions() {
   const { token, customerId, companyId } = useMemo(() => getAuthTokenAndIds(user), [user]);
   const role = (user?.role || "Customer").toString();
 
-  const headers = useMemo(
-    () => ({
-      accept: "*/*",
-      "Content-Type": "application/json",
-      authorization: token ? `Bearer ${token}` : undefined,
-    }),
-    [token]
-  );
+  // headers an toàn: không chèn chuỗi "undefined"
+  const headers = useMemo(() => {
+    const h = { accept: "*/*", "Content-Type": "application/json" };
+    if (token) h["authorization"] = `Bearer ${token}`;
+    return h;
+  }, [token]);
 
   const scopeInfo = useMemo(() => {
     const isCompanySide = /admin|host|company/i.test(role);
@@ -132,9 +132,10 @@ export default function ManageSubscriptions() {
     const flag = sessionStorage.getItem("__refresh_subs_after_pay");
     if (flag) {
       sessionStorage.removeItem("__refresh_subs_after_pay");
-      fetchRows(); // tự làm mới sau thanh toán
+      fetchRows();
     }
   }, [fetchRows]);
+
   useEffect(() => {
     const onFocus = () => fetchRows();
     window.addEventListener("focus", onFocus);
@@ -145,7 +146,6 @@ export default function ManageSubscriptions() {
       window.removeEventListener("focus", onFocus);
     };
   }, [fetchRows]);
-
 
   async function putUpdate(sub, patch) {
     const id = sub.subscriptionId;
@@ -173,6 +173,8 @@ export default function ManageSubscriptions() {
   }
 
   const handleToggleAutoRenew = async (sub, checked) => {
+    const isActive = String(sub.status || "").toLowerCase() === "active";
+    if (!isActive) return;
     try {
       const updated = await putUpdate(sub, { autoRenew: checked });
       msg.success(`Đã ${checked ? "bật" : "tắt"} tự gia hạn cho gói #${sub.subscriptionId}`);
@@ -186,10 +188,17 @@ export default function ManageSubscriptions() {
     }
   };
 
-  const handleCancel = async (sub) => {
+  // gọi API hủy trực tiếp (dùng bởi Popconfirm)
+  const doCancelNow = async (sub) => {
+    console.log("[ManageSubscriptions] doCancelNow", sub);
     try {
-      const updated = await putUpdate(sub, { status: "Canceled", endDate: new Date().toISOString() });
-      msg.success("Đã hủy gói");
+      const updated = await putUpdate(sub, {
+        status: "Inactive",
+        autoRenew: false,
+        // Nếu BE không cần endDate, có thể bỏ dòng dưới:
+        endDate: new Date().toISOString(),
+      });
+      msg.success("Đã hủy gói (trạng thái: Inactive, auto-renew: off).");
       setState((s) => ({
         ...s,
         rows: s.rows.map((r) => (r.subscriptionId === sub.subscriptionId ? updated : r)),
@@ -200,7 +209,7 @@ export default function ManageSubscriptions() {
     }
   };
 
-  // Lấy danh sách hóa đơn theo chủ sở hữu (company/customer) và chọn hóa đơn mới nhất
+  // (giữ các hàm invoice để tương thích, nếu cần dùng)
   async function fetchLatestInvoiceIdForOwner(owner) {
     const isCompany = !!owner.companyId;
     const id = isCompany ? owner.companyId : owner.customerId;
@@ -213,7 +222,6 @@ export default function ManageSubscriptions() {
     const arr = Array.isArray(json) ? json : json?.data || [];
     if (!Array.isArray(arr) || arr.length === 0) return null;
 
-    // chọn hóa đơn "mới nhất"
     const sorted = [...arr].sort(
       (a, b) =>
         (b.billingYear || 0) - (a.billingYear || 0) ||
@@ -224,7 +232,6 @@ export default function ManageSubscriptions() {
   }
 
   async function fetchLatestInvoiceIdForSubscription(subId) {
-    // Nếu đã có endpoint chuyên biệt thì dùng; nếu chưa có, rớt xuống owner như cũ
     try {
       const url = `${API_BASE}/Invoices/by-subscription/${subId}`;
       const r = await fetch(url, { headers: { accept: "*/*", authorization: headers.authorization } });
@@ -232,35 +239,29 @@ export default function ManageSubscriptions() {
         const js = await r.json();
         const arr = Array.isArray(js) ? js : js?.data || [];
         if (arr.length) {
-          arr.sort((a, b) =>
-            (b.billingYear || 0) - (a.billingYear || 0) ||
-            (b.billingMonth || 0) - (a.billingMonth || 0) ||
-            (b.invoiceId || 0) - (a.invoiceId || 0)
+          arr.sort(
+            (a, b) =>
+              (b.billingYear || 0) - (a.billingYear || 0) ||
+              (b.billingMonth || 0) - (a.billingMonth || 0) ||
+              (b.invoiceId || 0) - (a.invoiceId || 0)
           );
           return arr[0]?.invoiceId ?? null;
         }
       }
-    } catch { }
+    } catch {}
     return null;
   }
 
-
-  // Click "Chi tiết": tìm invoice theo chủ sở hữu của subscription rồi điều hướng
   const handleViewDetail = async (sub) => {
     try {
       msg.loading("Đang mở chi tiết hóa đơn…");
-
-      // 1) Thử tìm theo subscription trước
       let invoiceId = await fetchLatestInvoiceIdForSubscription(sub.subscriptionId);
-
-      // 2) Fallback theo owner như cũ
       if (!invoiceId) {
         invoiceId = await fetchLatestInvoiceIdForOwner({
           companyId: sub.companyId ?? null,
           customerId: sub.customerId ?? null,
         });
       }
-
       msg.dismiss();
       if (!invoiceId) {
         msg.warning("Không tìm thấy hóa đơn phù hợp cho gói này.");
@@ -273,7 +274,6 @@ export default function ManageSubscriptions() {
       msg.error("Không lấy được hóa đơn. Vui lòng thử lại.");
     }
   };
-
 
   const columns = [
     {
@@ -316,35 +316,53 @@ export default function ManageSubscriptions() {
       align: "center",
       width: 140,
       className: "ms-col-renew",
-      render: (checked, record) => (
-        <Switch checked={!!checked} onChange={(v) => handleToggleAutoRenew(record, v)} />
-      ),
+      render: (checked, record) => {
+        const isActive = String(record.status || "").toLowerCase() === "active";
+        return (
+          <Switch
+            checked={!!checked}
+            disabled={!isActive}
+            onChange={(v) => handleToggleAutoRenew(record, v)}
+          />
+        );
+      },
     },
     {
       title: "Hành động",
       key: "actions",
       width: 260,
       className: "ms-col-actions",
-      render: (_, r) => (
-        <Space>
-          <Tooltip title={String(r.status).toLowerCase() === "canceled" ? "Đã hủy" : "Hủy gói này"}>
-            <Button
-              danger
-              icon={<StopOutlined />}
-              disabled={String(r.status).toLowerCase() === "canceled"}
-              onClick={() => handleCancel(r)}
-            >
-              Hủy gói
-            </Button>
-          </Tooltip>
+      render: (_, r) => {
+        const status = String(r.status || "").toLowerCase();
+        const isActive = status === "active";
+        if (!isActive) return null;
 
-          {String(r.status).toLowerCase() === "pending" && (
-            <Button type="primary" onClick={() => handleViewDetail(r)}>
-              Chi tiết
-            </Button>
-          )}
-        </Space>
-      ),
+        return (
+          <Space
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <Popconfirm
+              title="Xác nhận hủy gói?"
+              description="Hủy là kết thúc luôn và không thể tiếp tục gia hạn."
+              okText="Hủy gói"
+              cancelText="Không"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => doCancelNow(r)}
+            >
+              <Tooltip title="Hủy gói này (kết thúc ngay)">
+                <Button
+                  danger
+                  icon={<StopOutlined />}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Hủy gói
+                </Button>
+              </Tooltip>
+            </Popconfirm>
+          </Space>
+        );
+      },
     },
   ];
 
