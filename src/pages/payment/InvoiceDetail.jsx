@@ -20,9 +20,11 @@ function isPaidOrConfirmed(raw) {
   const paid = raw.isPaid ?? raw.paid ?? raw.IsPaid;
   if (paid === true || paid === "true" || paid === 1) return true;
   const st = String(raw.status ?? raw.Status ?? "").toLowerCase();
-  if (["paid", "completed", "confirmed", "success"].includes(st)) return true;
+  if (["paid", "completed", "confirmed", "success", "active"].includes(st)) return true;
+
   const paymentStatus = String(raw.paymentStatus ?? raw.PaymentStatus ?? "").toLowerCase();
-  if (["paid", "success", "completed"].includes(paymentStatus)) return true;
+  if (["paid", "success", "completed", "active"].includes(paymentStatus)) return true;
+
   return false;
 }
 
@@ -645,10 +647,14 @@ export default function InvoiceDetail() {
                     state: {
                       from: "invoice-detail",
                       invoiceId: Number(invoice.invoiceId ?? invoice.id),
+                      subscriptionId: invoice.subscriptionId
+                        ?? invoice?.subscription?.subscriptionId
+                        ?? null,
                       companyId: invoice.companyId ?? state?.companyId ?? null,
                       presetAmount: Number(invoice.total) || undefined,
                     },
                   })
+
                 }
                 className="btn primary"
               >

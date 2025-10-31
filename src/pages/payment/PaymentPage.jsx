@@ -171,6 +171,7 @@ export default function PaymentPage() {
   const navigate = useNavigate();
   const [invoiceId, setInvoiceId] = useState(state?.invoiceId ?? null);
   const [companyId, setCompanyId] = useState(state?.companyId ?? null);
+  const [subscriptionId, setSubscriptionId] = useState(state?.subscriptionId ?? null);
 
   // ===== Local states
   const [loading, setLoading] = useState(false);
@@ -200,7 +201,7 @@ export default function PaymentPage() {
   }, [state?.presetAmount]);
 
   // Early guard
-  if (!state || (!state.bookingId && !state.invoiceId)) {
+  if (!state || (!state.bookingId && !state.invoiceId && !state.subscriptionId)) {
     return (
       <div className="page-fallback">
         <h2>Thiếu thông tin thanh toán</h2>
@@ -281,6 +282,43 @@ export default function PaymentPage() {
 
     return () => { mounted = false; };
   }, [API_BASE]);
+
+  // Sau khi trở lại từ VNPAY, poll invoice -> nếu Paid thì kích hoạt Subscription
+  useEffect(() => {
+    (async () => {
+      // Lấy từ state trước, nếu không có thì rút từ session
+      let invId = invoiceId;
+      let subId = subscriptionId ?? state?.subscriptionId ?? null;
+
+      if (!invId || !subId) {
+        try {
+          const ctx = JSON.parse(sessionStorage.getItem("__pay_ctx") || "{}");
+          invId = invId || ctx?.invoiceId || null;
+          subId = subId || ctx?.subscriptionId || null;
+        } catch { }
+      }
+
+      if (!invId || !subId) return;
+
+      // Poll trạng thái hóa đơn tối đa 2 phút
+      const { ok } = await pollUntilPaid({
+        apiBase: API_BASE,
+        invoiceId: invId,
+        timeoutMs: 120000,
+        stepMs: 2000
+      });
+
+      if (ok) {
+        try {
+          await activateSubscription(API_BASE, subId);
+          sessionStorage.setItem("__refresh_subs_after_pay", "1");
+        } catch { }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
 
   // Ưu tiên giá từ BE /Invoice/{id}
   useEffect(() => {
@@ -501,8 +539,8 @@ export default function PaymentPage() {
     setPayError("");
 
     try {
-      if (!bookingId && !invoiceId) {
-        throw new Error("Thiếu bookingId hoặc invoiceId.");
+      if (!bookingId && !invoiceId && !subscriptionId) {
+        throw new Error("Thiếu bookingId, invoiceId hoặc subscriptionId.");
       }
 
       // (Optional) Kiểm tra số tiền trước khi tạo phiên:
@@ -534,6 +572,7 @@ export default function PaymentPage() {
       const payload = {
         bookingId: bookingId ?? null,
         invoiceId: invoiceId ?? null,
+        subscriptionId: subscriptionId ?? state?.subscriptionId ?? null,
         companyId: companyId ?? state?.companyId ?? null,
         description: bookingId
           ? `Thanh toán booking #${bookingId}`
@@ -594,7 +633,7 @@ export default function PaymentPage() {
 
   // Auto-create VNPAY URL khi chọn QR và đã xác định bookingId — nhưng chỉ khi CHƯA có url
   useEffect(() => {
-    if (selectedPayment === "qr" && (bookingId || invoiceId) && !vnpayUrl) {
+    if (selectedPayment === "qr" && (bookingId || invoiceId || subscriptionId) && !vnpayUrl) {
       createVnpayPayment();
     }
   }, [selectedPayment, bookingId, invoiceId, orderId, vnpayUrl]);
@@ -604,7 +643,9 @@ export default function PaymentPage() {
     loading ||
     !selectedPayment ||
     (selectedPayment === "wallet" && !canPayByWallet) ||
-    (selectedPayment === "qr" && (!(bookingId || invoiceId) || creatingVnpay || !vnpayUrl)) ||
+    (selectedPayment === "qr" &&
+      (!(bookingId || invoiceId || subscriptionId) || creatingVnpay || !vnpayUrl))
+    ||
     (amount == null); // cần có giá từ BE (hoặc từ URL) để enable
 
   // ===== Helpers: kiểm tra trạng thái thanh toán/confirm từ BE =====
@@ -615,7 +656,7 @@ export default function PaymentPage() {
     if (paid === true || paid === "true" || paid === 1) return true;
 
     const st = String(raw.status ?? raw.Status ?? "").toLowerCase();
-    if (["paid", "completed", "confirmed", "success"].includes(st)) return true;
+    if (["paid", "completed", "confirmed", "success", "active"].includes(st)) return true;
 
     const paymentStatus = String(raw.paymentStatus ?? raw.PaymentStatus ?? "").toLowerCase();
     if (["paid", "success", "completed"].includes(paymentStatus)) return true;
@@ -656,10 +697,23 @@ export default function PaymentPage() {
     return { ok: false, data: null };
   }
 
+
   async function fetchInvoiceById(apiBase, invoiceId) {
     const res = await fetchAuthJSON(`${apiBase}/Invoices/${invoiceId}`, { method: "GET" });
     return res?.data ?? res ?? null; // unwrap
   }
+
+  async function activateSubscription(apiBase, subscriptionId) {
+    const id = Number(subscriptionId);
+    if (!Number.isFinite(id) || id <= 0) return;
+    const payload = { status: "Active" };
+    await fetchAuthJSON(`${apiBase}/Subscriptions/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  }
+
 
   const handlePay = async () => {
     if (selectedPayment !== "qr") {
@@ -682,7 +736,7 @@ export default function PaymentPage() {
     setPayError("");
 
     try {
-      
+
       // B1: đảm bảo đã có link VNPAY
       let payUrl = vnpayUrl;
       payUrl = toUrlString(payUrl);
@@ -696,9 +750,19 @@ export default function PaymentPage() {
       }
 
       // B2: Đặt cờ pending (để trang bridge/success đọc được), rồi chuyển TAB HIỆN TẠI sang VNPAY
-      try { sessionStorage.setItem(`pay:${orderId}:pending`, "1"); } catch {}
-      try { localStorage.setItem(`pay:${orderId}:pending`, "1"); } catch {}
+      try { sessionStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }
+      try { localStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }
       window.location.href = payUrl; // 👈 chuyển trong cùng tab
+      try {
+        // Lưu context để trang quay lại đọc
+        const ctx = {
+          invoiceId,
+          subscriptionId: subscriptionId ?? state?.subscriptionId ?? null,
+        };
+        sessionStorage.setItem("__pay_ctx", JSON.stringify(ctx));
+        sessionStorage.setItem("__refresh_subs_after_pay", "1");
+      } catch { }
+
       return; // dừng tại đây vì trang sẽ rẽ nhánh rời khỏi SPA hiện tại
     } finally {
       setLoading(false);

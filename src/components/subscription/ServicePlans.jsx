@@ -409,26 +409,34 @@ const ServicePlans = () => {
   const benefitOf = (plan) => plan.benefits || plan.description || "";
 
   // ✅ Mở modal trực tiếp khi bấm "Nâng cấp"
-  const handleUpgradeOpen = (plan) => {
-    setSelectedPlan(plan);
-    const now = new Date();
-    const toLocalInput = (d) => {
-      const pad = (n) => String(n).padStart(2, "0");
-      return (
-        d.getFullYear() +
-        "-" +
-        pad(d.getMonth() + 1) +
-        "-" +
-        pad(d.getDate()) +
-        "T" +
-        pad(d.getHours()) +
-        ":" +
-        pad(d.getMinutes())
-      );
-    };
-    setStartDateStr(toLocalInput(now));
-    setAutoRenew(true);
-    setOpen(true);
+  const handleUpgradeOpen = async (plan) => {
+    try {
+      const ok = await ensurePlanAllowed(plan, msgApi);
+      if (!ok) return;
+
+      setSelectedPlan(plan);
+      const now = new Date();
+      const toLocalInput = (d) => {
+        const pad = (n) => String(n).padStart(2, "0");
+        return (
+          d.getFullYear() +
+          "-" +
+          pad(d.getMonth() + 1) +
+          "-" +
+          pad(d.getDate()) +
+          "T" +
+          pad(d.getHours()) +
+          ":" +
+          pad(d.getMinutes())
+        );
+      };
+      setStartDateStr(toLocalInput(now));
+      setAutoRenew(true);
+      setOpen(true);
+    } catch (e) {
+      console.error("handleUpgradeOpen error:", e);
+      msgApi.error(e?.message || "Không thể kiểm tra quyền đăng ký gói.");
+    }
   };
 
   // ===== Tạo subscription rồi chuyển Payment khi bấm "Xác nhận" =====
@@ -549,21 +557,13 @@ const ServicePlans = () => {
       setOpen(false);
       msgApi.success("Đã tạo hoá đơn. Chuyển sang xác nhận thanh toán…");
 
-      navigate(`/invoiceDetail/${created.invoiceId}`, {
+      navigate("/payment", {
         state: {
+          from: "service-plans",
           invoiceId: created.invoiceId,
-          // truyền thêm để hiển thị tức thời (optional)
-          invoice: {
-            invoiceId: created.invoiceId,
-            billingMonth: startDate.getMonth() + 1,
-            billingYear: startDate.getFullYear(),
-            total: normalizeMonthlyPriceVND(selectedPlan.priceMonthly),
-            status: "Unpaid",
-            customerId: undefined,
-            customer: undefined,
-          },
-          // nếu có companyId (doanh nghiệp) thì pass sang để tạo phiên thanh toán:
+          subscriptionId,                              // 👈 quan trọng
           companyId: created.companyId ?? null,
+          presetAmount: normalizeMonthlyPriceVND(selectedPlan.priceMonthly), // để UI mượt
         },
       });
     } catch (e) {

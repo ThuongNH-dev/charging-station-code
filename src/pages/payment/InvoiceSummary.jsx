@@ -419,7 +419,8 @@ export default function InvoiceSummary() {
         if (!m) return;
         setRawInvoices(hydrated);
         try {
-          sessionStorage.setItem("charge:billing:list", JSON.stringify(sorted));
+          sessionStorage.setItem("charge:billing:list", JSON.stringify(hydrated));
+
         } catch { }
       } catch (e) {
         if (m) setErr(e?.message || "Không tải được danh sách hóa đơn.");
