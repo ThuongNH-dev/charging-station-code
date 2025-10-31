@@ -19,7 +19,9 @@ import BookingHistory from "./pages/booking/BookingHisory";
 import InvoicePage from "./components/charging/Invoice";
 import StaffLayout from "./layouts/StaffLayout";
 import AdminLayout from "./components/admin/layout/AdminLayout";
-import StationManagement from "./components/admin/pages/StationManagement";
+import StationPage from "./components/admin/pages/station/StationPage";
+import StationDetailPage from "./components/admin/pages/station/StationDetailPage";
+
 import UserManagement from "./components/admin/pages/UserManagement/UserManagement";
 import RegisterSelect from "./pages/Register/RegisterSelect";
 import PersonalRegister from "./pages/Register/PersonalRegister";
@@ -133,7 +135,7 @@ export default function App() {
       <Route
         path="/payment"
         element={
-          <ProtectedRoute allowedRoles={["Customer","Company"]}>
+          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
             <PaymentPage />
           </ProtectedRoute>
         }
@@ -157,7 +159,7 @@ export default function App() {
       <Route
         path="/payment/invoice"
         element={
-          <ProtectedRoute allowedRoles={["Customer","Company"]}>
+          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
             <PaymentInvoice />
           </ProtectedRoute>
         }
@@ -309,10 +311,10 @@ export default function App() {
         path="/company/reports"
         element={
           <ProtectedRoute allowedRoles={["Company"]}>
-            <MonthlyStats/>
+            <MonthlyStats />
           </ProtectedRoute>
         }
-        />
+      />
       {/*Staff */}
 
       {/* Staff */}
@@ -334,17 +336,18 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<StationManagement />} />
-        <Route path="stations" element={<StationManagement />} />
+        <Route index element={<StationPage />} />
+        <Route path="stations" element={<StationPage />} />
+        <Route path="stations/:stationId" element={<StationDetailPage />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="reports" element={<Reports />} />
       </Route>
-       {/*Notification */}
-       <Route
+      {/*Notification */}
+      <Route
         path="/notifications"
         element={
-          <ProtectedRoute allowedRoles={["Customer","Company"]}>
-            <Notification/>
+          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
+            <Notification />
           </ProtectedRoute>
         }
       />
