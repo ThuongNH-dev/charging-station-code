@@ -196,7 +196,7 @@ export default function ChargerManager() {
       const chargers = toArray(chargersRaw).map(normCharger);
       setRows(chargers);
 
-      // Lấy lại danh sách phiên để cập nhật “Phiên gần nhất”
+      // Lấy lại danh sách phiên để cập nhật "Phiên gần nhất"
       const sessionsRaw = await fetchAuthJSON(`${API_BASE}/ChargingSessions`);
       const sessions = toArray(sessionsRaw);
       const latestMap = {};
@@ -382,16 +382,16 @@ export default function ChargerManager() {
                   <tr key={r.id}>
                     <td>{r.code}</td>
                     <td>{r.powerKW}kW</td>
-                    <td
-                      className={`status ${
+                    <td>
+                      <span className={`status ${
                         r.status?.toLowerCase() === "outoforder"
                           ? "error"
                           : r.status?.toLowerCase() === "offline"
                           ? "error"
                           : "ok"
-                      }`}
-                    >
-                      {r.status}
+                      }`}>
+                        {r.status}
+                      </span>
                     </td>
                     <td>{renderLatest(r)}</td>
                     <td>{renderAction(r)}</td>

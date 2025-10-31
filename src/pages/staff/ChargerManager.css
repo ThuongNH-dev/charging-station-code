@@ -93,6 +93,9 @@
   padding: 12px 14px;
   border: 1px solid #9ca3af;
   text-align: left;
+  vertical-align: middle;
+  height: 41px;
+  box-sizing: border-box;
 }
 
 .sc-table th {

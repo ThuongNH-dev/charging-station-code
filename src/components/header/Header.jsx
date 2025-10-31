@@ -154,10 +154,11 @@ export default function Head() {
   /* ===== NAV items ===== */
   const items = isStaff
     ? [
-      { key: "s1", label: "Quản lý trụ sạc", path: "/staff/stations" },
-      { key: "s2", label: "Phiên sạc", path: "/staff/sessions" },
-      { key: "s3", label: "Thanh toán", path: "/staff/payments" },
-      { key: "s4", label: "Báo cáo", path: "/staff/reports" },
+      { key: "s1", label: "Quản lý trạm sạc", path: "/staff/stations" },
+      { key: "s2", label: "Quản lý trụ sạc", path: "/staff/chargers" },
+      { key: "s3", label: "Phiên sạc", path: "/staff/sessions" },
+      { key: "s4", label: "Thanh toán", path: "/staff/payments" },
+      { key: "s5", label: "Báo cáo", path: "/staff/reports" },
     ]
     : isCompany
       ? [
