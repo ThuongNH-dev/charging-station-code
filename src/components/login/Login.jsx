@@ -6,6 +6,8 @@ import MainLayout from "../../layouts/MainLayout";
 import { setToken as storeToken, getApiBase } from "../../utils/api";
 import "./Login.css";
 import { roleToPath } from "../../utils/roleRedirect";
+import { GoogleLogin } from "@react-oauth/google";
+
 
 const API_BASE = getApiBase();
 const LOGIN_URL = `${API_BASE}/Auth/login`;
@@ -341,7 +343,54 @@ export default function Login() {
   };
 
   // Social placeholders
-  const handleGoogleLogin = () => alert("🔵 Google login đang phát triển");
+  const handleGoogleLogin = async (credentialResponse) => {
+  try {
+    const idToken = credentialResponse?.credential;
+    if (!idToken) {
+      alert("Không lấy được idToken từ Google!");
+      return;
+    }
+
+    const res = await fetch(`${API_BASE}/Auth/login-google`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    });
+
+    if (!res.ok) {
+      const msg = await res.text();
+      throw new Error(`Đăng nhập Google thất bại: ${msg}`);
+    }
+
+    const data = await res.json();
+    const token = data?.token || data?.message?.token;
+    if (!token) throw new Error("Thiếu JWT trong phản hồi backend!");
+
+    // ✅ Lưu token
+    storeToken(token);
+
+    const role = getRoleFromToken(token);
+    const accountId = getAccountIdFromLoginResponse(data, token);
+    const { customerId, companyId } = await resolveIdentity(token, accountId);
+
+    const user = {
+      name: data?.user?.fullName || data?.user?.name || "Google User",
+      email: data?.user?.email,
+      role,
+      token,
+      customerId,
+      companyId,
+    };
+
+    localStorage.setItem("user", JSON.stringify(user));
+    login(user, true);
+    navigate(roleToPath(role), { replace: true });
+  } catch (err) {
+    console.error("Google Login Error:", err);
+    alert("Đăng nhập Google thất bại: " + err.message);
+  }
+};
+
   const handleFacebookLogin = () =>
     alert("🔵 Facebook login đang phát triển (chỉ dành cho tài khoản cá nhân)");
 
@@ -402,14 +451,14 @@ export default function Login() {
             </div>
 
             <div className="social-login">
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                className="social-btn google-btn"
-                disabled={loading}
-              >
-                Google
-              </button>
+              <GoogleLogin
+  onSuccess={handleGoogleLogin}
+  onError={() => alert("Đăng nhập Google thất bại!")}
+  text="signin_with"
+  shape="pill"
+  width="300"
+/>
+
               <button
                 type="button"
                 onClick={handleFacebookLogin}
