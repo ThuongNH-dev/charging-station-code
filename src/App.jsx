@@ -50,13 +50,14 @@ import StaffInfo from "./pages/updateProfileStaff/StaffInfo";
 import AdminInfo from "./pages/updateProfileAdmin/AdminInfo";
 import ForgotPassword from "./pages/password/ForgotPassword";
 import ResetPassword from "./pages/password/ResetPassword";
+import Dashboard from "./components/admin/pages/dashboard/Dashboard";
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
     case "customer":
       return "/stations";
     case "admin":
-      return "/admin";
+      return "/admin/dashboard";
     case "staff":
       return "/staff";
     case "company":
@@ -336,7 +337,8 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<StationPage />} />
+        <Route index element={<Dashboard />} />
+        <Route path="dashboard" element={<Dashboard />} />
         <Route path="stations" element={<StationPage />} />
         <Route path="stations/:stationId" element={<StationDetailPage />} />
         <Route path="users" element={<UserManagement />} />

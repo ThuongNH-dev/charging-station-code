@@ -1,227 +1,159 @@
-/*
- * =========================================================
- * OverviewKPIs.css - BẢN HOÀN CHỈNH (Phong cách Danh sách Phẳng)
- * Áp dụng bo góc cho khối lớn, dùng border-bottom cho các mục con.
- * =========================================================
- */
+/* =========================================================
+   OverviewKPIs.css — Sidebar gọn, phẳng, rõ ràng
+   ========================================================= */
 
-/* 1. LAYOUT CHUNG CỦA SIDEBAR */
-.report-sidebar {
+.sidebar {
   display: flex;
   flex-direction: column;
-  gap: 16px; /* Khoảng cách giữa các section */
-  padding: 16px;
-  background-color: #f0f2f5;
-  width: 280px;
-  box-shadow: 1px 0 5px rgba(0, 0, 0, 0.05);
-
-  overflow-y: auto;
-  max-height: calc(500vh - 40px);
-  overflow-x: hidden;
+  gap: 16px;
 }
 
-/* 2. KHU VỰC CHÍNH (KPI, CẢNH BÁO, TRẠM) - CỠ LỚN, CUỘN, CÓ BO GÓC */
-.kpi-total-section,
-.warnings-section,
-.station-list-section {
-  background: #ffffff;
-  border-radius: 12px; /* Bo góc khối lớn */
+.panel {
+  background: #fff;
+  border-radius: 12px;
   padding: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-
-  /* KÍCH THƯỚC LỚN & CUỘN DỌC */
-  max-height: 350px; /* Chiều cao tối đa hợp lý */
-  overflow-y: auto;
-  overflow-x: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  max-height: 380px;
+  overflow: hidden auto;
 }
 
-/* 🔹 Tiêu đề các section */
-.report-sidebar h3 {
+.panel h3 {
+  margin: 0 0 12px;
   font-size: 16px;
   font-weight: 700;
   color: #333;
-  margin-bottom: 0;
-  padding-bottom: 12px;
-}
-
-/* 3. CHI TIẾT KPI TỔNG QUAN (Dùng Border-bottom để phân tách) */
-
-/* 🔹 Hộp KPI (Chỉnh lại thành danh sách phẳng bên trong khối) */
-.kpi-box {
-  /* LOẠI BỎ VIỀN, BO GÓC, SHADOW, MARGIN để sát nhau */
-  background: transparent; /* Nền trong suốt để khớp với nền khối lớn */
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  margin-bottom: 0;
-
-  /* Dùng border-bottom để chia tách */
+  padding-bottom: 10px;
   border-bottom: 1px solid #eee;
-  padding: 12px 0; /* Padding trên dưới */
-
-  /* Các thuộc tính flex còn lại */
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
 }
-/* Bỏ border-bottom ở mục KPI cuối cùng */
-.kpi-total-section .kpi-box:last-of-type {
+
+/* KPI rows */
+.kpi-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+}
+.kpi-row:last-child {
   border-bottom: none;
 }
 
-/* 4. CHI TIẾT CẢNH BÁO (Dùng Border-bottom để phân tách) */
-
-.warning-item {
-  /* LOẠI BỎ VIỀN, BO GÓC, SHADOW, MARGIN */
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-
-  /* Dùng border-bottom để chia tách */
-  border-bottom: 1px solid #eee;
-  padding: 12px 0;
-
+.kpi-left {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 8px;
 }
-.warnings-section .warning-item:last-of-type {
-  border-bottom: none;
+.kpi-emoji {
+  font-size: 18px;
+}
+.kpi-title {
+  font-weight: 600;
+  color: #444;
 }
 
-/* 5. CHI TIẾT DANH SÁCH TRẠM (Dùng Border-bottom để phân tách) */
+.kpi-right {
+  text-align: right;
+}
+.kpi-value {
+  font-weight: 800;
+  color: #111;
+  font-size: 18px;
+  line-height: 1.1;
+}
+.kpi-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-top: 4px;
+}
+.kpi-change.up {
+  color: #1e7e34;
+  background: #e6ffec;
+}
+.kpi-change.down {
+  color: #dc3545;
+  background: #ffeaea;
+}
 
-.station-list-item {
-  /* LOẠI BỎ VIỀN, BO GÓC, SHADOW, MARGIN */
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-
-  /* Dùng border-bottom để chia tách */
-  border-bottom: 1px solid #eee;
-  padding: 12px 0;
-
+/* Warnings */
+.warn-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: background-color 0.1s;
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
 }
-.station-list-section .station-list-item:last-of-type {
+.warn-row:last-child {
   border-bottom: none;
 }
-.station-list-item:hover {
-  background-color: #f7f7f7;
-  cursor: pointer;
-}
-
-/* ---------------------------------------------------- */
-/* CÁC THUỘC TÍNH CHI TIẾT KHÁC (GIỮ NGUYÊN) */
-/* ---------------------------------------------------- */
-
-/* Kiểu chữ KPI */
-.kpi-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: #555;
-}
-.kpi-icon {
-  font-size: 16px;
-}
-.kpi-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: #111;
-}
-.kpi-change {
-  font-size: 13px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.kpi-change.positive {
-  color: #28a745;
-  background-color: #e6ffec;
-}
-.kpi-change.negative {
-  color: #dc3545;
-  background-color: #ffeaea;
-}
-
-/* Chi tiết Cảnh báo */
-.warning-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.warn-info {
   max-width: 70%;
 }
-.warning-name {
-  font-weight: 600;
-  font-size: 14px;
+.warn-name {
+  font-weight: 700;
   color: #333;
 }
-.warning-usage {
+.warn-sub {
+  color: #666;
   font-size: 12px;
-  color: #777;
+  margin-top: 2px;
 }
-.warning-status {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 6px;
-  min-width: 60px;
+.warn-badge {
+  min-width: 70px;
   text-align: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
 }
-.warning-status.green {
-  background-color: #e6ffec;
-  color: #28a745;
+.warn-badge.success {
+  background: #28a745;
 }
-.warning-status.red {
-  background-color: #ffeaea;
-  color: #dc3545;
+.warn-badge.warning {
+  background: #ffc107;
+  color: #333;
 }
-.warning-status.yellow {
-  background-color: #fff8e1;
-  color: #ffc107;
+.warn-badge.danger {
+  background: #dc3545;
 }
 
-/* Chi tiết Trạm */
-.station-info {
+/* Stations */
+.station-row {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+}
+.station-row:last-child {
+  border-bottom: none;
+}
+.station-info {
   max-width: 70%;
 }
 .station-name {
-  font-weight: 600;
-  color: #222;
-  font-size: 14px;
-  word-break: break-word;
-}
-.station-capacity {
-  font-size: 13px;
-  color: #777;
-}
-.station-usage-percent {
   font-weight: 700;
-  color: #0078ff;
-  font-size: 15px;
-  min-width: 50px;
-  text-align: right;
+  color: #222;
+}
+.station-sub {
+  color: #777;
+  font-size: 12px;
+  margin-top: 2px;
+}
+.station-usage {
+  font-weight: 800;
+  color: #007bff;
 }
 
-/* Xử lý cho thông báo rỗng */
-.empty-msg {
+/* Empty */
+.empty {
   color: #888;
   font-style: italic;
   text-align: center;
-  padding: 10px;
+  padding: 8px 0;
 }

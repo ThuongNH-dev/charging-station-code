@@ -1,38 +1,66 @@
 // ✅ src/api/reportsApi.js
 import axios from "axios";
 
-// BASE_URL tự động đổi theo môi trường dev/prod
-const BASE_URL = import.meta.env.DEV ? "/api" : "https://localhost:7268/api";
+/**
+ * Base URL:
+ * - Dev: dùng proxy /api
+ * - Prod: ưu tiên VITE_API_BASE_URL; nếu không có, fallback /api
+ */
+const BASE_URL = import.meta.env.DEV
+  ? "/api"
+  : import.meta.env.VITE_API_BASE_URL ?? "/api";
+
+const DEBUG = true;
+
+// Tạo axios instance riêng cho báo cáo
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 20000,
+});
+
+// Helper: đọc dữ liệu an toàn từ Promise.allSettled
+const settledData = (res, fallback = []) =>
+  res?.status === "fulfilled" ? res.value?.data ?? fallback : fallback;
 
 /**
  * 🔹 Lấy tất cả dữ liệu thô cần thiết cho báo cáo
- * @param {object} params - { startDate, endDate, stationId }
- * @returns {Promise<object>} Dữ liệu thô từ các nguồn: Sessions, Invoices, Stations, SubscriptionPlans, Subscriptions
+ * @param {{startDate?: string, endDate?: string, stationId?: string|number}} params
+ * @returns {Promise<{
+ *   sessionsData: any[],
+ *   invoicesData: any[],
+ *   stationsData: any[],
+ *   subscriptionPlansData: any[],
+ *   subscriptionsData: any[]
+ * }>}
  */
 export const fetchReportData = async (params = {}) => {
-  const { startDate = "", endDate = "", stationId = "" } = params;
+  const { startDate, endDate, stationId } = params;
 
   try {
-    // 1️⃣ Lấy dữ liệu phiên sạc
-    const sessionsPromise = axios.get(
-      `${BASE_URL}/ChargingSessions?startDate=${startDate}&endDate=${endDate}&stationId=${stationId}`
-    );
+    // 1) ChargingSessions (truyền query bằng params để tránh chuỗi rỗng)
+    const sessionsPromise = api.get("/ChargingSessions", {
+      params: {
+        ...(startDate ? { startDate } : {}),
+        ...(endDate ? { endDate } : {}),
+        ...(stationId ? { stationId } : {}),
+      },
+    });
 
-    // 2️⃣ Lấy dữ liệu hóa đơn
-    const invoicesPromise = axios.get(`${BASE_URL}/Invoices`);
+    // 2) Invoices
+    const invoicesPromise = api.get("/Invoices");
 
-    // 3️⃣ Lấy dữ liệu trạm sạc
-    const stationsPromise = axios.get(
-      `${BASE_URL}/Stations/paged?page=1&pageSize=100`
-    );
+    // 3) Stations paged
+    const stationsPromise = api.get("/Stations/paged", {
+      params: { page: 1, pageSize: 100 },
+    });
 
-    // 4️⃣ Lấy dữ liệu Gói Dịch vụ
-    const subscriptionPlansPromise = axios.get(`${BASE_URL}/SubscriptionPlans`);
+    // 4) SubscriptionPlans
+    const subscriptionPlansPromise = api.get("/SubscriptionPlans");
 
-    // 5️⃣ Lấy dữ liệu Đăng ký Gói (Subscriptions)
-    const subscriptionsPromise = axios.get(`${BASE_URL}/Subscriptions`);
+    // 5) Subscriptions
+    const subscriptionsPromise = api.get("/Subscriptions");
 
-    // 🔸 Chạy song song tất cả request với Promise.allSettled để debug
+    // Chạy song song
     const results = await Promise.allSettled([
       sessionsPromise,
       invoicesPromise,
@@ -41,7 +69,6 @@ export const fetchReportData = async (params = {}) => {
       subscriptionsPromise,
     ]);
 
-    // Kiểm tra từng API
     const [
       sessionsResult,
       invoicesResult,
@@ -50,6 +77,7 @@ export const fetchReportData = async (params = {}) => {
       subscriptionsResult,
     ] = results;
 
+    // Log lỗi từng API nếu có
     if (sessionsResult.status === "rejected")
       console.error("❌ ChargingSessions API failed:", sessionsResult.reason);
     if (invoicesResult.status === "rejected")
@@ -64,47 +92,25 @@ export const fetchReportData = async (params = {}) => {
     if (subscriptionsResult.status === "rejected")
       console.error("❌ Subscriptions API failed:", subscriptionsResult.reason);
 
-    // 🔹 Log dữ liệu thô để debug
-    console.log("📥 Raw report data fetched:", {
-      sessionsData:
-        sessionsResult.status === "fulfilled" ? sessionsResult.value.data : [],
-      invoicesData:
-        invoicesResult.status === "fulfilled" ? invoicesResult.value.data : [],
-      stationsData:
-        stationsResult.status === "fulfilled"
-          ? stationsResult.value.data?.items || stationsResult.value.data || []
-          : [],
-      subscriptionPlansData:
-        subscriptionPlansResult.status === "fulfilled"
-          ? subscriptionPlansResult.value.data
-          : [],
-      subscriptionsData:
-        subscriptionsResult.status === "fulfilled"
-          ? subscriptionsResult.value.data
-          : [],
-    });
-
-    // ✅ Trả dữ liệu thô đã gom nhóm
-    return {
-      sessionsData:
-        sessionsResult.status === "fulfilled" ? sessionsResult.value.data : [],
-      invoicesData:
-        invoicesResult.status === "fulfilled" ? invoicesResult.value.data : [],
-      stationsData:
-        stationsResult.status === "fulfilled"
-          ? stationsResult.value.data?.items || stationsResult.value.data || []
-          : [],
-      subscriptionPlansData:
-        subscriptionPlansResult.status === "fulfilled"
-          ? subscriptionPlansResult.value.data
-          : [],
-      subscriptionsData:
-        subscriptionsResult.status === "fulfilled"
-          ? subscriptionsResult.value.data
-          : [],
+    // Chuẩn hóa payload trả về
+    const payload = {
+      sessionsData: settledData(sessionsResult, []),
+      invoicesData: settledData(invoicesResult, []),
+      stationsData: (() => {
+        const data = settledData(stationsResult, []);
+        // endpoint paged có thể trả { items, total } hoặc list trực tiếp
+        return data?.items ?? data ?? [];
+      })(),
+      subscriptionPlansData: settledData(subscriptionPlansResult, []),
+      subscriptionsData: settledData(subscriptionsResult, []),
     };
+
+    if (DEBUG) console.log("📥 Raw report data fetched:", payload);
+    return payload;
   } catch (error) {
     console.error("❌ Lỗi khi tải dữ liệu báo cáo:", error);
     throw error;
   }
 };
+
+export default { fetchReportData };
