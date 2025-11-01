@@ -672,15 +672,8 @@ export default function StationDetailPage() {
         );
         return;
       }
-      if (endSoc === "" || Number.isNaN(Number(endSoc))) {
-        message.warning("Vui lòng nhập End SoC hợp lệ (0-100).");
-        return;
-      }
 
-      const payload = {
-        chargingSessionId,
-        endSoc: Math.max(0, Math.min(100, Number(endSoc))),
-      };
+      const payload = { chargingSessionId };
       console.log("➡️ Payload END Session đang gửi:", payload);
 
       const res = await stationApi.endSession(payload);
@@ -824,8 +817,6 @@ export default function StationDetailPage() {
         open={activeModal === "endSession"}
         onClose={closeModal}
         endSessionData={endSessionData}
-        endSoc={endSoc}
-        setEndSoc={setEndSoc}
         isEnding={isEnding}
         onConfirm={handleConfirmEndSession}
         ids={{

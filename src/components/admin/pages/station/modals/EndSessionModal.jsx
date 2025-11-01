@@ -38,36 +38,35 @@ export default function EndSessionModal({
     >
       {endSessionData ? (
         <>
-          {/* End SoC input */}
+          {/* End SoC: tự động đọc từ trụ tại thời điểm dừng */}
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
+              marginBottom: 8,
             }}
           >
             <div />
             <div className="input-field" style={{ marginTop: 12 }}>
-              <label>End SoC (%) *</label>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={100}
-                placeholder="Nhập SoC khi kết thúc (0-100)"
-                value={endSoc}
-                onChange={(e) => {
-                  const v = e.target.value.replace(/[^\d]/g, "");
-                  if (v === "") return setEndSoc("");
-                  const n = Math.max(0, Math.min(100, Number(v)));
-                  setEndSoc(String(n));
+              <label>End SoC (%)</label>
+              <div
+                style={{
+                  padding: "8px 12px",
+                  border: "1px solid #d9d9d9",
+                  borderRadius: 6,
+                  background: "#fafafa",
+                  minWidth: 200,
                 }}
-                onKeyDown={(e) =>
-                  ["e", "E", "+", "-", "."].includes(e.key) &&
-                  e.preventDefault()
-                }
-                onWheel={(e) => e.currentTarget.blur()}
-              />
+              >
+                {endSessionData?.endSoc != null
+                  ? `${endSessionData.endSoc}%`
+                  : "Lấy tự động từ trụ khi xác nhận dừng"}
+              </div>
+              <small style={{ color: "#999" }}>
+                * Admin không cần nhập; hệ thống sẽ đọc SoC thực tế tại thời
+                điểm dừng.
+              </small>
             </div>
           </div>
 
@@ -147,9 +146,7 @@ export default function EndSessionModal({
               type="button"
               className="btn blue"
               onClick={onConfirm}
-              disabled={
-                isEnding || endSoc === "" || Number.isNaN(Number(endSoc))
-              }
+              disabled={isEnding}
             >
               {isEnding ? "Đang kết thúc..." : "Xác nhận Kết thúc"}
             </button>
