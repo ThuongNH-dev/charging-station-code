@@ -51,6 +51,7 @@ import AdminInfo from "./pages/updateProfileAdmin/AdminInfo";
 import ForgotPassword from "./pages/password/ForgotPassword";
 import ResetPassword from "./pages/password/ResetPassword";
 import Dashboard from "./components/admin/pages/dashboard/Dashboard";
+import AdminNotificationsSendPage from "./components/admin/pages/AdminNotificationsSendPage";
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
@@ -343,6 +344,10 @@ export default function App() {
         <Route path="stations/:stationId" element={<StationDetailPage />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="reports" element={<Reports />} />
+        <Route
+          path="notifications/send"
+          element={<AdminNotificationsSendPage />}
+        />
       </Route>
       {/*Notification */}
       <Route

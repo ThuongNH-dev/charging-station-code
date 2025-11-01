@@ -6,6 +6,7 @@ import AccountMenu from "../others/Menu";
 import {
   FileSearchOutlined,
   FileTextOutlined,
+  NotificationOutlined,
   BellOutlined,
 } from "@ant-design/icons";
 import { getApiBase } from "../../utils/api";
@@ -26,9 +27,7 @@ function getTokenFromAnywhere(authUser) {
   if (authUser?.token) return authUser.token;
   try {
     const u = JSON.parse(
-      localStorage.getItem("user") ||
-      sessionStorage.getItem("user") ||
-      "null"
+      localStorage.getItem("user") || sessionStorage.getItem("user") || "null"
     );
     return u?.token || null;
   } catch {
@@ -64,7 +63,7 @@ function getNotiTime(n) {
         if (!isNaN(d2.getTime())) return d2.getTime();
       }
     }
-  } catch { }
+  } catch {}
   if (typeof n?.id === "number") return n.id;
   return 0;
 }
@@ -73,8 +72,12 @@ function getNotiTime(n) {
 export default function Head() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, user, userRole: ctxRole, userName: ctxName } =
-    useAuth();
+  const {
+    isAuthenticated,
+    user,
+    userRole: ctxRole,
+    userName: ctxName,
+  } = useAuth();
 
   const role = (user?.role || ctxRole || "").toLowerCase();
   const isStaff = role === "staff";
@@ -154,18 +157,18 @@ export default function Head() {
   /* ===== NAV items ===== */
   const items = isStaff
     ? [
-      { key: "s1", label: "Quản lý trụ sạc", path: "/staff/stations" },
-      { key: "s2", label: "Phiên sạc", path: "/staff/sessions" },
-      { key: "s3", label: "Thanh toán", path: "/staff/payments" },
-      { key: "s4", label: "Báo cáo", path: "/staff/reports" },
-    ]
+        { key: "s1", label: "Quản lý trụ sạc", path: "/staff/stations" },
+        { key: "s2", label: "Phiên sạc", path: "/staff/sessions" },
+        { key: "s3", label: "Thanh toán", path: "/staff/payments" },
+        { key: "s4", label: "Báo cáo", path: "/staff/reports" },
+      ]
     : isCompany
-      ? [
+    ? [
         { key: "c1", label: "Quản lý nguồn lực", path: "/company" },
         { key: "3", label: "Dịch vụ", path: "/services" },
         { key: "4", label: "Liên hệ", path: "/contact" },
       ]
-      : [
+    : [
         { key: "1", label: "Trang chủ", path: "/" },
         { key: "2", label: "Danh mục", path: "/stations" },
         { key: "3", label: "Dịch vụ", path: "/services" },
@@ -192,12 +195,24 @@ export default function Head() {
   }
 
   const danhMucMenuItems = [
-    { key: "dm-1", label: "Tìm trạm sạc", onClick: () => navigate("/stations") },
-    { key: "dm-2", label: "Phiên sạc", onClick: () => navigate("/charging/start") },
+    {
+      key: "dm-1",
+      label: "Tìm trạm sạc",
+      onClick: () => navigate("/stations"),
+    },
+    {
+      key: "dm-2",
+      label: "Phiên sạc",
+      onClick: () => navigate("/charging/start"),
+    },
   ];
   const quanLyNguonLucItems = [
     { key: "rl-1", label: "Quản lý xe", onClick: () => navigate("/company") },
-    { key: "rl-2", label: "Thống kê theo tháng", onClick: () => navigate("/company/reports") },
+    {
+      key: "rl-2",
+      label: "Thống kê theo tháng",
+      onClick: () => navigate("/company/reports"),
+    },
   ];
 
   /* ===== Right cluster ===== */
@@ -205,10 +220,18 @@ export default function Head() {
     if (!isAuthenticated) {
       return (
         <>
-          <Button className="btn-outline" type="text" onClick={() => navigate("/login")}>
+          <Button
+            className="btn-outline"
+            type="text"
+            onClick={() => navigate("/login")}
+          >
             Đăng nhập
           </Button>
-          <Button className="btn-outline" type="text" onClick={() => navigate("/register/select")}>
+          <Button
+            className="btn-outline"
+            type="text"
+            onClick={() => navigate("/register/select")}
+          >
             Đăng ký
           </Button>
         </>
@@ -251,13 +274,17 @@ export default function Head() {
                     // hiển thị đúng 4 tin, không cuộn
                     dataSource={notifications.slice(0, 4)}
                     renderItem={(item, idx) => (
-                      <List.Item className={`noti-item ${idx === 0 ? "first" : ""}`}>
+                      <List.Item
+                        className={`noti-item ${idx === 0 ? "first" : ""}`}
+                      >
                         <div className="noti-content">
                           <div className="noti-title">
                             {item.title || item.message || "Thông báo"}
                           </div>
                           <div className="noti-time">
-                            {dayjs(item.createdAt || item.timestamp || item.date).fromNow()}
+                            {dayjs(
+                              item.createdAt || item.timestamp || item.date
+                            ).fromNow()}
                           </div>
                         </div>
                       </List.Item>
@@ -285,7 +312,7 @@ export default function Head() {
                             String(latestMark || Date.now())
                           );
                       }
-                    } catch { }
+                    } catch {}
                     setHasNew(false);
                   }}
                 >
@@ -298,7 +325,49 @@ export default function Head() {
               <BellOutlined className="bell-icon" />
             </Badge>
           </Dropdown>
-
+        )}
+        {showBell && (
+          <Tooltip title="Trang thông báo">
+            <NotificationOutlined
+              className="bell-icon"
+              onClick={() => {
+                // điều hướng sang trang thông báo đầy đủ
+                navigate("/notifications");
+                // đánh dấu đã xem giống footer dropdown
+                try {
+                  if (isCustomer) {
+                    const cid = getCustomerId(user);
+                    if (cid)
+                      localStorage.setItem(
+                        `NOTI_LAST_SEEN_CUSTOMER_${cid}`,
+                        String(latestMark || Date.now())
+                      );
+                  } else if (isCompany) {
+                    const compId = getCompanyId(user);
+                    if (compId)
+                      localStorage.setItem(
+                        `NOTI_LAST_SEEN_COMPANY_${compId}`,
+                        String(latestMark || Date.now())
+                      );
+                  }
+                } catch {}
+                setHasNew(false);
+              }}
+            />
+          </Tooltip>
+        )}
+        {isAdmin && (
+          <Tooltip title="Gửi thông báo (Admin)">
+            <Button
+              type="primary"
+              size="middle"
+              icon={<NotificationOutlined />}
+              onClick={() => navigate("/admin/notifications/send")}
+              style={{ marginRight: 8 }}
+            >
+              Thông báo
+            </Button>
+          </Tooltip>
         )}
 
         <AccountMenu />
@@ -330,8 +399,9 @@ export default function Head() {
                         }}
                       >
                         <div
-                          className={`nav-item ${activeKey === item.key ? "active" : ""
-                            } nav-dropdown`}
+                          className={`nav-item ${
+                            activeKey === item.key ? "active" : ""
+                          } nav-dropdown`}
                           onClick={(e) => e.preventDefault()}
                         >
                           {item.label} <span className="caret">▾</span>
@@ -353,8 +423,9 @@ export default function Head() {
                         }}
                       >
                         <div
-                          className={`nav-item ${activeKey === item.key ? "active" : ""
-                            } nav-dropdown`}
+                          className={`nav-item ${
+                            activeKey === item.key ? "active" : ""
+                          } nav-dropdown`}
                           onClick={(e) => e.preventDefault()}
                         >
                           {item.label} <span className="caret">▾</span>
@@ -367,8 +438,9 @@ export default function Head() {
                 return (
                   <li key={item.key}>
                     <div
-                      className={`nav-item ${activeKey === item.key ? "active" : ""
-                        }`}
+                      className={`nav-item ${
+                        activeKey === item.key ? "active" : ""
+                      }`}
                       onClick={() => navigate(item.path)}
                     >
                       {item.label}
