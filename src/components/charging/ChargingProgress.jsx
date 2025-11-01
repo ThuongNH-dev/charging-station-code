@@ -208,30 +208,16 @@ const ChargingProgress = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location?.state ?? null; // luôn có biến state (có thể là null)
-  // const { state } = useLocation();
-
-  // if (!state) {
-  //   return (
-  //     <div style={{ padding: 24 }}>
-  //       <h2>Thiếu dữ liệu phiên sạc</h2>
-  //       <p>Bạn cần bắt đầu từ trang xác nhận để vào màn hình sạc.</p>
-  //       <div style={{ display: "flex", gap: 8 }}>
-  //         <Link to="/stations">Về danh sách trạm</Link>
-  //         <Link to="/payment">Về thanh toán</Link>
-  //       </div>
-  //     </div>
-  //   );
-  // }
-
-  // const stationId = state.station?.id ?? state.station?.stationId ?? state.station?.StationId;
-  // const chargerId = state.charger?.id ?? state.charger?.chargerId ?? state.charger?.ChargerId;
-  // const portId = state.gun?.id ?? state.gun?.portId ?? state.gun?.PortId;
 
   const liveAtBoot = React.useMemo(() => loadLive(), []);
-    // ==== Session từ BE ====
+  // ==== Session từ BE ====
   const [session, setSession] = useState(null);
   // Lưu thông tin chi tiết của Charger để hiển thị label khi không có state
   const [chargerInfo, setChargerInfo] = useState(null);
+  // trạng thái hiển thị: không có phiên sạc đang diễn ra
+  const [noActiveSession, setNoActiveSession] = useState(false);
+  // đang khởi tạo/đang kiểm tra: tránh show "chưa có phiên" quá sớm
+  const [booting, setBooting] = useState(true);
 
   // Ưu tiên state -> session -> chargerInfo -> live
   const stationId = React.useMemo(() => {
@@ -271,13 +257,6 @@ const ChargingProgress = () => {
     );
   }, [state, session, liveAtBoot]);
 
-
-  // const stationName = state.station?.name ?? "—";
-  // const chargerTitle = state.charger?.title ?? state.charger?.code ?? "—";
-  // const powerLabel =
-  //   state.charger?.power ?? (Number.isFinite(state.charger?.powerKw) ? `${state.charger.powerKw} kW` : "—");
-  // const priceLabel = state.charger?.price ?? null;
-
   const stationName = state?.station?.name ?? session?.stationName ?? "—";
   const chargerTitle =
     state?.charger?.title ??
@@ -314,7 +293,7 @@ const ChargingProgress = () => {
   // const fallbackPricePerKWh = Number.isFinite(state.pricePerKWh)
   //   ? state.pricePerKWh
   const fallbackPricePerKWh = Number.isFinite(state?.pricePerKWh)
-   ? state?.pricePerKWh
+    ? state?.pricePerKWh
     : Number.isFinite(parsedFromLabel)
       ? parsedFromLabel
       : 5500;
@@ -355,6 +334,7 @@ const ChargingProgress = () => {
   useEffect(() => {
     let alive = true;
     async function startSessionIfNeeded() {
+      setBooting(true);
       if (state?.chargingSessionId) {
         let seed = state?.startSessionData || null;
         if (!seed) {
@@ -417,6 +397,8 @@ const ChargingProgress = () => {
           graceSeconds: Number.isFinite(dynGraceSeconds) ? dynGraceSeconds : 5 * 60,
         };
         saveLive(live);
+        setNoActiveSession(false);
+        setBooting(false);
         return;
       }
 
@@ -430,7 +412,13 @@ const ChargingProgress = () => {
       const bookingId = state?.bookingId ?? state?.booking?.id ?? state?.booking?.bookingId;
       const portIdToUse = state?.gun?.id ?? state?.gun?.portId ?? state?.gun?.PortId ?? state?.portId;
 
-      if (!customerId || !vehicleId || !portIdToUse) return;
+      if (!customerId || !vehicleId || !portIdToUse) {
+        // Không đủ dữ liệu để start: nếu không có live thì coi như no active
+        const live = loadLive();
+        if (!live?.isActive) setNoActiveSession(true);
+        setBooting(false);
+        return;
+      }
 
       try {
         const url = `${API_ABS}/ChargingSessions/start`;
@@ -502,9 +490,13 @@ const ChargingProgress = () => {
           graceSeconds: Number.isFinite(dynGraceSeconds) ? dynGraceSeconds : 5 * 60,
         };
         saveLive(live);
+        setNoActiveSession(false);
+        setBooting(false);
       } catch (e) {
         if (!alive) return;
         message.error(`Không thể bắt đầu phiên sạc: ${e?.message || "Lỗi không xác định"}`);
+        setNoActiveSession(true);
+        setBooting(false);
       }
     }
 
@@ -537,16 +529,33 @@ const ChargingProgress = () => {
   // Resume khi vào từ Menu (không có state): đọc live và hydrate session/charger
   useEffect(() => {
     if (state) return; // có state thì không cần resume
+    setBooting(true);
     const live = loadLive();
-    if (!live?.isActive || !live?.chargingSessionId) return;
-
+    if (!live?.isActive || !live?.chargingSessionId) {
+      // không có gì để resume => nếu cũng không có state, coi như no active
+      setNoActiveSession(true);
+      setBooting(false);
+      return;
+    }
     let ignore = false;
     (async () => {
       try {
         // 1) lấy session theo id
         const s = await fetchAuthJSON(`${API_ABS}/ChargingSessions/${encodeURIComponent(live.chargingSessionId)}`, { method: "GET" });
         const seed = s?.data || s || null;
-        if (!seed || ignore) return;
+        if (!seed || ignore) {
+          setBooting(false);
+          return;
+        }
+        // Nếu trên server phiên đã kết thúc → đánh dấu noActive + clear live
+        if (isEndedStatus(seed.status) || seed.endedAt) {
+          markLiveInactive();
+          setSession(null);
+          setChargerInfo(null);
+          setNoActiveSession(true);
+          setBooting(false);
+          return;
+        }
 
         // 2) lấy Port và Charger để có chargerId và info
         let port = null, charger = null;
@@ -575,13 +584,14 @@ const ChargingProgress = () => {
 
         setSession(merged);
         if (charger) setChargerInfo(charger);
-
         // thông báo nhẹ khi resume
         message.open({
           type: "success",
           duration: 3,
           content: "🔄 Khôi phục phiên sạc đang chạy.",
         });
+        setNoActiveSession(false);
+        setBooting(false);
       } catch {/* ignore */ }
     })();
 
@@ -810,7 +820,14 @@ const ChargingProgress = () => {
   // --- Hydrate UI từ live khi mount ---
   useEffect(() => {
     const live = loadLive();
-    if (!live || !live.isActive) return;
+    // Nếu chưa có live/không active:
+    // - Nếu có state (đang vào từ màn xác nhận để bắt đầu phiên) => KHÔNG gán noActive, để chế độ booting
+    // - Nếu không có state => thật sự không có phiên -> noActive
+    if (!live || !live.isActive) {
+      if (!state) setNoActiveSession(true);
+      setBooting(false);
+      return;
+    }
 
     const nextBatt = computeBatteryNow(live);
     if (Number.isFinite(nextBatt)) {
@@ -825,6 +842,7 @@ const ChargingProgress = () => {
     }
 
     setIsCharging(Boolean(live.isCharging));
+    setBooting(false);
   }, []);
 
   // --- Tick UI: đọc/ghi live, không phụ thuộc tick để tăng pin ---
@@ -857,6 +875,8 @@ const ChargingProgress = () => {
           graceSeconds: Number.isFinite(dynGraceSeconds) ? dynGraceSeconds : 5 * 60,
         };
         saveLive(live);
+        setNoActiveSession(false);
+        setBooting(false);
       }
 
       const nextBatt = computeBatteryNow(live);
@@ -907,6 +927,25 @@ const ChargingProgress = () => {
     }
     return sid;
   }
+
+  function isEndedStatus(s) {
+    if (!s) return false;
+    const t = String(s).toLowerCase();
+    return /(end|ended|finish|finished|stop|stopped|complete|completed|cancel)/.test(t);
+  }
+
+  function markLiveInactive(extra = {}) {
+    const live = loadLive();
+    if (!live) return;
+    saveLive({
+      ...live,
+      isActive: false,
+      isCharging: false,
+      lastUpdateAt: Date.now(),
+      ...extra,
+    });
+  }
+
 
   // ==== END SESSION (chuẩn BE) ====
   async function endSessionOnServer({ endSoc, chargingSessionId }) {
@@ -984,6 +1023,11 @@ const ChargingProgress = () => {
       message.error("Không kết thúc được phiên sạc. Thử lại nhé.");
       return;
     }
+
+    // Đánh dấu local live đã kết thúc để quay lại trang này sẽ không resume
+    markLiveInactive({ batteryAtLastUpdate: Math.round(battery) });
+    setNoActiveSession(true);
+    setBooting(false);
 
     const orderId = `CHG${beData.chargingSessionId || Date.now()}`;
 
@@ -1086,6 +1130,33 @@ const ChargingProgress = () => {
     const r = s % 60;
     return `${m.toString().padStart(2, "0")}:${r.toString().padStart(2, "0")}`;
   }, [penaltyElapsedSecs]);
+
+  if (booting) {
+    return (
+      <MainLayout>
+        <div style={{ padding: 24 }}>
+          <h3>Đang khởi tạo phiên sạc…</h3>
+          <p>Vui lòng đợi trong giây lát.</p>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (noActiveSession) {
+    return (
+      <MainLayout>
+        <div style={{ padding: 24 }}>
+          <h2>Chưa có phiên sạc đang diễn ra</h2>
+          <p>Bạn có thể bắt đầu phiên sạc mới từ danh sách trạm.</p>
+          <div style={{ display: "flex", gap: 12 }}>
+            <Link to="/stations">🔌 Về danh sách trạm</Link>
+            <Link to="/payment">🧾 Xem hoá đơn gần đây</Link>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
 
   return (
     <MainLayout>
