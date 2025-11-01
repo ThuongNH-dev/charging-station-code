@@ -1,5 +1,5 @@
 // =========================================================
-// ReportContent.jsx — HOÀN CHỈNH (dùng Recharts + dữ liệu từ API)
+// ReportContent.jsx — HOÀN CHỈNH (Recharts + dữ liệu từ API)
 // =========================================================
 
 import React from "react";
@@ -87,13 +87,16 @@ function HeatmapHourly({ data = [] }) {
 
   return (
     <div style={{ marginTop: 30 }}>
-      <h4 style={{ marginBottom: 15 }}>Mức độ hoạt động theo giờ (7 ngày)</h4>
+      <h4 style={{ marginBottom: 8 }}>Mức độ hoạt động theo giờ (7 ngày)</h4>
       <ResponsiveContainer width="100%" height={400}>
         <ComposedChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="hour" />
           <YAxis domain={[0, maxVal]} />
-          <Tooltip />
+          <Tooltip
+            formatter={(v) => [`${v} phiên`, "Số phiên"]}
+            labelFormatter={(label) => `Giờ: ${label}`}
+          />
           {days.map((day, idx) => (
             <Bar
               key={day}
@@ -104,6 +107,10 @@ function HeatmapHourly({ data = [] }) {
           ))}
         </ComposedChart>
       </ResponsiveContainer>
+      <p style={{ marginTop: 8, color: "#666", fontSize: 12 }}>
+        Chú thích: Mỗi cột là một ngày; trục ngang là giờ (0–23h); màu biểu thị
+        số phiên trong từng giờ.
+      </p>
     </div>
   );
 }
@@ -129,7 +136,7 @@ function DailyCharts({ dailySessions = [], dailyRevenue = [] }) {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="day" />
             <YAxis />
-            <Tooltip />
+            <Tooltip formatter={(v) => [`${v} phiên`, "Phiên sạc"]} />
             <Line
               type="monotone"
               dataKey="sessions"
@@ -139,17 +146,22 @@ function DailyCharts({ dailySessions = [], dailyRevenue = [] }) {
             />
           </LineChart>
         </ResponsiveContainer>
+        <p style={{ marginTop: 6, color: "#666", fontSize: 12 }}>
+          Chú thích: Số lượng phiên sạc hoàn tất trong 7 ngày gần nhất.
+        </p>
       </div>
 
       {/* Doanh thu */}
       <div style={{ flex: 1, minWidth: 350, height: 300 }}>
-        <h4>Doanh thu theo ngày (₫)</h4>
+        <h4>Doanh thu theo ngày (nghìn ₫)</h4>
         <ResponsiveContainer>
           <LineChart data={dailyRevenue}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="day" />
             <YAxis />
-            <Tooltip formatter={(v) => `${v?.toLocaleString()} ₫`} />
+            <Tooltip
+              formatter={(v) => [`${v?.toLocaleString()} nghìn ₫`, "Doanh thu"]}
+            />
             <Line
               type="monotone"
               dataKey="revenue"
@@ -159,6 +171,9 @@ function DailyCharts({ dailySessions = [], dailyRevenue = [] }) {
             />
           </LineChart>
         </ResponsiveContainer>
+        <p style={{ marginTop: 6, color: "#666", fontSize: 12 }}>
+          Chú thích: Tổng doanh thu trung bình theo ngày (đơn vị nghìn đồng).
+        </p>
       </div>
     </div>
   );
@@ -185,7 +200,7 @@ function RevenueByPlan({ data = [] }) {
 
   return (
     <div style={{ marginTop: 20 }}>
-      <h4>Doanh thu theo gói dịch vụ</h4>
+      <h4>Doanh thu theo gói dịch vụ (₫)</h4>
       <ResponsiveContainer width="100%" height={350}>
         <BarChart data={data}>
           <CartesianGrid strokeDasharray="3 3" />
@@ -203,6 +218,9 @@ function RevenueByPlan({ data = [] }) {
           ))}
         </BarChart>
       </ResponsiveContainer>
+      <p style={{ marginTop: 8, color: "#666", fontSize: 12 }}>
+        Chú thích: Mỗi cột là một tháng; màu sắc thể hiện doanh thu từng gói.
+      </p>
     </div>
   );
 }
@@ -230,7 +248,7 @@ function ServiceStructurePie({ data = [] }) {
 
   return (
     <div style={{ marginTop: 30 }}>
-      <h4>Cơ cấu dịch vụ</h4>
+      <h4>Cơ cấu dịch vụ (theo doanh thu)</h4>
       <ResponsiveContainer width="100%" height={350}>
         <PieChart>
           <Pie
@@ -253,6 +271,9 @@ function ServiceStructurePie({ data = [] }) {
           <Legend />
         </PieChart>
       </ResponsiveContainer>
+      <p style={{ marginTop: 8, color: "#666", fontSize: 12 }}>
+        Chú thích: Tỷ trọng doanh thu giữa 6 gói dịch vụ hợp lệ.
+      </p>
     </div>
   );
 }
@@ -275,12 +296,21 @@ function AreaComparison({ areaData = {} }) {
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="region" />
           <YAxis />
-          <Tooltip formatter={(v) => `${v.toLocaleString()} ₫`} />
+          <Tooltip
+            formatter={(v, name) =>
+              name === "revenue"
+                ? [`${v.toLocaleString()} ₫`, "Doanh thu"]
+                : [`${v.toLocaleString()}`, "Phiên sạc"]
+            }
+          />
           <Legend />
           <Bar dataKey="revenue" fill="#34A853" />
           <Bar dataKey="sessions" fill="#4285F4" />
         </BarChart>
       </ResponsiveContainer>
+      <p style={{ marginTop: 8, color: "#666", fontSize: 12 }}>
+        Chú thích: Doanh thu (₫) và số phiên (lần) theo từng khu vực.
+      </p>
     </div>
   );
 }

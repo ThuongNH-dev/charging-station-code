@@ -251,11 +251,13 @@ export const processServiceStructure = (rawData) => {
   const byCompany = new Map();
   subscriptions.forEach((s) => {
     const item = {
-      planName: s.planName ?? s.PlanName ?? "",
+      planName:
+        s.planName ?? s.PlanName ?? s.plan?.planName ?? s.Plan?.PlanName ?? "",
       start: s.startDate ?? s.StartDate ?? null,
       end: s.endDate ?? s.EndDate ?? null,
       status: s.status ?? s.Status ?? "",
     };
+
     const cId = s.customerId ?? s.CustomerId ?? null;
     const coId = s.companyId ?? s.CompanyId ?? null;
     if (cId != null) {
@@ -547,8 +549,10 @@ export const processTimeChartHourly = (rawData) => {
   });
 
   const result = Object.entries(hourlyData).map(([key, value]) => {
-    const [date, hour] = key.split("-");
-    return { date, hour: parseInt(hour, 10), value };
+    const sep = key.lastIndexOf("-");
+    const date = key.slice(0, sep); // "YYYY-MM-DD"
+    const hour = parseInt(key.slice(sep + 1), 10); // 0..23
+    return { date, hour, value };
   });
 
   if (DEBUG_MODE) console.log("[Hourly Heatmap] points:", result.length);
