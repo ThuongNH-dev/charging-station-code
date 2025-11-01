@@ -291,6 +291,21 @@ export default function AccountMenu() {
         <MenuItem
           onClick={() => {
             handleClose();
+            navigate("/charging");
+          }}
+          sx={{
+            borderRadius: "10px",
+            mx: 0.5,
+            margin: "5px 0px",
+            "&:hover": { background: "#f5f7fa" },
+          }}
+        >
+          Phiên đang sạc
+        </MenuItem>
+
+        <MenuItem
+          onClick={() => {
+            handleClose();
             navigate("/manageSubcription");
           }}
           sx={{
