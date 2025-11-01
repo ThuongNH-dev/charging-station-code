@@ -179,3 +179,27 @@
   border-radius: 6px;
   font-size: 14px;
 }
+/* ===== Loại khách hàng ===== */
+.cust-type {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.cust-type.guest {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+.cust-type.company {
+  color: #1e40af;
+  background: #dbeafe;
+}
+
+.cust-type.normal {
+  color: #065f46;
+  background: #d1fae5;
+}

@@ -50,6 +50,7 @@ export default function ChargerManager() {
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [type, setType] = useState("guest");
+  const [vehicleType, setVehicleType] = useState("Car");
   const [chargerId, setChargerId] = useState("");
   const [portId, setPortId] = useState("");
   const [licensePlate, setLicensePlate] = useState("");
@@ -110,7 +111,6 @@ export default function ChargerManager() {
           (p) => String(p.chargerId ?? p.ChargerId) === String(chargerId)
         );
         setPorts(filtered);
-        console.log(`✅ Ports của trụ ${chargerId}:`, filtered);
       } catch (e) {
         console.error("❌ Lỗi tải cổng sạc:", e);
         setPorts([]);
@@ -123,7 +123,8 @@ export default function ChargerManager() {
   const renderLatest = (r) => {
     const found = latestSessions.find(
       (s) =>
-        String(s.portId) === String(r.id) || String(s.chargerId) === String(r.id)
+        String(s.portId) === String(r.id) ||
+        String(s.chargerId) === String(r.id)
     );
     if (!found) return "—";
     const id = found.chargingSessionId || found.id;
@@ -172,20 +173,51 @@ export default function ChargerManager() {
 
     setSubmitting(true);
     try {
+      const selectedPort = ports.find((p) => String(p.portId) === String(portId));
+      const charger = rows.find((c) => String(c.id) === String(chargerId));
+
+      let portCode =
+  selectedPort?.code ||
+  selectedPort?.Code ||
+  selectedPort?.portCode ||
+  selectedPort?.PortCode;
+
+if (!portCode) {
+  // ✅ Tự sinh PortCode fallback nếu API không trả về
+  const portNum = String(portId).padStart(3, "0"); // -> 001, 002...
+  portCode = `P${portNum}`;
+  console.warn(`⚠️ API /Ports không có Code, sinh tạm PortCode = ${portCode}`);
+}
+
+
+      const chargerCode =
+        charger?.code || charger?.Code || `C${chargerId}`;
+
       if (type === "guest") {
-        await fetchAuthJSON(`${API_BASE}/ChargingSessions/guest/start`, {
+        const body = {
+          licensePlate,
+          portId: Number(portId),
+          PortCode: portCode,
+          ChargerCode: chargerCode,
+          vehicleType,
+        };
+
+        console.log("🚀 Guest start body:", body);
+
+        const res = await fetchAuthJSON(`${API_BASE}/ChargingSessions/guest/start`, {
           method: "POST",
-          body: JSON.stringify({
-            licensePlate,
-            portId: Number(portId),
-          }),
+          body: JSON.stringify(body),
         });
-        alert("✅ Phiên sạc (Guest) đã khởi động!");
+        alert(res?.message || "✅ Phiên sạc (guest) đã được khởi động!");
       } else {
         const found = await fetchAuthJSON(
-          `${API_BASE}/Vehicles?licensePlate=${encodeURIComponent(licensePlate)}`
+          `${API_BASE}/Vehicles?licensePlate=${encodeURIComponent(
+            licensePlate
+          )}&vehicleType=${vehicleType}`
         );
-        const v = toArray(found.items || found.data || found.results || found.$values || found)[0];
+        const v = toArray(
+          found.items || found.data || found.results || found.$values || found
+        )[0];
         if (!v?.vehicleId)
           throw new Error("Không tìm thấy xe này trong hệ thống công ty!");
 
@@ -195,13 +227,17 @@ export default function ChargerManager() {
           vehicleId: v.vehicleId,
           bookingId: null,
           portId: Number(portId),
+          PortCode: portCode,
+          ChargerCode: chargerCode,
         };
 
-        await fetchAuthJSON(`${API_BASE}/ChargingSessions/start`, {
+        console.log("🚀 Company start body:", body);
+
+        const res = await fetchAuthJSON(`${API_BASE}/ChargingSessions/start`, {
           method: "POST",
           body: JSON.stringify(body),
         });
-        alert("✅ Phiên sạc (Company) đã khởi động!");
+        alert(res?.message || "✅ Phiên sạc (company) đã được khởi động!");
       }
 
       setShowModal(false);
@@ -353,6 +389,15 @@ export default function ChargerManager() {
               </label>
             </div>
 
+            <label>Loại xe</label>
+            <select
+              value={vehicleType}
+              onChange={(e) => setVehicleType(e.target.value)}
+            >
+              <option value="Car">Ô tô</option>
+              <option value="Motorbike">Xe máy</option>
+            </select>
+
             <label>Trụ sạc</label>
             <select value={chargerId} onChange={(e) => setChargerId(e.target.value)}>
               <option value="">-- Chọn trụ sạc --</option>
@@ -374,7 +419,8 @@ export default function ChargerManager() {
               </option>
               {ports.map((p) => (
                 <option key={p.portId} value={p.portId}>
-                  Cổng {p.portId} • {p.connectorType} • {p.status} • {p.maxPowerKw}kW
+                  {p.code || p.Code || `P-${p.portId}`} • {p.connectorType} • {p.status} •{" "}
+                  {p.maxPowerKw}kW
                 </option>
               ))}
             </select>
