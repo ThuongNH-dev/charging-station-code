@@ -406,7 +406,11 @@ export const stationApi = {
           body: JSON.stringify(sessionData),
         }
       );
-      return res || {};
+      if (!res) return { success: true, message: "Ended (204)" };
+   if (typeof res === "object" && res.success === undefined) {
+     return { success: true, ...res };
+   }
+   return res;
     } catch (error) {
       console.error("API Error: Bắt đầu phiên sạc thất bại.", error);
       throw new Error(`Bắt đầu phiên sạc thất bại: ${error.message}`);

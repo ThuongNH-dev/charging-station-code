@@ -691,7 +691,7 @@ export default function StationDetailPage() {
         endSoc: Math.max(0, Math.min(100, Number(endSoc))),
       };
       const res = await stationApi.endSession(payload);
-      const ok = !!(res?.data || res?.message);
+      const ok = res?.success !== false;
       if (!ok) {
         message.error(res?.message || "Không thể kết thúc phiên sạc!");
         return;

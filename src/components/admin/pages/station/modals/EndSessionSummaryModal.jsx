@@ -18,7 +18,7 @@ export default function EndSessionSummaryModal({
         <strong>Người dùng:</strong> {endSessionData?.userName}
       </p>
       <p>
-        + <strong>Xe:</strong> +{" "}
+        <strong>Xe:</strong>{" "}
         {endSessionData?.vehicleName ||
           endSessionData?.plate ||
           (endSessionData?.vehicleId

@@ -23,6 +23,7 @@ export default function EndSessionModal({
     >
       {endSessionData ? (
         <>
+          {/* End SoC input */}
           <div
             style={{
               display: "flex",
@@ -35,28 +36,40 @@ export default function EndSessionModal({
               <label>End SoC (%) *</label>
               <input
                 type="number"
+                inputMode="numeric"
                 min={0}
                 max={100}
                 placeholder="Nhập SoC khi kết thúc (0-100)"
                 value={endSoc}
-                onChange={(e) => setEndSoc(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^\d]/g, "");
+                  if (v === "") return setEndSoc("");
+                  const n = Math.max(0, Math.min(100, Number(v)));
+                  setEndSoc(String(n));
+                }}
+                onKeyDown={(e) =>
+                  ["e", "E", "+", "-"].includes(e.key) && e.preventDefault()
+                }
+                onWheel={(e) => e.currentTarget.blur()}
               />
             </div>
           </div>
 
+          {/* Info block */}
           <div style={{ fontSize: "15px", lineHeight: "1.8", color: "#333" }}>
-            <p style={{ margin: "0", fontWeight: "bold" }}>
-              Trạm: {ids.stationId} · Trụ: {ids.chargerId} · Cổng: {ids.portId}
+            <p style={{ margin: 0, fontWeight: "bold" }}>
+              Trạm: {ids?.stationId} · Trụ: {ids?.chargerId} · Cổng:{" "}
+              {ids?.portId}
             </p>
-            <p style={{ margin: "0", fontWeight: "bold" }}>
-              + Xe:{" "}
+            <p style={{ margin: 0, fontWeight: "bold" }}>
+              Xe:{" "}
               {endSessionData.vehicleName ||
                 endSessionData.plate ||
                 (endSessionData.vehicleId
                   ? `ID: ${endSessionData.vehicleId}`
                   : "Unknown")}
-              + · Người: {endSessionData.userName || "Unknown"} (ID:{" "}
-              {endSessionData.userId}) +{" "}
+              {" · "}Người: {endSessionData.userName || "Unknown"} (ID:{" "}
+              {endSessionData.userId})
             </p>
             <hr
               style={{
@@ -65,18 +78,24 @@ export default function EndSessionModal({
                 margin: "10px 0",
               }}
             />
-            <p style={{ margin: "0" }}>
+            <p style={{ margin: 0 }}>
               Bắt đầu:{" "}
-              {new Date(endSessionData.startTime).toLocaleTimeString("vi-VN") +
-                " " +
-                new Date(endSessionData.startTime).toLocaleDateString("vi-VN")}
+              {endSessionData.startTime
+                ? `${new Date(endSessionData.startTime).toLocaleTimeString(
+                    "vi-VN"
+                  )} ${new Date(endSessionData.startTime).toLocaleDateString(
+                    "vi-VN"
+                  )}`
+                : "N/A"}
             </p>
-            <p style={{ margin: "0" }}>Kết thúc: {endSessionData.endTime}</p>
-            <p style={{ margin: "0" }}>
-              Thời lượng (giờ): {endSessionData.duration}
+            <p style={{ margin: 0 }}>
+              Kết thúc: {endSessionData.endTime || "N/A"}
             </p>
-            <p style={{ margin: "0" }}>
-              Năng lượng (kWh): {endSessionData.energy}
+            <p style={{ margin: 0 }}>
+              Thời lượng (giờ): {endSessionData.duration ?? "N/A"}
+            </p>
+            <p style={{ margin: 0 }}>
+              Năng lượng (kWh): {endSessionData.energy ?? "N/A"}
             </p>
             <h4
               style={{
@@ -85,15 +104,17 @@ export default function EndSessionModal({
                 fontWeight: "bold",
               }}
             >
-              Chi phí (đ): {endSessionData.cost}
+              Chi phí (đ): {endSessionData.cost ?? "0"}
             </h4>
           </div>
 
+          {/* Actions */}
           <div className="modal-actions">
-            <button className="btn" onClick={onClose}>
+            <button type="button" className="btn" onClick={onClose}>
               Đóng
             </button>
             <button
+              type="button"
               className="btn blue"
               onClick={onConfirm}
               disabled={
@@ -110,7 +131,7 @@ export default function EndSessionModal({
             Không tìm thấy dữ liệu phiên sạc đang hoạt động cho cổng này.
           </p>
           <div className="modal-actions">
-            <button className="btn" onClick={onClose}>
+            <button type="button" className="btn" onClick={onClose}>
               Đóng
             </button>
           </div>
