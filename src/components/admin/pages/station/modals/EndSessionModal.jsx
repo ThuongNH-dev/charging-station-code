@@ -2,10 +2,24 @@
 import React from "react";
 import { Modal } from "antd";
 
+// Hàm tiện ích định dạng tiền tệ (310365 -> 310.365)
+const formatVND = (amount) => {
+  if (amount === null || amount === undefined) return "0";
+  // Đảm bảo Number(amount) là số trước khi gọi toLocaleString
+  return Number(amount).toLocaleString("vi-VN");
+};
+
+// Hàm tiện ích định dạng kWh (59.4 -> 59.40)
+const formatKwh = (energy) => {
+  if (energy === null || energy === undefined) return "0.00";
+  // Giả định năng lượng ở đây là giá trị tính toán nhanh, chỉ hiển thị 2 chữ số
+  return Number(energy).toFixed(2);
+};
+
 export default function EndSessionModal({
   open,
   onClose,
-  endSessionData,
+  endSessionData, // Cần chứa: .energy, .cost, .currentSubtotal, .currentTax
   endSoc,
   setEndSoc,
   isEnding,
@@ -16,10 +30,11 @@ export default function EndSessionModal({
 
   return (
     <Modal
-      title="Tổng kết phiên sạc"
+      title="Xác nhận Kết thúc phiên sạc"
       open={open}
       onCancel={onClose}
       footer={null}
+      destroyOnClose={true}
     >
       {endSessionData ? (
         <>
@@ -48,7 +63,8 @@ export default function EndSessionModal({
                   setEndSoc(String(n));
                 }}
                 onKeyDown={(e) =>
-                  ["e", "E", "+", "-"].includes(e.key) && e.preventDefault()
+                  ["e", "E", "+", "-", "."].includes(e.key) &&
+                  e.preventDefault()
                 }
                 onWheel={(e) => e.currentTarget.blur()}
               />
@@ -89,14 +105,24 @@ export default function EndSessionModal({
                 : "N/A"}
             </p>
             <p style={{ margin: 0 }}>
-              Kết thúc: {endSessionData.endTime || "N/A"}
+              Thời lượng (phút): {endSessionData.duration ?? "N/A"}
             </p>
+            {/* Sử dụng formatKwh cho dữ liệu tạm tính */}
             <p style={{ margin: 0 }}>
-              Thời lượng (giờ): {endSessionData.duration ?? "N/A"}
+              Năng lượng (kWh, tạm tính): {formatKwh(endSessionData.energy)}
             </p>
-            <p style={{ margin: 0 }}>
-              Năng lượng (kWh): {endSessionData.energy ?? "N/A"}
+
+            {/* ✨ HIỂN THỊ PHÍ CHI TIẾT TẠM TÍNH ✨ */}
+            {/* Đây là phần đã thêm để hiển thị chi phí tạm tính chi tiết */}
+            <p style={{ margin: 0, color: "#0056b3" }}>
+              Phí trước thuế (tạm tính):{" "}
+              {formatVND(endSessionData.currentSubtotal)} đ
             </p>
+            <p style={{ margin: 0, color: "#0056b3" }}>
+              Thuế (tạm tính): {formatVND(endSessionData.currentTax)} đ
+            </p>
+            {/* KẾT THÚC PHẦN THÊM */}
+
             <h4
               style={{
                 color: "#1677ff",
@@ -104,8 +130,12 @@ export default function EndSessionModal({
                 fontWeight: "bold",
               }}
             >
-              Chi phí (đ): {endSessionData.cost ?? "0"}
+              Chi phí (Tổng tạm tính): {formatVND(endSessionData.cost)} đ
             </h4>
+            <small style={{ color: "red", display: "block", marginTop: 5 }}>
+              *Chi phí cuối cùng (sau thuế, phí) sẽ được tính và gửi từ Backend
+              sau khi xác nhận.
+            </small>
           </div>
 
           {/* Actions */}
@@ -121,7 +151,7 @@ export default function EndSessionModal({
                 isEnding || endSoc === "" || Number.isNaN(Number(endSoc))
               }
             >
-              {isEnding ? "Đang kết thúc..." : "Kết thúc"}
+              {isEnding ? "Đang kết thúc..." : "Xác nhận Kết thúc"}
             </button>
           </div>
         </>

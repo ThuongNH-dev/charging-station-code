@@ -681,34 +681,48 @@ export default function StationDetailPage() {
         chargingSessionId,
         endSoc: Math.max(0, Math.min(100, Number(endSoc))),
       };
-      console.log("➡️ Payload END Session đang gửi:", payload); // LOG SẼ GIÚP DEBUG
+      console.log("➡️ Payload END Session đang gửi:", payload);
 
       const res = await stationApi.endSession(payload);
-      console.log("⬅️ Response END Session nhận được:", res); // LOG SẼ GIÚP DEBUG // Thêm kiểm tra mã lỗi HTTP nếu có thể, hiện tại chỉ check res?.success
+      console.log("⬅️ Response END Session nhận được:", res);
 
-      const ok = res?.success !== false;
-      if (!ok) {
-        message.error(res?.message || "Không thể kết thúc phiên sạc!");
+      // Hỗ trợ nhiều kiểu shape: {data:{...}}, {data:{data:{...}}}, hoặc trả thẳng object
+      const sessionResultData =
+        res?.data?.data ?? res?.data ?? res?.result ?? null;
+
+      if (!sessionResultData) {
+        message.error(
+          res?.message ||
+            "Không thể kết thúc phiên sạc hoặc dữ liệu tổng kết bị thiếu!"
+        );
         return;
       }
 
-      message.success(res?.message || "Kết thúc phiên sạc thành công!"); // Logic tính toán tổng kết (Chỉ mang tính hiển thị frontend)
-      const endTime = new Date();
-      const totalMinutes =
-        (endTime.getTime() - new Date(endSessionData.startTime).getTime()) /
-        60000;
-      const totalEnergy = (totalMinutes * 0.5).toFixed(2);
-      const totalCost = (totalEnergy * 3000).toFixed(0); // Hiển thị summary modal (Dùng dữ liệu tính toán từ FE để hiển thị)
+      message.success(res?.message || "Kết thúc phiên sạc thành công!");
 
-      setEndSessionData({
-        ...endSessionData,
-        endTime,
-        totalEnergy,
-        totalCost,
-        endSoc,
-      });
-      setActiveModal("endSessionSummary"); // Cập nhật trạng thái UI
+      // ⭐️ SỬA ĐỔI QUAN TRỌNG: Lấy dữ liệu THỰC TẾ từ Backend để hiển thị Summary Modal
+      const finalSummaryData = {
+        sessionId: chargingSessionId,
+        userId: endSessionData.userId,
+        userName: endSessionData.userName,
+        vehicleName: endSessionData.vehicleName,
+        plate: endSessionData.plate,
+        // DỮ LIỆU TỔNG KẾT TỪ BACKEND
+        startedAt: endSessionData.startTime, // Sử dụng startTime ban đầu
+        endedAt: sessionResultData.endedAt, // Dùng thời gian kết thúc thực tế
+        energyKwh: sessionResultData.energyKwh, // NĂNG LƯỢNG THỰC TẾ (48.6)
+        subtotal: sessionResultData.subtotal, // PHÍ TRƯỚC THUẾ (230850)
+        tax: sessionResultData.tax, // THUẾ (23085)
+        total: sessionResultData.total, // TỔNG PHÍ THỰC TẾ (253935)
+        endSoc: sessionResultData.endSoc, // End SoC thực tế hoặc từ payload
+      };
 
+      // 3. Hiển thị summary modal (Dùng dữ liệu THỰC TẾ từ Backend)
+      setEndSessionData(finalSummaryData);
+      setActiveModal("endSessionSummary");
+      setEndSoc("");
+
+      // Cập nhật trạng thái UI (Reset cổng)
       setActiveSessionsByPort((prev) => {
         const copy = { ...prev };
         delete copy[currentPortId];
