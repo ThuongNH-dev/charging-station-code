@@ -299,45 +299,65 @@ export default function StationDetailPage() {
     setFoundUserName(null);
     setActiveModal("startSession");
   };
-
-  const openEndSessionModal = (portId, stId, chId) => {
-    let session = null;
+  const openEndSessionModal = async (portId, stId, chId) => {
     setEndSoc("");
 
     const charger = station?.chargers.find((c) => c.ChargerId === chId);
     const port = charger?.ports.find((p) => p.PortId === portId);
 
-    if (port && isPortBusy(port.Status)) {
-      const sd = port.sessionData ?? activeSessionsByPort?.[port.PortId];
-      if (sd) {
-        const now = new Date();
-        const startTime = new Date(sd.startTime);
-        const durationMs = now - startTime;
-        const durationHours = (durationMs / (1000 * 60 * 60)).toFixed(2);
-        const energyKwh = (
-          parseFloat(port.MaxPowerKw) *
-          durationHours *
-          0.95
-        ).toFixed(3);
-        const costVND = (parseFloat(energyKwh) * 3500).toLocaleString("vi-VN");
-        session = {
-          ...sd,
-          endTime:
-            now.toLocaleTimeString("vi-VN") +
-            " " +
-            now.toLocaleDateString("vi-VN"),
-          duration: durationHours,
-          energy: energyKwh,
-          cost: costVND,
-        };
-      }
+    // Lấy phiên theo cổng (không phân biệt ai bắt đầu)
+    let active = null;
+    try {
+      active = await stationApi.getActiveSessionByPort(portId);
+    } catch (e) {
+      console.warn("[UI] getActiveSessionByPort lỗi:", e?.message);
     }
+
+    // Ưu tiên dữ liệu từ BE; fallback sang sessionData ở state (nếu có)
+    const sd = port?.sessionData ?? activeSessionsByPort?.[portId] ?? null;
+
+    const now = new Date();
+    const startISO = active?.startedAt || sd?.startTime || null;
+
+    let durationHours = 0;
+    if (startISO) {
+      const start = new Date(startISO);
+      durationHours = Math.max(0, (now - start) / (1000 * 60 * 60));
+    }
+
+    const energyKwh = Number(
+      (Number(port?.MaxPowerKw || 0) * durationHours * 0.95).toFixed(3)
+    );
+    const costVND = energyKwh * 3500 || 0;
+
+    const session = {
+      sessionId:
+        active?.chargingSessionId || active?.id || sd?.sessionId || null,
+      userId: active?.user?.id ?? sd?.userId ?? null,
+      userName: active?.user?.name ?? sd?.userName ?? "",
+      vehicleId: active?.vehicle?.id ?? sd?.vehicleId ?? null,
+      vehicleName: sd?.vehicleName ?? null,
+      plate: sd?.plate ?? null,
+
+      startTime: startISO,
+      endTime: `${now.toLocaleTimeString("vi-VN")} ${now.toLocaleDateString(
+        "vi-VN"
+      )}`,
+      duration: durationHours.toFixed(2),
+
+      energy: energyKwh.toFixed(3),
+      currentSubtotal: 0, // tạm tính
+      currentTax: 0, // tạm tính
+      cost: costVND,
+      endSoc: null,
+    };
+
     setEndSessionData(session);
     setCurrentPortId(portId);
     setCurrentStationId(stId);
     setCurrentChargerId(chId);
-    setActiveModal("endSession");
-  }; // CRUD station
+    setActiveModal("endSession"); // <-- LUÔN mở modal #2
+  };
 
   const handleAddStation = async () => {
     try {
@@ -661,67 +681,60 @@ export default function StationDetailPage() {
   }; // end confirm
 
   const handleConfirmEndSession = async () => {
-    if (!endSessionData || !currentPortId) return;
+    if (!currentPortId) return;
+
     try {
       setIsEnding(true);
 
-      const chargingSessionId = endSessionData?.sessionId;
-      if (!chargingSessionId || chargingSessionId <= 0) {
-        message.error(
-          "Thiếu chargingSessionId hợp lệ. Không thể kết thúc phiên sạc."
-        );
-        return;
-      }
-
-      const payload = { chargingSessionId };
-      console.log("➡️ Payload END Session đang gửi:", payload);
-
-      const res = await stationApi.endSession(payload);
-      console.log("⬅️ Response END Session nhận được:", res);
-
-      // Hỗ trợ nhiều kiểu shape: {data:{...}}, {data:{data:{...}}}, hoặc trả thẳng object
-      const sessionResultData =
-        res?.data?.data ?? res?.data ?? res?.result ?? null;
-
-      if (!sessionResultData) {
-        message.error(
-          res?.message ||
-            "Không thể kết thúc phiên sạc hoặc dữ liệu tổng kết bị thiếu!"
-        );
-        return;
-      }
-
-      message.success(res?.message || "Kết thúc phiên sạc thành công!");
-
-      // ⭐️ SỬA ĐỔI QUAN TRỌNG: Lấy dữ liệu THỰC TẾ từ Backend để hiển thị Summary Modal
-      const finalSummaryData = {
-        sessionId: chargingSessionId,
-        userId: endSessionData.userId,
-        userName: endSessionData.userName,
-        vehicleName: endSessionData.vehicleName,
-        plate: endSessionData.plate,
-        // DỮ LIỆU TỔNG KẾT TỪ BACKEND
-        startedAt: endSessionData.startTime, // Sử dụng startTime ban đầu
-        endedAt: sessionResultData.endedAt, // Dùng thời gian kết thúc thực tế
-        energyKwh: sessionResultData.energyKwh, // NĂNG LƯỢNG THỰC TẾ (48.6)
-        subtotal: sessionResultData.subtotal, // PHÍ TRƯỚC THUẾ (230850)
-        tax: sessionResultData.tax, // THUẾ (23085)
-        total: sessionResultData.total, // TỔNG PHÍ THỰC TẾ (253935)
-        endSoc: sessionResultData.endSoc, // End SoC thực tế hoặc từ payload
+      const payload = {
+        chargingSessionId: endSessionData?.sessionId || null,
+        portId: currentPortId,
+        // endSoc: endSoc !== "" ? Number(endSoc) : undefined, // nếu muốn gửi
       };
 
-      // 3. Hiển thị summary modal (Dùng dữ liệu THỰC TẾ từ Backend)
+      const res = await stationApi.endSession(payload);
+
+      if (res?.success === false && res?.code === "SESSION_NOT_FOUND") {
+        message.error(
+          res.message || "Không tìm thấy phiên sạc đang chạy cho cổng này."
+        );
+        setIsEnding(false);
+        return;
+      }
+      if (res?.success === false) {
+        message.error(res.message || "Kết thúc phiên sạc thất bại.");
+        setIsEnding(false);
+        return;
+      }
+
+      // Map dữ liệu BE -> Summary
+      const d = res?.data?.data ?? res?.data ?? res ?? {};
+      const finalSummaryData = {
+        sessionId: d.chargingSessionId ?? endSessionData?.sessionId ?? null,
+        userId: endSessionData?.userId ?? null,
+        userName: endSessionData?.userName ?? "",
+        vehicleName: endSessionData?.vehicleName ?? null,
+        plate: endSessionData?.plate ?? null,
+        startedAt: endSessionData?.startTime ?? d.startedAt ?? null,
+        endedAt: d.endedAt ?? new Date().toISOString(),
+        energyKwh: d.energyKwh ?? 0,
+        subtotal: d.subtotal ?? 0,
+        tax: d.tax ?? 0,
+        total: d.total ?? 0,
+        endSoc: d.endSoc ?? (endSoc !== "" ? Number(endSoc) : null),
+      };
+
+      message.success(res?.message || "Kết thúc phiên sạc thành công!");
       setEndSessionData(finalSummaryData);
       setActiveModal("endSessionSummary");
       setEndSoc("");
 
-      // Cập nhật trạng thái UI (Reset cổng)
+      // Reset UI
       setActiveSessionsByPort((prev) => {
-        const copy = { ...prev };
-        delete copy[currentPortId];
-        return copy;
+        const cp = { ...prev };
+        delete cp[currentPortId];
+        return cp;
       });
-
       setStation((prev) => ({
         ...prev,
         chargers: prev.chargers.map((charger) => ({
