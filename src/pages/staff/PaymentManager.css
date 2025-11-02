@@ -142,3 +142,23 @@
     grid-template-columns: 1fr;
   }
 }
+.center {
+  text-align: center;
+}
+.center h3 {
+  margin-top: 10px;
+  font-weight: 600;
+}
+.two-column {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  width: 100%;
+  max-width: 1200px;
+}
+
+@media (max-width: 900px) {
+  .two-column {
+    grid-template-columns: 1fr;
+  }
+}

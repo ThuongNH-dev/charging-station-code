@@ -19,6 +19,7 @@ import Unauthorized from "./pages/Unauthorized"; // ✅ thêm trang này (mục 
 import BookingHistory from "./pages/booking/BookingHisory"; // ✅ thêm trang lịch sử đặt chỗ
 import InvoicePage from "./components/charging/Invoice";
 import StaffLayout from "./layouts/StaffLayout";
+import StaffPaymentSuccess from "./pages/staff/StaffPaymentSuccess";
 import AdminLayout from "./components/admin/layout/AdminLayout";
 import StationManagement from "./components/admin/pages/StationManagement";
 import UserManagement from "./components/admin/pages/UserManagement/UserManagement";
@@ -271,6 +272,8 @@ export default function App() {
         }
         />
       {/*Staff */}
+      <Route path="/staff/payment-success" element={<StaffPaymentSuccess />} />
+      
       <Route
         path="/staff/*"
         element={
