@@ -65,7 +65,6 @@ export default function StaffLayout() {
               <Route path="payments" element={<PaymentManager />} />
               <Route path="reports" element={<ReportPage />} />
               <Route path="invoice" element={<StaffInvoice />} />
-              <Route path="payment-success" element={<StaffPaymentSuccess />} />
               <Route
                 path="incidents"
                 element={

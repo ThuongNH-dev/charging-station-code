@@ -6,6 +6,7 @@ import MainLayout from "../../layouts/MainLayout";
 import "./style/PaymentSuccess.css";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import { getCustomerIdStrict, getAccountIdStrict } from "../../api/authHelpers";
+import { useAuth } from "../../context/AuthContext"; // ✅ THÊM import này
 
 const API_BASE = getApiBase();
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
@@ -322,12 +323,14 @@ async function resolveMyVehicleId() {
 
 export default function PaymentSuccess() {
   const { state } = useLocation();
-  // const [search] = useSearchParams();
   const navigate = useNavigate();
   const [search] = useSearchParams();
+  
+  // ✅ THÊM: Lấy thông tin user để kiểm tra role
+  const { user, loading: authLoading } = useAuth();
 
-  const SPEED = Math.max(1, Number(search.get("speed") || 1)); // mặc định 1x
-  const [t0] = useState(() => Date.now()); // mốc thời gian thật để suy ra thời gian ảo
+  const SPEED = Math.max(1, Number(search.get("speed") || 1));
+  const [t0] = useState(() => Date.now());
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -339,6 +342,20 @@ export default function PaymentSuccess() {
   const okFlag = (search.get("success") || "true").toLowerCase() === "true";
   const bookingIdFromQS = search.get("bookingId");
 
+  // ✅ THÊM: Redirect Staff sang trang riêng
+  useEffect(() => {
+    // Đợi AuthContext load xong
+    if (authLoading) return;
+    
+    // Nếu user là Staff, redirect sang /staff/payment-success với toàn bộ query params
+    if (user?.role === "Staff") {
+      console.log("🔄 Staff detected, redirecting to staff payment success page");
+      console.log("🔍 Query params:", search.toString());
+      navigate(`/staff/payment-success?${search.toString()}`, { 
+        replace: true 
+      });
+    }
+  }, [user, authLoading, navigate, search]);
 
   // === Fetch booking từ BE ===
   useEffect(() => {
@@ -554,6 +571,17 @@ export default function PaymentSuccess() {
   const onEnter = (e) => e.key === "Enter" && handleStart();
 
   // ===== Render =====
+  // ✅ THÊM: Hiển thị loading khi đang kiểm tra auth
+  if (authLoading) {
+    return (
+      <MainLayout>
+        <div style={{ padding: 24, textAlign: 'center' }}>
+          Đang kiểm tra quyền truy cập...
+        </div>
+      </MainLayout>
+    );
+  }
+
   if (loading && !data)
     return (
       <MainLayout>
@@ -678,7 +706,7 @@ export default function PaymentSuccess() {
               </div>
               <div className="ps-kv">
                 <span className="ps-k">Súng/Cổng đã đặt</span>
-                <span className="ps-v">
+                                <span className="ps-v">
                   {[data.gun?.name, data.gun?.id].filter(Boolean).join(" — ") || "—"}
                 </span>
               </div>

@@ -203,3 +203,7 @@
   color: #065f46;
   background: #d1fae5;
 }
+.ant-pagination {
+  margin-top: 12px;
+  text-align: center;
+}

@@ -1,13 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {
-  Card,
-  Button,
-  message,
-  Table,
-  Tag,
-  Radio,
-  Spin,
-} from "antd";
+import { Card, Button, message, Table, Tag, Radio, Spin } from "antd";
 import {
   QrcodeOutlined,
   CreditCardOutlined,
@@ -23,7 +15,7 @@ const vnd = (n) =>
 
 export default function PaymentManager() {
   const [guestSessions, setGuestSessions] = useState([]);
-  const [invoices, setInvoices] = useState([]);
+  const [paidSessions, setPaidSessions] = useState([]); // ✅ Chỉ chứa phiên đã thanh toán
   const [loading, setLoading] = useState(true);
   const [payingId, setPayingId] = useState(null);
   const [method, setMethod] = useState("VNPAY");
@@ -36,13 +28,11 @@ export default function PaymentManager() {
   async function loadData() {
     setLoading(true);
     try {
-      // 🔹 Lấy tất cả phiên sạc
       const resSess = await fetchAuthJSON(`${API_BASE}/ChargingSessions`);
       let sessions =
         resSess?.data ?? resSess?.$values ?? resSess?.items ?? resSess ?? [];
       if (!Array.isArray(sessions)) sessions = [sessions];
 
-      // 🔹 Lấy danh sách xe để lấy biển số
       const resVeh = await fetchAuthJSON(`${API_BASE}/Vehicles`);
       let vehicles =
         resVeh?.data ?? resVeh?.$values ?? resVeh?.items ?? resVeh ?? [];
@@ -52,7 +42,6 @@ export default function PaymentManager() {
         vehicleMap[v.vehicleId || v.VehicleId] = v;
       });
 
-      // 🔧 Lấy chi tiết từng phiên
       const sessionDetailed = await Promise.all(
         sessions.map(async (s) => {
           let full = s;
@@ -61,15 +50,13 @@ export default function PaymentManager() {
               `${API_BASE}/ChargingSessions/${s.chargingSessionId || s.id}`
             );
             if (detail && typeof detail === "object") full = { ...s, ...detail };
-          } catch {
-            /* bỏ qua nếu lỗi */
-          }
+          } catch {}
           return full;
         })
       );
 
       // 🔍 Lọc khách vãng lai (ko có customerId & companyId)
-      const guest = sessionDetailed
+      const guestAll = sessionDetailed
         .map((s) => {
           const vid =
             s.vehicleId || s.VehicleId || s.vehicle?.vehicleId || null;
@@ -78,8 +65,7 @@ export default function PaymentManager() {
             chargingSessionId:
               s.chargingSessionId || s.id || s.sessionId || null,
             status: s.status || "Unknown",
-            energyKwh:
-              s.energyKwh ?? s.EnergyKwh ?? s.measuredEnergy ?? 0,
+            energyKwh: s.energyKwh ?? s.EnergyKwh ?? s.measuredEnergy ?? 0,
             total: s.total ?? s.Total ?? 0,
             portId: s.portId ?? s.PortId ?? null,
             customerId: s.customerId ?? s.CustomerId ?? 0,
@@ -105,26 +91,17 @@ export default function PaymentManager() {
             new Date(a.startedAt || 0).getTime()
         );
 
-      setGuestSessions(guest);
+      // 🔹 Lấy các phiên đã thanh toán tạm (localStorage)
+      const paidLocal =
+        JSON.parse(localStorage.getItem("staff_paid_sessions") || "[]") || [];
 
-      // 🔹 Lấy hóa đơn khách vãng lai
-      const resInv = await fetchAuthJSON(`${API_BASE}/Invoices`);
-      let inv = resInv?.data ?? resInv?.$values ?? resInv?.items ?? resInv ?? [];
-      if (!Array.isArray(inv)) inv = [inv];
+      // 🔸 Loại bỏ các session đã thanh toán khỏi danh sách bên trái
+      const unpaid = guestAll.filter(
+        (s) => !paidLocal.some((p) => p.sessionId === s.chargingSessionId)
+      );
 
-      const guestInv = inv
-        .filter(
-          (i) =>
-            (!i.customerId || i.customerId === 0) &&
-            (!i.companyId || i.companyId === 0)
-        )
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt || 0).getTime() -
-            new Date(a.createdAt || 0).getTime()
-        );
-
-      setInvoices(guestInv);
+      setGuestSessions(unpaid);
+      setPaidSessions(paidLocal);
     } catch (e) {
       console.error(e);
       message.error("Không thể tải dữ liệu!");
@@ -137,7 +114,6 @@ export default function PaymentManager() {
   async function handlePay(s) {
     setPayingId(s.chargingSessionId);
     try {
-      // ✅ Return URL riêng cho Staff
       const returnUrl = `${window.location.origin}/staff/payment-success`;
 
       const res = await fetchAuthJSON(
@@ -152,20 +128,28 @@ export default function PaymentManager() {
         throw new Error("Không nhận được đường dẫn thanh toán!");
 
       message.success(`Đang mở thanh toán cho phiên #${s.chargingSessionId}`);
-      window.location.href = data.paymentUrl;
+      window.open(data.paymentUrl, "_blank");
 
-      // 🧾 Thêm bản ghi tạm vào danh sách hóa đơn đã thanh toán
-      setInvoices((prev) => [
-        {
-          invoiceId: `TEMP-${Date.now()}`,
-          sessionId: s.chargingSessionId,
-          total: s.total ?? 0,
-          method,
-          createdAt: new Date().toISOString(),
-          status: "PAID",
-        },
-        ...prev,
-      ]);
+      // ✅ Thêm bản ghi tạm (đã thanh toán)
+      const newPaid = {
+        sessionId: s.chargingSessionId,
+        total: s.total ?? 0,
+        method,
+        createdAt: new Date().toISOString(),
+        status: "PAID",
+      };
+
+      // 🔹 Cập nhật localStorage
+      const stored =
+        JSON.parse(localStorage.getItem("staff_paid_sessions") || "[]") || [];
+      stored.unshift(newPaid);
+      localStorage.setItem("staff_paid_sessions", JSON.stringify(stored));
+
+      // 🔄 Cập nhật UI
+      setPaidSessions((prev) => [newPaid, ...prev]);
+      setGuestSessions((prev) =>
+        prev.filter((x) => x.chargingSessionId !== s.chargingSessionId)
+      );
     } catch (err) {
       console.error(err);
       message.error(`❌ Lỗi khi tạo thanh toán: ${err.message}`);
@@ -227,21 +211,13 @@ export default function PaymentManager() {
     },
   ];
 
-  /* ======================= CỘT PHẢI ======================= */
-  const invoiceCols = [
+  /* ======================= CỘT PHẢI (CHỈ PHIÊN ĐÃ THANH TOÁN) ======================= */
+  const paidCols = [
     {
-      title: "Hóa đơn",
-      dataIndex: "invoiceId",
-      key: "invoiceId",
-      render: (id) => (
-        <strong>{id?.toString().startsWith("TEMP") ? "—" : `INV-${id}`}</strong>
-      ),
-    },
-    {
-      title: "Phiên",
+      title: "Phiên sạc",
       dataIndex: "sessionId",
       key: "sessionId",
-      render: (id) => (id ? `S-${id}` : "—"),
+      render: (id) => <strong>{id ? `S-${id}` : "—"}</strong>,
     },
     {
       title: "Tổng tiền",
@@ -273,6 +249,7 @@ export default function PaymentManager() {
   /* ======================= HIỂN THỊ ======================= */
   return (
     <div className="pay-wrap two-column">
+      {/* CỘT TRÁI - CHƯA THANH TOÁN */}
       <div className="pay-left">
         <Card
           title={
@@ -317,17 +294,18 @@ export default function PaymentManager() {
         </Card>
       </div>
 
+      {/* CỘT PHẢI - ĐÃ THANH TOÁN */}
       <div className="pay-right">
         <Card
-          title="💰 Hóa đơn khách vãng lai đã thanh toán"
+          title="💰 Các phiên sạc đã thanh toán"
           bordered={false}
           className="pay-card"
         >
           <Table
-            columns={invoiceCols}
-            dataSource={invoices.map((i, idx) => ({
+            columns={paidCols}
+            dataSource={paidSessions.map((i, idx) => ({
               ...i,
-              key: i.invoiceId || idx,
+              key: i.sessionId || idx,
             }))}
             pagination={{ pageSize: 7 }}
             size="small"

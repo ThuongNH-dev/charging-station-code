@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
+import { Pagination } from "antd";
 import "./SessionManager.css";
 
 const API_BASE = getApiBase();
@@ -39,12 +40,10 @@ export default function SessionManager() {
   async function loadSessions() {
     setLoading(true);
     try {
-      // 1️⃣ Lấy danh sách phiên
       const res = await fetchAuthJSON(`${API_BASE}/ChargingSessions`);
       let sessionArr = res?.data ?? res?.$values ?? res?.items ?? res ?? [];
       if (!Array.isArray(sessionArr)) sessionArr = [sessionArr];
 
-      // 2️⃣ Lấy danh sách xe
       const vehiclesRaw = await fetchAuthJSON(`${API_BASE}/Vehicles`);
       let vehicles = [];
       if (Array.isArray(vehiclesRaw)) vehicles = vehiclesRaw;
@@ -59,7 +58,6 @@ export default function SessionManager() {
         if (id) vehicleMap[id] = v;
       }
 
-      // 3️⃣ Lấy danh sách hóa đơn
       const invRes = await fetchAuthJSON(`${API_BASE}/Invoices`);
       let invoices =
         invRes?.data ?? invRes?.$values ?? invRes?.items ?? invRes ?? [];
@@ -89,7 +87,6 @@ export default function SessionManager() {
         } catch {}
       }
 
-      // 4️⃣ Lấy chi tiết từng phiên (để có kWh & total)
       const detailed = await Promise.all(
         sessionArr.map(async (s) => {
           try {
@@ -103,7 +100,6 @@ export default function SessionManager() {
         })
       );
 
-      // 5️⃣ Gộp dữ liệu
       const merged = detailed
         .map((s) => {
           const sessionId = s.chargingSessionId || s.id;
@@ -389,6 +385,17 @@ export default function SessionManager() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* ✅ Thanh phân trang Ant Design */}
+        <div style={{ textAlign: "center", marginTop: 16 }}>
+          <Pagination
+            current={currentPage}
+            pageSize={pageSize}
+            total={filteredSessions.length}
+            onChange={(page) => setCurrentPage(page)}
+            showSizeChanger={false}
+          />
         </div>
       </div>
     </div>

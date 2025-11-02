@@ -158,7 +158,7 @@ export default function App() {
       <Route
         path="/payment/success"
         element={
-          <ProtectedRoute allowedRoles={["Customer"]}>
+          <ProtectedRoute allowedRoles={["Customer", "Staff"]}>
             <PaymentSuccess />
           </ProtectedRoute>
         }
@@ -198,7 +198,7 @@ export default function App() {
       <Route
         path="/invoiceSummary"
         element={
-          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
+          <ProtectedRoute allowedRoles={["Customer", "Company", "Staff"]}>
             <InvoiceSummary />
           </ProtectedRoute>
         }
@@ -206,7 +206,7 @@ export default function App() {
       <Route
         path="/invoiceDetail/:invoiceId"
         element={
-          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
+          <ProtectedRoute allowedRoles={["Customer", "Company", "Staff"]}>
             <InvoiceDetail />
           </ProtectedRoute>
         }
@@ -272,7 +272,15 @@ export default function App() {
         }
         />
       {/*Staff */}
-      <Route path="/staff/payment-success" element={<StaffPaymentSuccess />} />
+      {/* ✅ Đặt TRƯỚC để không bị /staff/* catch */}
+<Route
+  path="/staff/payment-success"
+  element={
+    <ProtectedRoute allowedRoles={["Staff"]}>
+      <StaffPaymentSuccess />
+    </ProtectedRoute>
+  }
+/>
       
       <Route
         path="/staff/*"
