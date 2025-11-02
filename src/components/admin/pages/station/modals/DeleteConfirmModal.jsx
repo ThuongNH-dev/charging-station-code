@@ -31,7 +31,17 @@ export default function DeleteConfirmModal({
       </p>
       <div className="modal-actions">
         <button onClick={onClose}>Hủy</button>
-        <button className="delete" onClick={onConfirm}>
+        <button
+          type="button"
+          className="delete"
+          disabled={!targetId}
+          title="Giữ Alt và bấm để xác nhận xoá"
+          onClick={(e) => {
+            if (!targetId) return;
+            if (!e.altKey) return;
+            onConfirm();
+          }}
+        >
           Xoá
         </button>
       </div>

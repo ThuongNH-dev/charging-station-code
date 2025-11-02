@@ -135,6 +135,43 @@ async function _getActiveSessionByPort(portId) {
   return null;
 }
 
+// === 0. CONNECTOR TYPES (dynamic) ===
+async function _getConnectorTypesFromDB() {
+  const candidates = [
+    "/api/Ports/connector-types",
+    "/api/ports/connector-types",
+    "/api/ConnectorTypes",
+    "/ConnectorTypes",
+    "/Ports/connector-types",
+  ];
+  for (const ep of candidates) {
+    try {
+      const res = await fetchAuthJSON(resolveUrl(ep), { method: "GET" });
+      if (!res) continue;
+      if (Array.isArray(res)) {
+        const list = res
+          .map((x) => {
+            if (typeof x === "string") return x;
+            if (x?.name) return String(x.name);
+            if (x?.Name) return String(x.Name);
+            if (x?.type) return String(x.type);
+            if (x?.Type) return String(x.Type);
+            return null;
+          })
+          .filter(Boolean);
+        if (list.length) return Array.from(new Set(list));
+      }
+      if (res?.items && Array.isArray(res.items)) {
+        const list = res.items.map(String);
+        if (list.length) return Array.from(new Set(list));
+      }
+    } catch (e) {
+      console.warn("[stationApi] connector-types fail @", ep, e?.message || e);
+    }
+  }
+  return [];
+}
+
 // === 2. HÀM XỬ LÝ LỖI (CRUD API) ===
 
 export const stationApi = {
@@ -148,6 +185,38 @@ export const stationApi = {
       return [];
     }
   },
+
+  async getConnectorTypes() {
+    try {
+      const list = await _getConnectorTypesFromDB();
+      if (list.length) return list;
+      // Fallback: suy luận từ list port nếu BE chưa có API riêng
+      try {
+        const ports = await this.getAllPorts();
+        const fromPorts = Array.isArray(ports)
+          ? Array.from(
+              new Set(
+                ports
+                  .map((p) => p?.ConnectorType)
+                  .filter((x) => typeof x === "string" && x.trim())
+              )
+            )
+          : [];
+        return fromPorts;
+      } catch {
+        return [];
+      }
+    } catch (e) {
+      console.warn("[stationApi] getConnectorTypes()", e?.message || e);
+      return [];
+    }
+  },
+
+  // (Nếu bạn CHƯA có) getPricingRules(): thêm stub/bản thật ở đây
+  // async getPricingRules() {
+  //   const res = await fetchAuthJSON(resolveUrl("/api/PricingRules"), { method: "GET" });
+  //   return Array.isArray(res) ? res : [];
+  // },
 
   async createStation(stationData) {
     try {
@@ -513,6 +582,16 @@ export const stationApi = {
     } catch (error) {
       console.error("API Error: Kết thúc phiên sạc thất bại.", error);
       throw new Error(`Kết thúc phiên sạc thất bại: ${error.message}`);
+    }
+  },
+  // ✅ Thêm stub để tránh lỗi gọi hàm không tồn tại
+  async getPricingRules() {
+    try {
+      const res = await fetchAuthJSON(resolveUrl("/api/PricingRules"));
+      return Array.isArray(res) ? res : [];
+    } catch (e) {
+      console.warn("[stationApi] getPricingRules() failed:", e);
+      return [];
     }
   },
 };
