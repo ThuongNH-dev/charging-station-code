@@ -214,71 +214,7 @@ export default function ManageSubscriptions() {
     }
   };
 
-  async function fetchLatestInvoiceIdForOwner(owner) {
-    const isCompany = !!owner.companyId;
-    const id = isCompany ? owner.companyId : owner.customerId;
-    if (!id) return null;
-
-    const url = `${API_BASE}/Invoices/${isCompany ? "by-company" : "by-customer"}/${id}`;
-    const res = await fetch(url, { headers: { accept: "*/*", authorization: headers.authorization } });
-    if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
-    const json = await res.json();
-    const arr = Array.isArray(json) ? json : json?.data || [];
-    if (!Array.isArray(arr) || arr.length === 0) return null;
-
-    const sorted = [...arr].sort(
-      (a, b) =>
-        (b.billingYear || 0) - (a.billingYear || 0) ||
-        (b.billingMonth || 0) - (a.billingMonth || 0) ||
-        (b.invoiceId || 0) - (a.invoiceId || 0)
-    );
-    return sorted[0]?.invoiceId ?? null;
-  }
-
-  async function fetchLatestInvoiceIdForSubscription(subId) {
-    try {
-      const url = `${API_BASE}/Invoices/by-subscription/${subId}`;
-      const r = await fetch(url, { headers: { accept: "*/*", authorization: headers.authorization } });
-      if (r.ok) {
-        const js = await r.json();
-        const arr = Array.isArray(js) ? js : js?.data || [];
-        if (arr.length) {
-          arr.sort(
-            (a, b) =>
-              (b.billingYear || 0) - (a.billingYear || 0) ||
-              (b.billingMonth || 0) - (a.billingMonth || 0) ||
-              (b.invoiceId || 0) - (a.invoiceId || 0)
-          );
-          return arr[0]?.invoiceId ?? null;
-        }
-      }
-    } catch {}
-    return null;
-  }
-
-  const handleViewDetail = async (sub) => {
-    try {
-      msg.loading("Đang mở chi tiết hóa đơn…");
-      let invoiceId = await fetchLatestInvoiceIdForSubscription(sub.subscriptionId);
-      if (!invoiceId) {
-        invoiceId = await fetchLatestInvoiceIdForOwner({
-          companyId: sub.companyId ?? null,
-          customerId: sub.customerId ?? null,
-        });
-      }
-      msg.dismiss();
-      if (!invoiceId) {
-        msg.warning("Không tìm thấy hóa đơn phù hợp cho gói này.");
-        return;
-      }
-      navigate(`/invoiceDetail/${encodeURIComponent(String(invoiceId))}`);
-    } catch (e) {
-      console.error(e);
-      msg.dismiss();
-      msg.error("Không lấy được hóa đơn. Vui lòng thử lại.");
-    }
-  };
-
+  // ===== Cột bảng
   const columns = [
     {
       title: "ID Gói",
@@ -339,12 +275,18 @@ export default function ManageSubscriptions() {
       render: (_, r) => {
         const status = String(r.status || "").toLowerCase();
         const isActive = status === "active";
+
+        // ẨN TOÀN BỘ HÀNH ĐỘNG KHI INACTIVE (hoặc khác Active)
+        if (!isActive) {
+          return <Text type="secondary">Không khả dụng</Text>;
+        }
+
         return (
           <Space
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {/* NEW: Gia hạn → Payment (renew) */}
+            {/* Gia hạn (chỉ hiện khi Active) */}
             <Tooltip title="Gia hạn gói này">
               <Button
                 type="primary"
@@ -362,25 +304,19 @@ export default function ManageSubscriptions() {
               </Button>
             </Tooltip>
 
-            {/* Xem hóa đơn gần nhất */}
-            <Tooltip title="Xem hóa đơn gần nhất">
-              <Button onClick={() => handleViewDetail(r)}>Xem HĐ</Button>
-            </Tooltip>
-
-            {isActive && (
-              <Popconfirm
-                title="Xác nhận hủy gói?"
-                description="Hủy là kết thúc luôn và không thể tiếp tục gia hạn."
-                okText="Hủy gói"
-                cancelText="Không"
-                okButtonProps={{ danger: true }}
-                onConfirm={() => doCancelNow(r)}
-              >
-                <Tooltip title="Hủy gói này (kết thúc ngay)">
-                  <Button danger icon={<StopOutlined />}>Hủy gói</Button>
-                </Tooltip>
-              </Popconfirm>
-            )}
+            {/* Hủy gói (chỉ hiện khi Active) */}
+            <Popconfirm
+              title="Xác nhận hủy gói?"
+              description="Hủy là kết thúc luôn và không thể tiếp tục gia hạn."
+              okText="Hủy gói"
+              cancelText="Không"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => doCancelNow(r)}
+            >
+              <Tooltip title="Hủy gói này (kết thúc ngay)">
+                <Button danger icon={<StopOutlined />}>Hủy gói</Button>
+              </Tooltip>
+            </Popconfirm>
           </Space>
         );
       },
