@@ -56,16 +56,11 @@ const pillClass = (status) => {
   return "pill";
 };
 
-// ---- Subscription normalize (format 199,000 đ nếu BE trả 199) ----
-// ---- Subscription normalize (đọc được cả {plan:{...}} lẫn {subscriptionPlan:{...}})
+// ---- Subscription normalize ----
 function normalizeSubscription(s) {
   if (!s) return null;
-  // API có thể trả "plan" hoặc "subscriptionPlan"
   const plan = s.plan || s.subscriptionPlan || {};
-
-  // Giá: BE có thể trả 199 → chuẩn hoá thành 199000
-  const rawPrice =
-    Number(plan.priceMonthly ?? s.priceMonthly ?? 0) || 0;
+  const rawPrice = Number(plan.priceMonthly ?? s.priceMonthly ?? 0) || 0;
   const priceMonthly = rawPrice >= 1000 ? rawPrice : rawPrice * 1000;
 
   return {
@@ -80,7 +75,6 @@ function normalizeSubscription(s) {
     benefits: plan.benefits ?? null,
     isForCompany: !!(plan.isForCompany ?? s.isForCompany),
 
-    // Nếu BE không trả, mặc định Monthly để UI có chữ
     billingCycle: s.billingCycle || "Monthly",
     autoRenew: !!s.autoRenew,
 
@@ -91,8 +85,7 @@ function normalizeSubscription(s) {
   };
 }
 
-
-// >>> Quy tắc chọn loại invoice: ưu tiên Charging nếu có sessions
+// >>> Quy tắc chọn loại invoice
 function pickInvoiceType(inv) {
   const hasSessions = Array.isArray(inv?.chargingSessions) && inv.chargingSessions.length > 0;
   if (hasSessions) return "charging";
@@ -100,12 +93,7 @@ function pickInvoiceType(inv) {
   const sub = inv?.subscription;
   const hasSub =
     !!(inv?.subscriptionId || inv?.isMonthlyInvoice) ||
-    !!(sub && (
-      sub.subscriptionId ||
-      sub.subscriptionPlanId ||
-      sub.planName ||
-      sub?.plan?.planName // <— thêm dòng này
-    ));
+    !!(sub && (sub.subscriptionId || sub.subscriptionPlanId || sub.planName || sub?.plan?.planName));
 
   return hasSub ? "subscription" : "charging";
 }
@@ -131,11 +119,10 @@ function normalizeSession(s) {
   };
 }
 
-// ==== NEW: helper gọi chi tiết phiên & pool giới hạn song song ====
+// ==== NEW: hydrate sessions ====
 async function fetchSessionDetail(sessionId) {
   try {
     const r = await fetchAuthJSON(`${API_ABS}/ChargingSessions/${sessionId}`, { method: "GET" });
-    // BE có thể bọc trong { data: {...} } hoặc trả trực tiếp object
     return r?.data ?? r ?? null;
   } catch {
     return null;
@@ -144,7 +131,8 @@ async function fetchSessionDetail(sessionId) {
 
 async function runLimitedPool(items, limit, worker) {
   const out = new Array(items.length);
-  let i = 0, running = 0;
+  let i = 0,
+    running = 0;
   return await new Promise((resolve) => {
     const next = () => {
       if (i >= items.length && running === 0) return resolve(out);
@@ -152,55 +140,51 @@ async function runLimitedPool(items, limit, worker) {
         const idx = i++;
         running++;
         Promise.resolve(worker(items[idx], idx))
-          .then((res) => { out[idx] = res; })
-          .catch(() => { out[idx] = null; })
-          .finally(() => { running--; next(); });
+          .then((res) => {
+            out[idx] = res;
+          })
+          .catch(() => {
+            out[idx] = null;
+          })
+          .finally(() => {
+            running--;
+            next();
+          });
       }
     };
     next();
   });
 }
 
-/**
- * Hydrate danh sách sessions bằng /ChargingSessions/{id}
- * - Giữ lại các field đã có, điền/chèn các field thiếu từ detail.
- * - Ưu tiên dữ liệu từ detail (vì là nguồn “đủ” nhất).
- */
 async function hydrateSessionsDetails(baseSessions) {
   const base = Array.isArray(baseSessions) ? baseSessions : [];
-  const ids = base.map(s => s?.chargingSessionId).filter(Boolean);
+  const ids = base.map((s) => s?.chargingSessionId).filter(Boolean);
   if (ids.length === 0) return base;
 
-  // gọi chi tiết theo pool để tránh dội server
   const details = await runLimitedPool(ids, 6, (sid) => fetchSessionDetail(sid));
 
   const byId = new Map();
   details.forEach((d) => {
     if (!d) return;
-    const norm = normalizeSession(d); // tận dụng mapper đã có
+    const norm = normalizeSession(d);
     if (norm?.chargingSessionId) byId.set(norm.chargingSessionId, norm);
   });
 
-  // merge: detail > base
   return base.map((s) => {
     const d = byId.get(s.chargingSessionId);
-    if (!d) return s; // không có detail thì giữ nguyên
+    if (!d) return s;
     return {
       ...s,
-      // time
       startedAt: d.startedAt ?? s.startedAt ?? null,
       endedAt: d.endedAt ?? s.endedAt ?? null,
       durationMin: (d.durationMin ?? s.durationMin) ?? 0,
       idleMin: (d.idleMin ?? s.idleMin) ?? 0,
-      // energy & SoC
       energyKwh: (d.energyKwh ?? s.energyKwh) ?? 0,
       startSoc: d.startSoc ?? s.startSoc ?? null,
       endSoc: d.endSoc ?? s.endSoc ?? null,
-      // money
       subtotal: (d.subtotal ?? s.subtotal) ?? 0,
       tax: (d.tax ?? s.tax) ?? 0,
       total: (d.total ?? s.total) ?? 0,
-      // others
       status: d.status ?? s.status ?? null,
       vehicleId: d.vehicleId ?? s.vehicleId ?? null,
       portId: d.portId ?? s.portId ?? null,
@@ -209,7 +193,6 @@ async function hydrateSessionsDetails(baseSessions) {
 }
 
 async function fetchSessionsForInvoice(invoiceId, context) {
-  // 1) Thử lấy sessions từ /Invoices/{id}
   try {
     const r = await fetchAuthJSON(`${API_ABS}/Invoices/${invoiceId}`, { method: "GET" });
     const inv = r?.data ?? r ?? null;
@@ -221,24 +204,21 @@ async function fetchSessionsForInvoice(invoiceId, context) {
 
     if (sessions?.length) {
       const base = sessions.map(normalizeSession).filter(Boolean);
-      const hydrated = await hydrateSessionsDetails(base);     // <--- NEW
+      const hydrated = await hydrateSessionsDetails(base);
       return hydrated;
     }
   } catch { }
 
-  // 2) Thử /ChargingSessions/by-invoice/{id} (LẤY HẾT TRANG)
   try {
     const baseUrl = `${API_ABS}/ChargingSessions/by-invoice/${invoiceId}`;
     const all = await fetchAllPagesJson(baseUrl, { pageSize: 100 });
     if (all.length) {
       const base = all.map(normalizeSession).filter(Boolean);
-      const hydrated = await hydrateSessionsDetails(base); // giữ như bạn đã thêm
+      const hydrated = await hydrateSessionsDetails(base);
       return hydrated;
     }
   } catch { }
 
-
-  // 3) Fall back theo customer + month/year (nếu có)
   const { customerId, billingYear, billingMonth } = context || {};
   if (customerId && billingYear && billingMonth) {
     try {
@@ -249,38 +229,33 @@ async function fetchSessionsForInvoice(invoiceId, context) {
       let arr = Array.isArray(r3?.data) ? r3.data : Array.isArray(r3) ? r3 : [];
       arr = arr.map(normalizeSession).filter(Boolean);
 
-      // Nếu có trường invoiceId thì lọc đúng hóa đơn
       if (arr.some((s) => s.invoiceId != null)) {
         arr = arr.filter((s) => String(s.invoiceId) === String(invoiceId));
       }
 
-      const hydrated = await hydrateSessionsDetails(arr);      // <--- NEW
+      const hydrated = await hydrateSessionsDetails(arr);
       return hydrated;
     } catch { }
   }
 
-  // 4) Không có gì
   return [];
 }
 
-// đặt gần các API helpers khác
 async function fetchAllPagesJson(urlBase, { startPage = 1, pageSize = 50, maxPages = 100 } = {}) {
   let page = startPage;
   const all = [];
   for (let i = 0; i < maxPages; i++) {
-    const url = `${urlBase}${urlBase.includes('?') ? '&' : '?'}page=${page}&pageSize=${pageSize}`;
+    const url = `${urlBase}${urlBase.includes("?") ? "&" : "?"}page=${page}&pageSize=${pageSize}`;
     const r = await fetchAuthJSON(url, { method: "GET" });
 
-    // Chuẩn hóa mảng items
-    const arr = Array.isArray(r?.data) ? r.data : (Array.isArray(r) ? r : (Array.isArray(r?.items) ? r.items : []));
+    const arr = Array.isArray(r?.data) ? r.data : Array.isArray(r) ? r : Array.isArray(r?.items) ? r.items : [];
     all.push(...arr);
 
-    // Thoát vòng nếu không rõ total, hoặc đã hết
     const total = Number(r?.total ?? r?.totalItems ?? 0);
     const size = Number(r?.pageSize ?? pageSize);
     const current = Number(r?.page ?? page);
     if (!total || !size) {
-      if (arr.length < pageSize) break; // không phải API chuẩn → dừng khi thiếu trang
+      if (arr.length < pageSize) break;
     } else {
       const maxPage = Math.max(1, Math.ceil(total / size));
       if (current >= maxPage) break;
@@ -289,8 +264,6 @@ async function fetchAllPagesJson(urlBase, { startPage = 1, pageSize = 50, maxPag
   }
   return all;
 }
-
-
 
 // small utils
 const inventorySafe = (arr) => (Array.isArray(arr) ? arr : []);
@@ -384,12 +357,10 @@ export default function InvoiceDetail() {
   const [err, setErr] = useState("");
   const [invoice, setInvoice] = useState(null);
 
-  // id mục tiêu
   const targetId = useMemo(() => {
     return state?.invoiceId || invoiceIdParam || state?.invoice?.id || null;
   }, [state?.invoiceId, invoiceIdParam, state?.invoice?.id]);
 
-  // load nhanh từ state/sessionStorage
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -401,7 +372,6 @@ export default function InvoiceDetail() {
           if (raw) {
             let list = JSON.parse(raw);
             if (Array.isArray(list)) {
-              // sort phòng trường hợp cache cũ chưa sắp xếp
               list = sortInvoicesDesc(list);
               const found = list.find((i, idx) => {
                 const id = i?.id || `${i?.billingYear}-${i?.billingMonth}-${idx}`;
@@ -419,7 +389,6 @@ export default function InvoiceDetail() {
     };
   }, [state?.invoice, targetId]);
 
-  // lấy dữ liệu mới nhất + sessions/subscription
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -439,7 +408,7 @@ export default function InvoiceDetail() {
 
         if (invoiceType === "subscription") {
           subscriptionNormalized = normalizeSubscription(
-            latest.subscription || (latest.customer?.subscriptions?.[0]) || null
+            latest.subscription || latest.customer?.subscriptions?.[0] || null
           );
           const dates = computeSubscriptionDates(subscriptionNormalized, latest);
           subDateHints = dates;
@@ -463,8 +432,6 @@ export default function InvoiceDetail() {
           setInvoice((prev) => ({
             ...prev,
             ...latest,
-
-            // normalize field dùng trong UI
             id: safeId,
             invoiceId: latest?.invoiceId ?? safeId,
             total: Number(latest?.total) || 0,
@@ -472,8 +439,6 @@ export default function InvoiceDetail() {
             tax: Number(latest?.tax) || 0,
             subscriptionAdjustment: Number(latest?.subscriptionAdjustment ?? 0) || 0,
             isMonthlyInvoice: !!latest?.isMonthlyInvoice,
-
-            // loại invoice + dữ liệu sub/sessions
             invoiceType,
             subscriptionId: latest?.subscriptionId ?? null,
             subscription: subscriptionNormalized,
@@ -495,17 +460,14 @@ export default function InvoiceDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetId, state?.invoice]);
 
-  // ===== compute =====
   const isSub = invoice?.invoiceType === "subscription";
   const sessions = inventorySafe(invoice?.chargingSessions);
 
-  // Charging totals
   const subtotalCharging = sessions.reduce((a, s) => a + (Number(s.subtotal) || 0), 0);
   const taxCharging = sessions.reduce((a, s) => a + (Number(s.tax) || 0), 0);
   const totalCharging = sessions.reduce((a, s) => a + (Number(s.total) || 0), 0);
-  const mismatchCharging = Math.abs(totalCharging - (Number(invoice?.total) || 0)) > 1;
+  // const mismatchCharging = Math.abs(totalCharging - (Number(invoice?.total) || 0)) > 1;
 
-  // Subscription totals
   const subtotalSub = Number(invoice?.subtotal) || 0;
   const taxSub = Number(invoice?.tax) || 0;
   const adjustSub = Number(invoice?.subscriptionAdjustment ?? 0) || 0;
@@ -513,7 +475,6 @@ export default function InvoiceDetail() {
 
   const customer = invoice?.customer || null;
 
-  // ===== filter + pagination for sessions =====
   const [sessStatus, setSessStatus] = useState("all");
   const [timeField, setTimeField] = useState("endedAt");
   const [from, setFrom] = useState("");
@@ -524,7 +485,6 @@ export default function InvoiceDetail() {
   const filteredSessions = useMemo(() => {
     let arr = sessions.slice();
 
-    // 1) Lọc theo trạng thái
     if (sessStatus !== "all") {
       arr = arr.filter((s) => {
         const v = String(s.status || "").toLowerCase();
@@ -536,12 +496,10 @@ export default function InvoiceDetail() {
       });
     }
 
-    // 2) Lọc theo khoảng ngày theo field đang chọn
     const dFrom = parseDate(from);
     const dTo = to ? endOfDay(parseDate(to)) : null;
     if (dFrom || dTo) {
       arr = arr.filter((s) => {
-        // Ưu tiên field đang chọn; nếu null thì fallback qua field còn lại
         const primary = s?.[timeField];
         const fallbackField = timeField === "startedAt" ? "endedAt" : "startedAt";
         const t = primary ?? s?.[fallbackField];
@@ -553,20 +511,20 @@ export default function InvoiceDetail() {
       });
     }
 
-    // 3) SẮP XẾP MỚI → CŨ
     arr.sort((a, b) => {
-      // Lấy timestamp theo field đang chọn, nếu trống thì fallback
       const fallbackField = timeField === "startedAt" ? "endedAt" : "startedAt";
-      const ta = a?.[timeField] ? new Date(a[timeField]).getTime()
-        : a?.[fallbackField] ? new Date(a[fallbackField]).getTime()
+      const ta = a?.[timeField]
+        ? new Date(a[timeField]).getTime()
+        : a?.[fallbackField]
+          ? new Date(a[fallbackField]).getTime()
           : 0;
-      const tb = b?.[timeField] ? new Date(b[timeField]).getTime()
-        : b?.[fallbackField] ? new Date(b[fallbackField]).getTime()
+      const tb = b?.[timeField]
+        ? new Date(b[timeField]).getTime()
+        : b?.[fallbackField]
+          ? new Date(b[fallbackField]).getTime()
           : 0;
 
-      if (tb !== ta) return tb - ta; // desc theo thời gian
-
-      // Tie-breaker: ưu tiên phiên có id lớn hơn (có xu hướng mới hơn)
+      if (tb !== ta) return tb - ta;
       const ida = Number(a.chargingSessionId ?? 0);
       const idb = Number(b.chargingSessionId ?? 0);
       return idb - ida;
@@ -574,7 +532,6 @@ export default function InvoiceDetail() {
 
     return arr;
   }, [sessions, sessStatus, timeField, from, to]);
-
 
   useEffect(() => {
     setPage(1);
@@ -585,7 +542,6 @@ export default function InvoiceDetail() {
   const pageItems = filteredSessions.slice(start, start + pageSize);
   const pageList = buildPages(totalPages, page, 2);
 
-  // ===== render states =====
   if (!targetId && !loading) {
     return (
       <MainLayout>
@@ -623,7 +579,6 @@ export default function InvoiceDetail() {
   return (
     <MainLayout>
       <div className="ivd-root">
-        {/* ===== Breadcrumb ===== */}
         <nav className="crumbs" aria-label="breadcrumb">
           <Link to="/invoiceSummary" className="crumb">
             Hóa đơn
@@ -634,7 +589,6 @@ export default function InvoiceDetail() {
           </span>
         </nav>
 
-        {/* Header actions */}
         <div className="ivp-topbar">
           <h2>
             Chi tiết hóa đơn {invoice.billingMonth}/{invoice.billingYear}
@@ -647,14 +601,10 @@ export default function InvoiceDetail() {
                     state: {
                       from: "invoice-detail",
                       invoiceId: Number(invoice.invoiceId ?? invoice.id),
-                      subscriptionId: invoice.subscriptionId
-                        ?? invoice?.subscription?.subscriptionId
-                        ?? null,
+                      // ❗ KHÔNG truyền subscriptionId ở trang Detail
                       companyId: invoice.companyId ?? state?.companyId ?? null,
-                      presetAmount: Number(invoice.total) || undefined,
                     },
                   })
-
                 }
                 className="btn primary"
               >
@@ -671,7 +621,6 @@ export default function InvoiceDetail() {
           </div>
         </div>
 
-        {/* Customer box */}
         <div className="ivp-card ivp-customer">
           <div className="ivp-head">
             <h3>Khách hàng: {customer?.fullName || `#${invoice.customerId || "—"}`}</h3>
@@ -703,7 +652,6 @@ export default function InvoiceDetail() {
           </div>
         </div>
 
-        {/* Subscription block */}
         {isSub && (
           <div className="ivp-card ivp-subscription">
             <div className="ivp-head">
@@ -720,7 +668,9 @@ export default function InvoiceDetail() {
               </div>
               <div>
                 Giá tháng:{" "}
-                <b>{invoice?.subscription?.priceMonthly ? VND(invoice.subscription.priceMonthly) : "—"}</b>
+                <b>
+                  {invoice?.subscription?.priceMonthly ? VND(invoice.subscription.priceMonthly) : "—"}
+                </b>
               </div>
               <div>
                 Bắt đầu:{" "}
@@ -759,7 +709,6 @@ export default function InvoiceDetail() {
           </div>
         )}
 
-        {/* Charging table */}
         {!isSub && (
           <>
             <div className="filters">
@@ -832,8 +781,8 @@ export default function InvoiceDetail() {
                       <td>
                         <div>Bắt đầu: {s.startedAt ? new Date(s.startedAt).toLocaleString("vi-VN") : "—"}</div>
                         <div>Kết thúc: {s.endedAt ? new Date(s.endedAt).toLocaleString("vi-VN") : "—"}</div>
-                        <div>Thời lượng: {(Number(s.durationMin) || 0)} phút</div>
-                        <div>Idle: {(Number(s.idleMin) || 0)} phút</div>
+                        <div>Thời lượng: {Number(s.durationMin) || 0} phút</div>
+                        <div>Idle: {Number(s.idleMin) || 0} phút</div>
                       </td>
                       <td>
                         {s.startSoc ?? "—"}% → {s.endSoc ?? "—"}%
@@ -864,12 +813,6 @@ export default function InvoiceDetail() {
                   </tr>
                 </tfoot>
               </table>
-
-              {/* {mismatchCharging && (
-                <div className="ivp-note">
-                  Tổng các phiên ({VND(totalCharging)}) khác tổng BE ({VND(invoice.total)}).
-                </div>
-              )} */}
             </section>
 
             {filteredSessions.length > 0 && (

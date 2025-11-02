@@ -61,7 +61,6 @@ function statusColor(s) {
 export default function ManageSubscriptions() {
   const { user } = useAuth();
 
-  // ---- Safe message helper ----
   const antApp = App.useApp?.();
   const _msg = antApp?.message;
   const msg = {
@@ -71,8 +70,8 @@ export default function ManageSubscriptions() {
       _msg?.warning
         ? _msg.warning(t)
         : _msg?.open
-        ? _msg.open({ type: "warning", content: t })
-        : alert(t),
+          ? _msg.open({ type: "warning", content: t })
+          : alert(t),
     loading: (t, key = "__loading") =>
       _msg?.loading ? _msg.loading({ content: t, key }) : null,
     dismiss: (key = "__loading") => (_msg?.destroy ? _msg.destroy(key) : null),
@@ -84,7 +83,6 @@ export default function ManageSubscriptions() {
   const { token, customerId, companyId } = useMemo(() => getAuthTokenAndIds(user), [user]);
   const role = (user?.role || "Customer").toString();
 
-  // headers an toàn: không chèn chuỗi "undefined"
   const headers = useMemo(() => {
     const h = { accept: "*/*", "Content-Type": "application/json" };
     if (token) h["authorization"] = `Bearer ${token}`;
@@ -172,6 +170,20 @@ export default function ManageSubscriptions() {
     return await res.json();
   }
 
+  async function updateSubscriptionStatus(sub, newStatus) {
+    const id = sub.subscriptionId;
+    const url = `${API_BASE}/Subscriptions/${id}/status?status=${encodeURIComponent(String(newStatus))}`;
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: { accept: "*/*", authorization: headers.authorization },
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      throw new Error(`PUT ${url} failed (${res.status}) ${t}`);
+    }
+    return await res.json();
+  }
+
   const handleToggleAutoRenew = async (sub, checked) => {
     const isActive = String(sub.status || "").toLowerCase() === "active";
     if (!isActive) return;
@@ -188,17 +200,10 @@ export default function ManageSubscriptions() {
     }
   };
 
-  // gọi API hủy trực tiếp (dùng bởi Popconfirm)
   const doCancelNow = async (sub) => {
-    console.log("[ManageSubscriptions] doCancelNow", sub);
     try {
-      const updated = await putUpdate(sub, {
-        status: "Inactive",
-        autoRenew: false,
-        // Nếu BE không cần endDate, có thể bỏ dòng dưới:
-        endDate: new Date().toISOString(),
-      });
-      msg.success("Đã hủy gói (trạng thái: Inactive, auto-renew: off).");
+      const updated = await updateSubscriptionStatus(sub, "Inactive");
+      msg.success("Đã hủy gói (trạng thái: Inactive).");
       setState((s) => ({
         ...s,
         rows: s.rows.map((r) => (r.subscriptionId === sub.subscriptionId ? updated : r)),
@@ -209,7 +214,6 @@ export default function ManageSubscriptions() {
     }
   };
 
-  // (giữ các hàm invoice để tương thích, nếu cần dùng)
   async function fetchLatestInvoiceIdForOwner(owner) {
     const isCompany = !!owner.companyId;
     const id = isCompany ? owner.companyId : owner.customerId;
@@ -330,36 +334,53 @@ export default function ManageSubscriptions() {
     {
       title: "Hành động",
       key: "actions",
-      width: 260,
+      width: 360,
       className: "ms-col-actions",
       render: (_, r) => {
         const status = String(r.status || "").toLowerCase();
         const isActive = status === "active";
-        if (!isActive) return null;
-
         return (
           <Space
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <Popconfirm
-              title="Xác nhận hủy gói?"
-              description="Hủy là kết thúc luôn và không thể tiếp tục gia hạn."
-              okText="Hủy gói"
-              cancelText="Không"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => doCancelNow(r)}
-            >
-              <Tooltip title="Hủy gói này (kết thúc ngay)">
-                <Button
-                  danger
-                  icon={<StopOutlined />}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Hủy gói
-                </Button>
-              </Tooltip>
-            </Popconfirm>
+            {/* NEW: Gia hạn → Payment (renew) */}
+            <Tooltip title="Gia hạn gói này">
+              <Button
+                type="primary"
+                onClick={() =>
+                  navigate("/payment", {
+                    state: {
+                      mode: "renew",
+                      subscriptionId: Number(r.subscriptionId),
+                      companyId: r.companyId ?? null,
+                    },
+                  })
+                }
+              >
+                Gia hạn
+              </Button>
+            </Tooltip>
+
+            {/* Xem hóa đơn gần nhất */}
+            <Tooltip title="Xem hóa đơn gần nhất">
+              <Button onClick={() => handleViewDetail(r)}>Xem HĐ</Button>
+            </Tooltip>
+
+            {isActive && (
+              <Popconfirm
+                title="Xác nhận hủy gói?"
+                description="Hủy là kết thúc luôn và không thể tiếp tục gia hạn."
+                okText="Hủy gói"
+                cancelText="Không"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => doCancelNow(r)}
+              >
+                <Tooltip title="Hủy gói này (kết thúc ngay)">
+                  <Button danger icon={<StopOutlined />}>Hủy gói</Button>
+                </Tooltip>
+              </Popconfirm>
+            )}
           </Space>
         );
       },

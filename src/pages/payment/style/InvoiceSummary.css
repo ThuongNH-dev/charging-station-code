@@ -118,3 +118,63 @@
   color: #3949ab;
   border: 1px solid #c5cae9;
 }
+
+.btn-combo {
+  padding: 8px 12px; border: none; border-radius: 8px; font-weight: 600;
+  cursor: pointer; background: #1677ff; color: #fff; margin-left: 8px;
+}
+.combo-hint { font-size: 13px; color: #1677ff; font-weight: 600; margin-left: 8px; }
+.sum-card.is-selected { outline: 2px solid #1677ff; box-shadow: 0 0 0 2px rgba(22,119,255,0.2); }
+.sum-card.is-pickable .sum-card-body { cursor: pointer; }
+.sum-card-actions {
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 8px 12px; border-top: 1px dashed #eee; gap: 8px;
+}
+.combo-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.combo-footer {
+  position: sticky; bottom: 0; left: 0; right: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  background: #fff; border-top: 1px solid #eee; padding: 10px 12px; margin-top: 10px; z-index: 10;
+}
+.combo-summary { font-size: 14px; }
+.combo-actions { display: flex; gap: 8px; }
+.combo-pay-btn, .combo-cancel-btn {
+  padding: 8px 14px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;
+}
+.combo-pay-btn { background: #1677ff; color: #fff; }
+.combo-cancel-btn { background: #f0f0f0; color: #333; }
+.combo-pay-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Fix: cho button trong card chiếm full chiều ngang, để cột phải bám sát mép phải */
+.sum-card-body{
+  all: unset;
+  display: block;
+  width: 100%;
+  cursor: pointer;
+}
+/* (Tuỳ chọn) đảm bảo cột phải co theo nội dung và dính mép phải */
+.sum-row.bottom{
+  display: grid;
+  grid-template-columns: 1fr max-content; /* thay vì 'auto' */
+  gap: 12px;
+  align-items: end;
+}
+
+.combo-banner {
+  margin: 12px 0 16px;
+  padding: 10px 12px;
+  border: 1px solid #e0e7ff;
+  background: #f5f8ff;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.combo-banner strong {
+  margin-right: 4px;
+}
+.combo-banner em {
+  font-style: normal;
+  font-weight: 600;
+}
+.combo-banner u {
+  text-underline-offset: 2px;
+}

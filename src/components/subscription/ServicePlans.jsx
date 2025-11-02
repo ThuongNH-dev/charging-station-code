@@ -67,6 +67,23 @@ function getToken() {
     return "";
   }
 }
+
+// ---- đọc role từ user (Login đã lưu user vào storage)
+function getStoredUser() {
+  try {
+    const raw =
+      localStorage.getItem("user") || sessionStorage.getItem("user") || "";
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+function getRoleFromStorage() {
+  const u = getStoredUser();
+  return (u?.role || "").toString() || "Customer";
+}
+
+// (có thể không dùng nữa nhưng giữ lại nếu cần debug về sau)
 function decodeJwtPayload(token) {
   try {
     const base64Url = token.split(".")[1];
@@ -98,23 +115,24 @@ function getCompanyIdFromToken() {
   );
   return Number.isFinite(n) && n > 0 ? n : null;
 }
-/** Vai actor = 'company' | 'customer' | null */
+
+/** Vai actor = 'company' | 'customer' (CHỈ theo role, tránh dính companyId cũ trong storage) */
 function resolveActorTypeSync() {
-  const comp = getStoredCompanyId() ?? getCompanyIdFromToken();
-  if (comp) return "company";
-  const cust = getStoredCustomerId() ?? getCustomerIdFromToken();
-  if (cust) return "customer";
-  return null;
+  const role = (getRoleFromStorage() || "Customer").toString().toLowerCase();
+  return role === "company" ? "company" : "customer";
 }
 async function resolveActorType() {
   return resolveActorTypeSync(); // giữ async cho tương thích
 }
 
 async function resolveCustomerIdSmart() {
-  return getStoredCustomerId() ?? getCustomerIdFromToken() ?? null;
+  const role = (getRoleFromStorage() || "").toString().toLowerCase();
+  if (role === "company") return null; // company thì không dùng customerId
+  return getStoredCustomerId() ?? null; // customer: lấy từ storage
 }
 async function resolveCompanyIdSmart() {
-  return getStoredCompanyId() ?? getCompanyIdFromToken() ?? null;
+  const role = (getRoleFromStorage() || "").toString().toLowerCase();
+  return role === "company" ? getStoredCompanyId() ?? null : null;
 }
 
 /* ==================== Audience helpers ==================== */
@@ -126,15 +144,9 @@ function planAudience(plan) {
 
 /** Kiểm tra quyền: KHÔNG gọi bất kỳ /.../me */
 async function ensurePlanAllowed(plan, msgApi) {
-  const actor = await resolveActorType(); // 'company' | 'customer' | null
+  const actor = await resolveActorType(); // 'company' | 'customer'
   const audience = planAudience(plan);
 
-  if (!actor) {
-    msgApi.warning(
-      "Không xác định được loại tài khoản (thiếu companyId/customerId). Vẫn cho phép thử đăng ký."
-    );
-    return true;
-  }
   if (actor === "customer" && audience === "company") {
     msgApi.error("Tài khoản cá nhân không thể đăng ký gói dành cho doanh nghiệp.");
     return false;
@@ -259,9 +271,9 @@ const ServicePlans = () => {
 
     if (!jwt) throw new Error("Bạn chưa đăng nhập (không có token).");
 
-    const actor = await resolveActorType(); // 'company' | 'customer' | null
-    const customerId = await resolveCustomerIdSmart();
-    const companyId = await resolveCompanyIdSmart();
+    const actor = await resolveActorType(); // 'company' | 'customer'
+    const customerId = await resolveCustomerIdSmart(); // theo role
+    const companyId = await resolveCompanyIdSmart();  // theo role
 
     const body = {
       subscriptionPlanId: plan.subscriptionPlanId,
@@ -294,18 +306,14 @@ const ServicePlans = () => {
   }) {
     if (!subscriptionId) throw new Error("Thiếu subscriptionId để tạo hóa đơn.");
     const actor = await resolveActorType();
-    const custId = await resolveCustomerIdSmart();
-    const compId = await resolveCompanyIdSmart();
+    const custId = await resolveCustomerIdSmart(); // theo role
+    const compId = await resolveCompanyIdSmart();  // theo role
 
     let finalCustomerId = null;
     let finalCompanyId = null;
     if (actor === "company") finalCompanyId = compId;
     else finalCustomerId = custId;
 
-    if (!finalCustomerId && !finalCompanyId) {
-      if (custId) finalCustomerId = custId;
-      else if (compId) finalCompanyId = compId;
-    }
     if (!finalCustomerId && !finalCompanyId) {
       throw new Error("Thiếu customerId/companyId: cần ít nhất 1 trong 2.");
     }
@@ -544,4 +552,3 @@ const ServicePlans = () => {
 };
 
 export default ServicePlans;
-  

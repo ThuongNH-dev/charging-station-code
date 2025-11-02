@@ -379,21 +379,31 @@ const ChargingProgress = () => {
 
         const startSoc = Number.isFinite(merged?.startSoc) ? Math.max(0, Math.min(100, Number(merged.startSoc))) : 0;
 
-        const prev = loadLive();
-        const keepBattery = computeBatteryNow(prev);
         const now = Date.now();
+        // ✅ Chỉ kế thừa live nếu cùng chargingSessionId (an toàn nhất)
+        const prev = loadLive();
+        const sameSession = !!(prev && prev.chargingSessionId === merged?.chargingSessionId);
+        const keepBattery = sameSession ? computeBatteryNow(prev) : NaN;
+        if (!sameSession && prev) {
+          // khác phiên => xoá live cũ để tránh mốc thời gian/pin sai
+          clearLive();
+        }
+
         const live = {
           isActive: true,
           isCharging: true,
           chargingSessionId: merged?.chargingSessionId,
           portId: merged?.portId ?? state?.gun?.id ?? state?.portId ?? null,
-          startedAt: prev?.startedAt ?? (merged?.startedAt ? new Date(merged.startedAt).getTime() : now),
+          // ✅ KHÔNG dùng startedAt từ live cũ khi khác phiên
+          startedAt: (merged?.startedAt ? new Date(merged.startedAt).getTime() : now),
           lastUpdateAt: now,
           startSoc,
+          // ✅ chỉ giữ pin nếu đúng cùng phiên; ngược lại seed theo startSoc để không nhảy 100%
           batteryAtLastUpdate: Number.isFinite(keepBattery) ? keepBattery : startSoc,
           powerKw,
           batteryCapacity: Number.isFinite(state?.batteryCapacity) ? state.batteryCapacity : 75,
-          fullAt: prev?.fullAt ?? null,
+          // ✅ không “kế thừa” fullAt từ phiên cũ
+          fullAt: sameSession ? (prev?.fullAt ?? null) : null,
           graceSeconds: Number.isFinite(dynGraceSeconds) ? dynGraceSeconds : 5 * 60,
         };
         saveLive(live);
@@ -819,6 +829,7 @@ const ChargingProgress = () => {
 
   // --- Hydrate UI từ live khi mount ---
   useEffect(() => {
+    if (state) return;
     const live = loadLive();
     // Nếu chưa có live/không active:
     // - Nếu có state (đang vào từ màn xác nhận để bắt đầu phiên) => KHÔNG gán noActive, để chế độ booting
@@ -1145,18 +1156,19 @@ const ChargingProgress = () => {
   if (noActiveSession) {
     return (
       <MainLayout>
-        <div style={{ padding: 24 }}>
-          <h2>Chưa có phiên sạc đang diễn ra</h2>
-          <p>Bạn có thể bắt đầu phiên sạc mới từ danh sách trạm.</p>
-          <div style={{ display: "flex", gap: 12 }}>
-            <Link to="/stations">🔌 Về danh sách trạm</Link>
-            <Link to="/payment">🧾 Xem hoá đơn gần đây</Link>
+        <div className="cp-empty">
+          <div className="cp-empty-card">
+            <h2 className="cp-empty-title">Chưa có phiên sạc đang diễn ra</h2>
+            <p className="cp-empty-desc">Bạn có thể bắt đầu phiên sạc mới từ danh sách trạm.</p>
+            <div className="cp-empty-actions">
+              <Link to="/stations" className="cp-link-btn">🔌 Về danh sách trạm</Link>
+              <Link to="/invoiceSummary" className="cp-link-secondary">🧾 Xem hoá đơn</Link>
+            </div>
           </div>
         </div>
       </MainLayout>
     );
   }
-
 
   return (
     <MainLayout>
