@@ -7,12 +7,12 @@ import React from "react";
 import { CaretUpOutlined, CaretDownOutlined } from "@ant-design/icons";
 import "./OverviewKPIs.css";
 
-const fmt = (n) =>
-  typeof n === "number"
-    ? n.toLocaleString("vi-VN")
-    : typeof n === "string"
-    ? n
-    : "0";
+const fmt = (n) => {
+  if (n === null || n === undefined || n === "") return "—";
+  if (typeof n === "number") return n.toLocaleString("vi-VN");
+  if (typeof n === "string") return n;
+  return "—";
+};
 
 const IconByKey = ({ k }) => {
   switch (k) {
@@ -32,7 +32,10 @@ const IconByKey = ({ k }) => {
 function KPIBox({ title, value, change, positive, iconKey }) {
   const Arrow = positive ? CaretUpOutlined : CaretDownOutlined;
   return (
-    <div className="kpi-row">
+    <div
+      className="kpi-row"
+      title={title === "Tổng năng lượng" ? "Tổng lượng điện đã sạc (kWh)" : ""}
+    >
       <div className="kpi-left">
         <IconByKey k={iconKey} />
         <div className="kpi-title">{title}</div>
@@ -106,7 +109,10 @@ export default function OverviewKPIs({ data }) {
     },
     {
       title: "Tổng năng lượng",
-      value: k.totalEnergy, // ví dụ "123.45 kWh"
+      value:
+        typeof k.totalEnergy === "number"
+          ? `${k.totalEnergy.toFixed(2)} kWh`
+          : k.totalEnergy || "—",
       change: k.energyPercent != null ? `${k.energyPercent}%` : "",
       positive: parseFloat(k.energyPercent || 0) >= 0,
       iconKey: "energy",

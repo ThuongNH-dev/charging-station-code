@@ -33,38 +33,40 @@ const settledData = (res, fallback = []) =>
  *   subscriptionsData: any[]
  * }>}
  */
+// ... giữ nguyên phần đầu file
 export const fetchReportData = async (params = {}) => {
   const { startDate, endDate, stationId } = params;
 
   try {
-    // 1) ChargingSessions (truyền query bằng params để tránh chuỗi rỗng)
     const sessionsPromise = api.get("/ChargingSessions", {
       params: {
         ...(startDate ? { startDate } : {}),
         ...(endDate ? { endDate } : {}),
         ...(stationId ? { stationId } : {}),
+        status: "Completed",
       },
     });
 
-    // 2) Invoices
     const invoicesPromise = api.get("/Invoices");
-
-    // 3) Stations paged
     const stationsPromise = api.get("/Stations/paged", {
-      params: { page: 1, pageSize: 100 },
+      params: { page: 1, pageSize: 200 },
     });
 
-    // 4) SubscriptionPlans
-    const subscriptionPlansPromise = api.get("/SubscriptionPlans");
+    // ✅ THÊM 2 API này
+    const portsPromise = api.get("/Ports", {
+      params: { page: 1, pageSize: 1000 },
+    });
+    const chargersPromise = api.get("/Chargers");
 
-    // 5) Subscriptions
+    const subscriptionPlansPromise = api.get("/SubscriptionPlans");
     const subscriptionsPromise = api.get("/Subscriptions");
 
-    // Chạy song song
     const results = await Promise.allSettled([
       sessionsPromise,
       invoicesPromise,
       stationsPromise,
+      portsPromise, // ✅
+      chargersPromise, // ✅
       subscriptionPlansPromise,
       subscriptionsPromise,
     ]);
@@ -73,34 +75,28 @@ export const fetchReportData = async (params = {}) => {
       sessionsResult,
       invoicesResult,
       stationsResult,
+      portsResult, // ✅
+      chargersResult, // ✅
       subscriptionPlansResult,
       subscriptionsResult,
     ] = results;
 
-    // Log lỗi từng API nếu có
-    if (sessionsResult.status === "rejected")
-      console.error("❌ ChargingSessions API failed:", sessionsResult.reason);
-    if (invoicesResult.status === "rejected")
-      console.error("❌ Invoices API failed:", invoicesResult.reason);
-    if (stationsResult.status === "rejected")
-      console.error("❌ Stations API failed:", stationsResult.reason);
-    if (subscriptionPlansResult.status === "rejected")
-      console.error(
-        "❌ SubscriptionPlans API failed:",
-        subscriptionPlansResult.reason
-      );
-    if (subscriptionsResult.status === "rejected")
-      console.error("❌ Subscriptions API failed:", subscriptionsResult.reason);
+    const settledData = (res, fb = []) =>
+      res?.status === "fulfilled" ? res.value?.data ?? fb : fb;
 
-    // Chuẩn hóa payload trả về
     const payload = {
       sessionsData: settledData(sessionsResult, []),
       invoicesData: settledData(invoicesResult, []),
       stationsData: (() => {
-        const data = settledData(stationsResult, []);
-        // endpoint paged có thể trả { items, total } hoặc list trực tiếp
-        return data?.items ?? data ?? [];
+        const d = settledData(stationsResult, []);
+        return d?.items ?? d ?? [];
       })(),
+      // ✅ TRẢ RA ports & chargers để FE map
+      portsData: (() => {
+        const d = settledData(portsResult, []);
+        return d?.items ?? d ?? [];
+      })(),
+      chargersData: settledData(chargersResult, []),
       subscriptionPlansData: settledData(subscriptionPlansResult, []),
       subscriptionsData: settledData(subscriptionsResult, []),
     };

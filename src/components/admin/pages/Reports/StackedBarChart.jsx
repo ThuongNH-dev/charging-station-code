@@ -11,18 +11,27 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+const normalize = (s = "") =>
+  s
+    .toString()
+    .trim()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+
 // Bản đồ màu “chuẩn” cho các gói quen thuộc
-const BASE_COLOR_MAP = {
-  "Tieu chuan": "#4285F4",
-  "Cao cap": "#34A853",
-  Bac: "#FBBC05",
-  "Doanh nghiep": "#EA4335",
-  Vang: "#9b59b6",
-  "Kim cuong": "#1abc9c",
-  "Trả trước": "#7f8c8d", // có dấu
-  "Tra truoc": "#7f8c8d", // không dấu (phòng hờ)
+const BASE_COLOR_MAP_RAW = {
+  "Tiêu chuẩn": "#4285F4",
+  "Cao cấp": "#34A853",
+  Bạc: "#FBBC05",
+  "Doanh nghiệp": "#EA4335",
+  Vàng: "#9b59b6",
+  "Kim cương": "#1abc9c",
   Khác: "#8e44ad",
 };
+const BASE_COLOR_MAP = Object.fromEntries(
+  Object.entries(BASE_COLOR_MAP_RAW).map(([k, v]) => [normalize(k), v])
+);
 
 const PALETTE = [
   "#4285F4",
@@ -75,8 +84,9 @@ const StackedBarChart = ({ data = [] }) => {
     const map = { ...BASE_COLOR_MAP };
     let paletteIdx = 0;
     planKeys.forEach((key) => {
-      if (!map[key]) {
-        map[key] = PALETTE[paletteIdx % PALETTE.length];
+      const nk = normalize(key);
+      if (!map[nk]) {
+        map[nk] = PALETTE[paletteIdx % PALETTE.length];
         paletteIdx += 1;
       }
     });
@@ -180,7 +190,7 @@ const StackedBarChart = ({ data = [] }) => {
               dataKey={plan}
               name={plan}
               stackId="a"
-              fill={colorMap[plan] || "#7f8c8d"}
+              fill={colorMap[normalize(plan)] || "#7f8c8d"}
             />
           ))}
         </BarChart>

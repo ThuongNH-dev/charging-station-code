@@ -4,6 +4,33 @@ import moment from "moment";
 
 const DEBUG_MODE = true;
 
+// =========================================
+// 🔧 Fallback mapping FE: port → charger → station
+// =========================================
+export function buildPortStationMap(portsData = [], chargersData = []) {
+  const chargerToStation = new Map();
+  (chargersData || []).forEach((c) => {
+    if (c.chargerId && (c.stationId || c.StationId)) {
+      chargerToStation.set(c.chargerId, c.stationId || c.StationId);
+    }
+  });
+
+  const portToStation = new Map();
+  (portsData || []).forEach((p) => {
+    if (!p.portId) return;
+    const sid =
+      p.stationId ||
+      p.StationId ||
+      (p.chargerId && chargerToStation.get(p.chargerId));
+    if (sid) portToStation.set(p.portId, sid);
+  });
+
+  // Debug (có thể xóa sau)
+  console.log("🧩 portToStation map", Object.fromEntries(portToStation));
+
+  return portToStation;
+}
+
 /* -------------------- Helpers chung -------------------- */
 export const formatCurrency = (value) => {
   const num = Number(value) || 0;
@@ -30,7 +57,7 @@ const normalize = (s = "") =>
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase();
 
-/** 🔑 CHỈ 6 GÓI HỢP LỆ (đúng như dữ liệu bạn cung cấp) */
+/** 🔑 CHỈ 6 GÓI HỢP LỆ */
 const OFFICIAL_PLANS = [
   "Tiêu chuẩn",
   "Cao cấp",
@@ -41,31 +68,74 @@ const OFFICIAL_PLANS = [
 ];
 const OFFICIAL_NORM = OFFICIAL_PLANS.map(normalize);
 
-/** Chuẩn hóa tên gói → 1 trong 6 gói trên; nếu không khớp, trả về null (BỎ QUA) */
+/** Chuẩn hóa tên gói → 1 trong 6 gói trên */
 const toOfficialPlan = (name) => {
   const n = normalize(name || "");
   if (!n) return null;
-  // khớp tuyệt đối
   const idx = OFFICIAL_NORM.indexOf(n);
   if (idx >= 0) return OFFICIAL_PLANS[idx];
-  // khớp alias phổ biến không dấu
   if (n.includes("tieu chuan")) return "Tiêu chuẩn";
   if (n.includes("cao cap")) return "Cao cấp";
   if (n === "bac") return "Bạc";
   if (n.includes("doanh nghiep")) return "Doanh nghiệp";
   if (n === "vang") return "Vàng";
   if (n.includes("kim cuong")) return "Kim cương";
-  // ❌ không thuộc 6 gói ⇒ bỏ qua khi thống kê theo gói
   return null;
 };
 
 const weekdayVN = (m) => {
-  const w = m.isoWeekday(); // 1..7
+  const w = m.isoWeekday();
   const names = ["", "Th2", "Th3", "Th4", "Th5", "Th6", "Th7", "CN"];
   return names[w];
 };
 
-// An toàn null: quy đổi city -> region
+/* =========================================================
+ * 🔹 PHÂN LOẠI KHU VỰC THEO THÀNH PHỐ (DÙNG TRONG FE)
+ * ========================================================= */
+export function classifyRegion(city = "") {
+  const c = (city || "").toString().trim().toLowerCase();
+  if (!c) return "Miền Nam";
+
+  const north = [
+    "hà nội",
+    "ha noi",
+    "hải phòng",
+    "hai phong",
+    "bắc ninh",
+    "bac ninh",
+    "bắc giang",
+    "bac giang",
+    "quảng ninh",
+    "quang ninh",
+    "nam định",
+    "ninh bình",
+    "hai duong",
+    "thái nguyên",
+    "thai nguyen",
+  ];
+  const central = [
+    "đà nẵng",
+    "da nang",
+    "huế",
+    "hue",
+    "thanh hóa",
+    "thanh hoa",
+    "nghệ an",
+    "nghe an",
+    "quảng nam",
+    "quang nam",
+    "quảng ngãi",
+    "quang ngai",
+    "nha trang",
+    "khánh hòa",
+    "khanh hoa",
+  ];
+
+  if (north.some((x) => c.includes(x))) return "Miền Bắc";
+  if (central.some((x) => c.includes(x))) return "Miền Trung";
+  return "Miền Nam";
+}
+
 const cityToRegion = (cityInput) => {
   const c = (cityInput ?? "").toString().trim().toLowerCase();
   if (!c) return "Miền Nam";
@@ -122,7 +192,7 @@ const areaKey = (region) =>
     ? "mienTrung"
     : "mienNam";
 
-// Lấy thời điểm kết thúc/bắt đầu từ session với nhiều kiểu field
+// Lấy thời điểm kết thúc/bắt đầu từ session
 const getSessionMoment = (s) => {
   const dt =
     s.endedAt ??
@@ -136,24 +206,54 @@ const getSessionMoment = (s) => {
   return m.isValid() ? m : null;
 };
 
-// Đọc năng lượng với nhiều key khác nhau
-const pickEnergy = (s) =>
-  Number(
-    s.energyKwh ??
-      s.energyKWh ??
-      s.energyConsumed ??
-      s.energy ??
-      s.EnergyKwh ??
-      s.EnergyKWh ??
-      s.EnergyConsumed ??
-      0
-  );
+// ✅ Đọc năng lượng với nhiều key khác nhau (đầy đủ alias)
+// ✅ Đọc năng lượng robust: hỗ trợ alias, string có dấu phẩy, field lồng
+const pickEnergy = (s) => {
+  const raw =
+    s?.energyKwh ??
+    s?.energyKWh ??
+    s?.energyConsumed ??
+    s?.energy ??
+    s?.kwh ??
+    s?.Kwh ??
+    s?.KWh ??
+    s?.Energy ??
+    s?.EnergyKwh ??
+    s?.EnergyKWh ??
+    s?.EnergyConsumed ??
+    s?.meter?.energyKwh ??
+    s?.meter?.energyKWh ??
+    s?.meter?.kwh ??
+    0;
+
+  const n =
+    typeof raw === "string"
+      ? Number(raw.replace(",", ".")) // "22,5" -> 22.5
+      : Number(raw);
+
+  return Number.isFinite(n) ? n : 0;
+};
 
 /* =========================================================
  * 1) KPI TỔNG QUAN — sessions (Completed)
  * ========================================================= */
 export const calculateKpiOverview = (rawData) => {
   const sessions = toArray(rawData?.sessionsData);
+  if (DEBUG_MODE) {
+    const sample = (Array.isArray(sessions) ? sessions : []).slice(0, 3);
+    console.log(
+      "[KPI] sample sessions energy fields:",
+      sample.map((s) => ({
+        id: s.chargingSessionId ?? s.id,
+        energyKwh: s.energyKwh,
+        energyKWh: s.energyKWh,
+        energy: s.energy,
+        kwh: s.kwh,
+        meter: s.meter,
+        total: s.total,
+      }))
+    );
+  }
 
   let totalRevenue = 0;
   let totalEnergy = 0;
@@ -164,7 +264,18 @@ export const calculateKpiOverview = (rawData) => {
     if ((s.status ?? s.Status) === "Completed") {
       totalRevenue += Number(s.total ?? s.Total ?? 0);
       totalEnergy += pickEnergy(s);
-      totalDurationMin += Number(s.durationMin ?? s.DurationMin ?? 0);
+
+      // ✅ fallback tính duration nếu không có durationMin
+      const st = new Date(s.startedAt ?? s.StartedAt ?? 0);
+      const en = new Date(s.endedAt ?? s.EndedAt ?? 0);
+      const hasSt = Number.isFinite(st.getTime());
+      const hasEn = Number.isFinite(en.getTime());
+      const durationMinFromTime =
+        hasSt && hasEn ? Math.max(0, Math.round((en - st) / 60000)) : 0;
+
+      const dur = s.durationMin ?? s.DurationMin ?? durationMinFromTime;
+      totalDurationMin += Number(dur || 0);
+
       completedSessions++;
     }
   });
@@ -213,9 +324,7 @@ export const calculateKpiOverview = (rawData) => {
 };
 
 /* =========================================================
- * 2) CƠ CẤU DỊCH VỤ (Pie + Bar) — map theo Subscriptions/Plans
- *    CHỈ dùng 6 gói: Tiêu chuẩn, Cao cấp, Bạc, Doanh nghiệp, Vàng, Kim cương
- *    ❗️Phiên không xác định gói → BỎ QUA trong thống kê theo gói.
+ * 2) CƠ CẤU DỊCH VỤ (Pie + Bar)
  * ========================================================= */
 export const processServiceStructure = (rawData) => {
   const sessions = toArray(rawData?.sessionsData);
@@ -223,30 +332,39 @@ export const processServiceStructure = (rawData) => {
   const subscriptions = toArray(rawData?.subscriptionsData);
   const plans = toArray(rawData?.subscriptionPlansData);
 
-  // --- Map helpers hiện có ---
   const invToSub = new Map();
   invoices.forEach((i) => {
     const invoiceId = i.invoiceId ?? i.InvoiceId;
-    const subId = i.subscriptionId ?? i.SubscriptionId;
+    const subId =
+      i.subscriptionId ??
+      i.SubscriptionId ??
+      i.subscription?.subscriptionId ??
+      i.Subscription?.SubscriptionId ??
+      null;
     if (invoiceId && subId) invToSub.set(invoiceId, subId);
   });
 
   const subToPlanName = new Map();
   subscriptions.forEach((s) => {
     const sid = s.subscriptionId ?? s.SubscriptionId;
-    const name = s.planName ?? s.PlanName ?? "";
+    const name =
+      s.planName ?? s.PlanName ?? s.plan?.planName ?? s.Plan?.PlanName ?? "";
     if (sid) subToPlanName.set(sid, name);
   });
 
   const planIdToName = new Map();
   plans.forEach((p) => {
-    const id = p.subscriptionPlanId ?? p.PlanId ?? p.id ?? p.Id;
+    const id =
+      p.subscriptionPlanId ??
+      p.SubscriptionPlanId ??
+      p.planId ??
+      p.PlanId ??
+      p.id ??
+      p.Id;
     const name = p.planName ?? p.PlanName ?? p.name ?? "";
     if (id) planIdToName.set(id, name);
   });
 
-  // --- NEW: index theo customer/company + hiệu lực thời gian ---
-  // Tạo 2 map: customerId -> list subs, companyId -> list subs
   const byCustomer = new Map();
   const byCompany = new Map();
   subscriptions.forEach((s) => {
@@ -257,7 +375,6 @@ export const processServiceStructure = (rawData) => {
       end: s.endDate ?? s.EndDate ?? null,
       status: s.status ?? s.Status ?? "",
     };
-
     const cId = s.customerId ?? s.CustomerId ?? null;
     const coId = s.companyId ?? s.CompanyId ?? null;
     if (cId != null) {
@@ -270,49 +387,42 @@ export const processServiceStructure = (rawData) => {
     }
   });
 
-  // Kiểm tra xem 1 subscription có "hiệu lực" tại thời điểm t không
   const isActiveAt = (sub, m) => {
     const startOk = sub.start ? moment(sub.start).isSameOrBefore(m) : true;
     const endOk = sub.end ? moment(sub.end).isSameOrAfter(m) : true;
-    // chấp nhận cả Active/Inactive, nhưng ưu tiên Active
     return startOk && endOk;
   };
 
-  // --- Cộng doanh thu theo 6 gói ---
   const revByPlan = Object.fromEntries(OFFICIAL_PLANS.map((n) => [n, 0]));
   let unresolved = 0;
 
   sessions.forEach((s) => {
     if ((s.status ?? s.Status) !== "Completed") return;
     const rev = Number(s.total ?? s.Total ?? 0);
-
-    // 1) Ưu tiên: invoice -> subscription -> planName
     let rawName = null;
+
+    // invoice -> sub -> plan
     const invoiceId = s.invoiceId ?? s.InvoiceId;
     const subId = invoiceId ? invToSub.get(invoiceId) : null;
     if (subId) rawName = subToPlanName.get(subId) || rawName;
 
-    // 2) Dự phòng: session.subscriptionPlanId
+    // fallback: subscriptionPlanId
     const spId = s.subscriptionPlanId ?? s.SubscriptionPlanId;
-    if (!rawName && spId && planIdToName.has(spId))
+    if (!rawName && spId && planIdToName.has(spId)) {
       rawName = planIdToName.get(spId);
+    }
 
-    // 3) NEW fallback: dò theo customer/company + thời điểm session
+    // fallback: theo customer/company + thời điểm
     if (!rawName) {
-      const m = getSessionMoment(s) || moment(); // thời điểm phiên
+      const m = getSessionMoment(s) || moment();
       const customerId = s.customerId ?? s.CustomerId ?? null;
       const companyId = s.companyId ?? s.CompanyId ?? null;
-
       const pickFrom = [];
-      if (customerId != null && byCustomer.has(customerId)) {
+      if (customerId != null && byCustomer.has(customerId))
         pickFrom.push(...byCustomer.get(customerId));
-      }
-      if (!rawName && companyId != null && byCompany.has(companyId)) {
+      if (!rawName && companyId != null && byCompany.has(companyId))
         pickFrom.push(...byCompany.get(companyId));
-      }
-
       if (pickFrom.length) {
-        // ưu tiên subscription Active tại thời điểm đó; nếu không có, lấy bất kỳ cái bao phủ thời gian
         const active = pickFrom.find(
           (x) => (x.status || "").toLowerCase() === "active" && isActiveAt(x, m)
         );
@@ -331,10 +441,7 @@ export const processServiceStructure = (rawData) => {
   });
 
   if (DEBUG_MODE) {
-    console.log(
-      "[ServiceStructure] unresolved sessions (no plan matched):",
-      unresolved
-    );
+    console.log("[ServiceStructure] unresolved:", unresolved);
     console.log("[ServiceStructure] revByPlan:", revByPlan);
   }
 
@@ -343,19 +450,20 @@ export const processServiceStructure = (rawData) => {
     value: revByPlan[name],
   }));
 
-  // --- Bar theo tháng (chỉ các phiên map được gói) ---
+  // --- Bar theo tháng
   const monthly = {};
   sessions.forEach((s) => {
     if ((s.status ?? s.Status) !== "Completed") return;
 
-    // Lặp lại cùng logic gán gói như trên (rút gọn dùng hàm con cũng được)
     let rawName = null;
     const invoiceId = s.invoiceId ?? s.InvoiceId;
     const subId = invoiceId ? invToSub.get(invoiceId) : null;
     if (subId) rawName = subToPlanName.get(subId) || rawName;
+
     const spId = s.subscriptionPlanId ?? s.SubscriptionPlanId;
     if (!rawName && spId && planIdToName.has(spId))
       rawName = planIdToName.get(spId);
+
     if (!rawName) {
       const m = getSessionMoment(s) || moment();
       const customerId = s.customerId ?? s.CustomerId ?? null;
@@ -396,16 +504,37 @@ export const processServiceStructure = (rawData) => {
 /* =========================================================
  * 3) SO SÁNH KHU VỰC & BẢNG TRẠM — tính từ sessions
  * ========================================================= */
+/* =========================================================
+ * 3) SO SÁNH KHU VỰC & BẢNG TRẠM — tính từ sessions
+ * ========================================================= */
 export const processRegionalComparison = (rawData) => {
   const stations = toArray(rawData?.stationsData);
   const sessions = toArray(rawData?.sessionsData);
+
+  // ✅ NEW: map hỗ trợ quy chiếu stationId
+  const ports = toArray(rawData?.portsData);
+  const chargers = toArray(rawData?.chargersData);
+
+  // portId -> stationId
+  const portToStation = new Map(
+    ports
+      .map((p) => [p.portId ?? p.PortId, p.stationId ?? p.StationId])
+      .filter(([pid, sid]) => pid != null && sid != null)
+  );
+
+  // chargerId -> stationId (BE của bạn có trường này)
+  const chargerToStation = new Map(
+    chargers
+      .map((c) => [c.chargerId ?? c.ChargerId, c.stationId ?? c.StationId])
+      .filter(([cid, sid]) => cid != null && sid != null)
+  );
 
   // Index trạm
   const stationMap = {};
   stations.forEach((s) => {
     const stationId = s.stationId ?? s.StationId ?? s.id ?? s.Id;
     if (stationId == null) return;
-    const region = cityToRegion(s.city ?? s.City);
+    const region = classifyRegion(s.city ?? s.City);
 
     stationMap[stationId] = {
       stationId,
@@ -421,14 +550,22 @@ export const processRegionalComparison = (rawData) => {
 
   // Cộng dồn từ sessions
   sessions.forEach((ss) => {
-    const sid = ss.stationId ?? ss.StationId;
-    const target = stationMap[sid];
+    if ((ss.status ?? ss.Status) !== "Completed") return;
+
+    // ✅ Lấy stationId theo 3 lớp fallback
+    const stationId =
+      ss.stationId ??
+      ss.StationId ??
+      chargerToStation.get(ss.chargerId ?? ss.ChargerId) ??
+      portToStation.get(ss.portId ?? ss.PortId) ??
+      null;
+
+    const target = stationId != null ? stationMap[stationId] : undefined;
     if (!target) return;
-    if ((ss.status ?? ss.Status) === "Completed") {
-      target.totalSessions += 1;
-      target.totalEnergy += pickEnergy(ss);
-      target.totalRevenue += Number(ss.total ?? ss.Total ?? 0);
-    }
+
+    target.totalSessions += 1;
+    target.totalEnergy += pickEnergy(ss);
+    target.totalRevenue += Number(ss.total ?? ss.Total ?? 0);
   });
 
   // Heuristic usage%
@@ -511,6 +648,8 @@ export const processTimeChartData = (rawData) => {
     day: d.day,
     sessions: d.sessions,
   }));
+
+  // Trả theo "nghìn ₫" để khớp label ở UI
   const dailyRevenue = Object.values(days).map((d) => ({
     day: d.day,
     revenue: Math.round(d.revenue / 1000),

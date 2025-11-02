@@ -21,6 +21,7 @@ import {
 } from "recharts";
 import AreaBox from "./AreaBox";
 import DetailedStationTable from "./DetailedStationTable";
+import StackedBarChart from "./StackedBarChart";
 
 const COLORS = [
   "#4285F4",
@@ -375,7 +376,7 @@ export default function ReportContent({ data, reportFilter }) {
       return (
         <div className="report-content-area">
           <h3 className="comparison-title">Cơ cấu dịch vụ</h3>
-          <RevenueByPlan data={serviceStructure?.monthlyRevenue || []} />
+          <StackedBarChart data={serviceStructure?.monthlyRevenue || []} />
           <ServiceStructurePie data={serviceStructure?.pieData || []} />
         </div>
       );
