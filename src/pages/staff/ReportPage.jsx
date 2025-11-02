@@ -1,3 +1,4 @@
+// src/pages/staff/ReportPage.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import { fetchAuthJSON } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
@@ -98,9 +99,11 @@ export default function ReportPage() {
         const myChargers = chargers.filter(
           (c) => c.stationId === selectedStationId
         );
-        const myChargerIds = myChargers.map((c) => c.chargerId);
+        const myChargerIds = myChargers.map((c) => c.chargerId || c.portId);
 
         const now = new Date();
+
+        // === Lọc invoices theo trạm và thời gian ===
         const filteredInvoices = invoices.filter((inv) => {
           const invPorts =
             inv.chargingSessions?.map((s) => s.portId) || [inv.portId];
@@ -120,7 +123,7 @@ export default function ReportPage() {
           return true;
         });
 
-        // === Tổng quan ===
+        // === Tổng doanh thu ===
         const totalRevenue = filteredInvoices.reduce(
           (sum, inv) => sum + (inv.total || 0),
           0
@@ -128,28 +131,50 @@ export default function ReportPage() {
 
         const runningSessions = sessions.filter(
           (s) =>
-            ["running", "active", "charging"].includes(
+            ["charging", "running", "active"].includes(
               s.status?.toLowerCase?.() || ""
             ) && myChargerIds.includes(s.portId)
         ).length;
 
-        const paidSessions = sessions.filter(
+        const completedSessions = sessions.filter(
           (s) =>
             ["completed", "done"].includes(s.status?.toLowerCase?.() || "") &&
             myChargerIds.includes(s.portId)
         );
 
-        setReport({
-          chargers: myChargers.length,
-          active: myChargers.filter(
-            (c) => ["online"].includes(c.status?.toLowerCase())
-          ).length,
-          revenue: totalRevenue,
-          incidents: 0,
-          runningSessions,
+        // === Tính thời lượng (endedAt - startedAt) ===
+        const formatDuration = (start, end) => {
+          if (!start || !end) return "—";
+          const diff = new Date(end) - new Date(start);
+          if (diff <= 0) return "—";
+          const h = Math.floor(diff / 3600000);
+          const m = Math.floor((diff % 3600000) / 60000);
+          return `${h}h ${m}m`;
+        };
+
+        // === Chuẩn bị lịch sử ===
+        const sessionRows = completedSessions.map((s, i) => {
+          const inv =
+            invoices.find((x) => x.invoiceId === s.invoiceId) ||
+            filteredInvoices.find((x) =>
+              x.chargingSessions?.some(
+                (cs) => cs.chargingSessionId === s.chargingSessionId
+              )
+            );
+          return {
+            session: `S-${s.chargingSessionId}`,
+            charger: s.portId,
+            customer: s.customerId || "—",
+            duration: formatDuration(s.startedAt, s.endedAt),
+            kWh: s.energyKwh || 0,
+            cost: s.total || 0,
+            invoice: inv
+              ? inv.invoiceCode || `INV-${inv.invoiceId}`
+              : s.invoiceId || "—",
+          };
         });
 
-        // === Dữ liệu biểu đồ ===
+        // === Biểu đồ doanh thu ===
         const daily = {};
         filteredInvoices.forEach((inv) => {
           const d = new Date(inv.createdAt);
@@ -159,21 +184,18 @@ export default function ReportPage() {
         const chartArr = Object.entries(daily)
           .sort(([a], [b]) => (a < b ? -1 : 1))
           .map(([date, revenue]) => ({ date, revenue }));
-        setChartData(chartArr);
 
-        // === Lịch sử chi tiết ===
-        const sessionRows = paidSessions.map((s, i) => ({
-          session: s.sessionId || `S-${i + 1}`,
-          charger: s.portId,
-          customer: s.customerId || "—",
-          duration: s.durationText || "—",
-          kWh: s.energyUsed || 0,
-          cost: s.total || 0,
-          invoice:
-            invoices.find((inv) => inv.invoiceId === s.invoiceId)?.invoiceCode ||
-            s.invoiceId ||
-            "—",
-        }));
+        // === Cập nhật state ===
+        setReport({
+          chargers: myChargers.length,
+          active: myChargers.filter(
+            (c) => ["online"].includes(c.status?.toLowerCase())
+          ).length,
+          revenue: totalRevenue,
+          incidents: 0,
+          runningSessions,
+        });
+        setChartData(chartArr);
         setHistory(sessionRows);
       } catch (err) {
         console.error("Lỗi khi tải báo cáo:", err);
@@ -246,7 +268,7 @@ export default function ReportPage() {
         </p>
       )}
 
-      {/* Tóm tắt */}
+      {/* Tổng quan */}
       <div className="rep-summary">
         <div className="rep-box">
           <p>Tổng trụ</p>
@@ -287,7 +309,7 @@ export default function ReportPage() {
         </div>
       )}
 
-      {/* Lịch sử phiên */}
+      {/* Lịch sử */}
       <h3>Lịch sử phiên đã thanh toán</h3>
       <div className="rep-table">
         <table>
@@ -297,7 +319,7 @@ export default function ReportPage() {
               <th>Trụ</th>
               <th>Khách</th>
               <th>Thời lượng</th>
-              <th>kWh</th>
+              {/*<th>kWh</th>*/}
               <th>Chi phí</th>
               <th>Hóa đơn</th>
             </tr>
@@ -316,7 +338,7 @@ export default function ReportPage() {
                   <td>{h.charger}</td>
                   <td>{h.customer}</td>
                   <td>{h.duration}</td>
-                  <td>{h.kWh}</td>
+                  {/*<td>{h.kWh}</tdt*/}
                   <td>{h.cost.toLocaleString("vi-VN")} đ</td>
                   <td>{h.invoice}</td>
                 </tr>
