@@ -8,6 +8,7 @@ import {
   FileTextOutlined,
   NotificationOutlined,
   BellOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 import { getApiBase } from "../../utils/api";
 import dayjs from "dayjs";
@@ -356,18 +357,33 @@ export default function Head() {
             />
           </Tooltip>
         )}
+
         {isAdmin && (
-          <Tooltip title="Gửi thông báo (Admin)">
-            <Button
-              type="primary"
-              size="middle"
-              icon={<NotificationOutlined />}
-              onClick={() => navigate("/admin/notifications/send")}
-              style={{ marginRight: 8 }}
-            >
-              Thông báo
-            </Button>
-          </Tooltip>
+          <>
+            <Tooltip title="Quản lý Quy tắc Giá (Admin)">
+              <Button
+                type="default"
+                size="middle"
+                icon={<SettingOutlined />}
+                onClick={() => navigate("/admin/pricing-rules")}
+                style={{ marginRight: 8 }}
+              >
+                Quy tắc giá
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Gửi thông báo (Admin)">
+              <Button
+                type="primary"
+                size="middle"
+                icon={<NotificationOutlined />}
+                onClick={() => navigate("/admin/notifications/send")}
+                style={{ marginRight: 8 }}
+              >
+                Thông báo
+              </Button>
+            </Tooltip>
+          </>
         )}
 
         <AccountMenu />

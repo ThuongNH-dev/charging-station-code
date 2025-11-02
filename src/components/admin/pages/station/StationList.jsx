@@ -68,7 +68,7 @@ function ChargerBlock({
             <div className="port-details">
               <p>
                 <strong>
-                  {port.ConnectorType} ({port.Code})
+                  {(port.ConnectorType || "").trim() || "N/A"} ({port.Code})
                 </strong>
               </p>
               <p className="port-extra-info">

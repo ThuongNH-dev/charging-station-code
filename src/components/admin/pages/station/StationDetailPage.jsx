@@ -16,10 +16,7 @@ import AddEditPortModal from "./modals/AddEditPortModal";
 import DeleteConfirmModal from "./modals/DeleteConfirmModal";
 import EndSessionSummaryModal from "./modals/EndSessionSummaryModal";
 
-import {
-  AVAILABLE_CONNECTOR_TYPES,
-  isPortBusy,
-} from "../../../../utils/stationUtils";
+import { isPortBusy } from "../../../../utils/stationUtils";
 
 // === Stub customerApi (giống bản bạn dùng) ===
 const customerApi = {
@@ -65,7 +62,7 @@ export default function StationDetailPage() {
   const [editingCharger, setEditingCharger] = useState({});
 
   const newPortInitialState = {
-    ConnectorType: "CCS2",
+    ConnectorType: "",
     MaxPowerKw: "",
     Code: "",
     Status: "Available",
@@ -604,19 +601,8 @@ export default function StationDetailPage() {
     console.log("➡️ Payload START Session gửi đi:", payload); // LOG SẼ GIÚP DEBUG
 
     try {
-      // 🔹 Khai báo và lấy thông tin xe từ vehicleApi trước khi gọi API startSession
       let vehicleName = null;
-      let vehiclePlate = null;
-      if (vehicleId > 0) {
-        try {
-          // Giả định stationApi.getById có thể lấy thông tin xe
-          const v = await stationApi.getById(vehicleId);
-          vehicleName = v?.model || v?.name || null;
-          vehiclePlate = v?.plate || v?.licensePlate || null;
-        } catch (err) {
-          console.warn("Không lấy được thông tin xe:", err);
-        }
-      }
+  let vehiclePlate = null; // TODO: nếu có vehicleApi thì map ở đây
       const res = await stationApi.startSession(payload);
       console.log("⬅️ Response START Session nhận được:", res); // LOG SẼ GIÚP DEBUG
 
