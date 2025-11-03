@@ -41,7 +41,7 @@
   cursor: pointer;
   font-weight: 600;
   transition: background-color 0.2s, box-shadow 0.2s;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: 14px;
@@ -70,63 +70,63 @@
   font-weight: 500;
 }
 
-.btn.green {
-  background-color: #52c41a; /* Xanh lá (Sẵn sàng/Bắt đầu) */
-  color: white;
-}
-.btn.red {
-  background-color: #ff4d4f; /* Đỏ (Nguy hiểm/Tổng kết) */
-  color: white;
-}
-.btn.blue {
-  background-color: #1677ff;
-  color: white;
-}
+.btn.green { background-color: #52c41a; color: #fff; }
+.btn.red   { background-color: #ff4d4f; color: #fff; }
+.btn.blue  { background-color: #1677ff; color: #fff; }
 
 .icon-btn {
   background: none;
   border: none;
   cursor: pointer;
-  color: #999; /* Xám nhẹ */
+  color: #999;
   font-size: 18px;
   margin-left: 5px;
   padding: 5px;
   transition: color 0.2s;
 }
-.icon-btn:hover {
-  color: #1677ff; /* Xanh chủ đạo khi hover */
-}
+.icon-btn:hover { color: #1677ff; }
 
 .link-btn {
   background: none;
   border: none;
   color: #1677ff;
   cursor: pointer;
-  text-decoration: none; /* Bỏ gạch chân */
+  text-decoration: none;
   font-weight: 500;
   margin-top: 10px;
   display: block;
   text-align: right;
   font-size: 14px;
 }
-.link-btn:hover {
-  text-decoration: underline;
-}
+.link-btn:hover { text-decoration: underline; }
 
-/* --- STATION CARD & BADGES --- */
+/* --- DANH SÁCH TRẠM --- */
 
-.station-list {
-  display: flex;
-  flex-direction: column;
+/* Dùng grid cho ổn định layout, tránh reflow khi hover/ảnh tải */
+.station-list{
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 20px;
+  contain: layout paint;   /* cô lập layout */
 }
 
+/* Card ổn định, mượt hover, không đổi kích thước */
 .station-card {
-  background: white;
+  background: #fff;
   border: 1px solid #e8e8e8;
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* Đổ bóng nhẹ hơn */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  min-height: 120px;             /* khóa chiều cao tối thiểu */
+  will-change: transform, box-shadow;
+  transform: translateZ(0);
+  transition: transform .18s ease, box-shadow .18s ease;
+  backface-visibility: hidden;
+  contain: layout paint;         /* cô lập reflow trong card */
+}
+.station-card:hover{
+  transform: translateY(-2px);   /* không scale để khỏi đẩy xung quanh */
+  box-shadow: 0 8px 22px rgba(0,0,0,.12);
 }
 
 .station-header {
@@ -140,7 +140,7 @@
 
 .station-header h3 {
   margin: 0 0 5px 0;
-  color: #1677ff; /* Xanh dương */
+  color: #1677ff;
   font-size: 20px;
   font-weight: 600;
 }
@@ -152,34 +152,27 @@
   line-height: 1.5;
 }
 
-/* ---------------------------------- */
 /* --- TRẠNG THÁI TRẠM (STATUS BADGE) --- */
-/* ---------------------------------- */
 
 .status-badge {
-  padding: 5px 12px;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  height: 26px;           /* cố định chiều cao để badge không đẩy layout */
+  padding: 0 12px;
+  border-radius: 999px;
   font-size: 12px;
-  font-weight: bold;
-  color: white;
+  font-weight: 700;
+  color: #fff;
   margin-right: 15px;
   text-transform: uppercase;
   white-space: nowrap;
+  line-height: 1;
 }
 
-.status-badge.active, /* Trạng thái "Active" của Trạm */
-.status-badge.online {
-  background-color: #52c41a; /* Xanh lá */
-}
-
-.status-badge.offline {
-  background-color: #999; /* Xám trung tính */
-}
-
-.status-badge.maintenance {
-  background-color: #faad14; /* Vàng/Cam đậm */
-  color: #333;
-}
+.status-badge.active,
+.status-badge.online { background-color: #52c41a; }
+.status-badge.offline { background-color: #999; }
+.status-badge.maintenance { background-color: #faad14; color: #333; }
 
 .station-footer {
   display: flex;
@@ -190,10 +183,10 @@
   border-top: 1px solid #f0f0f0;
 }
 
-/* --- POLE & PORT SECTIONS --- */
+/* --- POLE & PORT SECTIONS (dùng cho trang chi tiết) --- */
 
 .pole-section {
-  border-left: 3px solid #d9d9d9; /* Viền xám nhạt */
+  border-left: 3px solid #d9d9d9;
   padding-left: 20px;
   margin-bottom: 15px;
 }
@@ -235,7 +228,6 @@
   margin-top: 3px !important;
 }
 
-/* Thông tin công suất cố định (chỉ đọc) trong modal */
 .read-only-info {
   color: #1677ff;
   font-size: 13px;
@@ -251,41 +243,26 @@
   gap: 8px;
 }
 
-/* ---------------------------------- */
-/* --- TRẠNG THÁI CỔNG (PORT BADGE) --- */
-/* ---------------------------------- */
-
+/* TRẠNG THÁI CỔNG */
 .badge {
   padding: 4px 10px;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
-  color: white;
+  color: #fff;
   text-transform: uppercase;
   white-space: nowrap;
 }
-
-/* ĐÃ SỬA: Thêm class .badge.available để gán màu xanh lá cho trạng thái Available (hiển thị là Online) */
-.badge.available {
-  background-color: #52c41a; /* Xanh lá */
-}
-.badge.busy {
-  background-color: #ff4d4f; /* Đang bận - Đỏ */
-}
-.badge.maintenance {
-  background-color: #faad14; /* Bảo trì - Vàng/Cam */
-  color: #333;
-}
+.badge.available   { background-color: #52c41a; }
+.badge.busy        { background-color: #ff4d4f; }
+.badge.maintenance { background-color: #faad14; color: #333; }
 
 /* --- MODAL --- */
 
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.4);
+  inset: 0;
+  background: rgba(0,0,0,.4);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -297,13 +274,12 @@
   padding: 30px;
   border-radius: 8px;
   width: 90%;
-  max-width: 400px; /* Nhỏ hơn một chút */
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  max-width: 400px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
 }
 
 .modal-box h3 {
-  margin-top: 0;
-  margin-bottom: 20px;
+  margin: 0 0 20px 0;
   color: #1677ff;
   font-size: 20px;
 }
@@ -331,42 +307,39 @@
   gap: 10px;
   margin-top: 25px;
 }
-
 .modal-actions button {
   padding: 10px 18px;
   border-radius: 4px;
   cursor: pointer;
   font-weight: 600;
   border: 1px solid #d9d9d9;
-  background-color: white;
+  background: #fff;
   color: #333;
-  transition: all 0.2s;
+  transition: all .2s;
 }
-.modal-actions button:hover {
-  border-color: #1677ff;
-}
-
+.modal-actions button:hover { border-color: #1677ff; }
 .modal-actions button.save {
-  background-color: #1677ff;
-  color: white;
-  border-color: #1677ff;
+  background-color: #1677ff; color: #fff; border-color: #1677ff;
 }
-.modal-actions button.save:hover {
-  background-color: #0056b3;
-}
-
+.modal-actions button.save:hover { background-color: #0056b3; }
 .modal-actions button.delete {
-  background-color: #ff4d4f;
-  color: white;
-  border-color: #ff4d4f;
+  background-color: #ff4d4f; color: #fff; border-color: #ff4d4f;
 }
-.modal-actions button.delete:hover {
-  background-color: #cf1322;
-}
+.modal-actions button.delete:hover { background-color: #cf1322; }
 
+/* Ảnh trong chi tiết (nếu dùng) */
+.station-image-container{
+  width: 120px;
+  height: 90px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f3f5f7;
+  flex: 0 0 auto;
+}
 .station-img {
   width: 100%;
-  height: 200px;
+  height: 100%;
   object-fit: cover;
-  border-radius: 4px;
+  display: block;
+  transform: translateZ(0);
 }

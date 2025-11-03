@@ -9,7 +9,7 @@ function normalizePort(p) {
     console.warn(
       "normalizePort: Dữ liệu đầu vào không hợp lệ (null/undefined/không phải object). Trả về object rỗng."
     );
-    return {}; // Trả về object rỗng
+    return {};
   }
   return {
     PortId: p.id ?? p.portId ?? p.PortId ?? "",
@@ -27,25 +27,21 @@ function normalizeCharger(c) {
     console.warn(
       "normalizeCharger: Dữ liệu đầu vào không hợp lệ (null/undefined/không phải object). Trả về object rỗng."
     );
-    return {}; // Trả về object rỗng để tránh lỗi crash
+    return {};
   }
   return {
     ChargerId: c.id ?? c.chargerId ?? c.ChargerId ?? "",
     Code: c.code ?? c.Code ?? "",
     Type: c.type ?? c.Type ?? "",
-    // Đảm bảo là số
     PowerKw: Number(
       c.maxPowerKw ?? c.MaxPowerKw ?? c.PowerKw ?? c.powerKw ?? 0
     ),
     Status: c.status ?? c.Status ?? "",
     StationId: c.stationId ?? c.StationId ?? "",
     ImageUrl: c.imageUrl ?? c.ImageUrl ?? c.imageurl ?? "",
-    // Đệ quy chuẩn hóa các ports
     ports: Array.isArray(c.ports) ? c.ports.map(normalizePort) : [],
   };
 }
-
-// ✅ SỬA TRONG src/api/stationApi.js
 
 function normalizeStation(s = {}) {
   if (!s || typeof s !== "object") {
@@ -55,25 +51,19 @@ function normalizeStation(s = {}) {
     return {};
   }
 
-  // 1. Lấy giá trị trạng thái thô
   let rawStatus = s.status ?? s.Status ?? "";
+  let normalizedStatus = "Closed";
 
-  // 2. CHUẨN HÓA TRẠNG THÁI (STATUS) - Backend sử dụng "Open"/"Closed"
-  let normalizedStatus = "Closed"; // Mặc định là Closed nếu không xác định
-
-  // Kiểm tra các định dạng có thể có từ DB
   if (
     rawStatus === 1 ||
     String(rawStatus).toLowerCase() === "online" ||
     String(rawStatus).toLowerCase() === "onl" ||
     String(rawStatus).toLowerCase() === "active" ||
     String(rawStatus).toLowerCase() === "open" ||
-    String(rawStatus) === "Đang hoạt động" // Thêm các chuỗi tiếng Việt nếu cần
+    String(rawStatus) === "Đang hoạt động"
   ) {
-    normalizedStatus = "Open"; // Backend sử dụng "Open" thay vì "Active"
-  }
-  // Nếu không phải Open, giữ nguyên 'Closed' (hoặc kiểm tra rõ ràng cho Closed)
-  else if (
+    normalizedStatus = "Open";
+  } else if (
     rawStatus === 0 ||
     String(rawStatus).toLowerCase() === "offline" ||
     String(rawStatus).toLowerCase() === "off" ||
@@ -82,7 +72,6 @@ function normalizeStation(s = {}) {
   ) {
     normalizedStatus = "Closed";
   }
-  // Ghi chú: Nếu giá trị Status là một chuỗi tùy chỉnh (ví dụ: 'Maintenance'), bạn có thể giữ nguyên.
 
   return {
     StationId: s.id ?? s.stationId ?? s.StationId ?? s.Id,
@@ -92,52 +81,158 @@ function normalizeStation(s = {}) {
     Latitude: Number(s.lat ?? s.latitude ?? s.Latitude ?? 0),
     Longitude: Number(s.lng ?? s.longitude ?? s.Longitude ?? 0),
     ImageUrl: s.imageUrl ?? s.ImageUrl ?? s.thumbnail ?? "",
-
-    // Gán trạng thái đã được chuẩn hóa
     Status: normalizedStatus,
-
     Power: s.power ?? s.Power ?? "",
-    // ... (chargers logic giữ nguyên)
     chargers: s.connectors ?? s.Connectors ?? s.chargers ?? s.Chargers ?? [],
   };
+}
+
+async function _getActiveSessionByPort(portId) {
+  if (!portId) return null;
+
+  // ❗Chỉ dùng các endpoint có /api để tránh router nuốt "active" như /{controller}/{id}
+  const tryGets = [
+    `/api/ChargingSessions/active?portId=${encodeURIComponent(portId)}`,
+    `/api/ChargingSessions/active-by-port?portId=${encodeURIComponent(portId)}`,
+    `/api/Ports/${encodeURIComponent(portId)}/active-session`,
+    `/api/ports/${encodeURIComponent(portId)}/active-session`,
+  ];
+
+  for (const ep of tryGets) {
+    try {
+      const res = await fetchAuthJSON(resolveUrl(ep), { method: "GET" });
+      if (res) return res; // { chargingSessionId, ... } hoặc null
+    } catch (e) {
+      console.warn(
+        "[stationApi] getActiveSessionByPort fail @",
+        ep,
+        e?.message || e
+      );
+    }
+  }
+
+  // (Fallback hiếm gặp) một số BE cho phép POST để truy vấn
+  const tryPosts = [
+    { url: `/api/ChargingSessions/active`, body: { portId } },
+    { url: `/api/charging-sessions/active`, body: { portId } },
+  ];
+  for (const { url, body } of tryPosts) {
+    try {
+      const res = await fetchAuthJSON(resolveUrl(url), {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      if (res) return res;
+    } catch (e) {
+      console.warn(
+        "[stationApi] getActiveSessionByPort(POST) fail @",
+        url,
+        e?.message || e
+      );
+    }
+  }
+
+  return null;
+}
+
+// === 0. CONNECTOR TYPES (dynamic) ===
+async function _getConnectorTypesFromDB() {
+  const candidates = [
+    "/api/Ports/connector-types",
+    "/api/ports/connector-types",
+    "/api/ConnectorTypes",
+    "/ConnectorTypes",
+    "/Ports/connector-types",
+  ];
+  for (const ep of candidates) {
+    try {
+      const res = await fetchAuthJSON(resolveUrl(ep), { method: "GET" });
+      if (!res) continue;
+      if (Array.isArray(res)) {
+        const list = res
+          .map((x) => {
+            if (typeof x === "string") return x;
+            if (x?.name) return String(x.name);
+            if (x?.Name) return String(x.Name);
+            if (x?.type) return String(x.type);
+            if (x?.Type) return String(x.Type);
+            return null;
+          })
+          .filter(Boolean);
+        if (list.length) return Array.from(new Set(list));
+      }
+      if (res?.items && Array.isArray(res.items)) {
+        const list = res.items.map(String);
+        if (list.length) return Array.from(new Set(list));
+      }
+    } catch (e) {
+      console.warn("[stationApi] connector-types fail @", ep, e?.message || e);
+    }
+  }
+  return [];
 }
 
 // === 2. HÀM XỬ LÝ LỖI (CRUD API) ===
 
 export const stationApi = {
   // --- 1️⃣ STATIONS ---
-
   async getAllStations() {
     try {
       const res = await fetchAuthJSON(resolveUrl("/Stations"));
-      // Luôn kiểm tra res có phải mảng không trước khi map
       return Array.isArray(res) ? res.map(normalizeStation) : [];
     } catch (error) {
       console.error("API Error: Lấy danh sách Trạm thất bại.", error);
-      // Quan trọng: Trả về mảng rỗng để UI không bị crash
       return [];
     }
   },
 
+  async getConnectorTypes() {
+    try {
+      const list = await _getConnectorTypesFromDB();
+      if (list.length) return list;
+      // Fallback: suy luận từ list port nếu BE chưa có API riêng
+      try {
+        const ports = await this.getAllPorts();
+        const fromPorts = Array.isArray(ports)
+          ? Array.from(
+              new Set(
+                ports
+                  .map((p) => p?.ConnectorType)
+                  .filter((x) => typeof x === "string" && x.trim())
+              )
+            )
+          : [];
+        return fromPorts;
+      } catch {
+        return [];
+      }
+    } catch (e) {
+      console.warn("[stationApi] getConnectorTypes()", e?.message || e);
+      return [];
+    }
+  },
+
+  // (Nếu bạn CHƯA có) getPricingRules(): thêm stub/bản thật ở đây
+  // async getPricingRules() {
+  //   const res = await fetchAuthJSON(resolveUrl("/api/PricingRules"), { method: "GET" });
+  //   return Array.isArray(res) ? res : [];
+  // },
+
   async createStation(stationData) {
     try {
-      // Đảm bảo dữ liệu gửi lên khớp với API
       const res = await fetchAuthJSON(resolveUrl("/Stations"), {
         method: "POST",
         body: JSON.stringify(stationData),
       });
-      // Nếu API trả về đối tượng trạm mới tạo, hãy chuẩn hóa nó
       return normalizeStation(res);
     } catch (error) {
       console.error("API Error: Thêm Trạm mới thất bại.", error);
-      // Ném lại lỗi để component gọi biết rằng có vấn đề
       throw new Error(
         `Tạo trạm thất bại: ${error.message || "Lỗi không xác định"}`
       );
     }
   },
 
-  // ✅ SỬA LOGIC TRONG updateStation
   async updateStation(stationId, stationData) {
     try {
       console.log("🔄 API: Đang gửi request cập nhật trạm:", {
@@ -147,11 +242,8 @@ export const stationApi = {
         status: stationData.Status,
       });
 
-      // Đảm bảo dữ liệu được gửi đúng format
       const requestBody = JSON.stringify(stationData);
-      console.log("📤 Request Body:", requestBody);
 
-      // Thử endpoint chính trước
       let res = await fetchAuthJSON(resolveUrl(`/Stations/${stationId}`), {
         method: "PUT",
         headers: {
@@ -161,11 +253,8 @@ export const stationApi = {
         body: requestBody,
       });
 
-      // Nếu endpoint chính không hoạt động, thử các endpoint khác
       if (!res) {
         console.warn("⚠️ Endpoint chính không hoạt động, thử endpoint khác...");
-
-        // Thử endpoint với tên khác
         try {
           res = await fetchAuthJSON(resolveUrl(`/stations/${stationId}`), {
             method: "PUT",
@@ -181,28 +270,16 @@ export const stationApi = {
         }
       }
 
-      console.log("📥 API Response:", res);
-      console.log("📥 Response Status:", res?.status || "No status");
-      console.log("📥 Response Data:", res);
-
-      // ✅ SỬA LỖI: Backend trả về HTTP 204 No Content (thành công nhưng không có body)
-      // Đây là hành vi bình thường của REST API khi cập nhật thành công
       let updatedData = res;
-
-      // Nếu API trả về null/undefined (HTTP 204), coi như thành công
       if (res === null || res === undefined) {
         console.log(
           "✅ Backend trả về HTTP 204 No Content - cập nhật thành công"
         );
-        console.log("✅ Sử dụng dữ liệu đã gửi để cập nhật UI");
-        // Sử dụng dữ liệu đã gửi, kết hợp với StationId
         updatedData = { ...stationData, StationId: stationId };
       }
 
-      // Trả về dữ liệu đã được chuẩn hóa (có thể là res hoặc stationData)
       return normalizeStation(updatedData);
     } catch (error) {
-      // Giữ nguyên logic xử lý lỗi API thất bại (4xx, 5xx, network errors)
       console.error(`API Error: Sửa Trạm ID ${stationId} thất bại.`, error);
       throw new Error(
         `Cập nhật trạm thất bại: ${error.message || "Lỗi không xác định"}`
@@ -215,7 +292,6 @@ export const stationApi = {
       await fetchAuthJSON(resolveUrl(`/Stations/${stationId}`), {
         method: "DELETE",
       });
-      // Trả về true nếu thành công
       return true;
     } catch (error) {
       console.error(`API Error: Xóa Trạm ID ${stationId} thất bại.`, error);
@@ -226,7 +302,6 @@ export const stationApi = {
   },
 
   // --- 2️⃣ CHARGERS ---
-
   async getAllChargers() {
     try {
       const res = await fetchAuthJSON(resolveUrl("/Chargers"));
@@ -248,7 +323,7 @@ export const stationApi = {
         console.warn(
           "Tạo Bộ sạc thành công (Backend trả về rỗng). Sử dụng dữ liệu đầu vào."
         );
-        addedData = chargerData; // Sử dụng dữ liệu đã gửi đi để tạo đối tượng tạm
+        addedData = chargerData;
       }
       return normalizeCharger(addedData);
     } catch (error) {
@@ -266,18 +341,13 @@ export const stationApi = {
         body: JSON.stringify(chargerData),
       });
       let updatedData = res;
-
-      // KIỂM TRA QUAN TRỌNG:
       if (!res) {
         console.warn(
           `Cập nhật Bộ sạc ID ${chargerId} thành công (Backend trả về rỗng). Sử dụng dữ liệu đầu vào.`
         );
-        // Tạo đối tượng dữ liệu cập nhật từ đầu vào và ID
         updatedData = { ...chargerData, ChargerId: chargerId };
       }
-
-      // SỬA LỖI: Sử dụng biến 'updatedData' đã được kiểm tra/gán lại
-      return normalizeCharger(updatedData); // <--- ĐÃ SỬA LỖI
+      return normalizeCharger(updatedData);
     } catch (error) {
       console.error(`API Error: Sửa Bộ sạc ID ${chargerId} thất bại.`, error);
       throw new Error(
@@ -301,7 +371,6 @@ export const stationApi = {
   },
 
   // --- 3️⃣ PORTS ---
-
   async getAllPorts() {
     try {
       const res = await fetchAuthJSON(resolveUrl("/Ports"));
@@ -312,8 +381,6 @@ export const stationApi = {
     }
   },
 
-  /// ✅ HÀM CREATE: SỬ DỤNG portData
-  // ✅ BẢN SỬA LỖI CHO createPort
   async createPort(portData) {
     try {
       const res = await fetchAuthJSON(resolveUrl("/Ports"), {
@@ -322,54 +389,35 @@ export const stationApi = {
       });
 
       let addedData = res;
-
-      // KIỂM TRA QUAN TRỌNG:
-      // Nếu API trả về rỗng (null/undefined), giả định thành công và sử dụng
-      // dữ liệu đã gửi (portData) để cập nhật UI, đồng thời gán một ID tạm thời
-      // nếu portData chưa có ID (tùy thuộc vào cách Backend gán ID).
       if (!res) {
         console.warn(
           `Tạo Cổng sạc thành công (Backend trả về rỗng). Sử dụng dữ liệu đầu vào.`
         );
-        // Nếu Backend không trả ID, bạn có thể cần ID tạm thời ở đây
-        // (Hoặc giả định Backend đã xử lý và portData đủ để UI hoạt động)
         addedData = portData;
       }
-
-      // SỬA LỖI: Sử dụng biến 'addedData' đã được kiểm tra/gán lại
       return normalizePort(addedData);
     } catch (error) {
       console.error("API Error: Thêm Cổng sạc mới thất bại.", error);
-      // Ném lỗi để component React có thể bắt và hiển thị
       throw new Error(
         `Tạo cổng sạc thất bại: ${error.message || "Lỗi không xác định"}`
       );
     }
   },
 
-  // ✅ HÀM UPDATE: SỬ DỤNG portData
-  // ✅ src/api/stationApi.js - THÊM HÀM updatePort ĐÃ SỬA LỖI
   async updatePort(portId, portData) {
     try {
       const res = await fetchAuthJSON(resolveUrl(`/Ports/${portId}`), {
-        method: "PUT", // Hoặc PATCH
+        method: "PUT",
         body: JSON.stringify(portData),
       });
 
       let updatedData = res;
-
-      // KIỂM TRA QUAN TRỌNG:
-      // Nếu API không trả về đối tượng nào (res là null/undefined),
-      // giả định thành công và sử dụng dữ liệu đã gửi.
       if (!res) {
         console.warn(
           `Cập nhật Cổng sạc ID ${portId} thành công (Backend trả về rỗng). Sử dụng dữ liệu đầu vào.`
         );
-        // Tạo đối tượng dữ liệu cập nhật từ đầu vào và ID
         updatedData = { ...portData, PortId: portId };
       }
-
-      // Gọi hàm normalize đã được sửa lỗi
       return normalizePort(updatedData);
     } catch (error) {
       console.error(`API Error: Sửa Cổng sạc ID ${portId} thất bại.`, error);
@@ -379,12 +427,9 @@ export const stationApi = {
     }
   },
 
-  // ✅ HÀM DELETE: KHÔNG CẦN DÙNG portData
   async deletePort(portId) {
     try {
-      await fetchAuthJSON(resolveUrl(`/Ports/${portId}`), {
-        method: "DELETE",
-      });
+      await fetchAuthJSON(resolveUrl(`/Ports/${portId}`), { method: "DELETE" });
       return true;
     } catch (error) {
       console.error(`API Error: Xóa Cổng sạc ID ${portId} thất bại.`, error);
@@ -395,10 +440,8 @@ export const stationApi = {
   },
 
   // --- 4️⃣ SESSIONS ---
-  // stationApi.js - ĐOẠN CODE ĐÃ SỬA LỖI
   async startSession(sessionData) {
     try {
-      // ĐÚNG: Sử dụng URL chính xác theo tài liệu Backend
       const res = await fetchAuthJSON(
         resolveUrl("/api/ChargingSessions/start"),
         {
@@ -406,27 +449,149 @@ export const stationApi = {
           body: JSON.stringify(sessionData),
         }
       );
-      return res || {};
+      if (!res) return { success: true, message: "Ended (204)" };
+      if (typeof res === "object" && res.success === undefined) {
+        return { success: true, ...res };
+      }
+      return res;
     } catch (error) {
       console.error("API Error: Bắt đầu phiên sạc thất bại.", error);
       throw new Error(`Bắt đầu phiên sạc thất bại: ${error.message}`);
     }
   },
 
-  // ✅ BẢN ĐÚNG CHO CÁCH 2 - gọi 1 tham số payload { chargingSessionId, endSoc }
-  async endSession({ chargingSessionId, endSoc }) {
+  // ✅ Public API: lấy phiên theo cổng
+  async getActiveSessionByPort(portId) {
+    return _getActiveSessionByPort(portId);
+  },
+
+  // ✅ Public API: kết thúc phiên — chấp nhận { chargingSessionId HOẶC portId, endSoc }
+  async endSession({ chargingSessionId, portId, endSoc } = {}) {
     try {
-      const res = await fetchAuthJSON(
-        resolveUrl("/api/ChargingSessions/end"), // hoặc "/api/sessions/end" tùy BE
-        {
-          method: "POST",
-          body: JSON.stringify({ chargingSessionId, endSoc }),
+      const basePayload = {};
+      if (typeof endSoc === "number") basePayload.endSoc = endSoc;
+
+      // 1) Có sẵn sessionId -> kết thúc trực tiếp
+      if (chargingSessionId) {
+        const payload = { ...basePayload, chargingSessionId };
+        const tryDirect = [
+          { url: "/api/ChargingSessions/end", method: "POST", body: payload },
+          { url: "/api/charging-sessions/end", method: "POST", body: payload },
+        ];
+        for (const t of tryDirect) {
+          try {
+            const res = await fetchAuthJSON(resolveUrl(t.url), {
+              method: t.method,
+              body: JSON.stringify(t.body),
+            });
+            return res || { success: true }; // 204
+          } catch (e) {
+            console.warn(
+              "[stationApi] endSession by ID fail @",
+              t.url,
+              e?.message || e
+            );
+          }
         }
-      );
-      return res || {};
+      }
+
+      // 2) Không có sessionId nhưng có portId -> để BE tự resolve theo portId
+      if (portId) {
+        const tryByPort = [
+          {
+            url: "/api/ChargingSessions/end",
+            method: "POST",
+            body: { ...basePayload, portId },
+          },
+          {
+            url: "/api/charging-sessions/end",
+            method: "POST",
+            body: { ...basePayload, portId },
+          },
+          {
+            url: `/api/ChargingSessions/end-by-port?portId=${encodeURIComponent(
+              portId
+            )}`,
+            method: "POST",
+            body: basePayload,
+          },
+          {
+            url: `/api/Ports/${encodeURIComponent(portId)}/end-session`,
+            method: "POST",
+            body: basePayload,
+          },
+          {
+            url: `/api/ports/${encodeURIComponent(portId)}/end-session`,
+            method: "POST",
+            body: basePayload,
+          },
+        ];
+        for (const t of tryByPort) {
+          try {
+            const res = await fetchAuthJSON(resolveUrl(t.url), {
+              method: t.method,
+              body: JSON.stringify(t.body),
+            });
+            if (res) return res; // 200
+            return { success: true }; // 204
+          } catch (e) {
+            console.warn(
+              "[stationApi] endSession by PORT fail @",
+              t.url,
+              e?.message || e
+            );
+          }
+        }
+
+        // 3) Fallback cuối: tự lấy phiên active -> lấy id -> end
+        const active = await this.getActiveSessionByPort(portId);
+        const sessionId = active?.chargingSessionId || active?.id || null;
+        if (sessionId) {
+          const payload = { ...basePayload, chargingSessionId: sessionId };
+          const tryDirectAgain = [
+            { url: "/api/ChargingSessions/end", method: "POST", body: payload },
+            {
+              url: "/api/charging-sessions/end",
+              method: "POST",
+              body: payload,
+            },
+          ];
+          for (const t of tryDirectAgain) {
+            try {
+              const res = await fetchAuthJSON(resolveUrl(t.url), {
+                method: t.method,
+                body: JSON.stringify(t.body),
+              });
+              return res || { success: true };
+            } catch (e) {
+              console.warn(
+                "[stationApi] endSession by resolved ID fail @",
+                t.url,
+                e?.message || e
+              );
+            }
+          }
+        }
+      }
+
+      return {
+        success: false,
+        code: "END_FAILED",
+        message: "Kết thúc phiên sạc thất bại.",
+      };
     } catch (error) {
       console.error("API Error: Kết thúc phiên sạc thất bại.", error);
       throw new Error(`Kết thúc phiên sạc thất bại: ${error.message}`);
+    }
+  },
+  // ✅ Thêm stub để tránh lỗi gọi hàm không tồn tại
+  async getPricingRules() {
+    try {
+      const res = await fetchAuthJSON(resolveUrl("/api/PricingRules"));
+      return Array.isArray(res) ? res : [];
+    } catch (e) {
+      console.warn("[stationApi] getPricingRules() failed:", e);
+      return [];
     }
   },
 };
