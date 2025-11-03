@@ -9,6 +9,7 @@ import PaymentManager from "../pages/staff/PaymentManager";
 import ReportPage from "../pages/staff/ReportPage";
 import StaffInvoice from "../pages/staff/StaffInvoice";
 import StationManager from "../pages/staff/StationManager";
+import IncidentManager from "../pages/staff/IncidentManager";
 import StaffPaymentSuccess from "../pages/staff/StaffPaymentSuccess";
 
 import "./StaffLayout.css";
@@ -63,6 +64,7 @@ export default function StaffLayout() {
               <Route path="chargers" element={<ChargerManager />} />
               <Route path="sessions" element={<SessionManager />} />
               <Route path="payments" element={<PaymentManager />} />
+              <Route path="incidents" element={<IncidentManager />} />
               <Route path="reports" element={<ReportPage />} />
               <Route path="invoice" element={<StaffInvoice />} />
               <Route
