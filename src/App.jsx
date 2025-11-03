@@ -19,7 +19,9 @@ import BookingHistory from "./pages/booking/BookingHisory";
 import InvoicePage from "./components/charging/Invoice";
 import StaffLayout from "./layouts/StaffLayout";
 import AdminLayout from "./components/admin/layout/AdminLayout";
-import StationManagement from "./components/admin/pages/StationManagement";
+import StationPage from "./components/admin/pages/station/StationPage";
+import StationDetailPage from "./components/admin/pages/station/StationDetailPage";
+
 import UserManagement from "./components/admin/pages/UserManagement/UserManagement";
 import RegisterSelect from "./pages/Register/RegisterSelect";
 import PersonalRegister from "./pages/Register/PersonalRegister";
@@ -49,13 +51,16 @@ import AdminInfo from "./pages/updateProfileAdmin/AdminInfo";
 import ForgotPassword from "./pages/password/ForgotPassword";
 import ResetPassword from "./pages/password/ResetPassword";
 import ManageSubscriptions from "./components/subscription/ManageSubcription";
+import Dashboard from "./components/admin/pages/dashboard/Dashboard";
+import AdminNotificationsSendPage from "./components/admin/pages/AdminNotificationsSendPage";
+import PricingRulesPage from "./components/admin/pages/pricing/PricingRulesPage";
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
     case "customer":
       return "/stations";
     case "admin":
-      return "/admin";
+      return "/admin/dashboard";
     case "staff":
       return "/staff";
     case "company":
@@ -134,7 +139,7 @@ export default function App() {
       <Route
         path="/payment"
         element={
-          <ProtectedRoute allowedRoles={["Customer","Company"]}>
+          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
             <PaymentPage />
           </ProtectedRoute>
         }
@@ -158,7 +163,7 @@ export default function App() {
       <Route
         path="/payment/invoice"
         element={
-          <ProtectedRoute allowedRoles={["Customer","Company"]}>
+          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
             <PaymentInvoice />
           </ProtectedRoute>
         }
@@ -313,8 +318,7 @@ export default function App() {
             <MonthlyStats/>
           </ProtectedRoute>
         }
-        />
-      {/*Staff */}
+      />
 
       {/* Staff */}
       <Route
@@ -335,17 +339,25 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<StationManagement />} />
-        <Route path="stations" element={<StationManagement />} />
+        <Route index element={<Dashboard />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="stations" element={<StationPage />} />
+        <Route path="stations/:stationId" element={<StationDetailPage />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="reports" element={<Reports />} />
+
+        <Route path="pricing-rules" element={<PricingRulesPage />} />
+        <Route
+          path="notifications/send"
+          element={<AdminNotificationsSendPage />}
+        />
       </Route>
-       {/*Notification */}
-       <Route
+      {/*Notification */}
+      <Route
         path="/notifications"
         element={
-          <ProtectedRoute allowedRoles={["Customer","Company"]}>
-            <Notification/>
+          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
+            <Notification />
           </ProtectedRoute>
         }
       />

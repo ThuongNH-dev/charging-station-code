@@ -1,141 +1,178 @@
 // =========================================================
-// OverviewKPIs.jsx — HOÀN CHỈNH + DEBUG + % thống nhất
+// OverviewKPIs.jsx — HOÀN CHỈNH (khớp data từ Reports.jsx)
+// props.data = { kpi, warnings, stationTable, ... }
 // =========================================================
 
 import React from "react";
 import { CaretUpOutlined, CaretDownOutlined } from "@ant-design/icons";
 import "./OverviewKPIs.css";
 
-const DEBUG_MODE = true;
+const fmt = (n) => {
+  if (n === null || n === undefined || n === "") return "—";
+  if (typeof n === "number") return n.toLocaleString("vi-VN");
+  if (typeof n === "string") return n;
+  return "—";
+};
 
-// 🔹 KPIBox
-function KPIBox({ kpi }) {
-  if (!kpi) return null;
-  const { value, change, isPositive, period, icon } = kpi;
-  const changeClass = isPositive ? "positive" : "negative";
-  const Icon = isPositive ? CaretUpOutlined : CaretDownOutlined;
+const IconByKey = ({ k }) => {
+  switch (k) {
+    case "revenue":
+      return <span className="kpi-emoji">💰</span>;
+    case "energy":
+      return <span className="kpi-emoji">⚡</span>;
+    case "avgRevenue":
+      return <span className="kpi-emoji">💸</span>;
+    case "duration":
+      return <span className="kpi-emoji">⏱️</span>;
+    default:
+      return <span className="kpi-emoji">📊</span>;
+  }
+};
 
-  const getIcon = (name) => {
-    switch (name) {
-      case "cash":
-        return <span className="kpi-icon">💰</span>;
-      case "energy":
-        return <span className="kpi-icon">⚡</span>;
-      case "avg-cash":
-        return <span className="kpi-icon">💸</span>;
-      case "duration":
-        return <span className="kpi-icon">⏱️</span>;
-      default:
-        return <span className="kpi-icon">📊</span>;
-    }
-  };
-
-  if (DEBUG_MODE) console.log("[KPIBox]", kpi);
-
+function KPIBox({ title, value, change, positive, iconKey }) {
+  const Arrow = positive ? CaretUpOutlined : CaretDownOutlined;
   return (
-    <div className="kpi-box">
-      <div className="kpi-header">
-        {getIcon(icon)}
-        <span className="kpi-period">{period || "Chỉ số"}</span>
+    <div
+      className="kpi-row"
+      title={title === "Tổng năng lượng" ? "Tổng lượng điện đã sạc (kWh)" : ""}
+    >
+      <div className="kpi-left">
+        <IconByKey k={iconKey} />
+        <div className="kpi-title">{title}</div>
       </div>
-      <div className="kpi-value">{value || "0"}</div>
-      <div className={`kpi-change ${changeClass}`}>
-        {change && <Icon />} {change || "0%"}
+      <div className="kpi-right">
+        <div className="kpi-value">{fmt(value)}</div>
+        {!!change && (
+          <div className={`kpi-change ${positive ? "up" : "down"}`}>
+            <Arrow />
+            <span>{change}</span>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// 🔹 WarningItem
 function WarningItem({ name, usage, status, color }) {
-  if (!name) return null;
-
-  const statusColorMap = {
-    normal: "green",
-    warning: "yellow",
-    critical: "red",
-  };
-  const statusClasses = `warning-status ${
-    color || statusColorMap[status?.toLowerCase()] || ""
-  }`;
-
-  if (DEBUG_MODE) console.log("[WarningItem]", { name, usage, status });
-
+  const badge =
+    (color && color.toLowerCase()) ||
+    (parseFloat(usage) >= 90
+      ? "danger"
+      : parseFloat(usage) <= 20
+      ? "warning"
+      : "success");
   return (
-    <div className="warning-item">
-      <div className="warning-info">
-        <div className="warning-name">{name}</div>
-        <div className="warning-usage">
-          Sử dụng: <strong>{usage != null ? `${usage}%` : "0%"}</strong>
+    <div className="warn-row">
+      <div className="warn-info">
+        <div className="warn-name">{name || "Không xác định"}</div>
+        <div className="warn-sub">
+          Sử dụng: <b>{usage ?? 0}%</b>
         </div>
       </div>
-      <div className={statusClasses}>{status || "Chưa rõ"}</div>
+      <div className={`warn-badge ${badge}`}>
+        {status ||
+          (badge === "danger"
+            ? "Quá tải"
+            : badge === "warning"
+            ? "Ít sử dụng"
+            : "Tốt")}
+      </div>
     </div>
   );
 }
 
-// 🔹 StationListItem
-function StationListItem({ name, capacity, usage }) {
-  if (DEBUG_MODE) console.log("[StationListItem]", { name, capacity, usage });
-
+function StationItem({ name, capacity, usage }) {
   return (
-    <div className="station-list-item">
+    <div className="station-row">
       <div className="station-info">
-        <div className="station-name">{name || "Không xác định"}</div>
-        <div className="station-capacity">{capacity || "N/A"}</div>
+        <div className="station-name">{name || "N/A"}</div>
+        <div className="station-sub">{capacity || "—"}</div>
       </div>
-      <div className="station-usage-percent">
-        {usage != null ? `${usage}%` : "0%"}
-      </div>
+      <div className="station-usage">{usage != null ? `${usage}%` : "0%"}</div>
     </div>
   );
 }
 
-// 🔹 Component chính
 export default function OverviewKPIs({ data }) {
-  if (DEBUG_MODE) console.log("[OverviewKPIs] props", data);
+  if (!data) return null;
 
-  if (!data)
-    return <div className="report-sidebar empty">Đang tải dữ liệu KPI...</div>;
+  // data.kpi là object từ calculateKpiOverview()
+  const k = data.kpi || {};
+  // Một số field của bạn đã được format sẵn trong utils (VD: totalRevenue là "x ₫")
+  const kpiItems = [
+    {
+      title: "Tổng doanh thu",
+      value: k.totalRevenue, // đã format "₫" từ utils
+      change: k.revenuePercent != null ? `${k.revenuePercent}%` : "",
+      positive: parseFloat(k.revenuePercent || 0) >= 0,
+      iconKey: "revenue",
+    },
+    {
+      title: "Tổng năng lượng",
+      value:
+        typeof k.totalEnergy === "number"
+          ? `${k.totalEnergy.toFixed(2)} kWh`
+          : k.totalEnergy || "—",
+      change: k.energyPercent != null ? `${k.energyPercent}%` : "",
+      positive: parseFloat(k.energyPercent || 0) >= 0,
+      iconKey: "energy",
+    },
+    {
+      title: "Doanh thu TB / phiên",
+      value: k.avgRevenuePerSession, // đã format "₫"
+      change: "",
+      positive: true,
+      iconKey: "avgRevenue",
+    },
+    {
+      title: "Thời lượng TB / phiên",
+      value: k.avgDurationPerSession, // "Xm Ys"
+      change: "",
+      positive: true,
+      iconKey: "duration",
+    },
+  ];
 
-  const { kpiOverview = [], warnings = [], stationList = [] } = data;
+  const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+  // Dùng stationTable từ data, map sang sidebar list gọn
+  const stationList =
+    (data.stationTable || []).slice(0, 8).map((s) => ({
+      name: s.name || s.stationName,
+      capacity: s.capacity || "—",
+      usage:
+        typeof s.usage === "string"
+          ? s.usage.replace("%", "")
+          : Number.isFinite(s.usage)
+          ? s.usage.toFixed(1)
+          : 0,
+    })) || [];
 
   return (
-    <div className="report-sidebar">
-      <div className="kpi-total-section card">
+    <aside className="sidebar">
+      <div className="panel">
         <h3>KPI Tổng quan</h3>
-        {Array.isArray(kpiOverview) && kpiOverview.length > 0 ? (
-          kpiOverview.map((kpi, index) => <KPIBox key={index} kpi={kpi} />)
-        ) : (
-          <p className="empty-msg">Không có dữ liệu KPI.</p>
-        )}
+        {kpiItems.map((i, idx) => (
+          <KPIBox key={idx} {...i} />
+        ))}
       </div>
 
-      <div className="sidebar-divider"></div>
-
-      <div className="warnings-section card">
+      <div className="panel">
         <h3>Cảnh báo</h3>
-        {warnings.length > 0 ? (
-          warnings.map((warning, index) => (
-            <WarningItem key={index} {...warning} />
-          ))
+        {warnings.length ? (
+          warnings.map((w, i) => <WarningItem key={i} {...w} />)
         ) : (
-          <p className="empty-msg">Không có cảnh báo.</p>
+          <div className="empty">Không có cảnh báo.</div>
         )}
       </div>
 
-      <div className="sidebar-divider"></div>
-
-      <div className="station-list-section card">
+      <div className="panel">
         <h3>Danh sách trạm</h3>
-        {stationList.length > 0 ? (
-          stationList.map((station, index) => (
-            <StationListItem key={index} {...station} />
-          ))
+        {stationList.length ? (
+          stationList.map((s, i) => <StationItem key={i} {...s} />)
         ) : (
-          <p className="empty-msg">Chưa có dữ liệu trạm.</p>
+          <div className="empty">Chưa có dữ liệu trạm.</div>
         )}
       </div>
-    </div>
+    </aside>
   );
 }
