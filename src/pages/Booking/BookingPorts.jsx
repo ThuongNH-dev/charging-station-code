@@ -359,7 +359,7 @@ export default function BookingPorts() {
 
   const [endHour, setEndHour] = useState(defEnd.h);
   const [endMinute, setEndMinute] = useState(defEnd.m);
-  
+
 
   useEffect(() => {
     const curEndAbs = endHour * 60 + endMinute;
@@ -388,6 +388,14 @@ export default function BookingPorts() {
     if (h > minH) return all;
     return all.filter((m) => m >= minM);
   };
+
+  // 🔄 Đồng bộ phút kết thúc theo phút bắt đầu
+  useEffect(() => {
+    // Nếu giờ kết thúc nhỏ hơn giờ bắt đầu, giữ nguyên (để người dùng chọn lại)
+    setEndMinute(startMinute);
+  }, [startMinute]);
+
+
 
   // ====== TÍNH TỔNG PHÚT (chỉ để kiểm tra hợp lệ)
   const totalMinutes = useMemo(() => {
@@ -470,11 +478,11 @@ export default function BookingPorts() {
     return () => { alive = false; };
   }, [id, cid]);
 
-const priceText = useMemo(() => {
-  return currentPricing
-    ? `${vnd(currentPricing.pricePerKwh)}/kWh (${viTimeRange(currentPricing.timeRange)})`
-    : (priceRangeLabelForCharger(charger, pricingMap) || charger?.price || "—");
-}, [currentPricing, charger, pricingMap]);
+  const priceText = useMemo(() => {
+    return currentPricing
+      ? `${vnd(currentPricing.pricePerKwh)}/kWh (${viTimeRange(currentPricing.timeRange)})`
+      : (priceRangeLabelForCharger(charger, pricingMap) || charger?.price || "—");
+  }, [currentPricing, charger, pricingMap]);
 
 
   // ====== LOAD PORTS THEO CHARGER ======
@@ -877,7 +885,7 @@ const priceText = useMemo(() => {
                 ...charger,
                 connector: connectorText || charger?.connector || "—",
                 connectorTypes: allConnectorTypes,
-                price: priceText      
+                price: priceText
               }} />
               <div className="bp-charger-grid">
                 <div className="bp-panel-note">
@@ -958,20 +966,12 @@ const priceText = useMemo(() => {
                     <div className="bp-subtle" style={{ marginBottom: 6 }}>Giờ</div>
                     <select
                       className="bp-input-select"
-                      value={startHour}
-                      onChange={(e) => {
-                        let h = Number(e.target.value) || minStartHour;
-                        const mins = startMinuteOptionsForHour(h);
-                        let m = startMinute;
-                        if (!mins.includes(m)) m = mins[0] ?? 0;
-                        setStartHour(h);
-                        setStartMinute(m);
-                      }}
-                      disabled={startDisabled}
+                      value={startMinute}  // luôn hiển thị cùng phút với giờ bắt đầu
+                      disabled              // không cho người dùng chỉnh
                     >
-                      {startHourOptions.map(h => (
-                        <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
-                      ))}
+                      <option value={startMinute}>
+                        {String(startMinute).padStart(2, "0")}
+                      </option>
                     </select>
                   </div>
 
@@ -1030,19 +1030,15 @@ const priceText = useMemo(() => {
                     <div className="bp-subtle" style={{ marginBottom: 6 }}>Phút</div>
                     <select
                       className="bp-input-select"
-                      value={endMinute}
-                      onChange={(e) => {
-                        const m = Number(e.target.value) || 0;
-                        const mins = endMinuteOptionsForHour(endHour);
-                        setEndMinute(mins.includes(m) ? m : (mins[0] ?? 0));
-                      }}
-                      disabled={endDisabled}
+                      value={startMinute}   // luôn hiển thị giống phút bắt đầu
+                      disabled              // khóa, không cho chọn
                     >
-                      {endMinuteOptionsForHour(endHour).map(m => (
-                        <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
-                      ))}
+                      <option value={startMinute}>
+                        {String(startMinute).padStart(2, "0")}
+                      </option>
                     </select>
                   </div>
+
                 </div>
 
                 <div className="bp-hint">

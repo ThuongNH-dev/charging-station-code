@@ -692,8 +692,8 @@ export default function PaymentPage() {
       payload.description = bookingId
         ? `Thanh toán booking #${bookingId}`
         : (isCombo
-            ? `Thanh toán combo: invoice #${invoiceId} + subscription #${subscriptionId}`
-            : `Thanh toán hóa đơn #${invoiceId}`);
+          ? `Thanh toán combo: invoice #${invoiceId} + subscription #${subscriptionId}`
+          : `Thanh toán hóa đơn #${invoiceId}`);
       payload.returnUrl = bookingId
         ? `${window.location.origin}/payment/success?bookingId=${encodeURIComponent(bookingId)}&order=${encodeURIComponent(orderId)}`
         : `${window.location.origin}/invoiceSummary`;
@@ -782,8 +782,12 @@ export default function PaymentPage() {
         contact, vehiclePlate,
       };
       saveOrderBlob(orderId, payload);
-      if (bookingId) navigate("/payment/success", { replace: true, state: payload });
-      else if (invoiceId) navigate("/invoiceSummary");
+      if (bookingId) {
+        navigate("/payment/success", { replace: true, state: payload });
+      } else if (invoiceId || subscriptionId) {
+        // invoice đơn lẻ hoặc combo invoice+subscription → về trang tổng hợp hóa đơn
+        navigate("/invoiceSummary");
+      }
       return;
     }
 

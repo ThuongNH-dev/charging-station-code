@@ -12,6 +12,20 @@ import "./Homepage.css";
 
 const API_BASE = getApiBase();
 
+const PER_PAGE = 3;
+const DEFAULT_RADIUS_KM = 10; // chỉnh bán kính hiển thị trạm gần đây (km)
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export default function Homepage() {
   const navigate = useNavigate();
   const { Title } = Typography;
@@ -20,24 +34,17 @@ export default function Homepage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // ==== Geolocation ====
+  const [userPos, setUserPos] = useState(null); // {lat, lng}
+  const [geoError, setGeoError] = useState("");
+
   const itemRefs = useRef({});
   const [selectedStationId, setSelectedStationId] = useState(null);
 
   // ==== Pagination ====
-  const PER_PAGE = 3;
   const [page, setPage] = useState(0);
 
-  const totalPages = useMemo(
-    () => Math.max(1, Math.ceil((stations?.length || 0) / PER_PAGE)),
-    [stations]
-  );
-
-  const pageItems = useMemo(() => {
-    const start = page * PER_PAGE;
-    return (stations || []).slice(start, start + PER_PAGE);
-  }, [stations, page]);
-
-  // ==== Fetch Stations ====
+  // ---- Fetch all stations (giữ nguyên API hiện có) ----
   useEffect(() => {
     let mounted = true;
     fetchStations()
@@ -47,11 +54,61 @@ export default function Homepage() {
     return () => (mounted = false);
   }, []);
 
+  // ---- Lấy vị trí hiện tại (không cần BE) ----
+  const askGeolocation = () => {
+    setGeoError("");
+    if (!navigator.geolocation) {
+      setGeoError("Trình duyệt không hỗ trợ định vị.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setUserPos({ lat: latitude, lng: longitude });
+        setPage(0); // reset về trang đầu khi vừa xác định vị trí
+      },
+      (err) => {
+        setGeoError(err?.message || "Không thể truy cập vị trí.");
+      },
+      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 10_000 }
+    );
+  };
+
+  useEffect(() => {
+    // tự gọi 1 lần khi vào trang
+    askGeolocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---- Tính danh sách trạm gần bạn, có sẵn distance ----
+  const nearbyStations = useMemo(() => {
+    if (!userPos || !Array.isArray(stations)) return [];
+    return stations
+      .map((s) => {
+        const lat = Number(s.latitude ?? s.lat);
+        const lng = Number(s.longitude ?? s.lng);
+        const valid = Number.isFinite(lat) && Number.isFinite(lng);
+        const distance = valid ? haversineKm(userPos.lat, userPos.lng, lat, lng) : Infinity;
+        return { ...s, distance };
+      })
+      .filter((s) => s.distance < Infinity && s.distance <= DEFAULT_RADIUS_KM)
+      .sort((a, b) => a.distance - b.distance);
+  }, [stations, userPos]);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil((nearbyStations.length || 0) / PER_PAGE)),
+    [nearbyStations.length]
+  );
+
+  const pageItems = useMemo(() => {
+    const start = page * PER_PAGE;
+    return nearbyStations.slice(start, start + PER_PAGE);
+  }, [nearbyStations, page]);
+
   // ==== Marker Click ====
   const handleMarkerClick = (id) => {
-    const idx = (stations || []).findIndex(
-      (s) => String(s.id) === String(id)
-    );
+    // Tìm index theo danh sách gần đây (để nhảy đúng trang đang hiển thị)
+    const idx = nearbyStations.findIndex((s) => String(s.id) === String(id));
     if (idx >= 0) {
       const targetPage = Math.floor(idx / PER_PAGE);
       setPage(targetPage);
@@ -124,26 +181,46 @@ export default function Homepage() {
           <div className="mapCard">
             <div className="mapPanel">
               <div className="stations-map-canvas">
+                {/* vẫn truyền full stations để map hiển thị đầy đủ,
+                    hoặc bạn có thể đổi sang nearbyStations nếu muốn chỉ thấy gần đây */}
                 <StationMap stations={stations} onMarkerClick={handleMarkerClick} />
               </div>
             </div>
           </div>
 
-          {/* ===== STRIP 3 TRẠM ===== */}
+          {/* ===== STRIP TRẠM GẦN BẠN ===== */}
           <section className="station-strip">
-            <div className="strip-head">
+            <div className="strip-head" style={{ gap: 8, alignItems: "center" }}>
               <Title level={2} style={{ margin: 0 }}>
-                Trạm sạc nổi bật
+                Trạm sạc gần bạn
               </Title>
-              {!loading}
+
+              {/* trạng thái định vị gọn nhẹ */}
+              {userPos ? (
+                <span className="pill ok">📍 {userPos.lat.toFixed(4)}, {userPos.lng.toFixed(4)}</span>
+              ) : geoError ? (
+                <span className="pill warn">⚠️ {geoError}</span>
+              ) : (
+                <span className="pill">Đang xác định vị trí...</span>
+              )}
+
+              <button className="btn-ghost" onClick={askGeolocation} style={{ marginLeft: "auto" }}>
+                Lấy lại vị trí
+              </button>
             </div>
 
             {loading ? (
               <div className="note">Đang tải dữ liệu...</div>
             ) : error ? (
               <div className="error">Lỗi: {error}</div>
-            ) : (stations || []).length === 0 ? (
-              <div className="note">Chưa có trạm nào.</div>
+            ) : !userPos ? (
+              <div className="note">
+                Không thể xác định vị trí. Hãy bật quyền định vị trình duyệt rồi bấm <b>Lấy lại vị trí</b>.
+              </div>
+            ) : nearbyStations.length === 0 ? (
+              <div className="note">
+                Không có trạm nào trong bán kính {DEFAULT_RADIUS_KM}km quanh bạn.
+              </div>
             ) : (
               <>
                 <div className="strip-body">
@@ -170,8 +247,14 @@ export default function Homepage() {
                             navigate(`/stations/${st.id}`)
                           }
                           aria-label={`Xem chi tiết trạm ${st.name}`}
+                          title={Number.isFinite(st.distance) ? `${st.distance.toFixed(2)} km` : ""}
                         >
+                          {/* Nếu StationListItem hỗ trợ props distance, bạn có thể truyền thêm:
+                              <StationListItem station={st} distanceKm={st.distance} /> */}
                           <StationListItem station={st} />
+                          {Number.isFinite(st.distance) && (
+                            <div className="distance-chip">{st.distance.toFixed(2)} km</div>
+                          )}
                         </div>
                       ))}
                     </div>
