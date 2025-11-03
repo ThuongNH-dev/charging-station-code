@@ -38,7 +38,6 @@ const normCharger = (c = {}) => ({
   stationId: c.stationId ?? c.StationId,
 });
 
-/* ---------- Component ---------- */
 export default function ChargerManager() {
   const [sp] = useSearchParams();
   const stationId = sp.get("stationId") || "";
@@ -48,12 +47,14 @@ export default function ChargerManager() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // Modal
+  // Modal state
   const [showModal, setShowModal] = useState(false);
+  const [type, setType] = useState("guest");
+  const [vehicleType, setVehicleType] = useState("Car");
   const [chargerId, setChargerId] = useState("");
-  const [customerId, setCustomerId] = useState("");
-  const [vehicleId, setVehicleId] = useState("");
   const [portId, setPortId] = useState("");
+  const [licensePlate, setLicensePlate] = useState("");
+  const [ports, setPorts] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
   /* ---------- Load chargers + lấy phiên gần nhất ---------- */
@@ -74,10 +75,7 @@ export default function ChargerManager() {
         for (const s of sessions) {
           const key = s.portId ?? s.PortId ?? s.chargerId ?? s.ChargerId;
           if (!key) continue;
-          if (
-            !latestMap[key] ||
-            new Date(s.startedAt) > new Date(latestMap[key].startedAt)
-          ) {
+          if (!latestMap[key] || new Date(s.startedAt) > new Date(latestMap[key].startedAt)) {
             latestMap[key] = s;
           }
         }
@@ -100,6 +98,27 @@ export default function ChargerManager() {
     };
   }, [stationId]);
 
+  /* ---------- Lấy cổng theo chargerId ---------- */
+  useEffect(() => {
+    async function loadPorts() {
+      if (!chargerId) {
+        setPorts([]);
+        return;
+      }
+      try {
+        const allPorts = await fetchAuthJSON(`${API_BASE}/Ports`);
+        const filtered = toArray(allPorts).filter(
+          (p) => String(p.chargerId ?? p.ChargerId) === String(chargerId)
+        );
+        setPorts(filtered);
+      } catch (e) {
+        console.error("❌ Lỗi tải cổng sạc:", e);
+        setPorts([]);
+      }
+    }
+    loadPorts();
+  }, [chargerId]);
+
   /* ---------- Hiển thị phiên gần nhất ---------- */
   const renderLatest = (r) => {
     const found = latestSessions.find(
@@ -115,7 +134,7 @@ export default function ChargerManager() {
     return <span title={`Bắt đầu: ${start}`}>S-{id}</span>;
   };
 
-  /* ---------- Cập nhật trạng thái trụ ---------- */
+  /* ---------- Cập nhật trạng thái ---------- */
   async function updateChargerStatus(chargerId, newStatus) {
     try {
       const statusMap = {
@@ -132,209 +151,143 @@ export default function ChargerManager() {
         Fault: "OutOfOrder",
         fault: "OutOfOrder",
       };
-
       const apiStatus = statusMap[newStatus] || newStatus;
-      const response = await fetchAuthJSON(`${API_BASE}/Chargers/${chargerId}/status`, {
+
+      await fetchAuthJSON(`${API_BASE}/Chargers/${chargerId}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status: apiStatus }),
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
       });
 
-      const q = stationId ? `?stationId=${encodeURIComponent(stationId)}` : "";
-      const chargersRaw = await fetchAuthJSON(`${API_BASE}/Chargers${q}`);
-      const chargers = toArray(chargersRaw).map(normCharger);
-      setRows(chargers);
-
-      return response;
+      const chargersRaw = await fetchAuthJSON(`${API_BASE}/Chargers`);
+      setRows(toArray(chargersRaw).map(normCharger));
     } catch (err) {
-      console.error("❌ Lỗi đổi trạng thái trụ:", err);
-      throw err;
+      alert(`❌ ${err.message}`);
     }
   }
 
   /* ---------- Bắt đầu phiên ---------- */
-  async function handleStart() {
-    if (!chargerId || !customerId || !vehicleId || !portId)
-      return alert("⚠️ Vui lòng nhập đủ thông tin!");
+  async function handleStartNew() {
+    if (!chargerId || !portId || !licensePlate)
+      return alert("⚠️ Vui lòng chọn trụ, cổng và nhập biển số!");
 
     setSubmitting(true);
     try {
-      const body = {
-        customerId: Number(customerId),
-        companyId: 0,
-        vehicleId: Number(vehicleId),
-        bookingId: null,
-        portId: Number(portId),
-      };
+      const selectedPort = ports.find((p) => String(p.portId) === String(portId));
+      const charger = rows.find((c) => String(c.id) === String(chargerId));
 
-      console.log("🚀 Gửi dữ liệu:", body);
+      let portCode =
+  selectedPort?.code ||
+  selectedPort?.Code ||
+  selectedPort?.portCode ||
+  selectedPort?.PortCode;
 
-      const res = await fetchAuthJSON(`${API_BASE}/ChargingSessions/start`, {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
+if (!portCode) {
+  // ✅ Tự sinh PortCode fallback nếu API không trả về
+  const portNum = String(portId).padStart(3, "0"); // -> 001, 002...
+  portCode = `P${portNum}`;
+  console.warn(`⚠️ API /Ports không có Code, sinh tạm PortCode = ${portCode}`);
+}
 
-      console.log("✅ Phản hồi từ API:", res);
 
-      const message =
-        res?.message ||
-        "✅ Phiên sạc đã được khởi động thành công!";
-      alert(message);
+      const chargerCode =
+        charger?.code || charger?.Code || `C${chargerId}`;
 
-      // Đóng modal + reset form
-      setShowModal(false);
-      setChargerId("");
-      setCustomerId("");
-      setVehicleId("");
-      setPortId("");
+      if (type === "guest") {
+        const body = {
+          licensePlate,
+          portId: Number(portId),
+          PortCode: portCode,
+          ChargerCode: chargerCode,
+          vehicleType,
+        };
 
-      // Cập nhật lại danh sách trụ
-      const q = stationId ? `?stationId=${encodeURIComponent(stationId)}` : "";
-      const chargersRaw = await fetchAuthJSON(`${API_BASE}/Chargers${q}`);
-      const chargers = toArray(chargersRaw).map(normCharger);
-      setRows(chargers);
+        console.log("🚀 Guest start body:", body);
 
-      // Lấy lại danh sách phiên để cập nhật “Phiên gần nhất”
-      const sessionsRaw = await fetchAuthJSON(`${API_BASE}/ChargingSessions`);
-      const sessions = toArray(sessionsRaw);
-      const latestMap = {};
-      for (const s of sessions) {
-        const key = s.portId ?? s.PortId ?? s.chargerId ?? s.ChargerId;
-        if (!key) continue;
-        if (
-          !latestMap[key] ||
-          new Date(s.startedAt) > new Date(latestMap[key].startedAt)
-        ) {
-          latestMap[key] = s;
-        }
+        const res = await fetchAuthJSON(`${API_BASE}/ChargingSessions/guest/start`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        alert(res?.message || "✅ Phiên sạc (guest) đã được khởi động!");
+      } else {
+        const found = await fetchAuthJSON(
+          `${API_BASE}/Vehicles?licensePlate=${encodeURIComponent(
+            licensePlate
+          )}&vehicleType=${vehicleType}`
+        );
+        const v = toArray(
+          found.items || found.data || found.results || found.$values || found
+        )[0];
+        if (!v?.vehicleId)
+          throw new Error("Không tìm thấy xe này trong hệ thống công ty!");
+
+        const body = {
+          customerId: v.customerId,
+          companyId: v.companyId,
+          vehicleId: v.vehicleId,
+          bookingId: null,
+          portId: Number(portId),
+          PortCode: portCode,
+          ChargerCode: chargerCode,
+        };
+
+        console.log("🚀 Company start body:", body);
+
+        const res = await fetchAuthJSON(`${API_BASE}/ChargingSessions/start`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        alert(res?.message || "✅ Phiên sạc (company) đã được khởi động!");
       }
-      setLatestSessions(Object.values(latestMap));
+
+      setShowModal(false);
+      setLicensePlate("");
+      setPortId("");
+      setType("guest");
     } catch (e) {
-      console.error("❌ Lỗi bắt đầu phiên:", e);
-      alert(`❌ Lỗi khởi động phiên:\n${e.message || JSON.stringify(e)}`);
+      alert(`❌ Lỗi: ${e.message || JSON.stringify(e)}`);
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  /* ---------- Dừng phiên ---------- */
-  async function handleStop(charger) {
-    if (!window.confirm("Bạn có chắc muốn dừng phiên sạc?")) return;
-    try {
-      const sessions = await fetchAuthJSON(`${API_BASE}/ChargingSessions`);
-      const current = toArray(sessions).find(
-        (s) =>
-          s.status?.toLowerCase() === "charging" &&
-          s.portId &&
-          s.customerId &&
-          s.vehicleId
-      );
-      if (!current) throw new Error("Không tìm thấy phiên đang chạy cho trụ này!");
-
-      await fetchAuthJSON(`${API_BASE}/ChargingSessions/end`, {
-        method: "POST",
-        body: JSON.stringify({
-          chargingSessionId:
-            current.chargingSessionId ?? current.id ?? current.sessionId,
-          endSoc: 80,
-        }),
-      });
-
-      const q = stationId ? `?stationId=${encodeURIComponent(stationId)}` : "";
-      const chargersRaw = await fetchAuthJSON(`${API_BASE}/Chargers${q}`);
-      const chargers = toArray(chargersRaw).map(normCharger);
-      setRows(chargers);
-
-      alert("✅ Phiên sạc đã dừng!");
-    } catch (e) {
-      console.error(e);
-      alert(`❌ Lỗi dừng phiên:\n${e.message}`);
     }
   }
 
   /* ---------- Render Action ---------- */
   const renderAction = (r) => {
     const s = (r.status || "").toLowerCase();
-
     if (s === "online") {
       return (
         <button
           className="link"
-          onClick={async () => {
-            if (window.confirm("Bạn có chắc muốn tắt trụ sạc này?")) {
-              try {
-                await updateChargerStatus(r.id, "Offline");
-                alert("✅ Trụ sạc đã được tắt!");
-              } catch (err) {
-                console.error(err);
-                alert(`❌ Lỗi khi tắt trụ: ${err.message || JSON.stringify(err)}`);
-              }
-            }
-          }}
+          onClick={() => updateChargerStatus(r.id, "Offline")}
           style={{ color: "#dc2626" }}
         >
           Dừng
         </button>
       );
     }
-
     if (s === "offline") {
       return (
         <button
           className="link"
-          onClick={async () => {
-            if (window.confirm("Bạn có chắc muốn bật trụ sạc này?")) {
-              try {
-                await updateChargerStatus(r.id, "Online");
-                alert("✅ Trụ sạc đã được bật!");
-              } catch (err) {
-                console.error(err);
-                alert(`❌ Lỗi khi bật trụ: ${err.message || JSON.stringify(err)}`);
-              }
-            }
-          }}
+          onClick={() => updateChargerStatus(r.id, "Online")}
           style={{ color: "#16a34a" }}
         >
-          Bắt đầu
+          Bật
         </button>
       );
     }
-
     if (s === "outoforder") {
       return (
         <button
           className="link"
-          onClick={async () => {
-            if (window.confirm("Sửa xong trụ này chưa? Khôi phục về Online?")) {
-              try {
-                await updateChargerStatus(r.id, "Online");
-                alert("✅ Trụ sạc đã được khôi phục!");
-              } catch (err) {
-                console.error(err);
-                alert(`❌ Lỗi: ${err.message || JSON.stringify(err)}`);
-              }
-            }
-          }}
-          style={{ color: "#16a34a" }}
+          onClick={() => updateChargerStatus(r.id, "Online")}
+          style={{ color: "#2563eb" }}
         >
           Khôi phục
         </button>
       );
     }
-
-    return (
-      <button
-        className="link"
-        onClick={async () => {
-          const data = await fetchAuthJSON(`${API_BASE}/Chargers/${r.id}`);
-          alert(`🔍 Thông tin trụ:\n${JSON.stringify(data, null, 2)}`);
-        }}
-      >
-        Chi tiết
-      </button>
-    );
+    return <button className="link">Chi tiết</button>;
   };
 
   return (
@@ -343,13 +296,7 @@ export default function ChargerManager() {
         <h2>Danh sách trụ sạc</h2>
         <div className="sc-actions">
           <input className="sc-search" placeholder="🔍  Tìm kiếm" />
-          <button
-            className="sc-primary"
-            onClick={() => {
-              setChargerId("");
-              setShowModal(true);
-            }}
-          >
+          <button className="sc-primary" onClick={() => setShowModal(true)}>
             + Bắt đầu phiên
           </button>
         </div>
@@ -382,16 +329,18 @@ export default function ChargerManager() {
                   <tr key={r.id}>
                     <td>{r.code}</td>
                     <td>{r.powerKW}kW</td>
-                    <td
-                      className={`status ${
-                        r.status?.toLowerCase() === "outoforder"
-                          ? "error"
-                          : r.status?.toLowerCase() === "offline"
-                          ? "error"
-                          : "ok"
-                      }`}
-                    >
-                      {r.status}
+                    <td>
+                      <span
+                        className={`status ${
+                          r.status?.toLowerCase() === "outoforder"
+                            ? "error"
+                            : r.status?.toLowerCase() === "offline"
+                            ? "error"
+                            : "ok"
+                        }`}
+                      >
+                        {r.status}
+                      </span>
                     </td>
                     <td>{renderLatest(r)}</td>
                     <td>{renderAction(r)}</td>
@@ -409,105 +358,89 @@ export default function ChargerManager() {
           <div className="modal">
             <div className="modal-header">
               <h3>Khởi động phiên sạc</h3>
-              <button
-                className="modal-close"
-                onClick={() => {
-                  setShowModal(false);
-                  setCustomerId("");
-                  setVehicleId("");
-                  setPortId("");
-                  setChargerId("");
-                }}
-              >
+              <button className="modal-close" onClick={() => setShowModal(false)}>
                 ✕
               </button>
             </div>
-            <p>Nhập thông tin cần thiết để bắt đầu.</p>
 
-            {!chargerId ? (
-              <>
-                <label>Mã trụ sạc</label>
-                <select
-                  value={chargerId}
-                  onChange={(e) => setChargerId(e.target.value)}
-                  required
-                >
-                  <option value="">Chọn trụ sạc</option>
-                  {rows.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.code} • {r.powerKW}kW • {r.status}
-                    </option>
-                  ))}
-                </select>
-              </>
-            ) : (
-              <div
-                style={{
-                  padding: "10px",
-                  background: "#f0fdf4",
-                  borderRadius: "8px",
-                  marginBottom: "10px",
-                }}
-              >
-                <label>Mã trụ sạc đã chọn</label>
-                <p
-                  style={{
-                    margin: "5px 0 0 0",
-                    fontWeight: "600",
-                    color: "#16a34a",
-                  }}
-                >
-                  {rows.find((r) => r.id === chargerId)?.code || chargerId}
-                </p>
-              </div>
-            )}
+            <p>Chọn loại khách hàng và thông tin cần thiết.</p>
 
-            <label>Port ID (Bắt buộc)</label>
-            <input
-              type="number"
+            <label>Loại khách hàng</label>
+            <div className="type-select">
+              <label>
+                <input
+                  type="radio"
+                  name="type"
+                  value="guest"
+                  checked={type === "guest"}
+                  onChange={() => setType("guest")}
+                />
+                Khách vãng lai
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="type"
+                  value="company"
+                  checked={type === "company"}
+                  onChange={() => setType("company")}
+                />
+                Xe công ty
+              </label>
+            </div>
+
+            <label>Loại xe</label>
+            <select
+              value={vehicleType}
+              onChange={(e) => setVehicleType(e.target.value)}
+            >
+              <option value="Car">Ô tô</option>
+              <option value="Motorbike">Xe máy</option>
+            </select>
+
+            <label>Trụ sạc</label>
+            <select value={chargerId} onChange={(e) => setChargerId(e.target.value)}>
+              <option value="">-- Chọn trụ sạc --</option>
+              {rows.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.code} • {r.powerKW}kW • {r.status}
+                </option>
+              ))}
+            </select>
+
+            <label>Cổng sạc</label>
+            <select
               value={portId}
               onChange={(e) => setPortId(e.target.value)}
-              placeholder="VD: 1"
-              min="1"
-              required
-            />
+              disabled={!chargerId}
+            >
+              <option value="">
+                {chargerId ? "-- Chọn cổng sạc --" : "Chọn trụ trước"}
+              </option>
+              {ports.map((p) => (
+                <option key={p.portId} value={p.portId}>
+                  {p.code || p.Code || `P-${p.portId}`} • {p.connectorType} • {p.status} •{" "}
+                  {p.maxPowerKw}kW
+                </option>
+              ))}
+            </select>
 
-            <label>Customer ID (Bắt buộc)</label>
+            <label>Biển số xe</label>
             <input
-              type="number"
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-              placeholder="VD: 4"
-              min="1"
-              required
-            />
-
-            <label>Vehicle ID (Bắt buộc)</label>
-            <input
-              type="number"
-              value={vehicleId}
-              onChange={(e) => setVehicleId(e.target.value)}
-              placeholder="VD: 14"
-              min="1"
+              type="text"
+              value={licensePlate}
+              onChange={(e) => setLicensePlate(e.target.value)}
+              placeholder="VD: 51H-12345"
               required
             />
 
             <div className="modal-actions">
-              <button
-                className="sc-cancel"
-                onClick={() => {
-                  setShowModal(false);
-                  setCustomerId("");
-                  setVehicleId("");
-                  setPortId("");
-                  setChargerId("");
-                }}
-              >
+              <button className="sc-cancel" onClick={() => setShowModal(false)}>
                 Hủy
               </button>
               <button
                 className="sc-primary"
-                onClick={handleStart}
+                onClick={handleStartNew}
                 disabled={submitting}
               >
                 {submitting ? "Đang khởi động..." : "Bắt đầu"}

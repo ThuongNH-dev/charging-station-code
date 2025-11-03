@@ -1,366 +1,318 @@
 import React, { useEffect, useState } from "react";
+import { Card, Button, message, Table, Tag, Radio, Spin } from "antd";
 import {
-  Table,
-  Button,
-  message,
-  Input,
-  Select,
-  Tag,
-  Card,
-  Modal,
-  Descriptions,
-  Divider,
-} from "antd";
-import { fetchAuthJSON, getApiBase } from "../../utils/api";
-import {
-  SearchOutlined,
-  CheckOutlined,
-  DownloadOutlined,
-  FileSearchOutlined,
+  QrcodeOutlined,
+  CreditCardOutlined,
+  ThunderboltOutlined,
+  CarOutlined,
 } from "@ant-design/icons";
+import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import "./PaymentManager.css";
 
 const API_BASE = getApiBase();
-const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " ₫";
+const vnd = (n) =>
+  !n && n !== 0 ? "—" : (Number(n) || 0).toLocaleString("vi-VN") + " ₫";
 
 export default function PaymentManager() {
-  const [invoices, setInvoices] = useState([]);
-  const [filtered, setFiltered] = useState([]);
-  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
-  const [paidTransactions, setPaidTransactions] = useState([]);
+  const [guestSessions, setGuestSessions] = useState([]);
+  const [paidSessions, setPaidSessions] = useState([]); // ✅ Chỉ chứa phiên đã thanh toán
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("Unpaid");
-
-  // Modal hiển thị chi tiết hóa đơn
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalData, setModalData] = useState(null);
+  const [payingId, setPayingId] = useState(null);
+  const [method, setMethod] = useState("VNPAY");
 
   useEffect(() => {
-    loadInvoices();
+    loadData();
   }, []);
 
-  // 🔹 Lấy danh sách hóa đơn
-  async function loadInvoices() {
+  /* ======================= LOAD DỮ LIỆU ======================= */
+  async function loadData() {
     setLoading(true);
     try {
-      const res = await fetchAuthJSON(`${API_BASE}/Invoices`);
-      let data = res?.data ?? res?.$values ?? res ?? [];
-      if (!Array.isArray(data)) data = [data];
-      data = data.filter((inv) => inv && inv.invoiceId);
+      const resSess = await fetchAuthJSON(`${API_BASE}/ChargingSessions`);
+      let sessions =
+        resSess?.data ?? resSess?.$values ?? resSess?.items ?? resSess ?? [];
+      if (!Array.isArray(sessions)) sessions = [sessions];
 
-      // sắp xếp theo thời gian mới nhất
-      data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const resVeh = await fetchAuthJSON(`${API_BASE}/Vehicles`);
+      let vehicles =
+        resVeh?.data ?? resVeh?.$values ?? resVeh?.items ?? resVeh ?? [];
+      if (!Array.isArray(vehicles)) vehicles = [vehicles];
+      const vehicleMap = {};
+      vehicles.forEach((v) => {
+        vehicleMap[v.vehicleId || v.VehicleId] = v;
+      });
 
-      setInvoices(data);
-      setFiltered(data);
+      const sessionDetailed = await Promise.all(
+        sessions.map(async (s) => {
+          let full = s;
+          try {
+            const detail = await fetchAuthJSON(
+              `${API_BASE}/ChargingSessions/${s.chargingSessionId || s.id}`
+            );
+            if (detail && typeof detail === "object") full = { ...s, ...detail };
+          } catch {}
+          return full;
+        })
+      );
 
-      // Tạo danh sách giao dịch đã thanh toán
-      const paidList = data
-        .filter((inv) => (inv.status || "").toLowerCase() === "paid")
-        .map((inv) => ({
-          invoiceId: inv.invoiceId,
-          customerId: inv.customerId,
-          companyId: inv.companyId,
-          total: inv.total,
-          method: "BANK_TRANSFER",
-          time:
-            inv.updatedAt ||
-            inv.paidAt ||
-            new Date().toISOString(),
-          status: "PAID",
-        }));
-      setPaidTransactions(paidList);
+      // 🔍 Lọc khách vãng lai (ko có customerId & companyId)
+      const guestAll = sessionDetailed
+        .map((s) => {
+          const vid =
+            s.vehicleId || s.VehicleId || s.vehicle?.vehicleId || null;
+          const vehicle = vehicleMap[vid] || {};
+          return {
+            chargingSessionId:
+              s.chargingSessionId || s.id || s.sessionId || null,
+            status: s.status || "Unknown",
+            energyKwh: s.energyKwh ?? s.EnergyKwh ?? s.measuredEnergy ?? 0,
+            total: s.total ?? s.Total ?? 0,
+            portId: s.portId ?? s.PortId ?? null,
+            customerId: s.customerId ?? s.CustomerId ?? 0,
+            companyId: s.companyId ?? s.CompanyId ?? 0,
+            licensePlate:
+              s.licensePlate ??
+              s.LicensePlate ??
+              vehicle.licensePlate ??
+              vehicle.LicensePlate ??
+              "—",
+            startedAt: s.startedAt ?? s.StartedAt ?? null,
+            endedAt: s.endedAt ?? s.EndedAt ?? null,
+          };
+        })
+        .filter(
+          (x) =>
+            (!x.customerId || x.customerId === 0) &&
+            (!x.companyId || x.companyId === 0)
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.startedAt || 0).getTime() -
+            new Date(a.startedAt || 0).getTime()
+        );
+
+      // 🔹 Lấy các phiên đã thanh toán tạm (localStorage)
+      const paidLocal =
+        JSON.parse(localStorage.getItem("staff_paid_sessions") || "[]") || [];
+
+      // 🔸 Loại bỏ các session đã thanh toán khỏi danh sách bên trái
+      const unpaid = guestAll.filter(
+        (s) => !paidLocal.some((p) => p.sessionId === s.chargingSessionId)
+      );
+
+      setGuestSessions(unpaid);
+      setPaidSessions(paidLocal);
     } catch (e) {
       console.error(e);
-      message.error("Không thể tải danh sách hóa đơn!");
+      message.error("Không thể tải dữ liệu!");
     } finally {
       setLoading(false);
     }
   }
 
-  // 🔍 Lọc hóa đơn theo tìm kiếm + trạng thái
-  useEffect(() => {
-    const list = invoices.filter((inv) => {
-      const matchSearch =
-        inv.invoiceId?.toString().includes(search) ||
-        inv.customerId?.toString().includes(search) ||
-        inv.companyId?.toString().includes(search);
-      const matchStatus =
-        statusFilter === "All" ||
-        (statusFilter === "Paid" &&
-          (inv.status || "").toLowerCase() === "paid") ||
-        (statusFilter === "Unpaid" &&
-          (inv.status || "").toLowerCase() !== "paid");
-      return matchSearch && matchStatus;
-    });
-    setFiltered(list);
-  }, [search, statusFilter, invoices]);
-
-  // ✅ Đánh dấu nhiều hóa đơn là “Đã thanh toán”
-  async function handleMarkPaid() {
-    if (selectedRowKeys.length === 0)
-      return message.warning("Vui lòng chọn ít nhất 1 hóa đơn!");
-
+  /* ======================= THANH TOÁN CHO GUEST ======================= */
+  async function handlePay(s) {
+    setPayingId(s.chargingSessionId);
     try {
-      const promises = selectedRowKeys.map((id) =>
-        fetchAuthJSON(`${API_BASE}/Invoices/status`, {
-          method: "PUT",
-          body: JSON.stringify({ invoiceId: id, status: "Paid" }),
-        })
-      );
-      await Promise.all(promises);
+      const returnUrl = `${window.location.origin}/staff/payment-success`;
 
-      const newPaid = selectedRowKeys.map((id) => {
-        const inv = invoices.find(
-          (i) => i.invoiceId === id || i.id === id
-        );
-        return {
-          invoiceId: inv.invoiceId,
-          customerId: inv.customerId,
-          companyId: inv.companyId,
-          total: inv.total,
-          method: "BULK_SETTLEMENT",
-          time: new Date().toISOString(),
-          status: "PAID",
-        };
-      });
-
-      setPaidTransactions((prev) => [...prev, ...newPaid]);
-      message.success(
-        `Đã ghi nhận thanh toán cho ${selectedRowKeys.length} hóa đơn.`
+      const res = await fetchAuthJSON(
+        `${API_BASE}/Payment/create-for-guest-session?sessionId=${s.chargingSessionId}&returnUrl=${encodeURIComponent(
+          returnUrl
+        )}`,
+        { method: "POST" }
       );
-      setSelectedRowKeys([]);
-      await loadInvoices();
+
+      const data = res?.data || res;
+      if (!data?.paymentUrl)
+        throw new Error("Không nhận được đường dẫn thanh toán!");
+
+      message.success(`Đang mở thanh toán cho phiên #${s.chargingSessionId}`);
+      window.open(data.paymentUrl, "_blank");
+
+      // ✅ Thêm bản ghi tạm (đã thanh toán)
+      const newPaid = {
+        sessionId: s.chargingSessionId,
+        total: s.total ?? 0,
+        method,
+        createdAt: new Date().toISOString(),
+        status: "PAID",
+      };
+
+      // 🔹 Cập nhật localStorage
+      const stored =
+        JSON.parse(localStorage.getItem("staff_paid_sessions") || "[]") || [];
+      stored.unshift(newPaid);
+      localStorage.setItem("staff_paid_sessions", JSON.stringify(stored));
+
+      // 🔄 Cập nhật UI
+      setPaidSessions((prev) => [newPaid, ...prev]);
+      setGuestSessions((prev) =>
+        prev.filter((x) => x.chargingSessionId !== s.chargingSessionId)
+      );
     } catch (err) {
       console.error(err);
-      message.error("Không thể cập nhật trạng thái hóa đơn!");
+      message.error(`❌ Lỗi khi tạo thanh toán: ${err.message}`);
+    } finally {
+      setPayingId(null);
     }
   }
 
-  // 💾 Xuất file CSV tổng hợp
-  function exportCSV() {
-    const header =
-      "Mã HĐ,Khách hàng,Công ty,Tổng tiền,Trạng thái,Ngày tạo\n";
-    const rows = filtered.map(
-      (inv) =>
-        `${inv.invoiceId},${inv.customerId || "N/A"},${inv.companyId || "N/A"},${
-          inv.total || 0
-        },${inv.status || "UNPAID"},${new Date(inv.createdAt).toLocaleString("vi-VN")}`
-    );
-    const blob = new Blob([header + rows.join("\n")], {
-      type: "text/csv;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `invoices_${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-  }
-
-  // 🔎 Xem chi tiết hóa đơn
-  async function handleViewDetail(invoiceId) {
-    try {
-      const res = await fetchAuthJSON(`${API_BASE}/Invoices/${invoiceId}`);
-      const data = res?.data || res;
-      setModalData(data);
-      setModalOpen(true);
-    } catch (e) {
-      console.error(e);
-      message.error("Không thể tải chi tiết hóa đơn!");
-    }
-  }
-
-  // ⚙️ Cấu hình bảng hóa đơn
-  const columns = [
+  /* ======================= CỘT TRÁI ======================= */
+  const sessionCols = [
     {
-      title: "Mã HĐ",
-      dataIndex: "invoiceId",
-      key: "invoiceId",
-      render: (id) => <strong>INV-{id}</strong>,
+      title: "Phiên",
+      dataIndex: "chargingSessionId",
+      key: "id",
+      render: (id) => <strong>{id ? `S-${id}` : "—"}</strong>,
     },
     {
-      title: "Khách hàng / Công ty",
-      render: (t) =>
-        t.companyId ? (
-          <span>🏢 Company #{t.companyId}</span>
-        ) : (
-          <span>👤 Customer #{t.customerId}</span>
-        ),
-    },
-    {
-      title: "Tổng tiền",
-      dataIndex: "total",
-      key: "total",
-      render: vnd,
-    },
-    {
-      title: "Ngày tạo",
-      dataIndex: "createdAt",
-      key: "createdAt",
-      render: (t) => (t ? new Date(t).toLocaleString("vi-VN") : "—"),
+      title: "Biển số",
+      dataIndex: "licensePlate",
+      render: (plate) => (
+        <span>
+          <CarOutlined /> {plate || "—"}
+        </span>
+      ),
     },
     {
       title: "Trạng thái",
       dataIndex: "status",
-      key: "status",
       render: (st) =>
-        (st || "").toLowerCase() === "paid" ? (
-          <Tag color="green">Đã thanh toán</Tag>
+        (st || "").toLowerCase() === "charging" ? (
+          <Tag color="blue">Đang sạc</Tag>
         ) : (
-          <Tag color="orange">Chưa thanh toán</Tag>
+          <Tag color="green">Đã dừng</Tag>
         ),
+    },
+    {
+      title: "kWh",
+      dataIndex: "energyKwh",
+      render: (k) => (k ? `${k.toFixed(2)}` : "—"),
+    },
+    {
+      title: "Chi phí",
+      dataIndex: "total",
+      render: vnd,
     },
     {
       title: "Thao tác",
       key: "action",
-      render: (_, record) => (
+      render: (record) => (
         <Button
+          type="primary"
           size="small"
-          icon={<FileSearchOutlined />}
-          onClick={() => handleViewDetail(record.invoiceId)}
+          loading={payingId === record.chargingSessionId}
+          onClick={() => handlePay(record)}
         >
-          Xem chi tiết
+          Thanh toán
         </Button>
       ),
     },
   ];
 
-  const rowSelection = { selectedRowKeys, onChange: setSelectedRowKeys };
+  /* ======================= CỘT PHẢI (CHỈ PHIÊN ĐÃ THANH TOÁN) ======================= */
+  const paidCols = [
+    {
+      title: "Phiên sạc",
+      dataIndex: "sessionId",
+      key: "sessionId",
+      render: (id) => <strong>{id ? `S-${id}` : "—"}</strong>,
+    },
+    {
+      title: "Tổng tiền",
+      dataIndex: "total",
+      render: vnd,
+    },
+    {
+      title: "Phương thức",
+      dataIndex: "method",
+      render: (m) => m || "VNPAY",
+    },
+    {
+      title: "Thời gian",
+      dataIndex: "createdAt",
+      render: (t) =>
+        t ? new Date(t).toLocaleString("vi-VN") : new Date().toLocaleString(),
+    },
+    {
+      title: "TT",
+      dataIndex: "status",
+      render: (st) => (
+        <Tag color={st === "PAID" ? "green" : "orange"}>
+          {st === "PAID" ? "Đã thanh toán" : "Chưa"}
+        </Tag>
+      ),
+    },
+  ];
 
+  /* ======================= HIỂN THỊ ======================= */
   return (
     <div className="pay-wrap two-column">
-      {/* BÊN TRÁI - Danh sách hóa đơn */}
+      {/* CỘT TRÁI - CHƯA THANH TOÁN */}
       <div className="pay-left">
         <Card
-          title="📋 Hóa đơn trả sau"
+          title={
+            <span>
+              <ThunderboltOutlined /> Phiên sạc khách vãng lai
+            </span>
+          }
           bordered={false}
           className="pay-card"
         >
-          <div className="filters">
-            <Input
-              prefix={<SearchOutlined />}
-              placeholder="Tìm mã HĐ hoặc khách hàng..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              allowClear
-              style={{ width: 240 }}
-            />
-            <Select
-              value={statusFilter}
-              onChange={setStatusFilter}
-              style={{ width: 160 }}
-              options={[
-                { label: "Tất cả", value: "All" },
-                { label: "Chưa thanh toán", value: "Unpaid" },
-                { label: "Đã thanh toán", value: "Paid" },
-              ]}
-            />
-          </div>
-
-          <Table
-            rowSelection={rowSelection}
-            columns={columns}
-            dataSource={filtered.map((inv) => ({
-              ...inv,
-              key: inv.invoiceId,
-            }))}
-            loading={loading}
-            pagination={{ pageSize: 8 }}
-            bordered
-            size="middle"
-          />
-
-          <div className="action-row">
-            <Button
-              type="primary"
-              icon={<CheckOutlined />}
-              disabled={selectedRowKeys.length === 0}
-              onClick={handleMarkPaid}
+          <div style={{ marginBottom: 10 }}>
+            <span>Phương thức thanh toán: </span>
+            <Radio.Group
+              value={method}
+              onChange={(e) => setMethod(e.target.value)}
             >
-              Ghi nhận thanh toán
-            </Button>
-            <Button icon={<DownloadOutlined />} onClick={exportCSV}>
-              Xuất CSV
-            </Button>
+              <Radio.Button value="VNPAY">
+                <QrcodeOutlined /> VNPay
+              </Radio.Button>
+              <Radio.Button value="CASH">
+                <CreditCardOutlined /> Tiền mặt
+              </Radio.Button>
+            </Radio.Group>
           </div>
+
+          {loading ? (
+            <div className="center muted">
+              <Spin /> Đang tải danh sách phiên...
+            </div>
+          ) : (
+            <Table
+              columns={sessionCols}
+              dataSource={guestSessions.map((s) => ({
+                ...s,
+                key: s.chargingSessionId,
+              }))}
+              pagination={{ pageSize: 7 }}
+              size="small"
+              bordered
+            />
+          )}
         </Card>
       </div>
 
-      {/* BÊN PHẢI - Danh sách giao dịch */}
+      {/* CỘT PHẢI - ĐÃ THANH TOÁN */}
       <div className="pay-right">
         <Card
-          title="💰 Giao dịch đã thanh toán"
+          title="💰 Các phiên sạc đã thanh toán"
           bordered={false}
           className="pay-card"
         >
           <Table
-            columns={[
-              { title: "HĐ", dataIndex: "invoiceId", key: "invoiceId", render: (id) => `INV-${id}` },
-              { title: "Khách", dataIndex: "customerId", key: "customerId", render: (id) => `CUST-${id || "N/A"}` },
-              { title: "Công ty", dataIndex: "companyId", key: "companyId", render: (id) => id ? `CMP-${id}` : "—" },
-              { title: "Số tiền", dataIndex: "total", key: "total", render: vnd },
-              { title: "PTTT", dataIndex: "method", key: "method" },
-              { title: "Thời gian", dataIndex: "time", key: "time", render: (t) => new Date(t).toLocaleString("vi-VN") },
-              { title: "TT", dataIndex: "status", key: "status", render: () => <Tag color="green">PAID</Tag> },
-            ]}
-            dataSource={paidTransactions.map((t, i) => ({ ...t, key: i }))}
-            pagination={{ pageSize: 6 }}
+            columns={paidCols}
+            dataSource={paidSessions.map((i, idx) => ({
+              ...i,
+              key: i.sessionId || idx,
+            }))}
+            pagination={{ pageSize: 7 }}
             size="small"
+            bordered
           />
         </Card>
       </div>
-
-      {/* 🧾 Modal Chi Tiết Hóa Đơn */}
-      <Modal
-        title={`Chi tiết hóa đơn #INV-${modalData?.invoiceId || ""}`}
-        open={modalOpen}
-        onCancel={() => setModalOpen(false)}
-        footer={null}
-        width={700}
-      >
-        {modalData ? (
-          <>
-            <Descriptions bordered column={2} size="small">
-              <Descriptions.Item label="Khách hàng">
-                {modalData.customerId ? `CUST-${modalData.customerId}` : "—"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Công ty">
-                {modalData.companyId ? `CMP-${modalData.companyId}` : "—"}
-              </Descriptions.Item>
-              <Descriptions.Item label="Trạng thái">
-                {(modalData.status || "").toUpperCase()}
-              </Descriptions.Item>
-              <Descriptions.Item label="Ngày tạo">
-                {new Date(modalData.createdAt).toLocaleString("vi-VN")}
-              </Descriptions.Item>
-              <Descriptions.Item label="Tổng tiền" span={2}>
-                <strong>{vnd(modalData.total)}</strong>
-              </Descriptions.Item>
-            </Descriptions>
-
-            <Divider />
-
-            <h4>Danh sách phiên sạc</h4>
-            <Table
-              columns={[
-                { title: "Phiên", dataIndex: "chargingSessionId", key: "chargingSessionId", render: (id) => `S-${id}` },
-                { title: "kWh", dataIndex: "energyKwh", key: "energyKwh" },
-                { title: "Chi phí", dataIndex: "total", key: "total", render: vnd },
-                { title: "Bắt đầu", dataIndex: "startedAt", key: "startedAt", render: (t) => new Date(t).toLocaleString("vi-VN") },
-                { title: "Kết thúc", dataIndex: "endedAt", key: "endedAt", render: (t) => new Date(t).toLocaleString("vi-VN") },
-              ]}
-              dataSource={
-                modalData.chargingSessions?.$values || modalData.chargingSessions || []
-              }
-              pagination={false}
-              size="small"
-            />
-          </>
-        ) : (
-          <p>Đang tải chi tiết...</p>
-        )}
-      </Modal>
     </div>
   );
 }

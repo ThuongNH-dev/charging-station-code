@@ -161,6 +161,7 @@ export default function StaffInvoice() {
         <div className="ivp-meta">
           <div><strong>Mã phiên:</strong> S-{data.chargingSessionId}</div>
           <div><strong>Trụ sạc:</strong> {data.portId || data.gun?.id || "—"}</div>
+          <div><strong>Biển số xe:</strong> {data.vehicle?.licensePlate || data.licensePlate || "—"}</div>
           <div><strong>Bắt đầu:</strong> {fmt(data.startedAt)}</div>
           <div><strong>Kết thúc:</strong> {fmt(data.endedAt)}</div>
           <div><strong>Năng lượng tiêu thụ:</strong> {(data.energyKwh || 0).toFixed(2)} kWh</div>

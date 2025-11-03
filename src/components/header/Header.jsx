@@ -158,11 +158,13 @@ export default function Head() {
   /* ===== NAV items ===== */
   const items = isStaff
     ? [
-        { key: "s1", label: "Quản lý trụ sạc", path: "/staff/stations" },
-        { key: "s2", label: "Phiên sạc", path: "/staff/sessions" },
-        { key: "s3", label: "Thanh toán", path: "/staff/payments" },
-        { key: "s4", label: "Báo cáo", path: "/staff/reports" },
-      ]
+      { key: "s1", label: "Quản lý trạm sạc", path: "/staff/stations" },
+      { key: "s2", label: "Quản lý trụ sạc", path: "/staff/chargers" },
+      { key: "s3", label: "Phiên sạc", path: "/staff/sessions" },
+      { key: "s4", label: "Thanh toán", path: "/staff/payments" },
+      { key: "s5", label: "Sự cố", path: "/staff/incidents" },
+      { key: "s6", label: "Báo cáo", path: "/staff/reports" },
+    ]
     : isCompany
     ? [
         { key: "c1", label: "Quản lý nguồn lực", path: "/company" },
@@ -180,9 +182,11 @@ export default function Head() {
   let activeKey = "1";
   if (isStaff) {
     if (path.startsWith("/staff/stations")) activeKey = "s1";
-    else if (path.startsWith("/staff/sessions")) activeKey = "s2";
-    else if (path.startsWith("/staff/payments")) activeKey = "s3";
-    else if (path.startsWith("/staff/reports")) activeKey = "s4";
+    else if (path.startsWith("/staff/chargers")) activeKey = "s2";
+    else if (path.startsWith("/staff/sessions")) activeKey = "s3";
+    else if (path.startsWith("/staff/payments")) activeKey = "s4";
+    else if (path.startsWith("/staff/incidents")) activeKey = "s5";
+    else if (path.startsWith("/staff/reports")) activeKey = "s6";
   } else if (isCompany) {
     if (path.startsWith("/company")) activeKey = "c1";
     else if (path.startsWith("/services")) activeKey = "3";
