@@ -4,6 +4,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
 import ChargersCard from "../../components/station/ChargersCard";
 import ChargersGun from "../../components/station/ChargersGun";
+import FeedbackSection from "../../components/feedback/FeedbackSection";
 import "./BookingPorts.css";
 import { fetchJSON, fetchAuthJSON, getToken, getApiBase } from "../../utils/api";
 const API_BASE = getApiBase();
@@ -1135,12 +1136,18 @@ export default function BookingPorts() {
               )}
             </div>
 
-            <div className="bp-panel">
-              <div className="bp-title with-mb">Đánh giá</div>
-              <Review name="N***n" text="Nhân viên hỗ trợ tốt. Dịch vụ okie." />
-              <Review name="Q***h" text="Sạc nhanh, vị trí dễ tìm." />
-              <Review name="B***n" text="Nên đặt trước cuối tuần." />
-            </div>
+            <FeedbackSection 
+              apiBase={API_BASE}          // để component tự fetch
+              stationId={id}              // id trạm hiện tại từ useParams()
+              chargerId={cid}             // id trụ hiện tại từ useParams()
+              portId={selectedGun?.id}    // id cổng đã chọn (có thể null -> component tự xử)
+              // optional:
+              pageSize={10}               // modal lớn mỗi trang 10
+              initialCount={3}            // hiển thị 3 đánh giá mới nhất
+              className="bp-feedback"     // nếu cần áp style bên BookingPorts
+              style = {{marginTop : "10px"}}
+            />
+
           </div>
         </div>
       </div>

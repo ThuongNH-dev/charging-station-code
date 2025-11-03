@@ -103,17 +103,53 @@ function normTypeACDC(s = "") {
     return s || "";
 }
 
-function checkCompatibility(vehicle, charger) {
-    if (!vehicle || !charger) return { ok: true };
-    const vType = normTypeACDC(vehicle.vehicleType ?? vehicle.type ?? "");
-    const cType = normTypeACDC(charger.type ?? charger.Type ?? "");
-    // Quy tắc đơn giản:
-    // - Xe máy chỉ sạc AC
-    // - Ô tô có thể sạc AC hoặc DC
-    if (isBikeType(vType) && cType === "DC") {
-        return { ok: false, reason: "Xe máy không hỗ trợ sạc DC." };
+function checkCompatibility(vehicle, charger, port) {
+    if (!vehicle || !port) return { ok: true };
+
+    // 2.1) Kiểm tra theo đầu nối — QUAN TRỌNG vì BE cũng check như vậy
+    const vConn = vehicle.connectorType ?? vehicle.ConnectorType ?? "";
+    const pConn = port.connectorType ?? port.ConnectorType ?? port.portConnectorType ?? "";
+    if (vConn && pConn && !sameConnector(vConn, pConn)) {
+        return {
+            ok: false,
+            reason: `Đầu nối xe (${vConn}) không khớp với cổng (${pConn}).`,
+            code: "CONNECTOR_MISMATCH",
+        };
     }
+
+    // 2.2) Quy tắc AC/DC (bổ sung – giữ logic cũ)
+    const vType = normTypeACDC(vehicle.vehicleType ?? vehicle.type ?? "");
+    const cType = normTypeACDC(charger?.type ?? charger?.Type ?? "");
+    // Xe máy chỉ sạc AC
+    if (isBikeType(vType) && cType === "DC") {
+        return { ok: false, reason: "Xe máy không hỗ trợ sạc DC.", code: "AC_DC_RULE" };
+    }
+
     return { ok: true };
+}
+
+
+// ==== Connector helpers (NEW) ====
+function normConnector(raw = "") {
+    const s = String(raw || "").trim().toLowerCase()
+        .replace(/\s+/g, "")      // bỏ khoảng trắng
+        .replace(/-/g, "")        // bỏ dấu gạch
+        .replace(/_/g, "");
+
+    // alias phổ biến:
+    if (/^type2$|^t2$|^mennekes$/.test(s)) return "type2";        // AC
+    if (/^ccs2$|^combo2$|^ccscombo2$/.test(s)) return "ccs2";      // DC
+    if (/^chademo$|^cha?de?mo$/.test(s)) return "chademo";        // DC
+    if (/^gbt$|^gbtac$/.test(s)) return "gbt";                    // (nếu có)
+    if (/^schuko$|^2pin$|^2prong$|^scooter$/.test(s)) return "2pin";
+    return s; // giữ nguyên nếu không map được
+}
+
+function sameConnector(a, b) {
+    const x = normConnector(a);
+    const y = normConnector(b);
+    if (!x || !y) return false;
+    return x === y;
 }
 
 
@@ -542,7 +578,7 @@ export default function ChargingSessionStart() {
                         )}
 
                         {vehicle && gun?.status === "available" && (() => {
-                            const comp = checkCompatibility(vehicle, charger);
+                            const comp = checkCompatibility(vehicle, charger, gun); // 👈 truyền cả gun (port)
                             return !comp.ok ? (
                                 <div style={{
                                     marginTop: 12,
@@ -552,10 +588,11 @@ export default function ChargingSessionStart() {
                                     border: "1px solid #ffeeba",
                                     color: "#856404"
                                 }}>
-                                    ⚠️ {comp.reason}
+                                    ⚠️ {comp.reason || "Xe và cổng sạc không tương thích."}
                                 </div>
                             ) : null;
                         })()}
+
 
 
                         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
@@ -569,7 +606,7 @@ export default function ChargingSessionStart() {
                                     !infoReady ||
                                     ["busy", "maintenance", "reserved"].includes(gun?.status) ||
                                     !!vehicleError ||
-                                    (vehicle && !checkCompatibility(vehicle, charger).ok)
+                                    (vehicle && !checkCompatibility(vehicle, charger, gun).ok)
                                 }
 
                                 loading={starting}
@@ -583,7 +620,7 @@ export default function ChargingSessionStart() {
                                             ? "Không hoạt động"
                                             : vehicleError
                                                 ? "Chưa có xe"
-                                                : vehicle && !checkCompatibility(vehicle, charger).ok
+                                                : vehicle && !checkCompatibility(vehicle, charger, gun).ok
                                                     ? "Không tương thích"
                                                     : "Bắt đầu sạc"}
                             </Button>
