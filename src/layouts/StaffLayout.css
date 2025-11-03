@@ -17,8 +17,8 @@
 .staff-nav {
   position: relative;
   height: 50px;
-  background-color: #f1f5f9;
-  border-bottom: 1px solid #e2e8f0;
+  background-color: transparent; /* hoà với header trên */
+  border-bottom: none; /* xoá đường kẻ dưới thanh tab */
   display: flex;
   justify-content: center;
   align-items: center;
@@ -86,7 +86,7 @@
 .staff-content {
   background: #f8fafc;
   padding: 30px 40px;
-  margin-top: 20px;
+  margin-top: 0; /* kéo nội dung lên sát hơn */
   width: 100%;
   box-sizing: border-box;
 }
