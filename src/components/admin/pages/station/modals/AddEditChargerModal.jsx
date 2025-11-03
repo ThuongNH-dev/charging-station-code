@@ -1,4 +1,3 @@
-// src/components/station/modals/AddEditChargerModal.jsx
 import React from "react";
 import { Modal } from "antd";
 
@@ -15,12 +14,13 @@ export default function AddEditChargerModal({
     <Modal
       title={
         isEdit
-          ? `Sửa Bộ sạc (ID: ${data?.ChargerId})`
-          : `Thêm Bộ sạc (Trạm ID: ${currentStationId})`
+          ? `🛠️ Sửa Bộ sạc (ID: ${data?.ChargerId})`
+          : `➕ Thêm Bộ sạc (Trạm ID: ${currentStationId})`
       }
       open={open}
       onCancel={onClose}
       footer={null}
+      destroyOnClose
     >
       <input
         type="text"
@@ -29,10 +29,12 @@ export default function AddEditChargerModal({
         value={data?.Code || ""}
         onChange={onChange}
       />
+
       <select name="Type" value={data?.Type || "DC"} onChange={onChange}>
-        <option value="DC">DC (Sạc nhanh)</option>
-        <option value="AC">AC (Sạc chậm)</option>
+        <option value="DC">⚡ DC (Sạc nhanh)</option>
+        <option value="AC">🔌 AC (Sạc chậm)</option>
       </select>
+
       <input
         type="number"
         placeholder="Công suất (PowerKw) *"
@@ -40,14 +42,18 @@ export default function AddEditChargerModal({
         value={data?.PowerKw || ""}
         onChange={onChange}
       />
+
+      {/* ✅ Đồng bộ trạng thái Charger với BE */}
       <select
         name="Status"
         value={data?.Status || "Online"}
         onChange={onChange}
       >
-        <option value="Online">Online</option>
-        <option value="Offline">Offline</option>
+        <option value="Online">🟢 Online (Hoạt động)</option>
+        <option value="Offline">⚫ Offline (Ngắt kết nối)</option>
+        <option value="Maintenance">🟠 Maintenance (Bảo trì)</option>
       </select>
+
       <div className="modal-actions">
         <button onClick={onClose}>Hủy</button>
         <button className="save" onClick={onSubmit}>

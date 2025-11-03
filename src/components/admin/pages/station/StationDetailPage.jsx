@@ -86,6 +86,8 @@ export default function StationDetailPage() {
   const [endSessionData, setEndSessionData] = useState(null);
   const [endSoc, setEndSoc] = useState("");
   const [activeSessionsByPort, setActiveSessionsByPort] = useState({});
+  const [isManualEndRequired, setIsManualEndRequired] = useState(false);
+  const [manualEndSessionId, setManualEndSessionId] = useState("");
   const [userInfo, setUserInfo] = useState(null); // Load 1 trạm theo id
 
   useEffect(() => {
@@ -312,6 +314,9 @@ export default function StationDetailPage() {
 
     // Ưu tiên dữ liệu từ BE; fallback sang sessionData ở state (nếu có)
     const sd = port?.sessionData ?? activeSessionsByPort?.[portId] ?? null;
+    // 👉 Nếu không có sessionData do admin tạo trong UI, bắt buộc admin nhập ID khi dừng
+    setIsManualEndRequired(!sd);
+    setManualEndSessionId("");
 
     const now = new Date();
     const startISO = active?.startedAt || sd?.startTime || null;
@@ -602,7 +607,7 @@ export default function StationDetailPage() {
 
     try {
       let vehicleName = null;
-  let vehiclePlate = null; // TODO: nếu có vehicleApi thì map ở đây
+      let vehiclePlate = null; // TODO: nếu có vehicleApi thì map ở đây
       const res = await stationApi.startSession(payload);
       console.log("⬅️ Response START Session nhận được:", res); // LOG SẼ GIÚP DEBUG
 
@@ -672,14 +677,31 @@ export default function StationDetailPage() {
     try {
       setIsEnding(true);
 
-      const payload = {
-        chargingSessionId: endSessionData?.sessionId || null,
-        portId: currentPortId,
-        // endSoc: endSoc !== "" ? Number(endSoc) : undefined, // nếu muốn gửi
-      };
-
-      const res = await stationApi.endSession(payload);
-
+      let res;
+      if (isManualEndRequired) {
+        // ❗ Trường hợp dừng phiên NGẪU NHIÊN: bắt buộc có chargingSessionId
+        const idNum = Number(manualEndSessionId);
+        if (!idNum || idNum <= 0 || Number.isNaN(idNum)) {
+          message.warning("Vui lòng nhập chargingSessionId hợp lệ (số dương).");
+          setIsEnding(false);
+          return;
+        }
+        res = await stationApi.endSession({ chargingSessionId: idNum });
+      } else {
+        // ✅ Trường hợp phiên do admin bắt đầu trong UI: dùng sessionId đã lưu;
+        // nếu vì lý do nào đó thiếu, cho phép fallback theo portId.
+        const sessionId = endSessionData?.sessionId;
+        if (sessionId && sessionId > 0) {
+          res = await stationApi.endSession({ chargingSessionId: sessionId });
+        } else {
+          res = await stationApi.endSessionByPort(currentPortId, {});
+          if (res?.success === false) {
+            throw new Error(
+              res?.message || "Không thể kết thúc phiên theo cổng."
+            );
+          }
+        }
+      }
       if (res?.success === false && res?.code === "SESSION_NOT_FOUND") {
         message.error(
           res.message || "Không tìm thấy phiên sạc đang chạy cho cổng này."
@@ -818,6 +840,9 @@ export default function StationDetailPage() {
         endSessionData={endSessionData}
         isEnding={isEnding}
         onConfirm={handleConfirmEndSession}
+        isManualEndRequired={isManualEndRequired}
+        manualEndSessionId={manualEndSessionId}
+        setManualEndSessionId={setManualEndSessionId}
         ids={{
           stationId: currentStationId,
           chargerId: currentChargerId,

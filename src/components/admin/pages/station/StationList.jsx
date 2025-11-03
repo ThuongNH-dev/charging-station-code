@@ -33,10 +33,16 @@ function ChargerBlock({
         <h4>
           {charger.Code} ({charger.Type} - {charger.PowerKw}kW)
           <span
-            className={`status-badge ${charger.Status.toLowerCase()}`}
+            className={`status-badge ${String(
+              charger.Status || ""
+            ).toLowerCase()}`}
             style={{ marginLeft: "10px" }}
           >
-            {charger.Status === "Online" ? "Online" : "Offline"}
+            {charger.Status === "Online"
+              ? "🟢 Online"
+              : charger.Status === "Maintenance"
+              ? "🟠 Maintenance"
+              : "⚫ Offline"}
           </span>
         </h4>
         <p style={{ fontSize: "0.8em", color: "#666" }}>
@@ -62,7 +68,24 @@ function ChargerBlock({
       </div>
 
       {charger.ports.map((port) => {
-        const s = normalizeStatus(port.Status);
+        // Chuẩn hoá cục bộ: gộp InUse/Charging/Busy => occupied
+        const raw = normalizeStatus(port.Status); // "available" | "inuse" | "charging" | ...
+        const s =
+          raw === "inuse" || raw === "busy" || raw === "charging"
+            ? "occupied"
+            : raw; // giữ nguyên "available" | "reserved" | "disabled" | "occupied"
+
+        const portLabel =
+          s === "available"
+            ? "🟢 AVAILABLE"
+            : s === "reserved"
+            ? "🟡 RESERVED"
+            : s === "occupied"
+            ? "🔴 OCCUPIED"
+            : s === "disabled"
+            ? "⚫ DISABLED"
+            : (s || "UNKNOWN").toUpperCase();
+
         return (
           <div className="port-card" key={port.PortId}>
             <div className="port-details">
@@ -75,47 +98,45 @@ function ChargerBlock({
                 Công suất tối đa: {port.MaxPowerKw}kW
               </p>
             </div>
+
             <div className="status-row">
-              <>
-                <span className={`badge ${s}`}>
-                  {s === "available"
-                    ? "Online"
-                    : s === "maintenance"
-                    ? "Bảo trì"
-                    : "Đang bận"}
-                </span>
+              <span className={`badge ${s}`}>{portLabel}</span>
 
-                {s === "available" && (
-                  <button
-                    className="btn small green"
-                    onClick={() =>
-                      onStart(port.PortId, station.StationId, charger.ChargerId)
-                    }
-                  >
-                    Bắt đầu
-                  </button>
-                )}
+              {/* Chỉ AVAILABLE mới cho phép bắt đầu */}
+              {s === "available" && (
+                <button
+                  className="btn small green"
+                  onClick={() =>
+                    onStart(port.PortId, station.StationId, charger.ChargerId)
+                  }
+                >
+                  Bắt đầu
+                </button>
+              )}
 
-                {isPortBusy(port.Status) && (
-                  <button
-                    className="btn small red"
-                    onClick={() =>
-                      onEnd(port.PortId, station.StationId, charger.ChargerId)
-                    }
-                  >
-                    Dừng
-                  </button>
-                )}
-              </>
+              {/* Chỉ OCCUPIED mới cho phép dừng */}
+              {s === "occupied" && (
+                <button
+                  className="btn small red"
+                  onClick={() =>
+                    onEnd(port.PortId, station.StationId, charger.ChargerId)
+                  }
+                >
+                  Dừng
+                </button>
+              )}
+
               <button
                 className="icon-btn"
                 onClick={() => onEditPort(port.PortId)}
+                title="Sửa cổng"
               >
                 <EditOutlined />
               </button>
               <button
                 className="icon-btn"
                 onClick={() => onDeleteCharger(port.PortId, "port")}
+                title="Xóa cổng"
               >
                 <DeleteOutlined />
               </button>
@@ -184,12 +205,12 @@ export default function StationList({
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center" }}>
-          <span
-            className={`status-badge ${
-              station.Status === "Open" ? "active" : "offline"
-            }`}
-          >
-            {station.Status === "Open" ? "Open" : "Closed"}
+          <span className={`status-badge ${station.Status.toLowerCase()}`}>
+            {station.Status === "Open"
+              ? "🟢 Open"
+              : station.Status === "Maintenance"
+              ? "🟠 Maintenance"
+              : "⚫ Closed"}
           </span>
 
           <button

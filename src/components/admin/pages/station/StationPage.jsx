@@ -62,8 +62,9 @@ export default function StationPage() {
           style={{ maxWidth: 160 }}
         >
           <option value="All">Tất cả trạng thái</option>
-          <option value="Open">Open</option>
-          <option value="Closed">Closed</option>
+          <option value="Open">🟢 Open</option>
+          <option value="Closed">⚫ Closed</option>
+          <option value="Maintenance">🟠 Maintenance</option>
         </select>
 
         <input
@@ -109,11 +110,15 @@ export default function StationPage() {
                     </p>
                   </div>
                   <span
-                    className={`status-badge ${
-                      s.Status === "Open" ? "active" : "offline"
-                    }`}
+                    className={`status-badge ${String(
+                      s.Status || ""
+                    ).toLowerCase()}`}
                   >
-                    {s.Status === "Open" ? "OPEN" : "CLOSED"}
+                    {s.Status === "Open"
+                      ? "🟢 OPEN"
+                      : s.Status === "Maintenance"
+                      ? "🟠 MAINTENANCE"
+                      : "⚫ CLOSED"}
                   </span>
                 </div>
 

@@ -7,7 +7,7 @@
 }
 
 .admin-title {
-  color: #333; /* Chữ đen đậm */
+  color: #333;
   margin-bottom: 25px;
   border-bottom: 2px solid #eee;
   padding-bottom: 10px;
@@ -27,13 +27,12 @@
 .input-field {
   padding: 10px 12px;
   border: 1px solid #ccc;
-  border-radius: 6px; /* Bo tròn hơn */
+  border-radius: 6px;
   flex-grow: 1;
   font-size: 14px;
 }
 
 /* --- BUTTONS --- */
-
 .btn {
   padding: 10px 18px;
   border: none;
@@ -49,7 +48,7 @@
 }
 
 .btn.primary {
-  background-color: #1677ff; /* Xanh dương chủ đạo */
+  background-color: #1677ff;
   color: white;
 }
 .btn.primary:hover {
@@ -57,7 +56,7 @@
 }
 
 .btn.secondary {
-  background-color: #6c757d; /* Xám */
+  background-color: #6c757d;
   color: white;
 }
 .btn.secondary:hover {
@@ -70,9 +69,18 @@
   font-weight: 500;
 }
 
-.btn.green { background-color: #52c41a; color: #fff; }
-.btn.red   { background-color: #ff4d4f; color: #fff; }
-.btn.blue  { background-color: #1677ff; color: #fff; }
+.btn.green {
+  background-color: #52c41a;
+  color: #fff;
+}
+.btn.red {
+  background-color: #ff4d4f;
+  color: #fff;
+}
+.btn.blue {
+  background-color: #1677ff;
+  color: #fff;
+}
 
 .icon-btn {
   background: none;
@@ -84,7 +92,9 @@
   padding: 5px;
   transition: color 0.2s;
 }
-.icon-btn:hover { color: #1677ff; }
+.icon-btn:hover {
+  color: #1677ff;
+}
 
 .link-btn {
   background: none;
@@ -98,35 +108,34 @@
   text-align: right;
   font-size: 14px;
 }
-.link-btn:hover { text-decoration: underline; }
+.link-btn:hover {
+  text-decoration: underline;
+}
 
 /* --- DANH SÁCH TRẠM --- */
-
-/* Dùng grid cho ổn định layout, tránh reflow khi hover/ảnh tải */
-.station-list{
+.station-list {
   display: grid;
   grid-template-columns: 1fr;
   gap: 20px;
-  contain: layout paint;   /* cô lập layout */
+  contain: layout paint;
 }
 
-/* Card ổn định, mượt hover, không đổi kích thước */
 .station-card {
   background: #fff;
   border: 1px solid #e8e8e8;
   border-radius: 12px;
   padding: 20px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  min-height: 120px;             /* khóa chiều cao tối thiểu */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  min-height: 120px;
   will-change: transform, box-shadow;
   transform: translateZ(0);
-  transition: transform .18s ease, box-shadow .18s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
   backface-visibility: hidden;
-  contain: layout paint;         /* cô lập reflow trong card */
+  contain: layout paint;
 }
-.station-card:hover{
-  transform: translateY(-2px);   /* không scale để khỏi đẩy xung quanh */
-  box-shadow: 0 8px 22px rgba(0,0,0,.12);
+.station-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
 }
 
 .station-header {
@@ -152,12 +161,11 @@
   line-height: 1.5;
 }
 
-/* --- TRẠNG THÁI TRẠM (STATUS BADGE) --- */
-
+/* --- TRẠNG THÁI TRẠM / BỘ SẠC (STATUS BADGE) --- */
 .status-badge {
   display: inline-flex;
   align-items: center;
-  height: 26px;           /* cố định chiều cao để badge không đẩy layout */
+  height: 26px;
   padding: 0 12px;
   border-radius: 999px;
   font-size: 12px;
@@ -169,10 +177,29 @@
   line-height: 1;
 }
 
-.status-badge.active,
-.status-badge.online { background-color: #52c41a; }
-.status-badge.offline { background-color: #999; }
-.status-badge.maintenance { background-color: #faad14; color: #333; }
+/* ✅ Station statuses */
+.status-badge.open {
+  background-color: #52c41a;
+} /* Open */
+.status-badge.closed {
+  background-color: #999;
+} /* Closed */
+.status-badge.maintenance {
+  background-color: #faad14;
+  color: #333;
+}
+
+/* ✅ Charger statuses */
+.status-badge.online {
+  background-color: #52c41a;
+}
+.status-badge.offline {
+  background-color: #999;
+}
+.status-badge.maintenance {
+  background-color: #faad14;
+  color: #333;
+}
 
 .station-footer {
   display: flex;
@@ -183,8 +210,7 @@
   border-top: 1px solid #f0f0f0;
 }
 
-/* --- POLE & PORT SECTIONS (dùng cho trang chi tiết) --- */
-
+/* --- POLE & PORT SECTIONS --- */
 .pole-section {
   border-left: 3px solid #d9d9d9;
   padding-left: 20px;
@@ -243,7 +269,7 @@
   gap: 8px;
 }
 
-/* TRẠNG THÁI CỔNG */
+/* --- TRẠNG THÁI CỔNG (PORT STATUS BADGE) --- */
 .badge {
   padding: 4px 10px;
   border-radius: 4px;
@@ -253,16 +279,26 @@
   text-transform: uppercase;
   white-space: nowrap;
 }
-.badge.available   { background-color: #52c41a; }
-.badge.busy        { background-color: #ff4d4f; }
-.badge.maintenance { background-color: #faad14; color: #333; }
+
+.badge.available {
+  background-color: #52c41a;
+} /* Sẵn sàng */
+.badge.reserved {
+  background-color: #faad14;
+  color: #333;
+} /* Đặt trước */
+.badge.occupied {
+  background-color: #ff4d4f;
+} /* Đang sạc */
+.badge.disabled {
+  background-color: #999;
+} /* Không hoạt động */
 
 /* --- MODAL --- */
-
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,.4);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -275,7 +311,7 @@
   border-radius: 8px;
   width: 90%;
   max-width: 400px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 }
 
 .modal-box h3 {
@@ -315,20 +351,30 @@
   border: 1px solid #d9d9d9;
   background: #fff;
   color: #333;
-  transition: all .2s;
+  transition: all 0.2s;
 }
-.modal-actions button:hover { border-color: #1677ff; }
+.modal-actions button:hover {
+  border-color: #1677ff;
+}
 .modal-actions button.save {
-  background-color: #1677ff; color: #fff; border-color: #1677ff;
+  background-color: #1677ff;
+  color: #fff;
+  border-color: #1677ff;
 }
-.modal-actions button.save:hover { background-color: #0056b3; }
+.modal-actions button.save:hover {
+  background-color: #0056b3;
+}
 .modal-actions button.delete {
-  background-color: #ff4d4f; color: #fff; border-color: #ff4d4f;
+  background-color: #ff4d4f;
+  color: #fff;
+  border-color: #ff4d4f;
 }
-.modal-actions button.delete:hover { background-color: #cf1322; }
+.modal-actions button.delete:hover {
+  background-color: #cf1322;
+}
 
-/* Ảnh trong chi tiết (nếu dùng) */
-.station-image-container{
+/* --- ẢNH --- */
+.station-image-container {
   width: 120px;
   height: 90px;
   border-radius: 8px;

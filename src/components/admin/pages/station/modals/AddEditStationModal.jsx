@@ -1,4 +1,3 @@
-// src/components/station/modals/AddEditStationModal.jsx
 import React from "react";
 import { Modal } from "antd";
 
@@ -12,10 +11,11 @@ export default function AddEditStationModal({
 }) {
   return (
     <Modal
-      title={isEdit ? `Sửa Trạm (ID: ${data?.StationId})` : "Thêm Trạm"}
+      title={isEdit ? `🛠️ Sửa Trạm (ID: ${data?.StationId})` : "➕ Thêm Trạm"}
       open={open}
       onCancel={onClose}
       footer={null}
+      destroyOnClose
     >
       <input
         type="text"
@@ -40,22 +40,26 @@ export default function AddEditStationModal({
       />
       <input
         type="number"
-        placeholder="Vĩ độ (Latitude) *"
+        placeholder="Vĩ độ (Latitude)"
         name="Latitude"
         value={data?.Latitude || ""}
         onChange={onChange}
       />
       <input
         type="number"
-        placeholder="Kinh độ (Longitude) *"
+        placeholder="Kinh độ (Longitude)"
         name="Longitude"
         value={data?.Longitude || ""}
         onChange={onChange}
       />
+
+      {/* ✅ Đồng bộ trạng thái với BE */}
       <select name="Status" value={data?.Status || "Open"} onChange={onChange}>
-        <option value="Open">Open</option>
-        <option value="Closed">Closed</option>
+        <option value="Open">🟢 Open (Hoạt động)</option>
+        <option value="Closed">⚫ Closed (Đóng cửa)</option>
+        <option value="Maintenance">🟠 Maintenance (Bảo trì)</option>
       </select>
+
       <div className="modal-actions">
         <button onClick={onClose}>Hủy</button>
         <button className="save" onClick={onSubmit}>

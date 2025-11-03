@@ -1,5 +1,5 @@
 import React from "react";
-import { Modal } from "antd";
+import { Modal, Input } from "antd";
 
 // Tiện ích định dạng
 const formatVND = (amount) => {
@@ -22,6 +22,9 @@ export default function EndSessionModal({
   isEnding,
   onConfirm,
   ids, // { stationId, chargerId, portId }
+  isManualEndRequired,
+  manualEndSessionId,
+  setManualEndSessionId,
 }) {
   if (!open) return null;
 
@@ -56,6 +59,22 @@ export default function EndSessionModal({
       footer={null}
       destroyOnClose
     >
+      {/* Khi dừng phiên ngẫu nhiên: bắt buộc nhập ID */}
+      {isManualEndRequired && (
+        <div className="input-field" style={{ marginBottom: 12 }}>
+          <label>Charging Session ID (bắt buộc)</label>
+          <Input
+            placeholder="Nhập ID phiên sạc cần dừng (ví dụ: 260)"
+            value={manualEndSessionId}
+            onChange={(e) => setManualEndSessionId(e.target.value)}
+            inputMode="numeric"
+          />
+          <small style={{ color: "#999" }}>
+            * Trường hợp dừng phiên không do admin bắt đầu trong màn hình này,
+            bạn cần điền đúng ID phiên sạc.
+          </small>
+        </div>
+      )}
       {/* End SoC: đọc tự động khi xác nhận dừng */}
       <div
         style={{
@@ -144,7 +163,13 @@ export default function EndSessionModal({
           type="button"
           className="btn blue"
           onClick={onConfirm}
-          disabled={isEnding}
+          disabled={
+            isEnding ||
+            (isManualEndRequired &&
+              (!manualEndSessionId ||
+                Number(manualEndSessionId) <= 0 ||
+                Number.isNaN(Number(manualEndSessionId))))
+          }
         >
           {isEnding ? "Đang kết thúc..." : "Xác nhận Kết thúc"}
         </button>
