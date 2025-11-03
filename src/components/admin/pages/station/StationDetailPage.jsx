@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import "../StationManagement.css";
 import { message, Button } from "antd";
 import { useParams, useNavigate } from "react-router-dom";
 import { stationApi } from "../../../../api/stationApi";
 import { userApi } from "../../../../api/userApi";
 
-import FiltersBar from "./FiltersBar";
 import StationList from "./StationList";
+import DetailFiltersBar from "./DetailFiltersBar";
 
 import StartSessionModal from "./modals/StartSessionModal";
 import EndSessionModal from "./modals/EndSessionModal";
@@ -16,9 +16,7 @@ import AddEditPortModal from "./modals/AddEditPortModal";
 import DeleteConfirmModal from "./modals/DeleteConfirmModal";
 import EndSessionSummaryModal from "./modals/EndSessionSummaryModal";
 
-import { isPortBusy } from "../../../../utils/stationUtils";
-
-// === Stub customerApi (giống bản bạn dùng) ===
+// (tùy bạn còn dùng không)
 const customerApi = {
   getById: async (id) => {
     if (id && Number(id) > 0 && Number(id) !== 999) {
@@ -33,14 +31,20 @@ export default function StationDetailPage() {
   const { stationId } = useParams();
   const navigate = useNavigate();
 
-  const [activeModal, setActiveModal] = useState(null); // dữ liệu 1 trạm
+  const [activeModal, setActiveModal] = useState(null);
 
   const [station, setStation] = useState(null);
-  const [loading, setLoading] = useState(true); // filter (nội bộ trang chi tiết vẫn cho lọc theo tên cục bộ nếu muốn)
+  const [loading, setLoading] = useState(true);
 
-  const [statusFilter, setStatusFilter] = useState("All");
-  const [searchTerm, setSearchTerm] = useState(""); // buffer tạo/sửa
+  // ==== Bộ lọc CHI TIẾT (Trụ/Cổng) ====
+  const [chargerStatus, setChargerStatus] = useState("All"); // Online | Offline | Maintenance | All
+  const [portStatus, setPortStatus] = useState("All"); // available | occupied | reserved | disabled | All
+  const [connector, setConnector] = useState("All"); // lấy từ API trong DetailFiltersBar
+  const [powerMin, setPowerMin] = useState("");
+  const [powerMax, setPowerMax] = useState("");
+  const [searchCode, setSearchCode] = useState(""); // filter code trụ/cổng
 
+  // ==== State tạo/sửa ====
   const newStationInitialState = {
     StationName: "",
     Address: "",
@@ -48,8 +52,9 @@ export default function StationDetailPage() {
     Latitude: "",
     Longitude: "",
     Status: "Open",
+    ImageUrl: "",
   };
-  const [newStation, setNewStation] = useState(newStationInitialState);
+  const [newStation, setNewStation] = useState(newStationInitialState); // hiện chưa dùng tạo ở trang detail
   const [editingStation, setEditingStation] = useState({});
 
   const newChargerInitialState = {
@@ -57,6 +62,8 @@ export default function StationDetailPage() {
     Type: "DC",
     PowerKw: "",
     Status: "Online",
+    ImageUrl: "",
+    InstalledAt: "",
   };
   const [newChargerData, setNewChargerData] = useState(newChargerInitialState);
   const [editingCharger, setEditingCharger] = useState({});
@@ -68,15 +75,18 @@ export default function StationDetailPage() {
     Status: "Available",
   };
   const [newPortData, setNewPortData] = useState(newPortInitialState);
-  const [editingPort, setEditingPort] = useState({}); // context id
+  const [editingPort, setEditingPort] = useState({});
 
+  // ==== Context id ====
   const [currentStationId, setCurrentStationId] = useState(null);
   const [currentChargerId, setCurrentChargerId] = useState(null);
-  const [currentPortId, setCurrentPortId] = useState(null); // delete target
+  const [currentPortId, setCurrentPortId] = useState(null);
 
+  // ==== Delete target ====
   const [targetId, setTargetId] = useState(null);
-  const [targetType, setTargetType] = useState(null); // session
+  const [targetType, setTargetType] = useState(null);
 
+  // ==== Session ====
   const [isEnding, setIsEnding] = useState(false);
   const [startSessionData, setStartSessionData] = useState({
     userId: "",
@@ -88,12 +98,13 @@ export default function StationDetailPage() {
   const [activeSessionsByPort, setActiveSessionsByPort] = useState({});
   const [isManualEndRequired, setIsManualEndRequired] = useState(false);
   const [manualEndSessionId, setManualEndSessionId] = useState("");
-  const [userInfo, setUserInfo] = useState(null); // Load 1 trạm theo id
+  const [userInfo, setUserInfo] = useState(null);
 
+  // ====== LOAD chi tiết trạm ======
   useEffect(() => {
     (async () => {
       try {
-        setLoading(true); // NOTE: Việc load tất cả station/charger/port rồi filter ở frontend là KHÔNG HIỆU QUẢ. // Nếu có thể, nên gọi API: stationApi.getStationDetail(stationId)
+        setLoading(true);
         const [stationsRaw, chargersRaw, portsRaw] = await Promise.all([
           stationApi.getAllStations(),
           stationApi.getAllChargers(),
@@ -165,21 +176,52 @@ export default function StationDetailPage() {
     setEndSoc("");
   };
 
-  const filtered = station
-    ? [
-        {
-          ...station, // (nếu muốn cho phép search theo tên trạm ngay trong chi tiết)
-          hidden:
-            (statusFilter !== "All" &&
-              (station.Status === "Open" ? "Open" : "Closed") !==
-                statusFilter) ||
-            !(station.StationName || "")
-              .toLowerCase()
-              .includes(searchTerm.toLowerCase()),
-        },
-      ].filter((x) => !x.hidden)
-    : []; // handlers chung
+  // ====== BỘ LỌC ÁP DỤNG CHO DỮ LIỆU HIỂN THỊ ======
+  const filteredStation = useMemo(() => {
+    if (!station) return null;
+    const codeQ = searchCode.trim().toLowerCase();
 
+    const filterPort = (p) => {
+      const s = String(p.Status || "").toLowerCase();
+      const stOk =
+        portStatus === "All" ? true : s.includes(portStatus.toLowerCase());
+      const connOk =
+        connector === "All" ? true : (p.ConnectorType || "") === connector;
+      const pow = Number(p.MaxPowerKw || 0);
+      const powOk =
+        (powerMin === "" || pow >= Number(powerMin)) &&
+        (powerMax === "" || pow <= Number(powerMax));
+      const codeOk =
+        codeQ === "" ? true : (p.Code || "").toLowerCase().includes(codeQ);
+      return stOk && connOk && powOk && codeOk;
+    };
+
+    const filterCharger = (c) => {
+      const s = String(c.Status || "");
+      const chOk = chargerStatus === "All" ? true : s === chargerStatus;
+      const codeOk =
+        codeQ === "" ? true : (c.Code || "").toLowerCase().includes(codeQ);
+
+      const ports = (c.ports || []).filter(filterPort);
+      return chOk && codeOk ? { ...c, ports } : null;
+    };
+
+    const chargers = (station.chargers || [])
+      .map(filterCharger)
+      .filter(Boolean);
+
+    return { ...station, chargers };
+  }, [
+    station,
+    chargerStatus,
+    portStatus,
+    connector,
+    powerMin,
+    powerMax,
+    searchCode,
+  ]);
+
+  // ====== helpers chung ======
   const handleInputChange = (e, state, setState) => {
     const { name, value } = e.target;
     setState({ ...state, [name]: value });
@@ -195,17 +237,18 @@ export default function StationDetailPage() {
   const handleNewPortInputChange = (e) =>
     handleInputChange(e, newPortData, setNewPortData);
   const handleEditPortInputChange = (e) =>
-    handleInputChange(e, editingPort, setEditingPort); // user lookup // Helper lấy tên user từ mọi kiểu payload phổ biến
+    handleInputChange(e, editingPort, setEditingPort);
 
+  // user lookup
   const pickUserName = (res) => {
     return (
-      res?.customers?.[0]?.fullName || // tên trong danh sách khách hàng (chuẩn)
-      res?.data?.customers?.[0]?.fullName || // nếu trả về trong res.data
-      res?.fullName || // fallback cấp 1
-      res?.data?.fullName || // fallback cấp 2
-      res?.username || // username (nếu không có fullName)
-      res?.userName || // một số API viết hoa N
-      null // không fallback "User ${id}" nữa
+      res?.customers?.[0]?.fullName ||
+      res?.data?.customers?.[0]?.fullName ||
+      res?.fullName ||
+      res?.data?.fullName ||
+      res?.username ||
+      res?.userName ||
+      null
     );
   };
 
@@ -225,7 +268,7 @@ export default function StationDetailPage() {
         message.success(`Tìm thấy user: ${displayName}`);
       } else {
         setUserInfo(null);
-        setFoundUserName(null); // đừng đặt chuỗi; để nút Bắt đầu bị disable đúng
+        setFoundUserName(null);
         message.warning("Không tìm thấy người dùng này");
       }
     } catch (error) {
@@ -234,12 +277,239 @@ export default function StationDetailPage() {
       console.error("❌ Lỗi khi tìm user:", error);
       message.error("Không thể tìm người dùng, kiểm tra lại ID");
     }
-  }; // open modals
-
-  const openAddStationModal = () => {
-    setNewStation(newStationInitialState);
-    setActiveModal("addStation");
   };
+
+  // ====== LƯU SỬA TRẠM (payload camelCase đúng BE) ======
+  const handleSaveEditStation = async () => {
+    try {
+      const sid = editingStation?.StationId ?? editingStation?.stationId;
+      if (!sid) {
+        message.error("Lỗi: Không tìm thấy ID trạm");
+        return;
+      }
+
+      const payload = {
+        stationName: (editingStation?.StationName || "").trim(),
+        address: (editingStation?.Address || "").trim(),
+        city: (editingStation?.City || "").trim(),
+        latitude: Number(editingStation?.Latitude) || 0,
+        longitude: Number(editingStation?.Longitude) || 0,
+        status: editingStation?.Status || "Closed",
+        imageUrl: (editingStation?.ImageUrl || "").trim(),
+      };
+
+      if (!payload.stationName) {
+        message.error("Lỗi: Tên trạm không được để trống");
+        return;
+      }
+      if (!payload.address) {
+        message.error("Lỗi: Địa chỉ không được để trống");
+        return;
+      }
+
+      const updated = await stationApi.updateStation(sid, payload);
+
+      setStation((prev) => ({
+        ...(prev || {}),
+        ...(updated || {
+          StationId: sid,
+          StationName: payload.stationName,
+          Address: payload.address,
+          City: payload.city,
+          Latitude: payload.latitude,
+          Longitude: payload.longitude,
+          Status: payload.status,
+          ImageUrl: payload.imageUrl,
+        }),
+        chargers: prev?.chargers || [],
+      }));
+
+      message.success("Cập nhật trạm thành công!");
+      setActiveModal(null);
+    } catch (err) {
+      console.error("❌ Lỗi cập nhật trạm:", err);
+      message.error(
+        "Cập nhật trạm thất bại: " + (err?.message || "Không xác định")
+      );
+    }
+  };
+
+  // ====== XÓA TRẠM / TRỤ / CỔNG ======
+  const handleDeleteConfirm = async () => {
+    if (!targetId || !targetType) {
+      message.error("Không xác định được đối tượng cần xóa.");
+      return;
+    }
+
+    try {
+      let res;
+      if (targetType === "station") {
+        res = await stationApi.deleteStation(targetId);
+        message.success("Đã xóa trạm thành công!");
+        navigate("/admin/stations");
+      } else if (targetType === "charger") {
+        res = await stationApi.deleteCharger(targetId);
+        setStation((prev) => ({
+          ...prev,
+          chargers: (prev?.chargers || []).filter(
+            (c) => String(c.ChargerId) !== String(targetId)
+          ),
+        }));
+        message.success("Đã xóa trụ sạc thành công!");
+      } else if (targetType === "port") {
+        res = await stationApi.deletePort(targetId);
+        setStation((prev) => ({
+          ...prev,
+          chargers: (prev?.chargers || []).map((c) => ({
+            ...c,
+            ports: (c.ports || []).filter(
+              (p) => String(p.PortId) !== String(targetId)
+            ),
+          })),
+        }));
+        message.success("Đã xóa cổng sạc thành công!");
+      } else {
+        message.error("Loại đối tượng không hợp lệ.");
+        return;
+      }
+
+      console.log("✅ Delete result:", res);
+    } catch (err) {
+      console.error("❌ Lỗi xóa:", err);
+      message.error("Xóa thất bại: " + (err?.message || "Không xác định"));
+    } finally {
+      setActiveModal(null);
+    }
+  };
+
+  // ====== TẠO TRỤ (CHARGER) ======
+  const handleCreateCharger = async () => {
+    try {
+      const stId = station?.StationId;
+      if (!stId) return message.error("Chưa có StationId hợp lệ.");
+
+      const payload = {
+        StationId: stId,
+        Code: (newChargerData?.Code || "").trim(),
+        Type: newChargerData?.Type || "DC",
+        PowerKw: Number(newChargerData?.PowerKw) || 0,
+        Status: newChargerData?.Status || "Online",
+        ImageUrl: newChargerData?.ImageUrl || "",
+        InstalledAt: newChargerData?.InstalledAt || null,
+      };
+      if (!payload.Code) return message.error("Vui lòng nhập mã trụ (Code).");
+
+      const added = await stationApi.createCharger(payload);
+
+      setStation((prev) => ({
+        ...prev,
+        chargers: [...(prev?.chargers || []), added || payload],
+      }));
+      message.success("Thêm bộ sạc thành công!");
+      setActiveModal(null);
+    } catch (err) {
+      console.error("❌ Lỗi thêm bộ sạc:", err);
+      message.error(
+        "Không thể thêm bộ sạc: " + (err?.message || "Không xác định")
+      );
+    }
+  };
+
+  // ====== LƯU SỬA TRỤ (CHARGER) ======
+  const handleSaveEditCharger = async () => {
+    try {
+      const chargerId =
+        editingCharger?.ChargerId ??
+        editingCharger?.chargerId ??
+        editingCharger?.id;
+
+      if (!chargerId) return message.error("Không tìm thấy ID trụ.");
+
+      const updated = await stationApi.updateCharger(chargerId, editingCharger);
+
+      setStation((prev) => ({
+        ...prev,
+        chargers: (prev?.chargers || []).map((c) =>
+          (c.ChargerId ?? c.chargerId) === chargerId
+            ? updated || editingCharger
+            : c
+        ),
+      }));
+      message.success("Cập nhật bộ sạc thành công!");
+      setActiveModal(null);
+    } catch (err) {
+      console.error("❌ Lỗi cập nhật bộ sạc:", err);
+      message.error(
+        "Không thể cập nhật bộ sạc: " + (err?.message || "Không xác định")
+      );
+    }
+  };
+
+  // ====== TẠO CỔNG (PORT) ======
+  const handleCreatePort = async () => {
+    try {
+      const chId = currentChargerId;
+      if (!chId) return message.error("Chưa chọn trụ sạc hợp lệ.");
+
+      const payload = {
+        ...newPortData,
+        chargerId: chId, // BE nhận 'chargerId'
+      };
+      if (!payload.Code) return message.error("Vui lòng nhập mã cổng (Code).");
+
+      const added = await stationApi.createPort(payload);
+
+      setStation((prev) => ({
+        ...prev,
+        chargers: (prev?.chargers || []).map((c) =>
+          c.ChargerId === chId
+            ? { ...c, ports: [...(c.ports || []), added || payload] }
+            : c
+        ),
+      }));
+      message.success("Thêm cổng sạc thành công!");
+      setActiveModal(null);
+    } catch (err) {
+      console.error("❌ Lỗi thêm cổng sạc:", err);
+      message.error(
+        "Không thể thêm cổng sạc: " + (err?.message || "Không xác định")
+      );
+    }
+  };
+
+  // ====== LƯU SỬA CỔNG (PORT) ======
+  const handleSaveEditPort = async () => {
+    try {
+      const portId = editingPort?.PortId ?? editingPort?.portId;
+      const chId = editingPort?.ChargerId ?? editingPort?.chargerId;
+      if (!portId || !chId) return message.error("Thiếu PortId/ChargerId.");
+
+      const updated = await stationApi.updatePort(portId, editingPort);
+
+      setStation((prev) => ({
+        ...prev,
+        chargers: (prev?.chargers || []).map((c) =>
+          (c.ChargerId ?? c.chargerId) === chId
+            ? {
+                ...c,
+                ports: (c.ports || []).map((p) =>
+                  (p.PortId ?? p.portId) === portId ? updated || editingPort : p
+                ),
+              }
+            : c
+        ),
+      }));
+      message.success("Cập nhật cổng thành công!");
+      setActiveModal(null);
+    } catch (err) {
+      console.error("❌ Lỗi cập nhật cổng:", err);
+      message.error(
+        "Không thể cập nhật cổng: " + (err?.message || "Không xác định")
+      );
+    }
+  };
+
+  // ====== open modals ======
   const openEditStationModal = (stId) => {
     if (station && station.StationId === stId) {
       setEditingStation(station);
@@ -288,8 +558,9 @@ export default function StationDetailPage() {
     setTargetId(id);
     setTargetType(type);
     setActiveModal("deleteConfirm");
-  }; // start/end
+  };
 
+  // ====== Start/End ======
   const openStartSessionModal = (portId, stId, chId) => {
     setCurrentPortId(portId);
     setCurrentStationId(stId);
@@ -298,13 +569,14 @@ export default function StationDetailPage() {
     setFoundUserName(null);
     setActiveModal("startSession");
   };
+
   const openEndSessionModal = async (portId, stId, chId) => {
     setEndSoc("");
 
     const charger = station?.chargers.find((c) => c.ChargerId === chId);
     const port = charger?.ports.find((p) => p.PortId === portId);
 
-    // Lấy phiên theo cổng (không phân biệt ai bắt đầu)
+    // Lấy phiên theo cổng
     let active = null;
     try {
       active = await stationApi.getActiveSessionByPort(portId);
@@ -312,9 +584,7 @@ export default function StationDetailPage() {
       console.warn("[UI] getActiveSessionByPort lỗi:", e?.message);
     }
 
-    // Ưu tiên dữ liệu từ BE; fallback sang sessionData ở state (nếu có)
     const sd = port?.sessionData ?? activeSessionsByPort?.[portId] ?? null;
-    // 👉 Nếu không có sessionData do admin tạo trong UI, bắt buộc admin nhập ID khi dừng
     setIsManualEndRequired(!sd);
     setManualEndSessionId("");
 
@@ -348,8 +618,8 @@ export default function StationDetailPage() {
       duration: durationHours.toFixed(2),
 
       energy: energyKwh.toFixed(3),
-      currentSubtotal: 0, // tạm tính
-      currentTax: 0, // tạm tính
+      currentSubtotal: 0,
+      currentTax: 0,
       cost: costVND,
       endSoc: null,
     };
@@ -358,237 +628,8 @@ export default function StationDetailPage() {
     setCurrentPortId(portId);
     setCurrentStationId(stId);
     setCurrentChargerId(chId);
-    setActiveModal("endSession"); // <-- LUÔN mở modal #2
+    setActiveModal("endSession");
   };
-
-  const handleAddStation = async () => {
-    try {
-      const data = {
-        StationName: newStation.StationName?.trim() || "",
-        Address: newStation.Address?.trim() || "",
-        City: newStation.City?.trim() || "",
-        Latitude: Number(newStation.Latitude) || 0,
-        Longitude: Number(newStation.Longitude) || 0,
-        Status: newStation.Status || "Offline",
-      };
-      if (!data.StationName || !data.Address) {
-        message.error("Vui lòng điền đầy đủ Tên trạm và Địa chỉ!");
-        return;
-      }
-      const added = await stationApi.createStation(data);
-      setActiveModal(null);
-      setStation(added);
-    } catch (err) {
-      console.error("❌ Lỗi thêm trạm:", err);
-      message.error("Không thể thêm trạm mới: " + err.message);
-    }
-  };
-
-  const handleSaveEditStation = async () => {
-    try {
-      const updateData = {
-        StationId: editingStation.StationId,
-        StationName: editingStation.StationName,
-        Address: editingStation.Address,
-        City: editingStation.City,
-        Latitude: Number(editingStation.Latitude) || 0,
-        Longitude: Number(editingStation.Longitude) || 0,
-        Status: editingStation.Status,
-        ImageUrl: editingStation.ImageUrl || "",
-      };
-      if (!updateData.StationId)
-        return message.error("Lỗi: Không tìm thấy ID trạm");
-      if (!updateData.StationName?.trim())
-        return message.error("Lỗi: Tên trạm không được để trống");
-      if (!updateData.Address?.trim())
-        return message.error("Lỗi: Địa chỉ không được để trống");
-      if (!updateData.Status)
-        return message.error("Lỗi: Trạng thái không được để trống");
-
-      const updated = await stationApi.updateStation(
-        editingStation.StationId,
-        updateData
-      );
-      setActiveModal(null);
-      setStation(updated);
-      message.success("Cập nhật trạm thành công!");
-    } catch (err) {
-      console.error("❌ Lỗi cập nhật trạm:", err);
-      message.error("Cập nhật trạm thất bại: " + err.message);
-    }
-  }; // helpers update nested
-
-  const replaceChargerOnStation = (s, chargerId, updatedCharger) => ({
-    ...s,
-    chargers: s.chargers.map((c) =>
-      c.ChargerId === chargerId ? updatedCharger : c
-    ),
-  }); // charger
-
-  const handleCreateCharger = async () => {
-    try {
-      const stId = station?.StationId;
-      if (!stId) throw new Error("Chưa chọn trạm hợp lệ.");
-
-      const dataToSend = { ...newChargerData, StationId: stId };
-      const added = await stationApi.createCharger(dataToSend);
-
-      setActiveModal(null);
-      setStation((prev) => ({
-        ...prev,
-        chargers: [...(prev?.chargers || []), added],
-      }));
-      message.success("Thêm bộ sạc thành công!");
-    } catch (err) {
-      console.error("❌ Lỗi thêm bộ sạc:", err);
-      message.error("Không thể thêm bộ sạc: " + err.message);
-    }
-  };
-
-  const handleSaveEditCharger = async () => {
-    try {
-      const chargerId =
-        editingCharger?.ChargerId ??
-        editingCharger?.chargerId ??
-        editingCharger?.id;
-      const stId = station?.StationId;
-      if (!chargerId || !stId)
-        throw new Error("Thông tin Bộ sạc/Trạm không đầy đủ.");
-
-      const updated = await stationApi.updateCharger(chargerId, editingCharger);
-      setActiveModal(null);
-      setStation((prev) => replaceChargerOnStation(prev, chargerId, updated));
-      message.success("Cập nhật bộ sạc thành công!");
-    } catch (err) {
-      console.error("❌ Lỗi cập nhật bộ sạc:", err);
-      let displayMessage = "Không thể cập nhật bộ sạc: Lỗi không xác định.";
-      const rawMessage = err.message;
-      if (
-        rawMessage &&
-        rawMessage.startsWith("{") &&
-        rawMessage.endsWith("}")
-      ) {
-        try {
-          const errorObj = JSON.parse(rawMessage);
-          displayMessage =
-            errorObj.message ||
-            "Không thể cập nhật bộ sạc: Vui lòng kiểm tra dữ liệu.";
-        } catch {
-          displayMessage = "Không thể cập nhật bộ sạc: " + rawMessage;
-        }
-      } else displayMessage = "Không thể cập nhật bộ sạc: " + rawMessage;
-      message.error(displayMessage);
-    }
-  }; // port
-
-  const handleCreatePort = async () => {
-    try {
-      const chId = currentChargerId;
-      const stId = station?.StationId;
-      if (!chId || !stId) throw new Error("Chưa chọn trụ sạc hợp lệ.");
-
-      const currentCharger = station?.chargers.find(
-        (c) => c.ChargerId === chId
-      ); // Loại bỏ logic check availableType vì nó không phù hợp với thực tế 1 trụ sạc có nhiều cổng cùng loại // và dùng hardcoded ConnectorType: "CCS2" trong newPortInitialState
-      const dataToSend = {
-        ...newPortData,
-        chargerId: chId,
-      };
-      const addedPort = await stationApi.createPort(dataToSend);
-
-      setActiveModal(null);
-      setStation((prev) => ({
-        ...prev,
-        chargers: prev.chargers.map((c) =>
-          c.ChargerId === chId
-            ? { ...c, ports: [...(c.ports || []), addedPort] }
-            : c
-        ),
-      }));
-      message.success("Thêm cổng sạc thành công!");
-    } catch (err) {
-      console.error("❌ Lỗi thêm cổng sạc:", err);
-      let displayMessage = "Lỗi không xác định.";
-      const rawMessage = err.message;
-      if (
-        rawMessage &&
-        rawMessage.startsWith("{") &&
-        rawMessage.endsWith("}")
-      ) {
-        try {
-          const errorObj = JSON.parse(rawMessage);
-          displayMessage =
-            errorObj.message || "Lỗi cập nhật dữ liệu. Vui lòng thử lại.";
-        } catch {
-          displayMessage = rawMessage;
-        }
-      } else displayMessage = rawMessage;
-      message.error(`Không thể thêm cổng sạc: ${displayMessage}`);
-    }
-  };
-
-  const handleSaveEditPort = async () => {
-    try {
-      const portId = editingPort.PortId;
-      const chId = editingPort.ChargerId;
-      const stId = station?.StationId;
-      if (!portId || !chId || !stId)
-        throw new Error("Thông tin Cổng/Trụ/Trạm không đầy đủ.");
-
-      const updatedPort = await stationApi.updatePort(portId, editingPort);
-      setActiveModal(null);
-      setStation((prev) => ({
-        ...prev,
-        chargers: prev.chargers.map((c) =>
-          c.ChargerId === chId
-            ? {
-                ...c,
-                ports: c.ports.map((p) =>
-                  p.PortId === portId ? updatedPort : p
-                ),
-              }
-            : c
-        ),
-      }));
-      message.success("Cập nhật cổng thành công!");
-    } catch (err) {
-      console.error("❌ Lỗi cập nhật cổng:", err);
-      message.error("Không thể cập nhật cổng: " + err.message);
-    }
-  }; // delete
-
-  const handleDeleteConfirm = async () => {
-    try {
-      if (targetType === "station") {
-        await stationApi.deleteStation(targetId);
-        setActiveModal(null);
-        message.success("Xoá trạm thành công!");
-        navigate("/admin/stations");
-        return;
-      } else if (targetType === "charger") {
-        await stationApi.deleteCharger(targetId);
-        setStation((prev) => ({
-          ...prev,
-          chargers: prev.chargers.filter((c) => c.ChargerId !== targetId),
-        }));
-        message.success("Xoá bộ sạc thành công!");
-      } else if (targetType === "port") {
-        await stationApi.deletePort(targetId);
-        setStation((prev) => ({
-          ...prev,
-          chargers: prev.chargers.map((c) => ({
-            ...c,
-            ports: c.ports ? c.ports.filter((p) => p.PortId !== targetId) : [],
-          })),
-        }));
-        message.success("Xoá cổng sạc thành công!");
-      }
-      setActiveModal(null);
-    } catch (err) {
-      console.error("❌ Lỗi xoá:", err);
-      message.error("Không thể xoá: " + err.message);
-    }
-  }; // start confirm
 
   const handleConfirmStartSession = async () => {
     const customerId = Number(startSessionData.userId) || 0;
@@ -603,24 +644,18 @@ export default function StationDetailPage() {
     }
 
     const payload = { customerId, vehicleId, bookingId: null, portId };
-    console.log("➡️ Payload START Session gửi đi:", payload); // LOG SẼ GIÚP DEBUG
-
     try {
       let vehicleName = null;
-      let vehiclePlate = null; // TODO: nếu có vehicleApi thì map ở đây
+      let vehiclePlate = null;
       const res = await stationApi.startSession(payload);
-      console.log("⬅️ Response START Session nhận được:", res); // LOG SẼ GIÚP DEBUG
 
       const chargingSessionId =
         res?.chargingSessionId ??
         res?.sessionId ??
         res?.data?.chargingSessionId ??
         res?.data?.sessionId;
+
       if (!chargingSessionId || chargingSessionId <= 0) {
-        console.error(
-          "❌ API START Session không trả về ID phiên sạc hợp lệ.",
-          res
-        );
         message.error("Lỗi: Không nhận được ID phiên sạc từ máy chủ.");
         return;
       }
@@ -633,14 +668,14 @@ export default function StationDetailPage() {
         userId: customerId,
         userName: foundUserName,
         vehicleId,
-        vehicleName, // ← đã lấy từ vehicleApi
-        plate: vehiclePlate, // ← đã lấy từ vehicleApi
+        vehicleName,
+        plate: vehiclePlate,
       };
 
       setActiveSessionsByPort((prev) => ({
         ...prev,
         [portId]: sessionData,
-      })); // Cập nhật trạng thái cổng sạc
+      }));
 
       setStation((prev) => ({
         ...prev,
@@ -650,11 +685,7 @@ export default function StationDetailPage() {
                 ...ch,
                 ports: ch.ports.map((p) =>
                   p.PortId === currentPortId
-                    ? {
-                        ...p,
-                        Status: "Busy",
-                        sessionData: sessionData, // Lưu session data vào port
-                      }
+                    ? { ...p, Status: "Busy", sessionData }
                     : p
                 ),
               }
@@ -669,7 +700,7 @@ export default function StationDetailPage() {
         error?.message || "Lỗi không xác định khi bắt đầu phiên sạc.";
       message.error(`Lỗi: ${errorMessage}`);
     }
-  }; // end confirm
+  };
 
   const handleConfirmEndSession = async () => {
     if (!currentPortId) return;
@@ -679,7 +710,6 @@ export default function StationDetailPage() {
 
       let res;
       if (isManualEndRequired) {
-        // ❗ Trường hợp dừng phiên NGẪU NHIÊN: bắt buộc có chargingSessionId
         const idNum = Number(manualEndSessionId);
         if (!idNum || idNum <= 0 || Number.isNaN(idNum)) {
           message.warning("Vui lòng nhập chargingSessionId hợp lệ (số dương).");
@@ -688,8 +718,6 @@ export default function StationDetailPage() {
         }
         res = await stationApi.endSession({ chargingSessionId: idNum });
       } else {
-        // ✅ Trường hợp phiên do admin bắt đầu trong UI: dùng sessionId đã lưu;
-        // nếu vì lý do nào đó thiếu, cho phép fallback theo portId.
         const sessionId = endSessionData?.sessionId;
         if (sessionId && sessionId > 0) {
           res = await stationApi.endSession({ chargingSessionId: sessionId });
@@ -715,7 +743,6 @@ export default function StationDetailPage() {
         return;
       }
 
-      // Map dữ liệu BE -> Summary
       const d = res?.data?.data ?? res?.data ?? res ?? {};
       const finalSummaryData = {
         sessionId: d.chargingSessionId ?? endSessionData?.sessionId ?? null,
@@ -737,7 +764,6 @@ export default function StationDetailPage() {
       setActiveModal("endSessionSummary");
       setEndSoc("");
 
-      // Reset UI
       setActiveSessionsByPort((prev) => {
         const cp = { ...prev };
         delete cp[currentPortId];
@@ -802,17 +828,26 @@ export default function StationDetailPage() {
         <h2 className="admin-title">Chi tiết trạm</h2>
         <Button onClick={() => navigate("/admin/stations")}>← Quay lại</Button>
       </div>
-      {/* filter nhẹ (áp dụng cho tên trạm nếu bạn muốn) */}
-      <FiltersBar
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        searchTerm={searchTerm}
-        onSearchTermChange={setSearchTerm}
-        onAddStation={openAddStationModal}
+
+      {/* ✅ BỘ LỌC DÀNH CHO TRỤ/CỔNG (connector lấy từ API bên trong component) */}
+      <DetailFiltersBar
+        chargerStatus={chargerStatus}
+        setChargerStatus={setChargerStatus}
+        portStatus={portStatus}
+        setPortStatus={setPortStatus}
+        connector={connector}
+        setConnector={setConnector}
+        powerMin={powerMin}
+        setPowerMin={setPowerMin}
+        powerMax={powerMax}
+        setPowerMax={setPowerMax}
+        searchCode={searchCode}
+        setSearchCode={setSearchCode}
       />
+
       <div className="station-list">
         <StationList
-          stations={filtered}
+          stations={filteredStation ? [filteredStation] : []}
           onEditStation={openEditStationModal}
           onDeleteStation={(id) => openDeleteModal(id, "station")}
           onEditCharger={openEditChargerModal}
@@ -824,7 +859,8 @@ export default function StationDetailPage() {
           onEnd={openEndSessionModal}
         />
       </div>
-      {/* Modals */}
+
+      {/* ===== Modals ===== */}
       <StartSessionModal
         open={activeModal === "startSession"}
         onClose={closeModal}
@@ -849,15 +885,6 @@ export default function StationDetailPage() {
           portId: currentPortId,
         }}
       />
-      <AddEditStationModal
-        open={activeModal === "addStation"}
-        onClose={closeModal}
-        isEdit={false}
-        data={newStation}
-        onChange={handleNewStationInputChange}
-        onSubmit={handleAddStation}
-      />
-
       <AddEditStationModal
         open={activeModal === "editStation"}
         onClose={closeModal}

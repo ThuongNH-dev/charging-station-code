@@ -14,7 +14,7 @@ export default function AddEditChargerModal({
     <Modal
       title={
         isEdit
-          ? `🛠️ Sửa Bộ sạc (ID: ${data?.ChargerId})`
+          ? `🛠️ Sửa Bộ sạc (ID: ${data?.ChargerId || data?.chargerId || "?"})`
           : `➕ Thêm Bộ sạc (Trạm ID: ${currentStationId})`
       }
       open={open}
@@ -22,38 +22,77 @@ export default function AddEditChargerModal({
       footer={null}
       destroyOnClose
     >
-      <input
-        type="text"
-        placeholder="Mã Bộ sạc (VD: C003) *"
-        name="Code"
-        value={data?.Code || ""}
-        onChange={onChange}
-      />
+      {/* === FORM NHẬP THÔNG TIN CHARGER === */}
+      <div className="form-grid">
+        {/* Mã trụ */}
+        <input
+          type="text"
+          placeholder="Mã Bộ sạc (VD: C003) *"
+          name="Code"
+          value={data?.Code || ""}
+          onChange={onChange}
+          className="input-field"
+        />
 
-      <select name="Type" value={data?.Type || "DC"} onChange={onChange}>
-        <option value="DC">⚡ DC (Sạc nhanh)</option>
-        <option value="AC">🔌 AC (Sạc chậm)</option>
-      </select>
+        {/* Loại trụ */}
+        <select
+          name="Type"
+          value={data?.Type || "DC"}
+          onChange={onChange}
+          className="input-field"
+        >
+          <option value="DC">⚡ DC (Sạc nhanh)</option>
+          <option value="AC">🔌 AC (Sạc chậm)</option>
+        </select>
 
-      <input
-        type="number"
-        placeholder="Công suất (PowerKw) *"
-        name="PowerKw"
-        value={data?.PowerKw || ""}
-        onChange={onChange}
-      />
+        {/* Công suất */}
+        <input
+          type="number"
+          placeholder="Công suất (PowerKw) *"
+          name="PowerKw"
+          value={data?.PowerKw || ""}
+          onChange={onChange}
+          className="input-field"
+        />
 
-      {/* ✅ Đồng bộ trạng thái Charger với BE */}
-      <select
-        name="Status"
-        value={data?.Status || "Online"}
-        onChange={onChange}
-      >
-        <option value="Online">🟢 Online (Hoạt động)</option>
-        <option value="Offline">⚫ Offline (Ngắt kết nối)</option>
-        <option value="Maintenance">🟠 Maintenance (Bảo trì)</option>
-      </select>
+        {/* Trạng thái */}
+        <select
+          name="Status"
+          value={data?.Status || "Online"}
+          onChange={onChange}
+          className="input-field"
+        >
+          <option value="Online">🟢 Online (Hoạt động)</option>
+          <option value="Offline">⚫ Offline (Ngắt kết nối)</option>
+          <option value="Maintenance">🟠 Maintenance (Bảo trì)</option>
+        </select>
 
+        {/* ✅ Thêm trường InstalledAt */}
+        <input
+          type="datetime-local"
+          placeholder="Ngày cài đặt"
+          name="InstalledAt"
+          value={
+            data?.InstalledAt
+              ? new Date(data.InstalledAt).toISOString().slice(0, 16)
+              : ""
+          }
+          onChange={onChange}
+          className="input-field"
+        />
+
+        {/* ✅ Thêm trường ImageUrl */}
+        <input
+          type="text"
+          placeholder="Link ảnh bộ sạc (Image URL)"
+          name="ImageUrl"
+          value={data?.ImageUrl || ""}
+          onChange={onChange}
+          className="input-field"
+        />
+      </div>
+
+      {/* === BUTTONS === */}
       <div className="modal-actions">
         <button onClick={onClose}>Hủy</button>
         <button className="save" onClick={onSubmit}>
