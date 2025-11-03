@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
+import { Pagination } from "antd";
 import "./SessionManager.css";
 
 const API_BASE = getApiBase();
 
-// === Helpers ===
 function fmtTime(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -37,7 +37,6 @@ export default function SessionManager() {
     loadSessions();
   }, []);
 
-  // ✅ Lấy danh sách phiên + hóa đơn tương ứng
   async function loadSessions() {
     setLoading(true);
     try {
@@ -45,31 +44,25 @@ export default function SessionManager() {
       let sessionArr = res?.data ?? res?.$values ?? res?.items ?? res ?? [];
       if (!Array.isArray(sessionArr)) sessionArr = [sessionArr];
 
-      // Lấy chi tiết từng phiên
-      const detailed = await Promise.all(
-        sessionArr.map(async (s) => {
-          try {
-            const det = await fetchAuthJSON(
-              `${API_BASE}/ChargingSessions/${s.chargingSessionId || s.id}`
-            );
-            return {
-              ...s,
-              ...det,
-              invoiceId: det?.data?.invoiceId || det?.invoiceId || s.invoiceId,
-            };
-          } catch {
-            return s;
-          }
-        })
-      );
+      const vehiclesRaw = await fetchAuthJSON(`${API_BASE}/Vehicles`);
+      let vehicles = [];
+      if (Array.isArray(vehiclesRaw)) vehicles = vehiclesRaw;
+      else if (Array.isArray(vehiclesRaw.data)) vehicles = vehiclesRaw.data;
+      else if (Array.isArray(vehiclesRaw.$values)) vehicles = vehiclesRaw.$values;
+      else if (Array.isArray(vehiclesRaw.items)) vehicles = vehiclesRaw.items;
+      else vehicles = Object.values(vehiclesRaw || {});
 
-      // Lấy toàn bộ hóa đơn
+      const vehicleMap = {};
+      for (const v of vehicles) {
+        const id = v.vehicleId ?? v.VehicleId;
+        if (id) vehicleMap[id] = v;
+      }
+
       const invRes = await fetchAuthJSON(`${API_BASE}/Invoices`);
       let invoices =
         invRes?.data ?? invRes?.$values ?? invRes?.items ?? invRes ?? [];
       if (!Array.isArray(invoices)) invoices = [invoices];
 
-      // Map phiên -> trạng thái hóa đơn
       const sessionToInvoiceStatus = {};
       for (const inv of invoices) {
         try {
@@ -91,25 +84,60 @@ export default function SessionManager() {
               };
             }
           });
-        } catch (e) {
-          console.error(`Error loading invoice ${inv.invoiceId}:`, e);
-        }
+        } catch {}
       }
 
-      // Gộp dữ liệu & sắp xếp theo ID giảm dần
+      const detailed = await Promise.all(
+        sessionArr.map(async (s) => {
+          try {
+            const det = await fetchAuthJSON(
+              `${API_BASE}/ChargingSessions/${s.chargingSessionId || s.id}`
+            );
+            return { ...s, ...det };
+          } catch {
+            return s;
+          }
+        })
+      );
+
       const merged = detailed
         .map((s) => {
           const sessionId = s.chargingSessionId || s.id;
           const invoiceInfo = sessionToInvoiceStatus[sessionId];
-          let invoiceStatus = "UNPAID";
-          if (invoiceInfo?.status) invoiceStatus = invoiceInfo.status;
+          const invoiceStatus = invoiceInfo?.status || "UNPAID";
+
+          const vId =
+            s.vehicleId ||
+            s.VehicleId ||
+            s.vehicle?.vehicleId ||
+            s.vehicle?.VehicleId ||
+            null;
+          const v = vehicleMap[vId] || {};
+
+          const licensePlate =
+            v.licensePlate ??
+            v.LicensePlate ??
+            s.licensePlate ??
+            s.LicensePlate ??
+            "—";
+
+          const custId = s.customerId ?? s.CustomerId;
+          const companyId = s.companyId ?? v.companyId ?? v.CompanyId ?? 0;
+
+          let customerType = "Khách bình thường";
+          if (!custId || custId === 0) customerType = "Khách vãng lai";
+          else if (companyId > 0) customerType = "Xe công ty";
 
           return {
             ...s,
-            energyKwh: s.energyKwh ?? 0,
-            total: s.total ?? 0,
-            invoiceStatus: invoiceStatus,
+            energyKwh: s.energyKwh ?? s.energyUsed ?? 0,
+            total: s.total ?? s.amount ?? 0,
+            startedAt: s.startedAt ?? s.startTime,
+            endedAt: s.endedAt ?? s.endTime,
+            invoiceStatus,
             invoiceId: invoiceInfo?.invoiceId || null,
+            customerType,
+            licensePlate,
           };
         })
         .sort((a, b) => (b.chargingSessionId || 0) - (a.chargingSessionId || 0));
@@ -117,13 +145,12 @@ export default function SessionManager() {
       setSessions(merged);
     } catch (e) {
       console.error(e);
-      setErr("Không thể tải danh sách phiên hoặc hóa đơn!");
+      setErr("Không thể tải danh sách phiên hoặc dữ liệu kWh!");
     } finally {
       setLoading(false);
     }
   }
 
-  // ✅ Dừng phiên
   async function handleStopSession(s) {
     const confirmStop = window.confirm(
       `Bạn có chắc chắn muốn dừng phiên sạc #${s.chargingSessionId}?`
@@ -131,13 +158,28 @@ export default function SessionManager() {
     if (!confirmStop) return;
 
     try {
-      const res = await fetchAuthJSON(`${API_BASE}/ChargingSessions/end`, {
+      const isGuest = !s.customerId || s.customerId === 0;
+      const endpoint = isGuest
+        ? `${API_BASE}/ChargingSessions/guest/end`
+        : `${API_BASE}/ChargingSessions/end`;
+
+      const payload = isGuest
+        ? {
+            chargingSessionId: s.chargingSessionId,
+            licensePlate: s.licensePlate ?? "UNKNOWN",
+            portId: s.portId,
+            PortCode: s.portCode ?? `P${String(s.portId).padStart(3, "0")}`,
+            endSoc: s.endSoc ?? 80,
+          }
+        : {
+            chargingSessionId: s.chargingSessionId,
+            endSoc: s.endSoc ?? 80,
+          };
+
+      const res = await fetchAuthJSON(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chargingSessionId: s.chargingSessionId,
-          endSoc: s.endSoc ?? 80,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const beData = res?.data || res;
@@ -152,17 +194,12 @@ export default function SessionManager() {
         ...beData,
         chargingSessionId: beData.chargingSessionId ?? s.chargingSessionId,
         customerId: beData.customerId ?? s.customerId ?? "—",
-        customerName:
-          beData.customerName ?? s.customerName ?? s.name ?? "Không có",
+        licensePlate: s.licensePlate ?? "—",
         startedAt: beData.startedAt ?? s.startedAt ?? new Date().toISOString(),
         endedAt: beData.endedAt ?? new Date().toISOString(),
         energyKwh: beData.energyKwh ?? s.energyKwh ?? 0,
         total: beData.total ?? s.total ?? 0,
-        station: s.station ?? { id: s.stationId, name: s.stationName },
-        charger: s.charger ?? { id: s.chargerId, name: s.chargerName },
-        gun: s.gun ?? { id: s.portId },
         invoiceStatus: "UNPAID",
-        isMonthlyInvoice: false,
       };
 
       sessionStorage.setItem(`chargepay:${orderId}`, JSON.stringify(finalPayload));
@@ -180,12 +217,13 @@ export default function SessionManager() {
     }
   }
 
-  // ✅ Lọc & tìm kiếm
+  /* ===== Filtering + Search ===== */
   const filteredSessions = sessions.filter((s) => {
     const matchSearch = search
       ? String(s.chargingSessionId)
           .toLowerCase()
-          .includes(search.toLowerCase())
+          .includes(search.toLowerCase()) ||
+        String(s.licensePlate).toLowerCase().includes(search.toLowerCase())
       : true;
     const matchStatus =
       filterStatus === "all"
@@ -196,14 +234,12 @@ export default function SessionManager() {
     return matchSearch && matchStatus;
   });
 
-  // ✅ Thống kê
   const total = sessions.length;
   const chargingCount = sessions.filter(
     (s) => (s.status || "").toLowerCase() === "charging"
   ).length;
   const stoppedCount = total - chargingCount;
 
-  // ✅ Phân trang
   const totalPages = Math.ceil(filteredSessions.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedSessions = filteredSessions.slice(
@@ -216,12 +252,10 @@ export default function SessionManager() {
       <div className="sess-card">
         <div className="sess-head">
           <h3>Phiên sạc (đang chạy / lịch sử)</h3>
-
-          {/* 🔍 Thanh tìm kiếm + Lọc */}
           <div className="sess-filters">
             <input
               type="text"
-              placeholder="🔍 Tìm mã phiên..."
+              placeholder="🔍 Tìm mã hoặc biển số..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -241,17 +275,18 @@ export default function SessionManager() {
               <option value="charging">Đang sạc</option>
               <option value="stopped">Đã dừng</option>
             </select>
+            <button className="btn-light" onClick={loadSessions}>
+              🔄 Làm mới
+            </button>
           </div>
         </div>
 
-        {/* 📊 Thanh thống kê */}
         <div className="sess-summary">
           <span>🧾 Tổng số phiên: <strong>{total}</strong></span>
           <span>⚡ Đang sạc: <strong>{chargingCount}</strong></span>
           <span>✅ Đã dừng: <strong>{stoppedCount}</strong></span>
         </div>
 
-        {/* === Bảng dữ liệu === */}
         <div className="sess-table">
           <table>
             <thead>
@@ -259,30 +294,30 @@ export default function SessionManager() {
                 <th>Mã phiên</th>
                 <th>Trụ</th>
                 <th>Khách hàng</th>
+                <th>Biển số</th>
+                <th>Loại</th>
                 <th>Bắt đầu</th>
                 <th>Kết thúc</th>
                 <th>kWh</th>
                 <th>Chi phí</th>
                 <th>TT</th>
-                <th style={{ width: "160px" }}>Thao tác</th>
+                <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="center muted">
+                  <td colSpan={11} className="center muted">
                     Đang tải…
                   </td>
                 </tr>
               ) : err ? (
                 <tr>
-                  <td colSpan={9} className="center error">
-                    {err}
-                  </td>
+                  <td colSpan={11} className="center error">{err}</td>
                 </tr>
               ) : filteredSessions.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="center muted">
+                  <td colSpan={11} className="center muted">
                     Không tìm thấy phiên phù hợp.
                   </td>
                 </tr>
@@ -292,6 +327,20 @@ export default function SessionManager() {
                     <td className="strong">S-{s.chargingSessionId}</td>
                     <td>{s.portId ?? "—"}</td>
                     <td>{s.customerId ? `CUST-${s.customerId}` : "—"}</td>
+                    <td>{s.licensePlate}</td>
+                    <td>
+                      <span
+                        className={`cust-type ${
+                          s.customerType === "Khách vãng lai"
+                            ? "guest"
+                            : s.customerType === "Xe công ty"
+                            ? "company"
+                            : "normal"
+                        }`}
+                      >
+                        {s.customerType}
+                      </span>
+                    </td>
                     <td>{fmtTime(s.startedAt)}</td>
                     <td>{fmtTime(s.endedAt)}</td>
                     <td>{s.energyKwh?.toFixed(2) ?? "—"}</td>
@@ -321,9 +370,10 @@ export default function SessionManager() {
                         <button
                           className="btn-light"
                           onClick={() =>
-                            navigate(`/staff/invoice?order=S${s.chargingSessionId}`, {
-                              state: s,
-                            })
+                            navigate(
+                              `/staff/invoice?order=S${s.chargingSessionId}`,
+                              { state: s }
+                            )
                           }
                         >
                           Chi tiết
@@ -337,26 +387,16 @@ export default function SessionManager() {
           </table>
         </div>
 
-        {/* ✅ Pagination */}
-        {!loading && filteredSessions.length > pageSize && (
-          <div className="pagination">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => p - 1)}
-            >
-              ← Trang trước
-            </button>
-            <span>
-              Trang {currentPage} / {totalPages}
-            </span>
-            <button
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((p) => p + 1)}
-            >
-              Trang sau →
-            </button>
-          </div>
-        )}
+        {/* ✅ Thanh phân trang Ant Design */}
+        <div style={{ textAlign: "center", marginTop: 16 }}>
+          <Pagination
+            current={currentPage}
+            pageSize={pageSize}
+            total={filteredSessions.length}
+            onChange={(page) => setCurrentPage(page)}
+            showSizeChanger={false}
+          />
+        </div>
       </div>
     </div>
   );

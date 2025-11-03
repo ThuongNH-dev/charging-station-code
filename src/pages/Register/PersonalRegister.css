@@ -1,4 +1,4 @@
-.business-register {
+.personal-register {
   position: relative;
   min-height: 100vh;
   display: flex;
@@ -8,12 +8,13 @@
   overflow: hidden;
 }
 
-.business-register::before {
+/* nền ảnh phủ mờ */
+.personal-register::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
-  background:
+  background: 
     linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.35)),
     url("/Parking_lotV4.png") center / cover no-repeat;
   filter: brightness(0.9);
@@ -21,18 +22,20 @@
   pointer-events: none;
 }
 
-.register-container {
+/* form chính */
+.register-card {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(6px);
   padding: 40px 50px;
   width: 100%;
-  max-width: 600px;
+  max-width: 460px;
   animation: fadeInUp 0.5s ease;
 }
 
-.form-title {
+/* tiêu đề */
+.register-title {
   text-align: center;
   color: #dcdcdcff;
   font-size: 24px;
@@ -40,51 +43,38 @@
   margin-bottom: 24px;
 }
 
-.form-group label {
-  color: #dcdcdcff;
-  display: block;
-  margin-bottom: 6px;
+/* input */
+.ant-form-item-label > label {
+  color: #dcdcdcff !important;
   font-weight: 500;
 }
 
-.form-group input {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-  padding: 10px 12px;
-  outline: none;
+.ant-input,
+.ant-input-password {
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
 }
 
-.form-group input::placeholder {
-  color: #aaa;
+.ant-input::placeholder {
+  color: #aaa !important;
 }
 
-.checkbox {
-  color: #dcdcdcff;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.primary-btn {
-  margin-top: 20px;
-  width: 100%;
-  background: #dcdcdcff;
-  color: #111;
-  border: none;
-  padding: 12px;
-  border-radius: 8px;
-  cursor: pointer;
+.ant-btn-primary {
+  background: #dcdcdcff !important;
+  color: #111 !important;
+  border: none !important;
+  border-radius: 8px !important;
   font-weight: 600;
 }
 
-.primary-btn:hover {
-  background: #fff;
+.ant-btn-primary:hover {
+  background: #fff !important;
+  color: #000 !important;
 }
 
+/* hiệu ứng fade nhẹ */
 @keyframes fadeInUp {
   from {
     opacity: 0;

@@ -1,157 +1,140 @@
 .station-wrap {
   padding: 24px;
   background: #f6f7fb;
-  min-height: 100%;
+  min-height: 100vh;
+  border-radius: 12px;
 }
 
-.station-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 16px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-}
-
-.station-form {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-
-.station-form input,
-.station-form select {
-  padding: 8px;
-  border-radius: 6px;
-  border: 1px solid #d0d7de;
-  font-size: 14px;
-}
-
-.btn {
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-}
-
-.btn.primary {
-  background: #1677ff;
-  color: white;
-}
-
-.btn.cancel {
-  background: #e5e7eb;
-}
-
-.station-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.station-table th,
-.station-table td {
-  border-top: 1px solid #e2e8f0;
-  padding: 8px;
-  text-align: left;
-}
-
-.pill {
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 13px;
-}
-
-.pill.ok {
-  background: #f6ffed;
-  color: #237804;
-  border: 1px solid #b7eb8f;
-}
-
-.pill.warn {
-  background: #fff7e6;
-  color: #ad6800;
-  border: 1px solid #ffd591;
-}
-
-.error {
-  color: red;
-  font-weight: bold;
-}
-.station-wrap {
-  padding: 20px;
+/* ==== Tổng quan ==== */
+.sum-card {
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  text-align: center;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
 }
 
-.station-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.station-head h2 {
-  margin: 0;
-  font-weight: 600;
-}
-
-.actions button {
-  padding: 0 6px;
-}
-.station-wrap {
-  padding: 20px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.station-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.station-head h2 {
-  margin: 0;
-  font-weight: 700;
-}
-
-.actions button {
-  padding: 0 6px;
-}
-
-.pill {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.pill.ok {
-  background: #f6ffed;
-  color: #237804;
-  border: 1px solid #b7eb8f;
-}
-
-.pill.danger {
-  background: #fff2f0;
-  color: #a8071a;
-  border: 1px solid #ffa39e;
-}
-.station-search input {
-  font-size: 15px;
-  padding: 8px 12px;
-}
-.station-search {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+.sum-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
 }
 
 .sum-card h3 {
   font-size: 16px;
-  margin-bottom: 4px;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+/* ==== Thanh tìm kiếm ==== */
+.station-search {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.station-search input {
+  font-size: 15px;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+/* ==== Bảng ==== */
+.actions button {
+  padding: 0 6px;
+  font-weight: 500;
+}
+
+.ant-table {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ant-table-thead > tr > th {
+  background: #fafafa;
+  font-weight: 600;
+}
+
+/* ==== Modal chi tiết ==== */
+.ant-modal-title {
+  font-weight: 700 !important;
+}
+
+.muted {
+  color: #999;
+  font-style: italic;
+}
+
+.ant-list {
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin-top: 4px;
+}
+
+.ant-list-item {
+  padding: 8px 12px !important;
+  border-radius: 6px;
+  transition: background 0.2s ease;
+}
+
+.ant-list-item:hover {
+  background: #f0f5ff;
+}
+
+.ant-list-item div strong {
+  color: #222;
+}
+
+.ant-list-item .ant-btn-text {
+  color: #ff4d4f;
+  font-weight: 500;
+}
+
+/* ==== Form thêm nhân viên ==== */
+.ant-form-inline {
+  margin-top: 12px;
+  gap: 8px;
+}
+
+.ant-form-item-label label {
+  font-weight: 500;
+}
+
+.ant-input {
+  border-radius: 8px !important;
+}
+
+.ant-btn-primary {
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+/* ==== Thẻ trạng thái ==== */
+.ant-tag {
+  font-size: 13px;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+/* ==== Responsive ==== */
+@media (max-width: 768px) {
+  .sum-card h3 {
+    font-size: 14px;
+  }
+
+  .station-search input {
+    width: 100% !important;
+  }
+
+  .station-wrap {
+    padding: 16px;
+  }
+
+  .ant-modal {
+    width: 95% !important;
+  }
 }

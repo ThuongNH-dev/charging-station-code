@@ -1,135 +1,149 @@
-// src/pages/Register/PersonalRegister.jsx
 import React, { useState } from "react";
-import { Form, Input, Button, message } from "antd";
-import { UserOutlined, MailOutlined, LockOutlined, PhoneOutlined } from "@ant-design/icons";
-import { fetchJSON, getApiBase } from "../../utils/api";
+import { getApiBase, fetchAuthJSON } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
-import "./Register.css";
+import MainLayout from "../../layouts/MainLayout";
+import "./PersonalRegister.css";
 
 const API_BASE = getApiBase();
 
-const PersonalRegister = () => {
-  const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
+export default function PersonalRegister() {
   const navigate = useNavigate();
+  const [form, setForm] = useState({
+    userName: "",
+    fullName: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+  });
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (values) => {
+  const handleChange = (e) =>
+    setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
     try {
-      setLoading(true);
-
-      const payload = {
-        userName: values.userName,
-        password: values.password,
-        confirmPassword: values.confirmPassword,
-        fullName: values.fullName,
-        phone: values.phone,
-        email: values.email,
-      };
-
-      console.log("Sending payload:", payload);
-
-      await fetchJSON(`${API_BASE}/Auth/register-customer`, {
+      const res = await fetchAuthJSON(`${API_BASE}/Auth/register-customer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(form),
       });
 
-      message.success("🎉 Đăng ký tài khoản cá nhân thành công!");
-      form.resetFields();
+      if (!res || !res.message?.includes("thành công")) {
+        alert("Đăng ký thất bại. Vui lòng kiểm tra lại thông tin!");
+        setLoading(false);
+        return;
+      }
 
-      setTimeout(() => navigate("/login"), 1000);
+      alert("🎉 Đăng ký tài khoản cá nhân thành công!");
+      navigate("/login");
     } catch (err) {
       console.error("❌ Register error:", err);
-      message.error("Đăng ký thất bại. Vui lòng kiểm tra lại thông tin!");
+      alert("Lỗi kết nối đến máy chủ!");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="register-bg">
-      <div className="register-card w-[420px]">
-        <h2 className="font-semibold mb-6 text-center" style={{ fontSize: 28, color: "#fff" }}>
-          Đăng ký cá nhân
-        </h2>
+    <MainLayout>
+      <div className="personal-register">
+        <div className="register-card">
+          <h2 className="register-title">Đăng ký cá nhân</h2>
 
-        <Form layout="vertical" form={form} onFinish={handleSubmit} autoComplete="off">
-          <Form.Item
-            label={<span style={{ color: "#fff" }}>Tên đăng nhập</span>}
-            name="userName"
-            rules={[{ required: true, message: "Vui lòng nhập tên đăng nhập!" }]}
-          >
-            <Input placeholder="Tên đăng nhập" prefix={<UserOutlined />} />
-          </Form.Item>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">Tên đăng nhập</label>
+              <input
+                className="form-input"
+                name="userName"
+                value={form.userName}
+                onChange={handleChange}
+                required
+                placeholder="Nhập tên đăng nhập"
+              />
+            </div>
 
-          <Form.Item
-            label={<span style={{ color: "#fff" }}>Họ và tên</span>}
-            name="fullName"
-            rules={[{ required: true, message: "Vui lòng nhập họ và tên!" }]}
-          >
-            <Input placeholder="Họ và tên đầy đủ" prefix={<UserOutlined />} />
-          </Form.Item>
+            <div className="form-group">
+              <label className="form-label">Họ và tên</label>
+              <input
+                className="form-input"
+                name="fullName"
+                value={form.fullName}
+                onChange={handleChange}
+                required
+                placeholder="Nhập họ và tên đầy đủ"
+              />
+            </div>
 
-          <Form.Item
-            label={<span style={{ color: "#fff" }}>Email</span>}
-            name="email"
-            rules={[
-              { required: true, message: "Vui lòng nhập email!" },
-              { type: "email", message: "Email không hợp lệ!" },
-            ]}
-          >
-            <Input placeholder="Địa chỉ email" prefix={<MailOutlined />} />
-          </Form.Item>
+            <div className="form-group">
+              <label className="form-label">Email</label>
+              <input
+                className="form-input"
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={handleChange}
+                required
+                placeholder="example@email.com"
+              />
+            </div>
 
-          <Form.Item
-            label={<span style={{ color: "#fff" }}>Số điện thoại</span>}
-            name="phone"
-            rules={[{ required: true, message: "Vui lòng nhập số điện thoại!" }]}
-          >
-            <Input placeholder="Số điện thoại" prefix={<PhoneOutlined />} />
-          </Form.Item>
+            <div className="form-group">
+              <label className="form-label">Số điện thoại</label>
+              <input
+                className="form-input"
+                name="phone"
+                value={form.phone}
+                onChange={handleChange}
+                required
+                placeholder="+84xxxxxxxxx"
+              />
+            </div>
 
-          <Form.Item
-            label={<span style={{ color: "#fff" }}>Mật khẩu</span>}
-            name="password"
-            rules={[
-              { required: true, message: "Vui lòng nhập mật khẩu!" },
-              { min: 8, message: "Mật khẩu phải có ít nhất 8 ký tự!" },
-            ]}
-          >
-            <Input.Password placeholder="Nhập mật khẩu" prefix={<LockOutlined />} />
-          </Form.Item>
+            <div className="form-group">
+              <label className="form-label">Mật khẩu</label>
+              <input
+                className="form-input"
+                type="password"
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                required
+                placeholder="Tạo mật khẩu"
+              />
+            </div>
 
-          <Form.Item
-            label={<span style={{ color: "#fff" }}>Xác nhận mật khẩu</span>}
-            name="confirmPassword"
-            dependencies={["password"]}
-            rules={[
-              { required: true, message: "Vui lòng xác nhận mật khẩu!" },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (!value || getFieldValue("password") === value) return Promise.resolve();
-                  return Promise.reject(new Error("Mật khẩu không khớp!"));
-                },
-              }),
-            ]}
-          >
-            <Input.Password placeholder="Nhập lại mật khẩu" prefix={<LockOutlined />} />
-          </Form.Item>
+            <div className="form-group">
+              <label className="form-label">Xác nhận mật khẩu</label>
+              <input
+                className="form-input"
+                type="password"
+                name="confirmPassword"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                required
+                placeholder="Nhập lại mật khẩu"
+              />
+            </div>
 
-          <Form.Item>
-            <Button type="primary" block htmlType="submit" size="large" loading={loading}>
-              Đăng ký
-            </Button>
-          </Form.Item>
+            <button
+              type="submit"
+              className="primary-btn"
+              disabled={loading}
+            >
+              {loading ? "Đang xử lý..." : "Đăng ký"}
+            </button>
 
-          <div style={{ textAlign: "center", color: "#fff" }}>
-            Đã có tài khoản? <b onClick={() => navigate("/login")} style={{ cursor: "pointer" }}>Đăng nhập</b>
-          </div>
-        </Form>
+            <div className="signup-link">
+              Đã có tài khoản?{" "}
+              <a onClick={() => navigate("/login")}>Đăng nhập</a>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </MainLayout>
   );
-};
-
-export default PersonalRegister;
+}

@@ -148,3 +148,77 @@
     font-size: 13px;
   }
 }
+/* ====== Dropdown chọn trạm ====== */
+.rep-station-select {
+  width: 100%;
+  max-width: 1100px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rep-station-select label {
+  font-weight: 500;
+  color: #374151;
+}
+
+.rep-station-select select {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+/* ====== Dòng hiển thị trạm hiện tại ====== */
+.rep-current-station {
+  width: 100%;
+  max-width: 1100px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.rep-current-station strong {
+  color: #111827;
+}
+.rep-filters {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.rep-filters select {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 14px;
+}
+
+.rep-current-station {
+  font-size: 14px;
+  color: #374151;
+  margin-bottom: 20px;
+}
+
+.rep-chart {
+  width: 100%;
+  max-width: 1100px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  padding: 15px 20px;
+}
+.rep-chart {
+  margin-top: 10px;
+  width: 100%;
+  max-width: 1100px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  padding: 15px 20px;
+}

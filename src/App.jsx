@@ -18,6 +18,7 @@ import Unauthorized from "./pages/Unauthorized";
 import BookingHistory from "./pages/booking/BookingHisory";
 import InvoicePage from "./components/charging/Invoice";
 import StaffLayout from "./layouts/StaffLayout";
+import StaffPaymentSuccess from "./pages/staff/StaffPaymentSuccess";
 import AdminLayout from "./components/admin/layout/AdminLayout";
 import StationPage from "./components/admin/pages/station/StationPage";
 import StationDetailPage from "./components/admin/pages/station/StationDetailPage";
@@ -171,7 +172,7 @@ export default function App() {
       <Route
         path="/payment/success"
         element={
-          <ProtectedRoute allowedRoles={["Customer"]}>
+          <ProtectedRoute allowedRoles={["Customer", "Staff"]}>
             <PaymentSuccess />
           </ProtectedRoute>
         }
@@ -213,7 +214,7 @@ export default function App() {
       <Route
         path="/invoiceSummary"
         element={
-          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
+          <ProtectedRoute allowedRoles={["Customer", "Company", "Staff"]}>
             <InvoiceSummary />
           </ProtectedRoute>
         }
@@ -221,7 +222,7 @@ export default function App() {
       <Route
         path="/invoiceDetail/:invoiceId"
         element={
-          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
+          <ProtectedRoute allowedRoles={["Customer", "Company", "Staff"]}>
             <InvoiceDetail />
           </ProtectedRoute>
         }
@@ -314,14 +315,23 @@ export default function App() {
       <Route
         path="/company/reports"
         element={
-          <ProtectedRoute allowedRoles={["Company","Customer"]}>
-            <MonthlyStats/>
+          <ProtectedRoute allowedRoles={["Company", "Customer"]}>
+            <MonthlyStats />
           </ProtectedRoute>
         }
       />
-      {/*Staff */}
 
       {/* Staff */}
+      {/* ✅ Đặt TRƯỚC để không bị /staff/* catch */}
+      <Route
+        path="/staff/payment-success"
+        element={
+          <ProtectedRoute allowedRoles={["Staff"]}>
+            <StaffPaymentSuccess />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/staff/*"
         element={
@@ -363,12 +373,12 @@ export default function App() {
         }
       />
       <Route
-      path="/manageSubcription"
-      element={
-        <ProtectedRoute allowedRoles={["Customer","Company"]}>
-          <ManageSubscriptions/>
-        </ProtectedRoute>
-      }
+        path="/manageSubcription"
+        element={
+          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
+            <ManageSubscriptions />
+          </ProtectedRoute>
+        }
       />
 
       {/* FALLBACK */}
