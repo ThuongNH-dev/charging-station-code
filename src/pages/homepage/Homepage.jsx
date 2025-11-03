@@ -188,6 +188,21 @@ export default function Homepage() {
             </div>
           </div>
 
+          {/* ===== CTA ===== */}
+          <section className="find">
+            <Title level={1}>Tìm trạm sạc</Title>
+            <p>Xem mạng lưới các trạm sạc gần chỗ bạn.</p>
+            <div className="btn-row">
+              <button className="btn-primary" onClick={() => navigate("/stations")}>
+                Xem mạng lưới
+              </button>
+              <button className="btn-outline" onClick={() => navigate("/about")}>
+                Tìm hiểu thêm
+              </button>
+            </div>
+          </section>
+
+
           {/* ===== STRIP TRẠM GẦN BẠN ===== */}
           <section className="station-strip">
             <div className="strip-head" style={{ gap: 8, alignItems: "center" }}>
@@ -236,9 +251,8 @@ export default function Homepage() {
                           ref={(el) => {
                             if (el && st.id != null) itemRefs.current[st.id] = el;
                           }}
-                          className={`station-card stationListItemWrapper station-card-clickable${
-                            String(st.id) === String(selectedStationId) ? " highlight-card" : ""
-                          }`}
+                          className={`station-card stationListItemWrapper station-card-clickable${String(st.id) === String(selectedStationId) ? " highlight-card" : ""
+                            }`}
                           role="button"
                           tabIndex={0}
                           onClick={() => navigate(`/stations/${st.id}`)}
@@ -277,20 +291,6 @@ export default function Homepage() {
                 </div>
               </>
             )}
-          </section>
-
-          {/* ===== CTA ===== */}
-          <section className="find">
-            <Title level={1}>Tìm trạm sạc</Title>
-            <p>Xem mạng lưới các trạm sạc gần chỗ bạn.</p>
-            <div className="btn-row">
-              <button className="btn-primary" onClick={() => navigate("/stations")}>
-                Xem mạng lưới
-              </button>
-              <button className="btn-outline" onClick={() => navigate("/about")}>
-                Tìm hiểu thêm
-              </button>
-            </div>
           </section>
 
           {/* ===== NEWSLETTER ===== */}
