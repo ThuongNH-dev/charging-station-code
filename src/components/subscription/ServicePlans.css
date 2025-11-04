@@ -1,150 +1,261 @@
 /* ======================== */
-/* 🌐 Toàn trang dịch vụ */
+/* 🌐 Trang gói dịch vụ — Look mới */
 /* ======================== */
-.service-page {
-  padding: 40px 80px; /* Khoảng cách lề trong (top/bottom: 40px, left/right: 80px) */
-  font-family: "Segoe UI", sans-serif; /* Font chữ chính cho toàn trang */
-  color: #1f1f1f; /* Màu chữ mặc định */
-  background-color: #fff; /* Nền trắng cho toàn trang */
-  text-align: center; /* Căn giữa toàn bộ nội dung văn bản */
+
+/* ---- Reset nhỏ để text cân đối hơn ---- */
+:root{
+  --green: #0b702e;          /* brand green (toggle/accents) */
+  --green-2: #006d32;        /* primary button */
+  --green-3: #009e44;        /* hover btn */
+  --money: #16ca55;          /* price */
+  --ink-1: #111;             /* primary text */
+  --ink-2: #555;             /* secondary text */
+  --ink-3: #888;             /* muted */
+  --line: #e9e9e9;           /* hairline */
+  --card: #ffffffcc;         /* glass card */
+  --bg: #ffffff;             /* page bg */
+  --radius-xl: 20px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --shadow-sm: 0 6px 18px rgba(0,0,0,.06);
+  --shadow-md: 0 14px 34px rgba(0,0,0,.10);
 }
 
-/* ======================== */
-/* 🏷️ Tiêu đề chính và phụ */
-/* ======================== */
-.title {
-  font-size: 30px; /* Kích thước chữ tiêu đề chính */
-  font-weight: 700; /* In đậm tiêu đề */
-  margin-bottom: 8px; /* Khoảng cách dưới tiêu đề */
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink-1:#f4f6f7; --ink-2:#cfd6da; --ink-3:#9aa6ad;
+    --line:#2c2f33; --card:#0f1419cc; --bg:#0b0f14;
+    --shadow-sm: 0 6px 22px rgba(0,0,0,.35);
+    --shadow-md: 0 18px 44px rgba(0,0,0,.45);
+  }
 }
 
-.subtitle {
-  color: #555; /* Màu xám nhẹ cho phụ đề */
-  font-size: 16px; /* Kích thước chữ phụ đề */
-  margin-bottom: 40px; /* Tạo khoảng trống giữa phụ đề và phần kế tiếp */
+/* ---- Page background: nhẹ nhàng, hiện đại ---- */
+.service-page{
+  --grad-a: rgba(0, 157, 68, .06);
+  --grad-b: rgba(0, 109, 50, .04);
+  padding: 48px min(6vw, 80px);
+  font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ink-1);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, var(--grad-a), transparent 60%),
+    radial-gradient(900px 500px at 95% 10%, var(--grad-b), transparent 55%),
+    var(--bg);
+  backdrop-filter: saturate(110%);
+  text-align: center;
 }
 
-/* ======================== */
-/* 📦 Các phần (section) */
-/* ======================== */
-.section {
-  margin-bottom: 60px; /* Cách nhau giữa các phần */
+/* ---- Page header ---- */
+.title{
+  font-size: clamp(28px, 3.2vw, 36px);
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  margin: 0 0 8px 0;
+}
+.subtitle{
+  color: var(--ink-2);
+  font-size: clamp(15px, 1.6vw, 17px);
+  margin: 0 auto 36px;
+  max-width: 820px;
 }
 
-/* Tiêu đề của từng phần (VD: “Gói doanh nghiệp”) */
-.section-title {
-  font-size: 22px;
-  font-weight: 600;
-  margin-bottom: 16px; /* Tạo khoảng trống phía dưới */
-}
-
-/* Tiêu đề con (VD: “Gói hội viên”) */
-.subsection-title {
-  font-size: 22px;
-  font-weight: 600;
-  margin-top: 24px;
-  margin-bottom: 12px;
-}
-.card-container h4 {
-  font-size: 25px;
-  font-weight: bold;
-}
-
-/* ======================== */
-/* 🔘 Nút chuyển đổi Tháng/Năm */
-/* ======================== */
-.toggle {
-  display: flex; /* Sắp xếp các nút nằm ngang */
-  justify-content: center; /* Căn giữa các nút */
-  gap: 10px; /* Khoảng cách giữa các nút */
-  margin-bottom: 30px; /* Khoảng cách phía dưới nhóm nút */
-}
-
-/* Nút toggle cơ bản */
-.toggle-btn {
-  background-color: transparent; /* Nền trong suốt */
-  border: 1px solid #ddd; /* Viền xám nhạt */
-  padding: 6px 16px; /* Khoảng đệm trong nút */
-  border-radius: 20px; /* Bo tròn nút */
-  font-size: 14px;
-  cursor: pointer; /* Biểu tượng con trỏ tay */
-}
-
-/* Nút toggle đang được chọn */
-.toggle-btn.active {
-  background-color: #0b702e; /* Nền xanh dương */
-  color: #fff; /* Chữ trắng */
-  border-color: #0b702e; /* Viền cùng màu nền */
+/* ---- Sections ---- */
+.section{ margin: 56px auto; }
+.section-title{
+  font-size: 24px !important;
+  margin-bottom: 20px !important;
+  font-size: clamp(20px, 2.2vw, 24px);
+  font-weight: 700;
+  margin: 0 0 18px 0;
 }
 
 /* ======================== */
-/* 💳 Thẻ hiển thị gói dịch vụ */
+/* 🔘 Toggle Tháng / Năm */
 /* ======================== */
-.card-container {
-  display: flex; /* Hiển thị các thẻ nằm cạnh nhau */
-  justify-content: center; /* Căn giữa cả nhóm thẻ */
-  gap: 70px; /* Khoảng cách giữa các thẻ */
-  flex-wrap: wrap; /* Cho phép xuống hàng nếu màn hình nhỏ */
-}
-
-/* Một thẻ gói dịch vụ */
-.card {
-  background-color: #fff; /* Nền trắng */
-  border: 1px solid #e0e0e0; /* Viền mảnh xám nhạt */
-  border-radius: 16px; /* Bo góc mềm mại */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05); /* Đổ bóng nhẹ */
-  width: 280px;
-  height: 370px; /* Độ rộng cố định mỗi thẻ */
-  padding: 35px 24px 16px; /* Khoảng cách nội dung bên trong */
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between; /* Trên cùng - giữa - dưới cùng */
+.toggle{
+  display: inline-flex;
   align-items: center;
-  text-align: center; /* Căn giữa nội dung */
-  transition: transform 0.25s ease, box-shadow 0.25s ease; /* Hiệu ứng hover mượt */
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(6px);
 }
-
-.card p {
-  margin: 4px 0; /* 🔹 Giảm khoảng cách giữa các dòng */
-  line-height: 1.4;
+.toggle-btn{
+  position: relative;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: transform .15s ease;
 }
-
-/* Hiệu ứng khi rê chuột lên thẻ */
-.card:hover {
-  transform: translateY(-4px); /* Nhấc thẻ lên nhẹ */
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1); /* Bóng đậm hơn */
+.toggle-btn:focus-visible{ outline: 2px solid color-mix(in oklab, var(--green), white 40%); outline-offset: 2px; }
+.toggle-btn:hover{ transform: translateY(-1px); }
+.toggle-btn.active{
+  background: var(--green);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(11,112,46,.25);
 }
 
 /* ======================== */
-/* 💰 Phần hiển thị giá tiền */
+/* 💳 Card grid */
 /* ======================== */
-.price {
-  font-size: 26px; /* Kích thước giá */
-  font-weight: 700; /* In đậm giá */
-  color: #16ca55; /* Màu xanh nổi bật */
-  margin-bottom: 8px; /* Cách dưới */
-}
-.name {
-  font-size: 25px;
-  font-weight: bold;
-}
-
-/* ======================== */
-/* ⬆️ Nút nâng cấp gói */
-/* ======================== */
-.upgrade-btn {
-  margin-top: 4px;
-  margin-bottom: 10px; /* Cách phần nội dung trên */
-  background-color: #006d32; /* Màu nền xanh dương */
-  color: white; /* Chữ trắng */
-  border: none; /* Xóa viền mặc định */
-  border-radius: 8px; /* Bo góc mềm mại */
-  padding: 8px 18px; /* Khoảng đệm trong nút */
-  cursor: pointer; /* Con trỏ tay khi hover */
-  transition: background-color 0.2s ease; /* Hiệu ứng chuyển màu */
+.card-container{
+  --min: 270px; /* min card width */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--min), 1fr));
+  gap: clamp(18px, 3vw, 28px);
+  align-items: stretch;
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: left;
 }
 
-/* Khi rê chuột vào nút */
-.upgrade-btn:hover {
-  background-color: #009e44; /* Đậm hơn để phản hồi hành động */
+/* ---- Card ---- */
+.card{
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  padding: 22px 20px 16px;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(8px);
+  transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease;
+  overflow: clip;
+}
+.card:hover{
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-md);
+  border-color: color-mix(in oklab, var(--green), var(--line) 70%);
+}
+
+/* Ribbon “Phổ biến” cho card thứ 2 như ví dụ
+   (nếu muốn set chính xác, thêm class .is-popular vào card tương ứng) */
+.card:nth-child(2)::before,
+.card.is-popular::before{
+  content: "Phổ biến";
+  position: absolute;
+  top: 14px; right: -44px;
+  rotate: 36deg;
+  background: linear-gradient(90deg, var(--green), #0a8641);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  padding: 6px 56px;
+  box-shadow: 0 8px 18px rgba(0,0,0,.18);
+}
+
+/* Headings & text inside card */
+.name{ font-size: 20px; font-weight: 800; letter-spacing: -.01em; margin: 2px 0 6px; }
+.card h4{ font-size: 20px; font-weight: 800; letter-spacing: -.01em; margin: 2px 0 6px; }
+.price{
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--money);
+  margin: 2px 0 10px;
+}
+.card p{ margin: 4px 0; line-height: 1.5; color: var(--ink-2); }
+.muted{ color: var(--ink-3)!important; }
+
+/* Feature bullets (tự động biến dòng thành dấu chấm đẹp nếu có nhiều dòng) */
+.card p + p:not(.muted)::before{
+  /* no bullet on first paragraph after muted */
+}
+.card p + p{ position: relative; padding-left: 20px; }
+.card p + p::before{
+  content: "";
+  position: absolute; left: 0; top: .8em;
+  width: 6px; height: 6px; border-radius: 999px;
+  background: color-mix(in oklab, var(--green), white 20%);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--green), transparent 80%);
+}
+
+/* Divider line subtle */
+/* (Nếu muốn ngăn cách nội dung, bạn có thể chèn <hr class="card-hr" /> trong JSX) */
+.card-hr{
+  border: 0; height: 1px; margin: 10px 0 6px;
+  background: linear-gradient(90deg, transparent, var(--line), transparent);
+}
+
+/* ---- CTA button ---- */
+.upgrade-btn{
+  align-self: end;
+  justify-self: stretch;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  background: var(--green-2);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 18px rgba(0, 109, 50, .22);
+  transition: transform .15s ease, box-shadow .2s ease, background .2s ease;
+}
+.upgrade-btn:hover{
+  background: var(--green-3);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 26px rgba(0, 158, 68, .28);
+}
+.upgrade-btn:active{ transform: translateY(0); }
+.upgrade-btn:focus-visible{ outline: 2px solid color-mix(in oklab, var(--green-3), white 35%); outline-offset: 2px; }
+
+/* ======================== */
+/* 🪟 Modal preview (nội dung bên trong) */
+/* ======================== */
+.subs-preview{
+  display: grid;
+  gap: 10px;
+}
+.subs-preview .row{
+  display: grid;
+  grid-template-columns: 1.1fr 1.2fr;
+  gap: 10px;
+  align-items: center;
+}
+.subs-preview .row span{ color: var(--ink-2); font-weight: 600; }
+.subs-preview .row strong{ font-weight: 800; }
+.subs-preview input[type="datetime-local"]{
+  width: 100%;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  background: var(--card);
+  color: var(--ink-1);
+}
+.subs-preview .muted{ color: var(--ink-3); line-height: 1.5; }
+
+/* ======================== */
+/* ✨ Tiny details */
+/* ======================== */
+.section .subtitle-inline{
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+/* Focus ring cho các element có thể tương tác (a, button, input) */
+:where(a, button, input, .toggle-btn):focus-visible{
+  outline: 2px solid color-mix(in oklab, var(--green), white 35%);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+
+/* Reduce motion option */
+@media (prefers-reduced-motion: reduce){
+  *{ animation: none!important; transition: none!important; }
 }

@@ -345,3 +345,96 @@
   .cp-root .charging-buttons { grid-template-columns: 1fr; }
   .cp-root .battery-ring { width: 56px; height: 56px; }
 }
+/* ================= Empty state: No active charging session ================= */
+.cp-empty {
+  padding: 24px;
+  min-height: 60vh;
+  display: grid;
+  place-items: center;
+  animation: cpFadeIn 300ms ease-out;
+}
+
+.cp-empty-card {
+  width: min(720px, 92vw);
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 16px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.06);
+  padding: 28px;
+}
+
+.cp-empty-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+}
+
+.cp-empty-desc {
+  margin: 0;
+  color: #666;
+}
+
+.cp-empty-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Link styled as buttons */
+.cp-link-btn,
+.cp-link-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+
+.cp-link-btn {
+  background: #1677ff;            /* Ant Design primary */
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(22, 119, 255, 0.25);
+}
+.cp-link-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(22, 119, 255, 0.28);
+}
+
+.cp-link-secondary {
+  background: #f6f7f9;
+  color: #333;
+  border-color: #e6e8ec;
+}
+.cp-link-secondary:hover {
+  background: #eef1f5;
+  transform: translateY(-1px);
+}
+
+/* Accessibility */
+.cp-link-btn:focus-visible,
+.cp-link-secondary:focus-visible {
+  outline: 2px solid #91c4ff;
+  outline-offset: 2px;
+}
+
+/* Small screens */
+@media (max-width: 480px) {
+  .cp-empty-card { padding: 20px; }
+  .cp-empty-actions { gap: 10px; }
+  .cp-link-btn, .cp-link-secondary {
+    width: 100%;
+    height: 44px;
+  }
+}
+
+/* Subtle entrance */
+@keyframes cpFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}

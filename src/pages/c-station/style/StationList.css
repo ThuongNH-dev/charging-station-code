@@ -32,6 +32,7 @@
   justify-content: center;
   gap: 8px;
   margin: 18px 0 6px;
+  margin-top: 30px !important;
   flex-wrap: wrap;
 }
 
@@ -71,3 +72,69 @@
   font-size: 13px;
   margin-bottom: 8px;
 }
+
+/* Nearby strip nhỏ gọn giống trang chủ */
+.nearby-strip { padding: 12px 16px; }
+.nearby-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.nearby-title { margin:0; font-size:18px; }
+
+.nearby-strip-body {
+  display:flex; align-items:center; gap:8px;
+}
+.nearby-viewport {
+  overflow:hidden;
+  flex: 1 1 auto;
+}
+.nearby-row {
+  display:flex; gap:12px;
+  will-change: transform;
+}
+
+.nearby-card.compact {
+  flex: 0 0 auto;
+  width: 280px;              /* nhỏ hơn */
+  max-width: 100%;
+  transform: translateZ(0);
+}
+.nearby-card.compact .distance-chip{
+  margin-top:6px; font-size:12px; padding:4px 8px; border-radius:12px;
+  border:1px solid var(--line, #e5e7eb); background:#fff; display:inline-block;
+}
+
+/* Nút điều hướng trái/phải */
+.nav-arrow {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 1px solid var(--line, #e5e7eb);
+  background: #fff; cursor: pointer; font-size: 20px; line-height: 30px;
+  display:flex; align-items:center; justify-content:center;
+}
+.nav-arrow:disabled { opacity: .4; cursor: default; }
+.nav-arrow.left { margin-right: 4px; }
+.nav-arrow.right { margin-left: 4px; }
+
+/* Dots */
+.dots{
+  display:flex; gap:8px; justify-content:center; margin-top:8px;
+}
+.dot{
+  width:8px; height:8px; border-radius:50%;
+  border:1px solid var(--line, #e5e7eb); background:#fff; cursor:pointer;
+}
+.dot.active{ background:#111; }
+
+/* Pills & ghost btn tái sử dụng */
+.pill{
+  font-size:12px; padding:4px 8px; border-radius:999px;
+  border:1px solid #e5e7eb; background:#fff;
+}
+.pill.ok{ border-color:#a7f3d0; }
+.pill.warn{ border-color:#fecaca; }
+
+.btn-ghost{
+  background:transparent; border:1px solid #e5e7eb;
+  border-radius:10px; padding:6px 10px; cursor:pointer;
+}
+
+/* Nếu đã có .station-card-clickable & highlight-card thì dùng lại, nếu chưa có: */
+.station-card-clickable { cursor: pointer; }
+.highlight-card { outline: 2px solid #22c55e; outline-offset: 2px; }

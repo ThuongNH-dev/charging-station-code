@@ -4,6 +4,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
 import ChargersCard from "../../components/station/ChargersCard";
 import ChargersGun from "../../components/station/ChargersGun";
+import FeedbackSection from "../../components/feedback/FeedbackSection";
 import "./BookingPorts.css";
 import { fetchJSON, fetchAuthJSON, getToken, getApiBase } from "../../utils/api";
 const API_BASE = getApiBase();
@@ -46,16 +47,17 @@ function normalizeCharger(c = {}) {
       rawStatus.includes("busy") ? "busy" :
         rawStatus.includes("maint") ? "maintenance" :
           rawStatus || "unknown";
-
+  const typeRaw = c.type ?? c.Type ?? "";
   return {
     id,
     stationId: c.stationId ?? c.StationId,
     title: c.code ?? c.Code ?? `Trụ #${id}`,
-    // typeRaw: AC/DC (BE hay đặt ở field "type" hoặc "Type")
-    typeRaw: c.type ?? c.Type ?? "",
+    // typeRaw: AC/DC hoặc speed (raw); typeStd: đã chuẩn hóa AC/DC
+    typeRaw,
+    typeStd: normTypeACDC(typeRaw),
     connector: c.connector ?? c.Connector ?? "", // connector thực từ BE nếu có
     power: powerText,
-    powerKw: Number(p ?? 0) || undefined,
+    powerKw: (p != null && p !== "") ? Number(p) : undefined,
     status,
     price: c.price ?? c.Price ?? "",
     imageUrl: c.imageUrl ?? c.ImageUrl ?? "",
@@ -65,7 +67,7 @@ function normalizeCharger(c = {}) {
 function normalizePort(p = {}) {
   const id = p.id ?? p.PortId ?? p.portId;
   const code = p.code ?? p.Code ?? `P-${id}`;
-  const connector = p.connector ?? p.connectorType ?? p.ConnectorType ?? p.Connector ?? "-";
+  const connector = p.connector ?? p.connectorType ?? p.ConnectorType ?? p.Connector ?? "";
   const pw = p.power ?? p.maxPowerKW ?? p.MaxPowerKW;
   const powerText = (pw !== undefined && pw !== null && String(pw) !== "") ? `${pw} kW` : "";
 
@@ -224,6 +226,40 @@ function timeRangeOfHM(h, m) {
   return "Normal";
 }
 
+function normTypeACDC(s = "") {
+  const t = String(s).toLowerCase();
+  if (/(^|\W)dc(\W|$)|fast|rapid|ultra/.test(t)) return "DC";
+  if (/(^|\W)ac(\W|$)|slow|normal/.test(t)) return "AC";
+  return s || ""; // giữ nguyên nếu không đoán được
+}
+
+function priceRangeLabelForCharger(ch, mp) {
+  if (!ch) return "";
+  const types = [ch.typeStd, ch.typeRaw].filter(Boolean);
+  let kw = ch.powerKw ?? parseKwFromText(ch.power);
+  if (!Number.isFinite(kw)) kw = undefined;
+
+  const pickBucket = () => {
+    for (const tp of types) {
+      if (!tp) continue;
+      let b = null;
+      if (Number.isFinite(kw)) b = mp.get(mkKey(tp, kw));
+      if (!b) b = mp.get(mkKey(tp, 0));
+      if (b) return b;
+    }
+    return null;
+  };
+  const bucket = pickBucket();
+  if (!bucket) return "";
+  const vals = [bucket.low?.pricePerKwh, bucket.normal?.pricePerKwh, bucket.peak?.pricePerKwh]
+    .filter(v => Number.isFinite(v))
+    .sort((a, b) => a - b);
+  if (!vals.length) return "";
+  if (vals.length === 1) return `${vnd(vals[0])}/kWh`;
+  return `${vnd(vals[0])} - ${vnd(vals[vals.length - 1])} /kWh`;
+}
+
+
 export default function BookingPorts() {
   // === User/Vehicle ===
   const [me, setMe] = useState(null);
@@ -245,6 +281,8 @@ export default function BookingPorts() {
   const [portsError, setPortsError] = useState("");
 
   const [selectedGun, setSelectedGun] = useState(null);
+  const [allConnectorTypes, setAllConnectorTypes] = useState([]);  // NEW
+  const [connectorText, setConnectorText] = useState("");          // NEW
   // ---- PricingRule state ----
   const [pricingRules, setPricingRules] = useState([]);
   const [pricingMap, setPricingMap] = useState(() => new Map());
@@ -323,6 +361,7 @@ export default function BookingPorts() {
   const [endHour, setEndHour] = useState(defEnd.h);
   const [endMinute, setEndMinute] = useState(defEnd.m);
 
+
   useEffect(() => {
     const curEndAbs = endHour * 60 + endMinute;
     if (curEndAbs < minEndAbsMin) {
@@ -351,6 +390,14 @@ export default function BookingPorts() {
     return all.filter((m) => m >= minM);
   };
 
+  // 🔄 Đồng bộ phút kết thúc theo phút bắt đầu
+  useEffect(() => {
+    // Nếu giờ kết thúc nhỏ hơn giờ bắt đầu, giữ nguyên (để người dùng chọn lại)
+    setEndMinute(startMinute);
+  }, [startMinute]);
+
+
+
   // ====== TÍNH TỔNG PHÚT (chỉ để kiểm tra hợp lệ)
   const totalMinutes = useMemo(() => {
     const endAbs = endHour * 60 + endMinute;
@@ -362,12 +409,19 @@ export default function BookingPorts() {
   const currentPricing = useMemo(() => {
     if (!charger) return null;
 
-    const typeRaw = charger.typeRaw || "";
-    const kw = charger.powerKw ?? parseKwFromText(charger.power);
-    if (!typeRaw || !Number.isFinite(kw)) return null;
+    const typeCandidates = [charger.typeStd, charger.typeRaw].filter(Boolean);
+    let kw = charger.powerKw ?? parseKwFromText(charger.power);
+    if (!Number.isFinite(kw)) kw = undefined;
 
-    const key = mkKey(typeRaw, kw);
-    const bucket = pricingMap.get(key);
+    let bucket = null;
+    for (const tp of typeCandidates) {
+      if (!tp) continue;
+      if (bucket) break;
+      // 1) type + exact kW
+      if (Number.isFinite(kw)) bucket = pricingMap.get(mkKey(tp, kw));
+      // 2) type + 0 (BE không ràng công suất)
+      if (!bucket) bucket = pricingMap.get(mkKey(tp, 0));
+    }
     if (!bucket) return null;
 
     const tr = timeRangeOfHM(startHour, startMinute); // "Low" | "Normal" | "Peak"
@@ -425,6 +479,11 @@ export default function BookingPorts() {
     return () => { alive = false; };
   }, [id, cid]);
 
+  const priceText = useMemo(() => {
+    return currentPricing
+      ? `${vnd(currentPricing.pricePerKwh)}/kWh (${viTimeRange(currentPricing.timeRange)})`
+      : (priceRangeLabelForCharger(charger, pricingMap) || charger?.price || "—");
+  }, [currentPricing, charger, pricingMap]);
 
 
   // ====== LOAD PORTS THEO CHARGER ======
@@ -445,6 +504,20 @@ export default function BookingPorts() {
 
         const mapped = arr.map(normalizePort);
         setPorts(mapped);
+
+        // NEW: gom connector types của trụ này
+        const typesSet = new Set(mapped.map(p => String(p.connector || p.connectorType || p.ConnectorType || "").trim()).filter(Boolean));
+        const typesArr = Array.from(typesSet);
+        setAllConnectorTypes(typesArr);
+        setConnectorText(typesArr.join(", "));
+
+        // Đồng bộ cho ChargersCard giống StationDetail
+        setCharger(prev => prev ? {
+          ...prev,
+          connector: typesArr.join(", "),      // text gộp
+          connectorTypes: typesArr,          // mảng, nếu card dùng dạng list
+          price: prev.price
+        } : prev);
 
         if (arr.length === 0 && Array.isArray(data) && data.length > 0) {
           console.warn("[Ports] API trả rộng, FE đã lọc client-side theo chargerId =", cid);
@@ -809,12 +882,19 @@ export default function BookingPorts() {
             </div>
 
             <div className="bp-panel-chargers">
-              <ChargersCard charger={charger} />
+              <ChargersCard charger={{
+                ...charger,
+                connector: connectorText || charger?.connector || "—",
+                connectorTypes: allConnectorTypes,
+                price: priceText
+              }} />
               <div className="bp-charger-grid">
                 <div className="bp-panel-note">
                   <div className="bp-note">Biểu giá dịch vụ sạc điện</div>
                   <div className="bp-price">
-                    {currentPricing ? currentPricing.label : (charger.price || "—")}
+                    {currentPricing
+                      ? currentPricing.label
+                      : (priceRangeLabelForCharger(charger, pricingMap) || charger.price || "—")}
                   </div>
                   {currentPricing && (
                     <div className="bp-subtle">
@@ -887,20 +967,12 @@ export default function BookingPorts() {
                     <div className="bp-subtle" style={{ marginBottom: 6 }}>Giờ</div>
                     <select
                       className="bp-input-select"
-                      value={startHour}
-                      onChange={(e) => {
-                        let h = Number(e.target.value) || minStartHour;
-                        const mins = startMinuteOptionsForHour(h);
-                        let m = startMinute;
-                        if (!mins.includes(m)) m = mins[0] ?? 0;
-                        setStartHour(h);
-                        setStartMinute(m);
-                      }}
-                      disabled={startDisabled}
+                      value={startMinute}  // luôn hiển thị cùng phút với giờ bắt đầu
+                      disabled              // không cho người dùng chỉnh
                     >
-                      {startHourOptions.map(h => (
-                        <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
-                      ))}
+                      <option value={startMinute}>
+                        {String(startMinute).padStart(2, "0")}
+                      </option>
                     </select>
                   </div>
 
@@ -959,19 +1031,15 @@ export default function BookingPorts() {
                     <div className="bp-subtle" style={{ marginBottom: 6 }}>Phút</div>
                     <select
                       className="bp-input-select"
-                      value={endMinute}
-                      onChange={(e) => {
-                        const m = Number(e.target.value) || 0;
-                        const mins = endMinuteOptionsForHour(endHour);
-                        setEndMinute(mins.includes(m) ? m : (mins[0] ?? 0));
-                      }}
-                      disabled={endDisabled}
+                      value={startMinute}   // luôn hiển thị giống phút bắt đầu
+                      disabled              // khóa, không cho chọn
                     >
-                      {endMinuteOptionsForHour(endHour).map(m => (
-                        <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
-                      ))}
+                      <option value={startMinute}>
+                        {String(startMinute).padStart(2, "0")}
+                      </option>
                     </select>
                   </div>
+
                 </div>
 
                 <div className="bp-hint">
@@ -1001,7 +1069,7 @@ export default function BookingPorts() {
               <div className="bp-summary">
                 <RowKV
                   k="Cổng sạc"
-                  v={`${selectedGun?.connector || charger?.connector || "—"} • ${(selectedGun?.power || charger?.power || "—")}`}
+                  v={`${(selectedGun?.connector || connectorText || charger?.connector || "—")} • ${(selectedGun?.power || charger?.power || "—")}`}
                 />
                 <RowKV k="Súng" v={selectedGun ? (selectedGun.name || `Súng ${selectedGun.id}`) : "—"} />
                 <RowKV
@@ -1068,12 +1136,18 @@ export default function BookingPorts() {
               )}
             </div>
 
-            <div className="bp-panel">
-              <div className="bp-title with-mb">Đánh giá</div>
-              <Review name="N***n" text="Nhân viên hỗ trợ tốt. Dịch vụ okie." />
-              <Review name="Q***h" text="Sạc nhanh, vị trí dễ tìm." />
-              <Review name="B***n" text="Nên đặt trước cuối tuần." />
-            </div>
+            <FeedbackSection 
+              apiBase={API_BASE}          // để component tự fetch
+              stationId={id}              // id trạm hiện tại từ useParams()
+              chargerId={cid}             // id trụ hiện tại từ useParams()
+              portId={selectedGun?.id}    // id cổng đã chọn (có thể null -> component tự xử)
+              // optional:
+              pageSize={10}               // modal lớn mỗi trang 10
+              initialCount={3}            // hiển thị 3 đánh giá mới nhất
+              className="bp-feedback"     // nếu cần áp style bên BookingPorts
+              style = {{marginTop : "10px"}}
+            />
+
           </div>
         </div>
       </div>

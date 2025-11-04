@@ -69,6 +69,10 @@
   padding: 16px;
 }
 
+.bp-panel{
+  margin-bottom: 20px;
+}
+
 /* ===== TYPOGRAPHY ===== */
 .bp-title {
   font-weight: 700;
@@ -302,5 +306,6 @@
 }
 .bp-vehicle-display { font-weight: 600; }
 .bp-applied { margin-top: 6px; }
+.bp-feedback{margin-top: 10px !important;}
 
 

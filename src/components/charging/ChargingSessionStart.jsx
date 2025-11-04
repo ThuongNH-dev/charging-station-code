@@ -66,8 +66,98 @@ function timeRangeOfHM(h, m) {
 }
 // NEW ↑↑↑
 
+function normalizePortStatus(raw = "") {
+    const s = String(raw).trim().toLowerCase();
+    switch (s) {
+        case "available":
+            return "available";
+        case "reserved":
+            return "reserved";
+        case "occupied":
+        case "busy":
+        case "charging":
+            return "busy"; // đồng nhất "Occupied" = "busy"
+        case "disabled":
+        case "inactive":
+        case "maintenance":
+            return "maintenance"; // "Disabled" = bảo trì
+        default:
+            return "unknown";
+    }
+}
+
+
+
+function isCarType(t = "") {
+    const s = String(t).toLowerCase();
+    return ["car", "oto", "ô tô", "ôto", "auto", "four-wheeler"].some(k => s.includes(k));
+}
+function isBikeType(t = "") {
+    const s = String(t).toLowerCase();
+    return ["bike", "xe máy", "xemay", "motor", "scooter", "moped", "two-wheeler"].some(k => s.includes(k));
+}
+function normTypeACDC(s = "") {
+    const t = String(s).toLowerCase();
+    if (/(^|\W)dc(\W|$)|fast|rapid|ultra/.test(t)) return "DC";
+    if (/(^|\W)ac(\W|$)|slow|normal/.test(t)) return "AC";
+    return s || "";
+}
+
+function checkCompatibility(vehicle, charger, port) {
+    if (!vehicle || !port) return { ok: true };
+
+    // 2.1) Kiểm tra theo đầu nối — QUAN TRỌNG vì BE cũng check như vậy
+    const vConn = vehicle.connectorType ?? vehicle.ConnectorType ?? "";
+    const pConn = port.connectorType ?? port.ConnectorType ?? port.portConnectorType ?? "";
+    if (vConn && pConn && !sameConnector(vConn, pConn)) {
+        return {
+            ok: false,
+            reason: `Đầu nối xe (${vConn}) không khớp với cổng (${pConn}).`,
+            code: "CONNECTOR_MISMATCH",
+        };
+    }
+
+    // 2.2) Quy tắc AC/DC (bổ sung – giữ logic cũ)
+    const vType = normTypeACDC(vehicle.vehicleType ?? vehicle.type ?? "");
+    const cType = normTypeACDC(charger?.type ?? charger?.Type ?? "");
+    // Xe máy chỉ sạc AC
+    if (isBikeType(vType) && cType === "DC") {
+        return { ok: false, reason: "Xe máy không hỗ trợ sạc DC.", code: "AC_DC_RULE" };
+    }
+
+    return { ok: true };
+}
+
+
+// ==== Connector helpers (NEW) ====
+function normConnector(raw = "") {
+    const s = String(raw || "").trim().toLowerCase()
+        .replace(/\s+/g, "")      // bỏ khoảng trắng
+        .replace(/-/g, "")        // bỏ dấu gạch
+        .replace(/_/g, "");
+
+    // alias phổ biến:
+    if (/^type2$|^t2$|^mennekes$/.test(s)) return "type2";        // AC
+    if (/^ccs2$|^combo2$|^ccscombo2$/.test(s)) return "ccs2";      // DC
+    if (/^chademo$|^cha?de?mo$/.test(s)) return "chademo";        // DC
+    if (/^gbt$|^gbtac$/.test(s)) return "gbt";                    // (nếu có)
+    if (/^schuko$|^2pin$|^2prong$|^scooter$/.test(s)) return "2pin";
+    return s; // giữ nguyên nếu không map được
+}
+
+function sameConnector(a, b) {
+    const x = normConnector(a);
+    const y = normConnector(b);
+    if (!x || !y) return false;
+    return x === y;
+}
+
+
+
 /* ===== Component ===== */
 export default function ChargingSessionStart() {
+    const [vehicle, setVehicle] = useState(null);
+    const [vehicleError, setVehicleError] = useState("");
     const navigate = useNavigate();
     const { state } = useLocation();
 
@@ -136,6 +226,34 @@ export default function ChargingSessionStart() {
         })();
         return () => { alive = false; };
     }, []);
+
+    useEffect(() => {
+        let alive = true;
+        (async () => {
+            try {
+                const cid = await resolveCustomerIdFromAuth(API_ABS);
+                if (!Number.isFinite(cid)) {
+                    setVehicleError("Không xác định được khách hàng.");
+                    return;
+                }
+
+                const res = await fetchAuthJSON(`/Vehicles?page=1&pageSize=50&customerId=${cid}`);
+                const items = Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []);
+                if (!items.length) {
+                    setVehicleError("Tài khoản của bạn chưa có xe. Hãy thêm xe trước khi bắt đầu sạc.");
+                    return;
+                }
+
+                const first = items.find(v => String(v.customerId ?? v.CustomerId) === String(cid)) || items[0];
+                if (alive) setVehicle(first);
+            } catch (e) {
+                if (alive) setVehicleError(e?.message || "Không thể tải danh sách xe.");
+            }
+        })();
+        return () => { alive = false; };
+    }, []);
+
+
     // Xác định pricing hiện tại theo giờ “bắt đầu sạc ngay bây giờ”
     const currentPricing = useMemo(() => {
         if (!charger) return null;
@@ -181,7 +299,19 @@ export default function ChargingSessionStart() {
             // Port
             const port = await fetchOne([`/Ports/${portId}`, `/ChargingPorts/${portId}`]);
             const resolvedPortId = port?.portId ?? port?.PortId ?? portId;
-            setGun({ ...(port || {}), portId: resolvedPortId, id: resolvedPortId });
+            const portStatus = normalizePortStatus(
+                port?.status ??
+                port?.Status ??
+                port?.state ??
+                port?.State ??
+                port?.currentStatus ??
+                port?.CurrentStatus ??
+                port?.availability ??
+                port?.Availability ??
+                ""
+            );
+
+            setGun({ ...(port || {}), portId: resolvedPortId, id: resolvedPortId, status: portStatus });
 
             // Charger
             const chId = port?.chargerId ?? port?.ChargerId ?? gun?.chargerId ?? gun?.ChargerId ?? normId(charger);
@@ -236,6 +366,27 @@ export default function ChargingSessionStart() {
             message.error("Vui lòng xác nhận ID trước khi bắt đầu sạc.");
             return;
         }
+
+        if (gun?.status && gun.status !== "available") {
+            message.warning("Cổng này hiện không khả dụng để sạc.");
+            return;
+        }
+
+        if (vehicleError) {
+            message.error(vehicleError);
+            return;
+        }
+        if (!vehicle) {
+            message.error("Không tìm thấy xe của bạn.");
+            return;
+        }
+
+        const comp = checkCompatibility(vehicle, charger);
+        if (!comp.ok) {
+            message.error(comp.reason || "Xe và cổng sạc không tương thích.");
+            return;
+        }
+
 
         const portId = toNumId(normId(gun));
         let vehicleId = toNumId(state?.vehicleId ?? state?.vehicle?.id ?? state?.vehicle?.vehicleId);
@@ -380,6 +531,70 @@ export default function ChargingSessionStart() {
                             </div>
                         </div>
 
+                        {/* NEW: cảnh báo khi cổng không khả dụng */}
+                        {gun?.status && gun.status !== "available" && (
+                            <div
+                                style={{
+                                    marginTop: 12,
+                                    padding: "12px 14px",
+                                    borderRadius: 8,
+                                    backgroundColor:
+                                        gun.status === "busy"
+                                            ? "#fff3cd"
+                                            : gun.status === "maintenance"
+                                                ? "#f8d7da"
+                                                : gun.status === "reserved"
+                                                    ? "#cce5ff"
+                                                    : "#e2e3e5",
+                                    border: "1px solid #ccc",
+                                    color:
+                                        gun.status === "busy"
+                                            ? "#856404"
+                                            : gun.status === "maintenance"
+                                                ? "#721c24"
+                                                : gun.status === "reserved"
+                                                    ? "#004085"
+                                                    : "#383d41",
+                                }}
+                            >
+                                {gun.status === "busy" && <>⚠️ Cổng này đang <b>bận</b> (Occupied). Vui lòng chờ.</>}
+                                {gun.status === "reserved" && <>📅 Cổng này đã được <b>đặt trước</b>. Vui lòng chọn cổng khác.</>}
+                                {gun.status === "maintenance" && <>🛠️ Cổng này đang <b>bảo trì</b> hoặc bị vô hiệu hóa.</>}
+                            </div>
+                        )}
+
+                        {/* NEW: cảnh báo xe hoặc tương thích */}
+                        {vehicleError && (
+                            <div style={{
+                                marginTop: 12,
+                                padding: "12px 14px",
+                                borderRadius: 8,
+                                backgroundColor: "#f8d7da",
+                                border: "1px solid #f5c2c7",
+                                color: "#721c24"
+                            }}>
+                                🚫 {vehicleError}
+                            </div>
+                        )}
+
+                        {vehicle && gun?.status === "available" && (() => {
+                            const comp = checkCompatibility(vehicle, charger, gun); // 👈 truyền cả gun (port)
+                            return !comp.ok ? (
+                                <div style={{
+                                    marginTop: 12,
+                                    padding: "12px 14px",
+                                    borderRadius: 8,
+                                    backgroundColor: "#fff3cd",
+                                    border: "1px solid #ffeeba",
+                                    color: "#856404"
+                                }}>
+                                    ⚠️ {comp.reason || "Xe và cổng sạc không tương thích."}
+                                </div>
+                            ) : null;
+                        })()}
+
+
+
                         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
                             {/* Nút Bắt đầu sạc */}
                             <Button
@@ -387,12 +602,29 @@ export default function ChargingSessionStart() {
                                 type="primary"
                                 size="large"
                                 icon={<ThunderboltOutlined />}
-                                disabled={!infoReady}
+                                disabled={
+                                    !infoReady ||
+                                    ["busy", "maintenance", "reserved"].includes(gun?.status) ||
+                                    !!vehicleError ||
+                                    (vehicle && !checkCompatibility(vehicle, charger, gun).ok)
+                                }
+
                                 loading={starting}
                                 onClick={handleStart}
                             >
-                                Bắt đầu sạc
+                                {gun?.status === "busy"
+                                    ? "Cổng đang bận"
+                                    : gun?.status === "maintenance"
+                                        ? "Đang bảo trì"
+                                        : gun?.status === "inactive"
+                                            ? "Không hoạt động"
+                                            : vehicleError
+                                                ? "Chưa có xe"
+                                                : vehicle && !checkCompatibility(vehicle, charger, gun).ok
+                                                    ? "Không tương thích"
+                                                    : "Bắt đầu sạc"}
                             </Button>
+
                         </div>
                     </div>
                 )}

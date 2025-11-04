@@ -54,13 +54,10 @@ export default function CarField() {
               max={2100}
             />
           </Form.Item>
-        </Col>
 
-        {/* Cột phải */}
-        <Col xs={24} md={12}>
           <Form.Item
             name="connectorType" // ✅ Input text
-            label="Cổng sạc"
+            label={<strong>Cổng sạc</strong>}
             rules={[
               { required: true, message: "Nhập cổng sạc (VD: CCS2, Type2…)" },
               { max: 50, message: "Tối đa 50 ký tự" },
@@ -68,7 +65,10 @@ export default function CarField() {
           >
             <Input placeholder="VD: CCS2, Type2, CHAdeMO…" allowClear />
           </Form.Item>
+        </Col>
 
+        {/* Cột phải */}
+        <Col xs={24} md={12}>
           <Form.Item
             label={<strong>Biển số xe</strong>}
             name="licensePlate" // ✅
