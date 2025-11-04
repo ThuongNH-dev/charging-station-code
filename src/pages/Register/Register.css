@@ -1,39 +1,102 @@
-/* Background chung cho tất cả trang register */
+/* ====== BACKGROUND TOÀN MÀN HÌNH ====== */
 .register-bg {
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background-image: url("./background.jpg");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  position: relative;
   overflow: hidden;
+  isolation: isolate;
 }
 
-/* lớp phủ mờ tối trên background (nếu cần) */
+/* Ảnh nền với gradient overlay hiện đại */
 .register-bg::before {
   content: "";
   position: absolute;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  z-index: 1;
+  z-index: 0;
+  background: 
+    linear-gradient(135deg, rgba(15, 118, 110, 0.85) 0%, rgba(20, 83, 45, 0.75) 50%, rgba(15, 118, 110, 0.85) 100%),
+    url("./background.jpg") center / cover no-repeat;
+  filter: brightness(0.7) contrast(1.1) saturate(1.2);
+  transform: scale(1.05);
+  animation: backgroundShift 20s ease-in-out infinite;
 }
 
-/* Card chung cho các form và card chọn vai trò */
+@keyframes backgroundShift {
+  0%, 100% {
+    transform: scale(1.05) translate(0, 0);
+  }
+  50% {
+    transform: scale(1.08) translate(-10px, -10px);
+  }
+}
+
+/* Pattern overlay hiện đại */
+.register-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: 
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(255, 255, 255, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(15, 118, 110, 0.15) 0%, transparent 70%);
+  animation: patternFloat 25s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes patternFloat {
+  0%, 100% {
+    opacity: 0.6;
+    transform: translate(0, 0);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translate(-20px, 20px);
+  }
+}
+
+/* ====== CARD CHUNG ====== */
 .register-card {
   position: relative;
   z-index: 2;
-  background: rgba(252, 252, 252, 0);
-  padding: 2rem 3rem;
-  border-radius: 20px;
-  box-shadow: 0 0 4px 4px rgba(255, 255, 255, 0.322);
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 3rem 4rem;
+  border-radius: 24px;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.3) inset,
+    0 8px 32px rgba(0, 0, 0, 0.2);
   text-align: center;
   color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.89);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   max-width: 900px;
   width: 100%;
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.register-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 
+    0 24px 70px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.4) inset,
+    0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+/* Hiệu ứng nhẹ khi load */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Chỉnh màu chữ của các label trong form */
@@ -41,74 +104,216 @@
   color: white;
 }
 
-/* Chỉ áp dụng cho trang lựa chọn vai trò */
+/* ====== CARD CHỌN VAI TRÒ ====== */
 .register-card-select {
-  max-width: 650px;
-  padding: 4rem 7rem;
+  max-width: 700px;
+  padding: 4rem 5rem;
 }
 
-/* Container cho 2 button */
+.register-card-select h2 {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  letter-spacing: -0.5px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.register-card-select p {
+  font-size: 18px;
+  margin-bottom: 3rem;
+  opacity: 0.95;
+  font-weight: 400;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* ====== CONTAINER CHO 2 BUTTON ====== */
 .register-options {
   display: flex;
   justify-content: center;
-  align-items: center; /* Thêm để căn giữa theo chiều dọc */
-  gap: 2rem;
-  flex-wrap: nowrap; /* Đổi từ wrap sang nowrap để giữ 2 thẻ trên 1 hàng */
+  align-items: center;
+  gap: 2.5rem;
+  flex-wrap: nowrap;
   padding-top: 1rem;
 }
 
-/* Card chọn vai trò (Cá nhân / Doanh nghiệp) */
+/* ====== CARD CHỌN VAI TRÒ ====== */
 .register-option {
   cursor: pointer;
-  padding: 1.5rem;
-  border-radius: 16px;
-  transition: all 0.3s;
+  padding: 2rem;
+  border-radius: 20px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 200px;
+  height: 200px;
+  flex-shrink: 0;
   
-  /* Kích thước cố định */
-  width: 180px;
-  height: 180px;
-  flex-shrink: 0; /* Thêm để ngăn button bị co lại */
-  
-  /* Styling */
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 6px rgb(0, 0, 0);
-  border: 1px solid rgb(255, 255, 255);
-  box-shadow: 0 0 4px 4px rgba(255, 255, 255, 0.322);
+  /* Glassmorphism effect */
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+  position: relative;
+  overflow: hidden;
+}
+
+.register-option::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.6s ease;
+}
+
+.register-option:hover::before {
+  left: 100%;
 }
 
 .register-option:hover {
-  background: rgba(179, 176, 176, 0);
-  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
-  transform: translateY(-2px); /* Thêm hiệu ứng nâng nhẹ khi hover */
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-8px) scale(1.05);
+  box-shadow: 
+    0 16px 48px rgba(0, 0, 0, 0.4),
+    0 0 0 2px rgba(255, 255, 255, 0.4) inset,
+    0 8px 24px rgba(15, 118, 110, 0.3);
+}
+
+.register-option:active {
+  transform: translateY(-4px) scale(1.02);
+}
+
+.register-option.selected {
+  background: rgba(15, 118, 110, 0.4);
+  border-color: rgba(15, 118, 110, 0.8);
+  box-shadow: 
+    0 16px 48px rgba(15, 118, 110, 0.4),
+    0 0 0 2px rgba(15, 118, 110, 0.6) inset,
+    0 8px 24px rgba(15, 118, 110, 0.3);
+}
+
+.register-option.selected::after {
+  content: "✓";
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  background: rgba(15, 118, 110, 0.9);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  animation: checkmarkPop 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes checkmarkPop {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .register-option-icon {
-  font-size: 90px;
-  color: rgb(255, 255, 255);
+  font-size: 80px;
+  color: rgba(255, 255, 255, 0.95);
+  transition: all 0.3s ease;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
 }
 
-/* Responsive cho màn hình nhỏ */
+.register-option:hover .register-option-icon {
+  transform: scale(1.1);
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+.register-option.selected .register-option-icon {
+  color: rgba(255, 255, 255, 1);
+  transform: scale(1.05);
+}
+
+.register-option p {
+  margin-top: 1rem;
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.register-option:hover p {
+  color: rgba(255, 255, 255, 1);
+  transform: translateY(-2px);
+}
+
+/* ====== RESPONSIVE ====== */
 @media (max-width: 768px) {
   .register-card-select {
-    padding: 3rem 2rem;
+    padding: 3rem 2.5rem;
     max-width: 90%;
+    margin: 20px;
   }
-  
+
+  .register-card-select h2 {
+    font-size: 28px;
+  }
+
+  .register-card-select p {
+    font-size: 16px;
+    margin-bottom: 2rem;
+  }
+
   .register-options {
-    flex-wrap: wrap; /* Cho phép xuống dòng trên mobile */
-    gap: 1.5rem;
+    flex-direction: column;
+    gap: 2rem;
   }
-  
+
   .register-option {
-    width: 150px;
-    height: 150px;
+    width: 180px;
+    height: 180px;
   }
-  
+
   .register-option-icon {
     font-size: 70px;
+  }
+
+  .register-option p {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .register-card-select {
+    padding: 2.5rem 2rem;
+  }
+
+  .register-card-select h2 {
+    font-size: 24px;
+  }
+
+  .register-option {
+    width: 160px;
+    height: 160px;
+    padding: 1.5rem;
+  }
+
+  .register-option-icon {
+    font-size: 60px;
   }
 }
