@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { getApiBase, fetchAuthJSON } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
+import MessageBox from "../../components/staff/MessageBox";
 import "./PersonalRegister.css";
 
 const API_BASE = getApiBase();
@@ -17,6 +18,7 @@ export default function PersonalRegister() {
     confirmPassword: "",
   });
   const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: "", text: "" });
 
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -32,16 +34,20 @@ export default function PersonalRegister() {
       });
 
       if (!res || !res.message?.includes("thành công")) {
-        alert("Đăng ký thất bại. Vui lòng kiểm tra lại thông tin!");
+        setMessage({ type: "error", text: "Đăng ký thất bại. Vui lòng kiểm tra lại thông tin!" });
+        setTimeout(() => setMessage({ type: "", text: "" }), 5000);
         setLoading(false);
         return;
       }
 
-      alert("🎉 Đăng ký tài khoản cá nhân thành công!");
-      navigate("/login");
+      setMessage({ type: "success", text: "🎉 Đăng ký tài khoản cá nhân thành công! Đang chuyển đến trang đăng nhập..." });
+      setTimeout(() => {
+        navigate("/login");
+      }, 2000);
     } catch (err) {
       console.error("❌ Register error:", err);
-      alert("Lỗi kết nối đến máy chủ!");
+      setMessage({ type: "error", text: "Lỗi kết nối đến máy chủ!" });
+      setTimeout(() => setMessage({ type: "", text: "" }), 5000);
     } finally {
       setLoading(false);
     }
@@ -50,83 +56,93 @@ export default function PersonalRegister() {
   return (
     <MainLayout>
       <div className="personal-register">
+        <MessageBox
+          type={message.type}
+          message={message.text}
+          visible={!!message.text}
+          onClose={() => setMessage({ type: "", text: "" })}
+        />
+        
         <div className="register-card">
           <h2 className="register-title">Đăng ký cá nhân</h2>
 
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label className="form-label">Tên đăng nhập</label>
-              <input
-                className="form-input"
-                name="userName"
-                value={form.userName}
-                onChange={handleChange}
-                required
-                placeholder="Nhập tên đăng nhập"
-              />
+          <form onSubmit={handleSubmit} className="register-form">
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Tên đăng nhập</label>
+                <input
+                  className="form-input"
+                  name="userName"
+                  value={form.userName}
+                  onChange={handleChange}
+                  required
+                  placeholder="Nhập tên đăng nhập"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Họ và tên</label>
+                <input
+                  className="form-input"
+                  name="fullName"
+                  value={form.fullName}
+                  onChange={handleChange}
+                  required
+                  placeholder="Nhập họ và tên đầy đủ"
+                />
+              </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Họ và tên</label>
-              <input
-                className="form-input"
-                name="fullName"
-                value={form.fullName}
-                onChange={handleChange}
-                required
-                placeholder="Nhập họ và tên đầy đủ"
-              />
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input
+                  className="form-input"
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  required
+                  placeholder="example@email.com"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Số điện thoại</label>
+                <input
+                  className="form-input"
+                  name="phone"
+                  value={form.phone}
+                  onChange={handleChange}
+                  required
+                  placeholder="+84xxxxxxxxx"
+                />
+              </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Email</label>
-              <input
-                className="form-input"
-                name="email"
-                type="email"
-                value={form.email}
-                onChange={handleChange}
-                required
-                placeholder="example@email.com"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Số điện thoại</label>
-              <input
-                className="form-input"
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                required
-                placeholder="+84xxxxxxxxx"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Mật khẩu</label>
-              <input
-                className="form-input"
-                type="password"
-                name="password"
-                value={form.password}
-                onChange={handleChange}
-                required
-                placeholder="Tạo mật khẩu"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Xác nhận mật khẩu</label>
-              <input
-                className="form-input"
-                type="password"
-                name="confirmPassword"
-                value={form.confirmPassword}
-                onChange={handleChange}
-                required
-                placeholder="Nhập lại mật khẩu"
-              />
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Mật khẩu</label>
+                <input
+                  className="form-input"
+                  type="password"
+                  name="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  required
+                  placeholder="Tạo mật khẩu"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Xác nhận mật khẩu</label>
+                <input
+                  className="form-input"
+                  type="password"
+                  name="confirmPassword"
+                  value={form.confirmPassword}
+                  onChange={handleChange}
+                  required
+                  placeholder="Nhập lại mật khẩu"
+                />
+              </div>
             </div>
 
             <button
