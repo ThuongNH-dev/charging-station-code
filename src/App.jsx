@@ -321,7 +321,7 @@ export default function App() {
         }
       />
 
-      {/* Staff */}
+      {/*Staff */}
       {/* ✅ Đặt TRƯỚC để không bị /staff/* catch */}
       <Route
         path="/staff/payment-success"

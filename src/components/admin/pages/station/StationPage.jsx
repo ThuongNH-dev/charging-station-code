@@ -3,6 +3,8 @@ import "../StationManagement.css";
 import { Button, message } from "antd";
 import { useNavigate } from "react-router-dom";
 import { stationApi } from "../../../../api/stationApi";
+import FiltersBar from "./FiltersBar";
+import AddEditStationModal from "./modals/AddEditStationModal";
 
 function normalizeStation(s) {
   return {
@@ -11,37 +13,49 @@ function normalizeStation(s) {
     Address: s.Address ?? s.address ?? "Địa chỉ",
     City: s.City ?? s.city ?? "Thành phố",
     Status: s.Status ?? s.status ?? "Closed",
-    ImageUrl: s.ImageUrl ?? s.imageUrl ?? null,
+    ImageUrl: s.ImageUrl ?? s.imageUrl ?? "",
   };
 }
 
 export default function StationPage() {
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("All"); // All | Open | Closed
+  const [statusFilter, setStatusFilter] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newStation, setNewStation] = useState({
+    StationName: "",
+    Address: "",
+    City: "",
+    Latitude: "",
+    Longitude: "",
+    Status: "Open",
+    ImageUrl: "",
+  });
   const navigate = useNavigate();
 
+  const load = async () => {
+    try {
+      setLoading(true);
+      const list = await stationApi.getAllStations();
+      const safe = Array.isArray(list) ? list.map(normalizeStation) : [];
+      setStations(safe);
+    } catch (e) {
+      console.error(e);
+      message.error("Không tải được danh sách trạm");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    (async () => {
-      try {
-        const list = await stationApi.getAllStations();
-        const safe = Array.isArray(list) ? list.map(normalizeStation) : [];
-        setStations(safe);
-      } catch (e) {
-        console.error(e);
-        message.error("Không tải được danh sách trạm");
-      } finally {
-        setLoading(false);
-      }
-    })();
+    load();
   }, []);
 
   const filtered = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
     return stations.filter((s) => {
       const status = (s.Status ?? "").toString();
-      // chỉ lọc Open/Closed nếu người dùng chọn, còn lại giữ nguyên
       const matchStatus =
         statusFilter === "All" ? true : status === statusFilter;
       const name = (s.StationName ?? "").toLowerCase();
@@ -49,31 +63,62 @@ export default function StationPage() {
     });
   }, [stations, statusFilter, searchTerm]);
 
+  const openAdd = () => {
+    setNewStation({
+      StationName: "",
+      Address: "",
+      City: "",
+      Latitude: "",
+      Longitude: "",
+      Status: "Open",
+      ImageUrl: "",
+    });
+    setIsAddOpen(true);
+  };
+
+  const handleNewChange = (e) => {
+    const { name, value } = e.target;
+    setNewStation((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleCreate = async () => {
+    // ✅ Map sang camelCase đúng spec BE
+    const payload = {
+      stationName: newStation.StationName?.trim() || "",
+      address: newStation.Address?.trim() || "",
+      city: newStation.City?.trim() || "",
+      latitude: Number(newStation.Latitude) || 0,
+      longitude: Number(newStation.Longitude) || 0,
+      status: newStation.Status || "Open",
+      imageUrl: newStation.ImageUrl?.trim() || "",
+    };
+
+    if (!payload.stationName || !payload.address) {
+      message.error("Vui lòng nhập Tên trạm và Địa chỉ");
+      return;
+    }
+    try {
+      await stationApi.createStation(payload);
+      message.success("Đã thêm trạm!");
+      setIsAddOpen(false);
+      await load();
+    } catch (e) {
+      console.error(e);
+      message.error("Thêm trạm thất bại: " + e.message);
+    }
+  };
+
   return (
     <div className="station-page">
       <h2 className="admin-title">Trạm sạc</h2>
 
-      {/* thanh filter đơn giản */}
-      <div className="station-actions">
-        <select
-          className="input-field"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          style={{ maxWidth: 160 }}
-        >
-          <option value="All">Tất cả trạng thái</option>
-          <option value="Open">Open</option>
-          <option value="Closed">Closed</option>
-        </select>
-
-        <input
-          type="text"
-          className="input-field"
-          placeholder="Tìm theo tên trạm…"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
+      <FiltersBar
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        searchTerm={searchTerm}
+        onSearchTermChange={setSearchTerm}
+        onAddStation={openAdd}
+      />
 
       {loading ? (
         <div>Đang tải…</div>
@@ -87,20 +132,18 @@ export default function StationPage() {
                 className="station-card"
                 key={s.StationId ?? String(Math.random())}
               >
-                {/* Ảnh */}
                 <div className="station-image-container">
                   <img
                     src={s.ImageUrl || "/placeholder.png"}
                     alt="Hình trạm"
                     className="station-img"
                     onError={(e) => {
-                      e.currentTarget.onerror = null; // tránh loop
+                      e.currentTarget.onerror = null;
                       e.currentTarget.src = "/placeholder.png";
                     }}
                   />
                 </div>
 
-                {/* Header */}
                 <div className="station-header">
                   <div>
                     <h3>{s.StationName}</h3>
@@ -109,15 +152,18 @@ export default function StationPage() {
                     </p>
                   </div>
                   <span
-                    className={`status-badge ${
-                      s.Status === "Open" ? "active" : "offline"
-                    }`}
+                    className={`status-badge ${String(
+                      s.Status || ""
+                    ).toLowerCase()}`}
                   >
-                    {s.Status === "Open" ? "OPEN" : "CLOSED"}
+                    {s.Status === "Open"
+                      ? "🟢 OPEN"
+                      : s.Status === "Maintenance"
+                      ? "🟠 MAINTENANCE"
+                      : "⚫ CLOSED"}
                   </span>
                 </div>
 
-                {/* Footer: chỉ có Xem chi tiết */}
                 <div
                   className="station-footer"
                   style={{ justifyContent: "flex-end" }}
@@ -135,6 +181,15 @@ export default function StationPage() {
           )}
         </div>
       )}
+
+      <AddEditStationModal
+        open={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        isEdit={false}
+        data={newStation}
+        onChange={handleNewChange}
+        onSubmit={handleCreate}
+      />
     </div>
   );
 }

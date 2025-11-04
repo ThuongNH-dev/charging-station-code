@@ -19,13 +19,12 @@ import {
 } from "antd";
 import {
   EnvironmentOutlined,
-  InfoCircleOutlined,
   SearchOutlined,
-  FilterOutlined,
   UserAddOutlined,
   DeleteOutlined,
   LockOutlined,
   UnlockOutlined,
+  InfoCircleOutlined,
 } from "@ant-design/icons";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import "./StationManager.css";
@@ -35,6 +34,7 @@ const API_BASE = getApiBase();
 export default function StationManager() {
   const [stations, setStations] = useState([]);
   const [chargers, setChargers] = useState([]);
+  const [ports, setPorts] = useState([]);
   const [staffs, setStaffs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ open: 0, closed: 0 });
@@ -44,10 +44,12 @@ export default function StationManager() {
   const [reasonModalOpen, setReasonModalOpen] = useState(false);
   const [selectedStation, setSelectedStation] = useState(null);
   const [canEdit, setCanEdit] = useState(false);
+  const [selectedCharger, setSelectedCharger] = useState(null);
+  const [selectedPort, setSelectedPort] = useState(null);
   const [reasonForm] = Form.useForm();
   const [staffForm] = Form.useForm();
+  const [reportForm] = Form.useForm();
 
-  // ✅ Giả lập accountId hiện tại (sau này bạn có thể thay bằng AuthContext)
   const currentAccountId = localStorage.getItem("accountId") || "12";
 
   useEffect(() => {
@@ -55,7 +57,7 @@ export default function StationManager() {
     loadChargers();
   }, []);
 
-  // ✅ Load danh sách trạm
+  // === Load danh sách trạm ===
   async function loadStations() {
     setLoading(true);
     try {
@@ -67,26 +69,52 @@ export default function StationManager() {
         open: data.filter((s) => s.status === "Open").length,
         closed: data.filter((s) => s.status === "Closed").length,
       });
-    } catch (err) {
+    } catch {
       message.error("Không thể tải danh sách trạm!");
     } finally {
       setLoading(false);
     }
   }
 
-  // ✅ Load danh sách trụ
+  // === Load danh sách trụ ===
   async function loadChargers() {
     try {
       const res = await fetchAuthJSON(`${API_BASE}/Chargers`);
       let data = res?.data ?? res?.$values ?? res ?? [];
       if (!Array.isArray(data)) data = [data];
       setChargers(data);
-    } catch (err) {
-      console.error(err);
+    } catch {
+      console.error("Không thể tải trụ sạc!");
     }
   }
 
-  // ✅ Load nhân viên trạm + kiểm tra quyền
+  // === Load cổng sạc theo trụ ===
+  async function loadPorts(chargerId) {
+    if (!chargerId) {
+      setPorts([]);
+      setSelectedCharger(null);
+      return;
+    }
+    try {
+      const res = await fetchAuthJSON(`${API_BASE}/Ports`);
+      let data = res?.data ?? res?.$values ?? res ?? [];
+      if (!Array.isArray(data)) data = [data];
+
+      // ✅ Lọc port theo trụ sạc đã chọn
+      const filtered = data.filter(
+        (p) => String(p.chargerId) === String(chargerId)
+      );
+      setPorts(filtered);
+
+      const charger = chargers.find((c) => c.chargerId === chargerId);
+      setSelectedCharger(charger || null);
+    } catch {
+      console.warn("Không thể tải danh sách cổng sạc!");
+      setPorts([]);
+    }
+  }
+
+  // === Load nhân viên trạm ===
   async function loadStaffs(stationId) {
     try {
       const res = await fetchAuthJSON(
@@ -100,11 +128,39 @@ export default function StationManager() {
       );
       setCanEdit(belongs);
     } catch {
-      message.error("Không thể tải danh sách nhân viên!");
+      message.error("Không thể tải nhân viên!");
     }
   }
 
-  // ✅ Đóng/Mở trạm
+  // === Gửi báo cáo sự cố ===
+  async function handleCreateReport(values) {
+    if (!selectedStation) return;
+    try {
+      await fetchAuthJSON(`${API_BASE}/reports`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          staffId: Number(currentAccountId),
+          stationId: selectedStation.stationId,
+          chargerId: values.chargerId || null,
+          portId: values.portId || null,
+          title: values.title,
+          description: values.description,
+          severity: values.severity,
+          status: values.status || "Pending",
+        }),
+      });
+      message.success("✅ Đã gửi báo cáo sự cố!");
+      reportForm.resetFields();
+      setSelectedCharger(null);
+      setSelectedPort(null);
+      setPorts([]);
+    } catch {
+      message.error("Không thể gửi báo cáo!");
+    }
+  }
+
+  // === Đóng / Mở trạm ===
   async function toggleStationStatus(station, reason = "") {
     try {
       const newStatus = station.status === "Open" ? "Closed" : "Open";
@@ -125,7 +181,7 @@ export default function StationManager() {
     }
   }
 
-  // ✅ Thêm nhân viên
+  // === Thêm / Xóa nhân viên ===
   async function handleAddStaff(values) {
     if (!selectedStation) return;
     try {
@@ -145,7 +201,6 @@ export default function StationManager() {
     }
   }
 
-  // ✅ Xóa nhân viên
   async function handleRemoveStaff(accountId) {
     try {
       await fetchAuthJSON(
@@ -159,19 +214,20 @@ export default function StationManager() {
     }
   }
 
-  const openMap = (station) => {
-    if (station.latitude && station.longitude) {
-      window.open(
-        `https://www.google.com/maps?q=${station.latitude},${station.longitude}`,
-        "_blank"
-      );
-    } else message.info("Trạm chưa có tọa độ GPS!");
-  };
-
+  // === Mở modal chi tiết ===
   const openDetailModal = (station) => {
     setSelectedStation(station);
     setIsDetailModalOpen(true);
     loadStaffs(station.stationId);
+  };
+
+  const openMap = (station) => {
+    if (station.latitude && station.longitude)
+      window.open(
+        `https://www.google.com/maps?q=${station.latitude},${station.longitude}`,
+        "_blank"
+      );
+    else message.info("Trạm chưa có tọa độ!");
   };
 
   const chargersForStation = chargers.filter(
@@ -193,8 +249,6 @@ export default function StationManager() {
     {
       title: "Ảnh",
       dataIndex: "imageUrl",
-      key: "imageUrl",
-      width: 100,
       render: (url) =>
         url ? (
           <Image
@@ -210,7 +264,6 @@ export default function StationManager() {
     {
       title: "Tên trạm",
       dataIndex: "stationName",
-      key: "stationName",
       render: (text, record) => (
         <Button type="link" onClick={() => openDetailModal(record)}>
           {text}
@@ -220,12 +273,10 @@ export default function StationManager() {
     {
       title: "Thành phố",
       dataIndex: "city",
-      key: "city",
     },
     {
       title: "Địa chỉ",
       dataIndex: "address",
-      key: "address",
       render: (addr, record) => (
         <Tooltip title="Xem trên bản đồ">
           <Button
@@ -241,7 +292,6 @@ export default function StationManager() {
     {
       title: "Trạng thái",
       dataIndex: "status",
-      key: "status",
       render: (t) =>
         t === "Open" ? (
           <Tag color="green">Hoạt động</Tag>
@@ -299,7 +349,7 @@ export default function StationManager() {
         />
       </div>
 
-      {/* === Bảng === */}
+      {/* === Bảng trạm === */}
       <Table
         columns={columns}
         dataSource={filteredStations.map((s) => ({ ...s, key: s.stationId }))}
@@ -346,29 +396,25 @@ export default function StationManager() {
                         <Tag color="red">Đóng</Tag>
                       )}
                     </p>
-
-                    {/* ✅ Nút Đóng/Mở trạm chỉ cho nhân viên thuộc trạm */}
                     {canEdit && (
-                      <>
-                        {selectedStation.status === "Open" ? (
-                          <Button
-                            type="primary"
-                            danger
-                            icon={<LockOutlined />}
-                            onClick={() => setReasonModalOpen(true)}
-                          >
-                            Đóng trạm
-                          </Button>
-                        ) : (
-                          <Button
-                            type="primary"
-                            icon={<UnlockOutlined />}
-                            onClick={() => toggleStationStatus(selectedStation)}
-                          >
-                            Mở trạm
-                          </Button>
-                        )}
-                      </>
+                      selectedStation.status === "Open" ? (
+                        <Button
+                          type="primary"
+                          danger
+                          icon={<LockOutlined />}
+                          onClick={() => setReasonModalOpen(true)}
+                        >
+                          Đóng trạm
+                        </Button>
+                      ) : (
+                        <Button
+                          type="primary"
+                          icon={<UnlockOutlined />}
+                          onClick={() => toggleStationStatus(selectedStation)}
+                        >
+                          Mở trạm
+                        </Button>
+                      )
                     )}
                   </>
                 ),
@@ -381,11 +427,11 @@ export default function StationManager() {
                     dataSource={chargersForStation}
                     renderItem={(c) => (
                       <List.Item>
-                        <strong>{c.chargerName}</strong> —{" "}
+                        <strong>{c.code}</strong> —{" "}
                         <span
                           style={{
                             color:
-                              c.status === "Available"
+                              c.status === "Online"
                                 ? "#389e0d"
                                 : c.status === "Faulted"
                                 ? "#cf1322"
@@ -432,7 +478,6 @@ export default function StationManager() {
                         </List.Item>
                       )}
                     />
-
                     {canEdit && (
                       <Form
                         layout="inline"
@@ -443,14 +488,9 @@ export default function StationManager() {
                         <Form.Item
                           name="accountId"
                           label="ID nhân viên"
-                          rules={[
-                            { required: true, message: "Nhập accountId!" },
-                          ]}
+                          rules={[{ required: true, message: "Nhập ID!" }]}
                         >
-                          <Input
-                            placeholder="Nhập ID nhân viên..."
-                            style={{ width: 220 }}
-                          />
+                          <Input placeholder="Nhập ID nhân viên..." />
                         </Form.Item>
                         <Form.Item>
                           <Button
@@ -466,12 +506,160 @@ export default function StationManager() {
                   </>
                 ),
               },
+              {
+                key: "4",
+                label: "Báo cáo sự cố",
+                children: (
+                  <>
+                    {canEdit ? (
+                      <>
+                        <h4>Tạo báo cáo mới</h4>
+                        <Form
+                          form={reportForm}
+                          layout="vertical"
+                          onFinish={handleCreateReport}
+                        >
+                          <Form.Item
+                            name="title"
+                            label="Tiêu đề"
+                            rules={[{ required: true, message: "Nhập tiêu đề!" }]}
+                          >
+                            <Input placeholder="VD: Trụ sạc không phản hồi..." />
+                          </Form.Item>
+
+                          <Form.Item
+                            name="description"
+                            label="Mô tả chi tiết"
+                            rules={[{ required: true, message: "Nhập mô tả!" }]}
+                          >
+                            <Input.TextArea rows={3} placeholder="Mô tả sự cố..." />
+                          </Form.Item>
+
+                          <Form.Item
+                            name="severity"
+                            label="Mức độ nghiêm trọng"
+                            rules={[{ required: true, message: "Chọn mức độ!" }]}
+                          >
+                            <Select
+                              options={[
+                                { label: "Low", value: "Low" },
+                                { label: "Medium", value: "Medium" },
+                                { label: "High", value: "High" },
+                                { label: "Critical", value: "Critical" },
+                              ]}
+                            />
+                          </Form.Item>
+
+                          <Form.Item
+                            name="status"
+                            label="Trạng thái ban đầu"
+                            initialValue="Pending"
+                            rules={[{ required: true, message: "Chọn trạng thái!" }]}
+                          >
+                            <Select
+                              options={[
+                                { label: "Pending", value: "Pending" },
+                                { label: "In Progress", value: "InProgress" },
+                                { label: "Resolved", value: "Resolved" },
+                                { label: "Closed", value: "Closed" },
+                              ]}
+                            />
+                          </Form.Item>
+
+                          {/* ✅ Trụ sạc */}
+                          <Form.Item
+                            name="chargerId"
+                            label="Trụ sạc"
+                            rules={[{ required: true, message: "Chọn trụ sạc!" }]}
+                          >
+                            <Select
+                              placeholder="Chọn trụ sạc..."
+                              onChange={(v) => {
+                                loadPorts(v);
+                                reportForm.setFieldValue("portId", null);
+                                const charger = chargersForStation.find(
+                                  (c) => c.chargerId === v
+                                );
+                                setSelectedCharger(charger || null);
+                              }}
+                              options={chargersForStation.map((c) => ({
+                                label: `${c.code || c.chargerName} (${c.type || "Không rõ"})`,
+                                value: c.chargerId,
+                              }))}
+                            />
+                          </Form.Item>
+
+                          {/* ✅ Cổng sạc */}
+                          <Form.Item
+                            name="portId"
+                            label="Cổng sạc"
+                            rules={[{ required: true, message: "Chọn cổng sạc!" }]}
+                          >
+                            <Select
+                              placeholder="Chọn cổng sạc..."
+                              onChange={(v) => {
+                                const port = ports.find((p) => p.portId === v);
+                                setSelectedPort(port || null);
+                              }}
+                              options={ports.map((p) => ({
+                                label: `${p.connectorType || "Port"} — ${p.status}`,
+                                value: p.portId,
+                              }))}
+                            />
+                          </Form.Item>
+
+                          {/* ✅ Hiển thị trụ & cổng được chọn */}
+                          {(selectedCharger || selectedPort) && (
+                            <div
+                              style={{
+                                background: "#fafafa",
+                                borderRadius: 8,
+                                padding: "8px 12px",
+                                marginBottom: 16,
+                                border: "1px solid #eee",
+                              }}
+                            >
+                              {selectedCharger && (
+                                <p style={{ margin: 0 }}>
+                                  <strong>Trụ đang chọn:</strong>{" "}
+                                  {selectedCharger.code || selectedCharger.chargerName}
+                                </p>
+                              )}
+                              {selectedPort && (
+                                <p style={{ margin: 0 }}>
+                                  <strong>Cổng đang chọn:</strong>{" "}
+                                  {selectedPort.connectorType} (
+                                  {selectedPort.status})
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          <Form.Item>
+                            <Button
+                              type="primary"
+                              htmlType="submit"
+                              icon={<InfoCircleOutlined />}
+                            >
+                              Gửi báo cáo
+                            </Button>
+                          </Form.Item>
+                        </Form>
+                      </>
+                    ) : (
+                      <p className="muted center">
+                        Bạn không có quyền báo cáo sự cố cho trạm này.
+                      </p>
+                    )}
+                  </>
+                ),
+              },
             ]}
           />
         )}
       </Modal>
 
-      {/* === Modal nhập lý do đóng trạm === */}
+      {/* === Modal lý do đóng trạm === */}
       <Modal
         title="Lý do đóng trạm"
         open={reasonModalOpen}
@@ -489,13 +677,10 @@ export default function StationManager() {
         <Form layout="vertical" form={reasonForm}>
           <Form.Item
             name="reason"
-            label="Vui lòng nhập lý do đóng trạm:"
+            label="Nhập lý do đóng trạm:"
             rules={[{ required: true, message: "Vui lòng nhập lý do!" }]}
           >
-            <Input.TextArea
-              rows={3}
-              placeholder="VD: Bảo trì, mất điện, sự cố kỹ thuật..."
-            />
+            <Input.TextArea rows={3} />
           </Form.Item>
         </Form>
       </Modal>

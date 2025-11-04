@@ -9,6 +9,7 @@ import PaymentManager from "../pages/staff/PaymentManager";
 import ReportPage from "../pages/staff/ReportPage";
 import StaffInvoice from "../pages/staff/StaffInvoice";
 import StationManager from "../pages/staff/StationManager";
+import IncidentManager from "../pages/staff/IncidentManager";
 import StaffPaymentSuccess from "../pages/staff/StaffPaymentSuccess";
 
 import "./StaffLayout.css";
@@ -28,30 +29,7 @@ export default function StaffLayout() {
     <>
       <Head />
 
-      {/* 🔹 Thanh điều hướng staff */}
-      <div className={`staff-nav ${isFixed ? "fixed" : ""}`}>
-        <NavLink to="/staff/stations" className={({ isActive }) => (isActive ? "active" : "")}>
-          Trạm sạc
-        </NavLink>
-        <NavLink to="/staff/chargers" className={({ isActive }) => (isActive ? "active" : "")}>
-          Trụ sạc
-        </NavLink>
-        <NavLink to="/staff/sessions" className={({ isActive }) => (isActive ? "active" : "")}>
-          Phiên sạc
-        </NavLink>
-        <NavLink to="/staff/payments" className={({ isActive }) => (isActive ? "active" : "")}>
-          Thanh toán
-        </NavLink>
-        <NavLink to="/staff/incidents" className={({ isActive }) => (isActive ? "active" : "")}>
-          Sự cố
-        </NavLink>
-        <NavLink to="/staff/reports" className={({ isActive }) => (isActive ? "active" : "")}>
-          Báo cáo
-        </NavLink>
-      </div>
-
-      {/* 🔹 Placeholder giữ chỗ khi nav fixed */}
-      {isFixed && <div className="nav-placeholder"></div>}
+      {/* 🔹 Đã chuyển điều hướng lên header; bỏ thanh nav nội bộ */}
 
       {/* 🔹 Layout nội dung */}
       <Layout className="staff-layout">
@@ -63,17 +41,9 @@ export default function StaffLayout() {
               <Route path="chargers" element={<ChargerManager />} />
               <Route path="sessions" element={<SessionManager />} />
               <Route path="payments" element={<PaymentManager />} />
+              <Route path="incidents" element={<IncidentManager />} />
               <Route path="reports" element={<ReportPage />} />
               <Route path="invoice" element={<StaffInvoice />} />
-              <Route
-                path="incidents"
-                element={
-                  <div className="staff-stub">
-                    <h2>Sự cố</h2>
-                    <p>Trang này sẽ được phát triển sau.</p>
-                  </div>
-                }
-              />
               <Route path="*" element={<Navigate to="stations" replace />} />
             </Routes>
           </Content>
