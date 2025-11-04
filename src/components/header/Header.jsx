@@ -64,7 +64,7 @@ function getNotiTime(n) {
         if (!isNaN(d2.getTime())) return d2.getTime();
       }
     }
-  } catch {}
+  } catch { }
   if (typeof n?.id === "number") return n.id;
   return 0;
 }
@@ -80,11 +80,11 @@ export default function Head() {
     userName: ctxName,
   } = useAuth();
 
-  const role = (user?.role || ctxRole || "").toLowerCase();
-  const isStaff = role === "staff";
-  const isAdmin = role === "admin";
-  const isCustomer = role === "customer";
-  const isCompany = role === "company";
+  const rawRole = String(user?.role ?? "").trim().toLowerCase();
+  const isAdmin = rawRole === "admin";
+  const isStaff = rawRole === "staff";
+  const isCustomer = rawRole === "customer";
+  const isCompany = rawRole === "company";
   const userName = user?.name || user?.userName || ctxName || "User";
 
   const showBell = isAuthenticated && !isAdmin && !isStaff;
@@ -166,12 +166,12 @@ export default function Head() {
       { key: "s6", label: "Báo cáo", path: "/staff/reports" },
     ]
     : isCompany
-    ? [
+      ? [
         { key: "c1", label: "Quản lý nguồn lực", path: "/company" },
         { key: "3", label: "Dịch vụ", path: "/services" },
         { key: "4", label: "Liên hệ", path: "/contact" },
       ]
-    : [
+      : [
         { key: "1", label: "Trang chủ", path: "/" },
         { key: "2", label: "Danh mục", path: "/stations" },
         { key: "3", label: "Dịch vụ", path: "/services" },
@@ -317,7 +317,7 @@ export default function Head() {
                             String(latestMark || Date.now())
                           );
                       }
-                    } catch {}
+                    } catch { }
                     setHasNew(false);
                   }}
                 >
@@ -331,7 +331,7 @@ export default function Head() {
             </Badge>
           </Dropdown>
         )}
-        {showBell && (
+        {/* {showBell && (
           <Tooltip title="Trang thông báo">
             <NotificationOutlined
               className="bell-icon"
@@ -355,12 +355,12 @@ export default function Head() {
                         String(latestMark || Date.now())
                       );
                   }
-                } catch {}
+                } catch { }
                 setHasNew(false);
               }}
             />
           </Tooltip>
-        )}
+        )} */}
 
         {isAdmin && (
           <>
@@ -419,9 +419,8 @@ export default function Head() {
                         }}
                       >
                         <div
-                          className={`nav-item ${
-                            activeKey === item.key ? "active" : ""
-                          } nav-dropdown`}
+                          className={`nav-item ${activeKey === item.key ? "active" : ""
+                            } nav-dropdown`}
                           onClick={(e) => e.preventDefault()}
                         >
                           {item.label} <span className="caret">▾</span>
@@ -443,9 +442,8 @@ export default function Head() {
                         }}
                       >
                         <div
-                          className={`nav-item ${
-                            activeKey === item.key ? "active" : ""
-                          } nav-dropdown`}
+                          className={`nav-item ${activeKey === item.key ? "active" : ""
+                            } nav-dropdown`}
                           onClick={(e) => e.preventDefault()}
                         >
                           {item.label} <span className="caret">▾</span>
@@ -458,9 +456,8 @@ export default function Head() {
                 return (
                   <li key={item.key}>
                     <div
-                      className={`nav-item ${
-                        activeKey === item.key ? "active" : ""
-                      }`}
+                      className={`nav-item ${activeKey === item.key ? "active" : ""
+                        }`}
                       onClick={() => navigate(item.path)}
                     >
                       {item.label}

@@ -10,7 +10,7 @@ import {
   Card,
   Row,
   Col,
-  Space,
+  DatePicker,
 } from "antd";
 import {
   EyeOutlined,
@@ -21,94 +21,128 @@ import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import "./IncidentManager.css";
 
 const API_BASE = getApiBase();
+const { RangePicker } = DatePicker;
 
 export default function IncidentManager() {
   const [reports, setReports] = useState([]);
   const [stations, setStations] = useState([]);
   const [selectedStation, setSelectedStation] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [severityFilter, setSeverityFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [search, setSearch] = useState("");
-  const [stats, setStats] = useState({
-    pending: 0,
-    inProgress: 0,
-    resolved: 0,
-    closed: 0,
-  });
-
+  const [dateRange, setDateRange] = useState([]);
   const currentAccountId = localStorage.getItem("accountId") || "12";
 
+  /* ---------------- Load dữ liệu ---------------- */
   useEffect(() => {
     loadStaffStations();
   }, []);
 
   useEffect(() => {
     if (selectedStation) loadReports(selectedStation.stationId);
-  }, [selectedStation]);
+  }, [selectedStation, dateRange]);
 
   // === Lấy danh sách trạm mà nhân viên phụ trách ===
   async function loadStaffStations() {
     try {
-      const res = await fetchAuthJSON(
-        `${API_BASE}/station-staffs?staffId=${currentAccountId}`
+      setLoading(true);
+      const allStations = await fetchAuthJSON(`${API_BASE}/Stations`);
+      let stationsArr =
+        allStations?.data ?? allStations?.$values ?? allStations ?? [];
+      if (!Array.isArray(stationsArr)) stationsArr = [stationsArr];
+
+      const myStationIds = [];
+      for (const st of stationsArr) {
+        const res = await fetchAuthJSON(
+          `${API_BASE}/station-staffs?stationId=${st.stationId}`
+        );
+        let staffs = res?.data ?? res?.$values ?? res ?? [];
+        if (!Array.isArray(staffs)) staffs = [staffs];
+        const found = staffs.some(
+          (s) => String(s.staffId) === String(currentAccountId)
+        );
+        if (found) myStationIds.push(st.stationId);
+      }
+
+      const myStations = stationsArr.filter((s) =>
+        myStationIds.includes(s.stationId)
       );
-      let data = res?.data ?? res?.$values ?? res ?? [];
-      if (!Array.isArray(data)) data = [data];
-      setStations(data);
-      if (data.length === 1) setSelectedStation(data[0]); // Tự chọn nếu chỉ có 1 trạm
-    } catch {
-      message.error("Không thể tải danh sách trạm của bạn!");
+      setStations(myStations);
+      if (myStations.length > 0) setSelectedStation(myStations[0]);
+    } catch (err) {
+      console.error(err);
+      message.error("Không thể tải danh sách trạm!");
+    } finally {
+      setLoading(false);
     }
   }
 
-  // === Lấy danh sách sự cố theo trạm ===
+  // === Lấy danh sách sự cố ===
   async function loadReports(stationId) {
     if (!stationId) return;
     setLoading(true);
     try {
-      const res = await fetchAuthJSON(
-        `${API_BASE}/reports?stationId=${stationId}`
-      );
-      let data = res?.data ?? res?.$values ?? res ?? [];
+      const params = new URLSearchParams({
+        page: 1,
+        pageSize: 999,
+        stationId,
+      });
+      if (dateRange.length === 2) {
+        params.append("from", dateRange[0].toISOString());
+        params.append("to", dateRange[1].toISOString());
+      }
+
+      const res = await fetchAuthJSON(`${API_BASE}/reports?${params.toString()}`);
+      let data = res?.items ?? res?.data?.items ?? [];
       if (!Array.isArray(data)) data = [data];
       setReports(data);
-
-      // Tính thống kê trạng thái
-      const countByStatus = (st) =>
-        data.filter((r) => r.status === st).length;
-      setStats({
-        pending: countByStatus("Pending"),
-        inProgress: countByStatus("InProgress"),
-        resolved: countByStatus("Resolved"),
-        closed: countByStatus("Closed"),
-      });
-    } catch {
+    } catch (err) {
+      console.error(err);
       message.error("Không thể tải danh sách sự cố!");
     } finally {
       setLoading(false);
     }
   }
 
-  // === Cập nhật trạng thái ===
+  // === Cập nhật trạng thái sự cố ===
   async function updateStatus(reportId, newStatus) {
     try {
-      await fetchAuthJSON(`${API_BASE}/reports/${reportId}/status`, {
-        method: "PATCH",
+      const report = reports.find((r) => r.reportId === reportId);
+      if (!report) return message.error("Không tìm thấy sự cố!");
+
+      await fetchAuthJSON(`${API_BASE}/reports/${reportId}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({
+          title: report.title || "No title",
+          description: report.description || "No description",
+          severity: report.severity || "Low",
+          status: newStatus,
+          resolvedAt:
+            newStatus === "Closed" || newStatus === "Resolved"
+              ? new Date().toISOString()
+              : null,
+        }),
       });
+
+      setReports((prev) =>
+        prev.map((r) =>
+          r.reportId === reportId ? { ...r, status: newStatus } : r
+        )
+      );
+
       message.success("✅ Cập nhật trạng thái thành công!");
-      loadReports(selectedStation?.stationId);
       setDetailOpen(false);
-    } catch {
+    } catch (err) {
+      console.error(err);
       message.error("Không thể cập nhật trạng thái!");
     }
   }
 
-  // === Lọc và tìm kiếm ===
+  /* ---------------- Bộ lọc ---------------- */
   const filteredReports = reports.filter((r) => {
     const matchesSearch =
       r.title?.toLowerCase().includes(search.toLowerCase()) ||
@@ -125,7 +159,6 @@ export default function IncidentManager() {
     High: "orange",
     Critical: "red",
   };
-
   const statusColor = {
     Pending: "default",
     InProgress: "processing",
@@ -134,8 +167,8 @@ export default function IncidentManager() {
   };
 
   const columns = [
-    { title: "ID", dataIndex: "reportId", key: "reportId", width: 70 },
-    { title: "Tiêu đề", dataIndex: "title", key: "title" },
+    { title: "ID", dataIndex: "reportId", width: 70 },
+    { title: "Tiêu đề", dataIndex: "title" },
     {
       title: "Mức độ",
       dataIndex: "severity",
@@ -147,7 +180,7 @@ export default function IncidentManager() {
       render: (st) => <Tag color={statusColor[st]}>{st}</Tag>,
     },
     { title: "Trụ sạc", dataIndex: "chargerCode" },
-    { title: "Cổng", dataIndex: "portName" },
+    { title: "Cổng", dataIndex: "portCode" },
     { title: "Người báo cáo", dataIndex: "staffName" },
     {
       title: "Ngày báo cáo",
@@ -156,7 +189,6 @@ export default function IncidentManager() {
     },
     {
       title: "Thao tác",
-      key: "action",
       render: (_, record) => (
         <Button
           type="link"
@@ -178,54 +210,26 @@ export default function IncidentManager() {
         <ExclamationCircleOutlined style={{ color: "#faad14" }} /> Quản lý sự cố
       </h2>
 
-      {/* === Thống kê tổng quan === */}
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} md={6}>
-          <Card className="sum-card" style={{ borderLeft: "5px solid #fa8c16" }}>
-            <h4>Chờ xử lý</h4>
-            <p style={{ color: "#fa8c16", fontWeight: 700 }}>{stats.pending}</p>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card className="sum-card" style={{ borderLeft: "5px solid #1677ff" }}>
-            <h4>Đang xử lý</h4>
-            <p style={{ color: "#1677ff", fontWeight: 700 }}>{stats.inProgress}</p>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card className="sum-card" style={{ borderLeft: "5px solid #52c41a" }}>
-            <h4>Đã giải quyết</h4>
-            <p style={{ color: "#52c41a", fontWeight: 700 }}>{stats.resolved}</p>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={6}>
-          <Card className="sum-card" style={{ borderLeft: "5px solid #cf1322" }}>
-            <h4>Đã đóng</h4>
-            <p style={{ color: "#cf1322", fontWeight: 700 }}>{stats.closed}</p>
-          </Card>
-        </Col>
-      </Row>
-
       {/* === Bộ lọc === */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         {stations.length > 1 && (
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={4}>
             <Select
               value={selectedStation?.stationId || null}
-              placeholder="Chọn trạm để xem sự cố..."
+              placeholder="Chọn trạm..."
               onChange={(id) => {
                 const st = stations.find((s) => s.stationId === id);
                 setSelectedStation(st);
               }}
-              style={{ width: "100%" }}
               options={stations.map((s) => ({
                 label: s.stationName,
                 value: s.stationId,
               }))}
+              style={{ width: "100%" }}
             />
           </Col>
         )}
-        <Col xs={24} sm={12} md={6}>
+        <Col xs={24} sm={12} md={4}>
           <Input
             placeholder="Tìm kiếm sự cố..."
             value={search}
@@ -234,6 +238,13 @@ export default function IncidentManager() {
           />
         </Col>
         <Col xs={24} sm={12} md={5}>
+          <RangePicker
+            style={{ width: "100%" }}
+            onChange={(dates) => setDateRange(dates || [])}
+            placeholder={["Từ ngày", "Đến ngày"]}
+          />
+        </Col>
+        <Col xs={24} sm={12} md={3}>
           <Select
             value={severityFilter}
             onChange={setSeverityFilter}
@@ -247,7 +258,7 @@ export default function IncidentManager() {
             ]}
           />
         </Col>
-        <Col xs={24} sm={12} md={5}>
+        <Col xs={24} sm={12} md={3}>
           <Select
             value={statusFilter}
             onChange={setStatusFilter}
@@ -262,24 +273,33 @@ export default function IncidentManager() {
           />
         </Col>
         <Col xs={24} sm={12} md={2}>
-          <Button icon={<ReloadOutlined />} onClick={() => loadReports(selectedStation?.stationId)}>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={() => loadReports(selectedStation?.stationId)}
+            disabled={!selectedStation}
+          >
             Làm mới
           </Button>
         </Col>
       </Row>
 
       {/* === Bảng sự cố === */}
-      <Card>
+      <Card variant="bordered">
         <Table
           columns={columns}
           dataSource={filteredReports.map((r) => ({ ...r, key: r.reportId }))}
           loading={loading}
           pagination={{ pageSize: 10 }}
           bordered
+          locale={{
+            emptyText: selectedStation
+              ? "Không có sự cố nào"
+              : "Vui lòng chọn trạm để xem sự cố",
+          }}
         />
       </Card>
 
-      {/* === Modal chi tiết === */}
+      {/* === Modal xem chi tiết === */}
       <Modal
         title={`Chi tiết sự cố #${selectedReport?.reportId || ""}`}
         open={detailOpen}
@@ -289,14 +309,38 @@ export default function IncidentManager() {
       >
         {selectedReport && (
           <>
-            <p><strong>Tiêu đề:</strong> {selectedReport.title}</p>
-            <p><strong>Mức độ:</strong> <Tag color={severityColor[selectedReport.severity]}>{selectedReport.severity}</Tag></p>
-            <p><strong>Trạng thái:</strong> <Tag color={statusColor[selectedReport.status]}>{selectedReport.status}</Tag></p>
-            <p><strong>Mô tả:</strong> {selectedReport.description || "—"}</p>
-            <p><strong>Trụ sạc:</strong> {selectedReport.chargerCode || "—"}</p>
-            <p><strong>Cổng sạc:</strong> {selectedReport.portName || "—"}</p>
-            <p><strong>Người báo cáo:</strong> {selectedReport.staffName || "—"}</p>
-            <p><strong>Ngày tạo:</strong> {new Date(selectedReport.createdAt).toLocaleString("vi-VN")}</p>
+            <p>
+              <strong>Tiêu đề:</strong> {selectedReport.title}
+            </p>
+            <p>
+              <strong>Mức độ:</strong>{" "}
+              <Tag color={severityColor[selectedReport.severity]}>
+                {selectedReport.severity}
+              </Tag>
+            </p>
+            <p>
+              <strong>Trạng thái:</strong>{" "}
+              <Tag color={statusColor[selectedReport.status]}>
+                {selectedReport.status}
+              </Tag>
+            </p>
+            <p>
+              <strong>Mô tả:</strong> {selectedReport.description || "—"}
+            </p>
+            <p>
+              <strong>Trụ sạc:</strong> {selectedReport.chargerCode || "—"}
+            </p>
+            <p>
+              <strong>Cổng sạc:</strong> {selectedReport.portCode || "—"}
+            </p>
+            <p>
+              <strong>Người báo cáo:</strong>{" "}
+              {selectedReport.staffName || "—"}
+            </p>
+            <p>
+              <strong>Ngày tạo:</strong>{" "}
+              {new Date(selectedReport.createdAt).toLocaleString("vi-VN")}
+            </p>
 
             <Select
               defaultValue={selectedReport.status}
