@@ -289,7 +289,8 @@ export default function ChargerManager() {
       const chargersRaw = await fetchAuthJSON(`${API_BASE}/Chargers`);
       setRows(toArray(chargersRaw).map(normCharger));
     } catch (err) {
-      alert(`❌ ${err.message}`);
+      setFormError(`❌ ${err.message}`);
+      setTimeout(() => setFormError(""), 5000);
     }
   }
 
