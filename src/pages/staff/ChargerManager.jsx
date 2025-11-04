@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { getApiBase, fetchAuthJSON } from "../../utils/api";
 import "./ChargerManager.css";
 
@@ -154,6 +154,7 @@ function extractErrorMessage(error) {
 
 export default function ChargerManager() {
   const [sp] = useSearchParams();
+  const navigate = useNavigate();
   const stationId = sp.get("stationId") || "";
 
   const [rows, setRows] = useState([]);
@@ -171,6 +172,17 @@ export default function ChargerManager() {
   const [ports, setPorts] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const redirectTimerRef = React.useRef(null);
+
+  /* ---------- Cleanup timer on unmount ---------- */
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current);
+      }
+    };
+  }, []);
 
   /* ---------- Load chargers + lấy phiên gần nhất ---------- */
   useEffect(() => {
@@ -326,12 +338,23 @@ if (!portCode) {
           method: "POST",
           body: JSON.stringify(body),
         });
-        // Success - close modal
+        // Success - show success message and redirect
         setShowModal(false);
         setLicensePlate("");
         setPortId("");
         setType("guest");
         setFormError("");
+        setSuccessMessage(res?.message || "✅ Phiên sạc (guest) đã được khởi động thành công!");
+        
+        // Clear any existing timer
+        if (redirectTimerRef.current) {
+          clearTimeout(redirectTimerRef.current);
+        }
+        
+        // Redirect to sessions after 2 seconds
+        redirectTimerRef.current = setTimeout(() => {
+          navigate("/staff/sessions");
+        }, 2000);
       } else {
         const found = await fetchAuthJSON(
           `${API_BASE}/Vehicles?licensePlate=${encodeURIComponent(
@@ -360,12 +383,23 @@ if (!portCode) {
           method: "POST",
           body: JSON.stringify(body),
         });
-        // Success - close modal
+        // Success - show success message and redirect
         setShowModal(false);
         setLicensePlate("");
         setPortId("");
         setType("guest");
         setFormError("");
+        setSuccessMessage(res?.message || "✅ Phiên sạc (company) đã được khởi động thành công!");
+        
+        // Clear any existing timer
+        if (redirectTimerRef.current) {
+          clearTimeout(redirectTimerRef.current);
+        }
+        
+        // Redirect to sessions after 2 seconds
+        redirectTimerRef.current = setTimeout(() => {
+          navigate("/staff/sessions");
+        }, 2000);
       }
     } catch (e) {
       // Extract user-friendly error message
@@ -424,6 +458,7 @@ if (!portCode) {
           <button className="sc-primary" onClick={() => {
             setShowModal(true);
             setFormError("");
+            setSuccessMessage("");
           }}>
             + Bắt đầu phiên
           </button>
@@ -432,6 +467,26 @@ if (!portCode) {
 
       {loading && <div className="sc-empty">Đang tải…</div>}
       {err && <div className="sc-error">{err}</div>}
+      
+      {/* Success message */}
+      {successMessage && (
+        <div className="success-message-box">
+          <div className="success-message-icon">
+            ✓
+          </div>
+          <div className="success-message-content">
+            {successMessage}
+          </div>
+          <button
+            className="success-message-close"
+            onClick={() => setSuccessMessage("")}
+            aria-label="Đóng thông báo"
+            title="Đóng"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {!loading && !err && (
         <div className="sc-table">
