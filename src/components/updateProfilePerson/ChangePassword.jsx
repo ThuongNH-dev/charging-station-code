@@ -3,6 +3,7 @@ import ProfileSidebar from "../form/Info/ProfileSidebar";
 import "./UpdateProfile.css";
 import MainLayout from "../../layouts/MainLayout";
 import { EyeOutlined, EyeInvisibleOutlined } from "@ant-design/icons";
+import { changePassword } from "../../api/passwordApi";
 
 export default function ChangePassword() {
   const [form, setForm] = useState({
@@ -12,8 +13,8 @@ export default function ChangePassword() {
   });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
 
-  // 👁 Trạng thái hiển thị mật khẩu cho từng ô
   const [showPassword, setShowPassword] = useState({
     current: false,
     new: false,
@@ -25,37 +26,31 @@ export default function ChangePassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (form.newPassword !== form.confirmPassword) {
-      return setMsg("Mật khẩu mới không khớp!");
-    }
-
-    setLoading(true);
     setMsg("");
+    setError("");
+
     try {
-      const response = await fetch(
-        "http://localhost:8080/api/change-password",
+      setLoading(true);
+      const accountIdRaw = localStorage.getItem("accountId");
+      const accountId = accountIdRaw ? Number.parseInt(accountIdRaw, 10) : 0;
+
+      const result = await changePassword(
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            currentPassword: form.currentPassword,
-            newPassword: form.newPassword,
-          }),
+          accountId,
+          oldPassword: form.currentPassword,
+          newPassword: form.newPassword,
+          confirmPassword: form.confirmPassword,
+        },
+        {
+          // path: "/api/change-password", // ← nếu BE bạn dùng path khác thì mở dòng này
         }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Đổi mật khẩu thất bại!");
-      }
-
-      setMsg("Đổi mật khẩu thành công!");
+      setMsg(result?.message || "Đổi mật khẩu thành công!");
       setForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (err) {
       console.error(err);
-      setMsg(err.message || "Có lỗi xảy ra khi đổi mật khẩu!");
+      setError(err.message || "Có lỗi xảy ra khi đổi mật khẩu!");
     } finally {
       setLoading(false);
     }
@@ -76,6 +71,7 @@ export default function ChangePassword() {
                 value={form.currentPassword}
                 onChange={handleChange}
                 required
+                autoComplete="current-password"
                 style={{ width: "100%", paddingRight: "40px" }}
               />
               <span
@@ -87,7 +83,7 @@ export default function ChangePassword() {
                 }
                 style={{
                   position: "absolute",
-                  right: "10px",
+                  right: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
                   cursor: "pointer",
@@ -109,18 +105,16 @@ export default function ChangePassword() {
                 value={form.newPassword}
                 onChange={handleChange}
                 required
+                autoComplete="new-password"
                 style={{ width: "100%", paddingRight: "40px" }}
               />
               <span
                 onClick={() =>
-                  setShowPassword((prev) => ({
-                    ...prev,
-                    new: !prev.new,
-                  }))
+                  setShowPassword((prev) => ({ ...prev, new: !prev.new }))
                 }
                 style={{
                   position: "absolute",
-                  right: "10px",
+                  right: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
                   cursor: "pointer",
@@ -138,6 +132,7 @@ export default function ChangePassword() {
                 value={form.confirmPassword}
                 onChange={handleChange}
                 required
+                autoComplete="new-password"
                 style={{ width: "100%", paddingRight: "40px" }}
               />
               <span
@@ -149,7 +144,7 @@ export default function ChangePassword() {
                 }
                 style={{
                   position: "absolute",
-                  right: "10px",
+                  right: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
                   cursor: "pointer",
@@ -181,7 +176,17 @@ export default function ChangePassword() {
                 Hủy
               </button>
             </div>
-            {msg && <p className="msg">{msg}</p>}
+
+            {msg && (
+              <p className="msg" style={{ color: "#0a7c2f" }}>
+                {msg}
+              </p>
+            )}
+            {error && (
+              <p className="msg" style={{ color: "#c62828" }}>
+                {error}
+              </p>
+            )}
           </form>
         </div>
       </div>
