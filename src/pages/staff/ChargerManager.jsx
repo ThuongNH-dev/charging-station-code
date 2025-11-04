@@ -38,6 +38,120 @@ const normCharger = (c = {}) => ({
   stationId: c.stationId ?? c.StationId,
 });
 
+/* ---------- Extract user-friendly error message ---------- */
+function extractErrorMessage(error) {
+  if (!error) return "Đã xảy ra lỗi không xác định";
+
+  // Try to get error from response body (if it's a JSON string)
+  let message = error.message || error.error || "";
+  
+  if (typeof message === "string" && message.length > 0) {
+    // Try to parse as JSON
+    try {
+      const parsed = JSON.parse(message);
+      if (parsed?.error) {
+        message = typeof parsed.error === "string" ? parsed.error : parsed.error.error || "";
+      } else if (typeof parsed === "string") {
+        message = parsed;
+      } else if (parsed?.message) {
+        message = parsed.message;
+      }
+    } catch {
+      // Not JSON, use message as is
+    }
+  }
+
+  if (typeof message !== "string") {
+    if (message?.error) {
+      message = typeof message.error === "string" ? message.error : "";
+    } else if (message?.message) {
+      message = message.message;
+    } else {
+      message = "";
+    }
+  }
+
+  // Clean up the message - remove stack traces and technical details
+  if (message) {
+    // First, try to extract meaningful error from common patterns
+    // Look for user-friendly Vietnamese error messages (these are usually the first meaningful text)
+    const userMessagePatterns = [
+      /Trụ sạc đang bận hoặc không khả dụng[\.!。！]?/i,
+      /Cổng sạc đang được sử dụng hoặc bị khóa[\.!。！]?/i,
+      /Không tìm thấy[^\.!。！\n]*[\.!。！]?/i,
+      /Không thể[^\.!。！\n]*[\.!。！]?/i,
+      /Đã xảy ra lỗi[^\.!。！\n]*[\.!。！]?/i,
+    ];
+    
+    let foundUserMessage = false;
+    for (const pattern of userMessagePatterns) {
+      const match = message.match(pattern);
+      if (match && match[0]) {
+        const extracted = match[0].trim();
+        // Only use if it's a reasonable length (not too short, not too long)
+        if (extracted.length >= 10 && extracted.length < 200) {
+          message = extracted;
+          foundUserMessage = true;
+          break;
+        }
+      }
+    }
+    
+    // If we didn't find a user-friendly message, clean up the original message
+    if (!foundUserMessage) {
+      // Remove stack trace (lines starting with "at " or containing file paths)
+      message = message.split("\n")
+        .filter(line => {
+          const trimmed = line.trim();
+          // Keep lines that don't look like stack traces or technical info
+          return !trimmed.startsWith("at ") && 
+                 !trimmed.includes("System.Exception") &&
+                 !trimmed.includes("Stack Trace") &&
+                 !trimmed.match(/^\s*at\s+\w+/) &&
+                 !trimmed.match(/\.(js|ts|cs|dll|exe):\d+/) &&
+                 !trimmed.match(/^at\s+/i) &&
+                 !trimmed.toLowerCase().includes("user-agent") &&
+                 !trimmed.toLowerCase().includes("accept-encoding") &&
+                 !trimmed.toLowerCase().includes("cookie") &&
+                 !trimmed.toLowerCase().includes("referer") &&
+                 !trimmed.toLowerCase().includes("x-requested-with") &&
+                 !trimmed.toLowerCase().includes("content-length") &&
+                 !trimmed.toLowerCase().match(/^host:/) &&
+                 !trimmed.match(/^\d{3}\s+[a-z]/i) && // HTTP status codes
+                 trimmed.length > 0;
+        })
+        .join(" ")
+        .trim();
+    }
+
+    // Remove common technical prefixes
+    message = message
+      .replace(/^System\.Exception:\s*/i, "")
+      .replace(/^Error:\s*/i, "")
+      .replace(/^Lỗi:\s*/i, "")
+      .replace(/\s*at\s+.*$/i, "")
+      .replace(/Stack Trace:.*$/is, "")
+      .trim();
+
+    // Extract message from JSON-like structures
+    const jsonMatch = message.match(/\{\s*"error"\s*:\s*"([^"]+)"\s*\}/i);
+    if (jsonMatch && jsonMatch[1]) {
+      message = jsonMatch[1];
+    }
+
+
+    // If message is too long, take first sentence or first 200 chars
+    if (message.length > 200) {
+      const firstSentence = message.split(/[.!?。！？]/)[0];
+      message = firstSentence.length > 0 && firstSentence.length < 200 
+        ? firstSentence.trim() 
+        : message.substring(0, 200).trim() + "...";
+    }
+  }
+
+  return message || "Đã xảy ra lỗi không xác định";
+}
+
 export default function ChargerManager() {
   const [sp] = useSearchParams();
   const stationId = sp.get("stationId") || "";
@@ -56,6 +170,7 @@ export default function ChargerManager() {
   const [licensePlate, setLicensePlate] = useState("");
   const [ports, setPorts] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
 
   /* ---------- Load chargers + lấy phiên gần nhất ---------- */
   useEffect(() => {
@@ -168,9 +283,12 @@ export default function ChargerManager() {
 
   /* ---------- Bắt đầu phiên ---------- */
   async function handleStartNew() {
-    if (!chargerId || !portId || !licensePlate)
-      return alert("⚠️ Vui lòng chọn trụ, cổng và nhập biển số!");
+    if (!chargerId || !portId || !licensePlate) {
+      setFormError("⚠️ Vui lòng chọn trụ, cổng và nhập biển số!");
+      return;
+    }
 
+    setFormError("");
     setSubmitting(true);
     try {
       const selectedPort = ports.find((p) => String(p.portId) === String(portId));
@@ -208,7 +326,12 @@ if (!portCode) {
           method: "POST",
           body: JSON.stringify(body),
         });
-        alert(res?.message || "✅ Phiên sạc (guest) đã được khởi động!");
+        // Success - close modal
+        setShowModal(false);
+        setLicensePlate("");
+        setPortId("");
+        setType("guest");
+        setFormError("");
       } else {
         const found = await fetchAuthJSON(
           `${API_BASE}/Vehicles?licensePlate=${encodeURIComponent(
@@ -237,15 +360,17 @@ if (!portCode) {
           method: "POST",
           body: JSON.stringify(body),
         });
-        alert(res?.message || "✅ Phiên sạc (company) đã được khởi động!");
+        // Success - close modal
+        setShowModal(false);
+        setLicensePlate("");
+        setPortId("");
+        setType("guest");
+        setFormError("");
       }
-
-      setShowModal(false);
-      setLicensePlate("");
-      setPortId("");
-      setType("guest");
     } catch (e) {
-      alert(`❌ Lỗi: ${e.message || JSON.stringify(e)}`);
+      // Extract user-friendly error message
+      const errorMsg = extractErrorMessage(e);
+      setFormError(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -296,7 +421,10 @@ if (!portCode) {
         <h2>Danh sách trụ sạc</h2>
         <div className="sc-actions">
           <input className="sc-search" placeholder="🔍  Tìm kiếm" />
-          <button className="sc-primary" onClick={() => setShowModal(true)}>
+          <button className="sc-primary" onClick={() => {
+            setShowModal(true);
+            setFormError("");
+          }}>
             + Bắt đầu phiên
           </button>
         </div>
@@ -358,12 +486,35 @@ if (!portCode) {
           <div className="modal">
             <div className="modal-header">
               <h3>Khởi động phiên sạc</h3>
-              <button className="modal-close" onClick={() => setShowModal(false)}>
+              <button className="modal-close" onClick={() => {
+                setShowModal(false);
+                setFormError("");
+              }}>
                 ✕
               </button>
             </div>
 
             <p>Chọn loại khách hàng và thông tin cần thiết.</p>
+
+            {/* Inline error message */}
+            {formError && (
+              <div className="error-message-box">
+                <div className="error-message-icon">
+                  ⚠
+                </div>
+                <div className="error-message-content">
+                  {formError}
+                </div>
+                <button
+                  className="error-message-close"
+                  onClick={() => setFormError("")}
+                  aria-label="Đóng thông báo lỗi"
+                  title="Đóng"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
 
             <label>Loại khách hàng</label>
             <div className="type-select">

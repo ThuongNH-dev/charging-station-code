@@ -173,3 +173,99 @@
 .sc-cancel { background: #fff; color: #111827; border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
 .sc-cancel:hover { background: #f9fafb; }
 .sc-primary { min-width: 112px; }
+
+/* ===== Error Message Box ===== */
+.error-message-box {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border: 1.5px solid #ef4444;
+  border-left: 4px solid #dc2626;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.12), 0 2px 4px rgba(220, 38, 38, 0.08);
+  color: #991b1b;
+  font-size: 14px;
+  line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  animation: slideInError 0.3s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.error-message-box::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #dc2626, #ef4444, #dc2626);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes slideInError {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.error-message-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #dc2626;
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.3);
+}
+
+.error-message-content {
+  flex: 1;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.error-message-close {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #991b1b;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  opacity: 0.6;
+}
+
+.error-message-close:hover {
+  opacity: 1;
+  background: rgba(220, 38, 38, 0.1);
+  transform: scale(1.1);
+}
