@@ -53,13 +53,11 @@ export default function SessionManager() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [message, setMessage] = useState({ type: "", text: "" });
   const [confirmDialog, setConfirmDialog] = useState({ open: false, session: null });
-  const pageSize = 8;
-  const navigate = useNavigate();
-
-  // ✅ Trạm staff phụ trách
   const [stations, setStations] = useState([]);
   const [myStations, setMyStations] = useState([]);
   const [selectedStationId, setSelectedStationId] = useState(null);
+  const pageSize = 8;
+  const navigate = useNavigate();
 
   /* ---------------- Load danh sách trạm staff ---------------- */
   useEffect(() => {
@@ -75,9 +73,7 @@ export default function SessionManager() {
             const staffs = toArray(res);
             const found = staffs.some((s) => String(s.staffId) === String(currentAccountId));
             if (found) myStationIds.push(st.stationId);
-          } catch {
-            console.warn("Không lấy được staff của trạm:", st.stationId);
-          }
+          } catch {}
         }
 
         const mine = stationsArr.filter((s) => myStationIds.includes(s.stationId));
@@ -111,15 +107,10 @@ export default function SessionManager() {
       const chargers = toArray(chargersRes);
 
       const portToCharger = {};
-      for (const p of ports) {
-        portToCharger[p.portId] = p.chargerId;
-      }
+      for (const p of ports) portToCharger[p.portId] = p.chargerId;
       const chargerToStation = {};
-      for (const c of chargers) {
-        chargerToStation[c.chargerId] = c.stationId;
-      }
+      for (const c of chargers) chargerToStation[c.chargerId] = c.stationId;
 
-      // ✅ Giới hạn session chỉ thuộc trạm hiện tại
       sessionArr = sessionArr.filter((s) => {
         const portId = s.portId ?? s.PortId;
         const chargerId = portToCharger[portId];
@@ -143,9 +134,7 @@ export default function SessionManager() {
         try {
           const invDetail = await fetchAuthJSON(`${API_BASE}/Invoices/${inv.invoiceId || inv.id}`);
           const invoiceData = invDetail?.data || invDetail;
-          const sessionsList =
-            invoiceData?.chargingSessions || invoiceData?.$values?.chargingSessions || [];
-
+          const sessionsList = invoiceData?.chargingSessions || invoiceData?.$values?.chargingSessions || [];
           sessionsList.forEach((session) => {
             const sessionId = session.chargingSessionId || session.id;
             if (sessionId) {
@@ -174,28 +163,13 @@ export default function SessionManager() {
           const sessionId = s.chargingSessionId || s.id;
           const invoiceInfo = sessionToInvoiceStatus[sessionId];
           const invoiceStatus = invoiceInfo?.status || "UNPAID";
-
-          const vId =
-            s.vehicleId ??
-            s.VehicleId ??
-            s.vehicle?.vehicleId ??
-            s.vehicle?.VehicleId ??
-            null;
+          const vId = s.vehicleId ?? s.VehicleId ?? s.vehicle?.vehicleId ?? s.vehicle?.VehicleId ?? null;
           const v = vehicleMap[vId] || {};
 
           let licensePlate =
-            s.licensePlate ??
-            s.LicensePlate ??
-            v.licensePlate ??
-            v.LicensePlate ??
-            "—";
+            s.licensePlate ?? s.LicensePlate ?? v.licensePlate ?? v.LicensePlate ?? "—";
 
-          const companyId =
-            s.companyId ??
-            v.companyId ??
-            v.CompanyId ??
-            null;
-
+          const companyId = s.companyId ?? v.companyId ?? v.CompanyId ?? null;
           const custId = s.customerId ?? s.CustomerId;
           let customerType = "Khách bình thường";
           if (!custId || custId === 0) customerType = "Khách vãng lai";
@@ -214,6 +188,8 @@ export default function SessionManager() {
             total: s.total ?? s.amount ?? 0,
             startedAt: s.startedAt ?? s.startTime,
             endedAt: s.endedAt ?? s.endTime,
+            startSoc: s.startSoc ?? s.StartSoc ?? null, // ✅ thêm cột % bắt đầu
+            endSoc: s.endSoc ?? s.EndSoc ?? null,       // ✅ thêm cột % kết thúc
             invoiceStatus,
             invoiceId: invoiceInfo?.invoiceId || null,
             customerType,
@@ -246,18 +222,30 @@ export default function SessionManager() {
         ? `${API_BASE}/ChargingSessions/guest/end`
         : `${API_BASE}/ChargingSessions/end`;
 
-      const payload = isGuest
-        ? {
-            chargingSessionId: s.chargingSessionId,
-            licensePlate: s.licensePlate ?? "UNKNOWN",
-            portId: s.portId,
-            PortCode: s.portCode ?? `P${String(s.portId).padStart(3, "0")}`,
-            endSoc: s.endSoc ?? 80,
-          }
-        : {
-            chargingSessionId: s.chargingSessionId,
-            endSoc: s.endSoc ?? 80,
-          };
+      // ✅ Lấy endSoc thật từ localStorage nếu có
+let realEndSoc = 80;
+try {
+  const live = JSON.parse(localStorage.getItem("charging:live:v1") || "null");
+  if (live && Number.isFinite(live.batteryAtLastUpdate)) {
+    realEndSoc = Math.round(live.batteryAtLastUpdate);
+  }
+} catch {
+  realEndSoc = s.endSoc ?? 80;
+}
+
+const payload = isGuest
+  ? {
+      chargingSessionId: s.chargingSessionId,
+      licensePlate: s.licensePlate ?? "UNKNOWN",
+      portId: s.portId,
+      PortCode: s.portCode ?? `P${String(s.portId).padStart(3, "0")}`,
+      endSoc: realEndSoc,   // ✅ thay vì cố định 80
+    }
+  : {
+      chargingSessionId: s.chargingSessionId,
+      endSoc: realEndSoc,   // ✅ thay vì cố định 80
+    };
+
 
       const res = await fetchAuthJSON(endpoint, {
         method: "POST",
@@ -304,12 +292,9 @@ export default function SessionManager() {
     }
   }
 
-  /* ===== Filtering + Search ===== */
   const filteredSessions = sessions.filter((s) => {
     const matchSearch = search
-      ? String(s.chargingSessionId)
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
+      ? String(s.chargingSessionId).includes(search) ||
         String(s.licensePlate).toLowerCase().includes(search.toLowerCase())
       : true;
     const matchStatus =
@@ -329,10 +314,7 @@ export default function SessionManager() {
 
   const totalPages = Math.ceil(filteredSessions.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedSessions = filteredSessions.slice(
-    startIndex,
-    startIndex + pageSize
-  );
+  const paginatedSessions = filteredSessions.slice(startIndex, startIndex + pageSize);
 
   return (
     <div className="sess-wrap">
@@ -342,7 +324,7 @@ export default function SessionManager() {
         visible={!!message.text}
         onClose={() => setMessage({ type: "", text: "" })}
       />
-      
+
       <ConfirmDialog
         open={confirmDialog.open}
         title="Xác nhận dừng phiên sạc"
@@ -418,6 +400,8 @@ export default function SessionManager() {
                 <th>Loại</th>
                 <th>Bắt đầu</th>
                 <th>Kết thúc</th>
+                <th>% bắt đầu</th>
+                <th>% kết thúc</th>
                 <th>kWh</th>
                 <th>Chi phí</th>
                 <th>TT</th>
@@ -427,17 +411,17 @@ export default function SessionManager() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="center muted">
+                  <td colSpan={13} className="center muted">
                     Đang tải…
                   </td>
                 </tr>
               ) : err ? (
                 <tr>
-                  <td colSpan={11} className="center error">{err}</td>
+                  <td colSpan={13} className="center error">{err}</td>
                 </tr>
               ) : filteredSessions.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="center muted">
+                  <td colSpan={13} className="center muted">
                     Không tìm thấy phiên phù hợp.
                   </td>
                 </tr>
@@ -463,6 +447,8 @@ export default function SessionManager() {
                     </td>
                     <td>{fmtTime(s.startedAt)}</td>
                     <td>{fmtTime(s.endedAt)}</td>
+                    <td>{s.startSoc != null ? `${s.startSoc}%` : "—"}</td>
+                    <td>{s.endSoc != null ? `${s.endSoc}%` : "—"}</td>
                     <td>{s.energyKwh?.toFixed(2) ?? "—"}</td>
                     <td>{vnd(s.total)}</td>
                     <td>
@@ -489,12 +475,7 @@ export default function SessionManager() {
                       ) : (
                         <button
                           className="btn-light"
-                          onClick={() =>
-                            navigate(
-                              `/staff/invoice?order=S${s.chargingSessionId}`,
-                              { state: s }
-                            )
-                          }
+                          onClick={() => navigate(`/staff/invoice?session=${s.chargingSessionId}`)}
                         >
                           Chi tiết
                         </button>
@@ -507,13 +488,12 @@ export default function SessionManager() {
           </table>
         </div>
 
-        {/* ✅ Thanh phân trang Ant Design */}
-        <div style={{ textAlign: "center", marginTop: 16 }}>
+        <div className="sess-footer">
           <Pagination
             current={currentPage}
-            pageSize={pageSize}
             total={filteredSessions.length}
-            onChange={(page) => setCurrentPage(page)}
+            pageSize={pageSize}
+            onChange={(p) => setCurrentPage(p)}
             showSizeChanger={false}
           />
         </div>
