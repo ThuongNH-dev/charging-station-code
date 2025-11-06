@@ -37,43 +37,6 @@ export default function SubscriptionMembersPage() {
       );
       setPlan(found || null);
       setSubs(subsOfPlan || []);
-      const normalized = [];
-      (allUsers || []).forEach((acc) => {
-        const accountId = acc.accountId ?? acc.AccountId;
-        const role = acc.role ?? acc.Role;
-
-        // 🔹 Các customer thuộc account này
-        const customers = acc.customers ?? acc.Customers ?? [];
-        customers.forEach((c) => {
-          normalized.push({
-            id: c.customerId ?? c.CustomerId, // dùng CustomerId để khớp Subscriptions.CustomerId
-            role: "Customer",
-            userName:
-              c.fullName ??
-              c.FullName ??
-              acc.userName ??
-              acc.UserName ??
-              `acc#${accountId}`,
-            companyName: "",
-          });
-        });
-
-        // 🔹 Company (nếu có)
-        const comp = acc.company ?? acc.Company;
-        if (comp) {
-          normalized.push({
-            id: comp.companyId ?? comp.CompanyId, // dùng CompanyId để khớp Subscriptions.CompanyId
-            role: "Company",
-            userName:
-              comp.name ??
-              comp.Name ??
-              acc.userName ??
-              acc.UserName ??
-              `acc#${accountId}`,
-            companyName: comp.name ?? comp.Name ?? "",
-          });
-        }
-      });
       setCustMap(
         new Map(
           (customers || []).map((c) => [
@@ -118,17 +81,17 @@ export default function SubscriptionMembersPage() {
   };
 
   const filtered = useMemo(() => {
-    return subs.filter((s) => {
-      const u = findUser(s) || {};
-      const searchHit = (u.userName || u.companyName || "")
-        .toLowerCase()
-        .includes(filters.search.toLowerCase());
-      const roleOk = filters.role === "all" || u.role === filters.role;
+    const q = (filters.search || "").toLowerCase();
+    return (subs || []).filter((s) => {
+      const u = findUser(s);
+      const name = (u?.name || "").toLowerCase();
+      const searchHit = !q || name.includes(q);
+      const roleOk = filters.role === "all" || u?.role === filters.role;
       const statusOk =
         filters.status === "all" || String(s.status) === filters.status;
       return searchHit && roleOk && statusOk;
     });
-  }, [subs, users, filters]);
+  }, [subs, custMap, compMap, filters]);
 
   const changeStatus = async (s, v) => {
     await userApi.changeSubscriptionStatus(s.subscriptionId ?? s.id, v);
@@ -218,7 +181,7 @@ export default function SubscriptionMembersPage() {
                 {filtered.map((s) => {
                   const id = s.subscriptionId ?? s.id;
                   const u = findUser(s) || {};
-                  const name = (u && u.name) || `User #${u?.id}`;
+                  const name = u?.name || `User #${u?.id ?? "-"}`;
                   return (
                     <tr key={id}>
                       <td>{id}</td>

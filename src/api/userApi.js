@@ -82,7 +82,7 @@ export const userApi = {
   // === SUBSCRIPTIONS ===
   fetchAllSubscriptions: async () => {
     const res = await axios.get(`${BASE_URL}/Subscriptions`);
-    return res.data;
+    return Array.isArray(res.data) ? res.data : res.data?.items || [];
   },
   // === GET USER BY ID ===
   getUserById: async (id) => {
@@ -102,9 +102,7 @@ export const userApi = {
   fetchSubscriptionsByPlan: async (subscriptionPlanId) => {
     const all = await userApi.fetchAllSubscriptions();
     return all.filter(
-      (s) =>
-        String(s.subscriptionPlanId ?? s.servicePackageId ?? s.planId) ===
-        String(subscriptionPlanId)
+      (s) => String(s.subscriptionPlanId) === String(subscriptionPlanId)
     );
   },
 
@@ -138,6 +136,18 @@ export const userApi = {
   fetchAllCompanies: async () => {
     const res = await axios.get(`${BASE_URL}/Companies`);
     // trả mảng companies [{ companyId, name, ... }]
+    return Array.isArray(res.data) ? res.data : res.data?.items || [];
+  },
+
+  // === INVOICES ===
+  fetchInvoicesByCompany: async (companyId) => {
+    const res = await axios.get(`${BASE_URL}/Invoices/by-company/${companyId}`);
+    return Array.isArray(res.data) ? res.data : res.data?.items || [];
+  },
+  fetchInvoicesByCustomer: async (customerId) => {
+    const res = await axios.get(
+      `${BASE_URL}/Invoices/by-customer/${customerId}`
+    );
     return Array.isArray(res.data) ? res.data : res.data?.items || [];
   },
 };
