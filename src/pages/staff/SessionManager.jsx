@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
 import { Pagination } from "antd";
+import MessageBox from "../../components/staff/MessageBox";
+import ConfirmDialog from "../../components/staff/ConfirmDialog";
 import "./SessionManager.css";
 
 const API_BASE = getApiBase();
@@ -30,6 +32,8 @@ export default function SessionManager() {
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [message, setMessage] = useState({ type: "", text: "" });
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, session: null });
   const pageSize = 8;
   const navigate = useNavigate();
 
@@ -152,10 +156,13 @@ export default function SessionManager() {
   }
 
   async function handleStopSession(s) {
-    const confirmStop = window.confirm(
-      `Bạn có chắc chắn muốn dừng phiên sạc #${s.chargingSessionId}?`
-    );
-    if (!confirmStop) return;
+    setConfirmDialog({ open: true, session: s });
+  }
+
+  async function confirmStopSession() {
+    const s = confirmDialog.session;
+    if (!s) return;
+    setConfirmDialog({ open: false, session: null });
 
     try {
       const isGuest = !s.customerId || s.customerId === 0;
@@ -184,7 +191,8 @@ export default function SessionManager() {
 
       const beData = res?.data || res;
       if (!beData) {
-        alert("❌ Không thể dừng phiên sạc!");
+        setMessage({ type: "error", text: "❌ Không thể dừng phiên sạc!" });
+        setTimeout(() => setMessage({ type: "", text: "" }), 5000);
         return;
       }
 
@@ -203,15 +211,18 @@ export default function SessionManager() {
       };
 
       sessionStorage.setItem(`chargepay:${orderId}`, JSON.stringify(finalPayload));
-      alert("✅ Phiên sạc đã dừng! Chuyển đến hóa đơn...");
-
-      navigate(`/staff/invoice?order=${orderId}`, {
-        state: finalPayload,
-        replace: true,
-      });
+      setMessage({ type: "success", text: "✅ Phiên sạc đã dừng! Đang chuyển đến hóa đơn..." });
+      
+      setTimeout(() => {
+        navigate(`/staff/invoice?order=${orderId}`, {
+          state: finalPayload,
+          replace: true,
+        });
+      }, 1500);
     } catch (err) {
       console.error(err);
-      alert(`❌ Lỗi khi dừng phiên: ${err.message}`);
+      setMessage({ type: "error", text: `❌ Lỗi khi dừng phiên: ${err.message}` });
+      setTimeout(() => setMessage({ type: "", text: "" }), 5000);
     } finally {
       await loadSessions();
     }
@@ -249,6 +260,24 @@ export default function SessionManager() {
 
   return (
     <div className="sess-wrap">
+      <MessageBox
+        type={message.type}
+        message={message.text}
+        visible={!!message.text}
+        onClose={() => setMessage({ type: "", text: "" })}
+      />
+      
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title="Xác nhận dừng phiên sạc"
+        message={`Bạn có chắc chắn muốn dừng phiên sạc #${confirmDialog.session?.chargingSessionId}?`}
+        onConfirm={confirmStopSession}
+        onCancel={() => setConfirmDialog({ open: false, session: null })}
+        confirmText="Xác nhận"
+        cancelText="Hủy"
+        type="warning"
+      />
+
       <div className="sess-card">
         <div className="sess-head">
           <h3>Phiên sạc (đang chạy / lịch sử)</h3>
