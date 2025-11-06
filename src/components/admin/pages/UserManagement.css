@@ -245,9 +245,30 @@ th {
 }
 
 .action-cell {
-  display: flex; /* Giữ lại để các nút nằm ngang */
+  display: flex;
   align-items: center;
-  gap: 4px; /* Khoảng cách giữa các nút */
+  justify-content: center;
+  gap: 12px; /* khoảng cách giữa 2 icon */
+}
+
+.action-icon {
+  font-size: 16px;
+  color: #595959;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 4px;
+}
+
+.action-icon:hover {
+  transform: scale(1.2);
+}
+
+.edit-icon:hover {
+  color: #1677ff; /* xanh dương khi hover */
+}
+
+.delete-icon:hover {
+  color: #ff4d4f; /* đỏ khi hover */
 }
 
 .icon-btn {
@@ -345,4 +366,301 @@ th {
 
 .modal-actions button:hover {
   opacity: 0.9;
+}
+/* ======= STYLE CHO CỘT QUYỀN LỢI TRONG BẢNG ======= */
+.minimal-table .benefit-list {
+  list-style-type: disc; /* Hiển thị dấu chấm đầu dòng */
+  padding-left: 20px; /* Thụt vào một chút */
+  margin: 4px 0; /* Giảm khoảng cách trên dưới */
+}
+
+.minimal-table .benefit-list li {
+  line-height: 1.5; /* Khoảng cách giữa các dòng */
+  margin-bottom: 4px; /* Giãn nhẹ giữa các mục */
+  color: #333; /* Màu chữ rõ hơn */
+  font-size: 14px;
+}
+
+.user-page {
+  padding: 24px 32px;
+  background: #f8f9fb;
+  min-height: 100vh;
+  font-family: "Inter", sans-serif;
+}
+
+.admin-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.user-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ddd;
+  flex-wrap: wrap;
+}
+
+.user-actions .btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: 0.25s;
+}
+
+.btn.primary {
+  background: #1677ff;
+  color: #fff;
+}
+.btn.primary:hover {
+  background: #125ed6;
+}
+
+.btn.secondary {
+  background: #f0f2f5;
+  color: #333;
+}
+.btn.secondary:hover {
+  background: #e5e7eb;
+}
+
+.user-actions .btn.export {
+  display: none;
+}
+
+.filter-container {
+  padding: 15px 0 24px 0;
+}
+
+.filter-bar {
+  display: flex;
+  gap: 20px;
+  padding: 0;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-group-bottom {
+  justify-content: flex-end;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.filter-label {
+  font-weight: 600;
+  color: #555;
+  margin-right: 5px;
+  font-size: 14px;
+  min-width: 90px;
+}
+
+.filter-dropdown {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: white;
+  min-width: 120px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 0 12px;
+  background-color: white;
+  flex-grow: 1;
+  max-width: 300px;
+}
+.search-box input {
+  border: none;
+  padding: 8px 0;
+  outline: none;
+  width: 100%;
+  font-size: 14px;
+  background: transparent;
+}
+.search-icon {
+  color: #999;
+  cursor: pointer;
+  margin-left: 8px;
+}
+
+.btn.export {
+  background: #111827;
+  color: #fff;
+}
+.btn.export:hover {
+  background: #000;
+}
+
+.segmented-control {
+  display: flex;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: white;
+}
+.segmented-button {
+  padding: 8px 12px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  background: transparent;
+  color: #555;
+  transition: background-color 0.2s, color 0.2s;
+  border-right: 1px solid #ccc;
+}
+.segmented-button:last-child {
+  border-right: none;
+}
+.segmented-button.active {
+  background: #1677ff;
+  color: white;
+  font-weight: 600;
+}
+.segmented-button:not(.active):hover {
+  background: #f0f2f5;
+}
+
+.user-tables-group {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.user-table-section {
+  background: #fff;
+  padding: 20px;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.user-table-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.action-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  color: #555;
+  transition: 0.2s;
+  padding: 4px;
+}
+.icon-btn:hover {
+  color: #1677ff;
+}
+
+/* ================== BẢNG + SCROLL + PHÂN TRANG ================== */
+
+/* bọc section cho phép cuộn ngang khi màn hình hẹp */
+.service-package-table {
+  overflow-x: auto;
+}
+
+/* wrapper riêng cho bảng để scroll ngang */
+.table-responsive-wrapper {
+  overflow-x: auto; /* cuộn ngang nếu cần */
+  overflow-y: visible;
+  width: 100%;
+}
+
+/* bảng không bị co hẹp, giữ độ rộng tối thiểu */
+.minimal-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1000px; /* tạo thanh cuộn ngang khi container hẹp */
+}
+
+.minimal-table th,
+.minimal-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #eee;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+}
+
+.minimal-table th {
+  background: #f8f9fb;
+  font-weight: 600;
+}
+
+/* cột Quyền lợi: khung dễ đọc + cuộn dọc nếu dài */
+.minimal-table .description-cell {
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-width: 280px;
+  max-width: 420px;
+  max-height: 140px;
+  overflow-y: auto; /* cuộn dọc khi nội dung dài */
+}
+
+/* danh sách quyền lợi */
+.minimal-table .benefit-list {
+  list-style-type: disc;
+  padding-left: 20px;
+  margin: 0;
+}
+.minimal-table .benefit-list li {
+  line-height: 1.6;
+  margin-bottom: 4px;
+  color: #333;
+  font-size: 14px;
+}
+.minimal-table .benefit-list li::marker {
+  color: #2e7d32;
+}
+
+/* phân trang */
+.table-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+.pagination-btn {
+  padding: 6px 12px;
+  border: 1px solid #d0d7de;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 600;
+}
+.pagination-btn:hover {
+  background: #f6f8fa;
+}
+.pagination-btn.active {
+  border-color: #1677ff;
+  color: #1677ff;
+  background: #fff;
+}
+.pagination-btn:disabled {
+  color: #9aa2af;
+  border-color: #e5e7eb;
+  cursor: not-allowed;
+  background: #fafafa;
 }

@@ -84,27 +84,20 @@ const VehicleTable = ({ filteredData = [], setActiveModal }) => {
 
                   return (
                     <td key={col.key} className="action-cell">
-                      {/* Nút sửa: mở modal VehicleModal với dữ liệu sẵn */}
-                      <button
-                        className="icon-btn"
+                      <EditOutlined
+                        className="action-icon edit-icon"
+                        title="Chỉnh sửa"
                         onClick={() =>
-                          setActiveModal(`editVehicle-${vehicleId}`)
+                          setActiveModal?.(`editVehicle-${vehicle.vehicleId}`)
                         }
-                        disabled={!vehicleId}
-                      >
-                        <EditOutlined />
-                      </button>
-
-                      {/* Nút xóa: cũng mở modal VehicleModal với nút Xóa */}
-                      <button
-                        className="icon-btn"
+                      />
+                      <DeleteOutlined
+                        className="action-icon delete-icon"
+                        title="Xóa"
                         onClick={() =>
-                          setActiveModal(`deleteVehicle-${vehicleId}`)
+                          setActiveModal?.(`deleteVehicle-${vehicle.vehicleId}`)
                         }
-                        disabled={!vehicleId}
-                      >
-                        <DeleteOutlined />
-                      </button>
+                      />
                     </td>
                   );
                 }

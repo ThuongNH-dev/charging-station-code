@@ -170,22 +170,20 @@ export const UserTables = ({
                   if (col.key === "action") {
                     return (
                       <td key={col.key} className="action-cell">
-                        <button
-                          className="icon-btn"
+                        <EditOutlined
+                          className="action-icon edit-icon"
+                          title="Chỉnh sửa"
                           onClick={() =>
-                            setActiveModal(`editUser-${user.accountId}`)
+                            setActiveModal?.(`editUser-${user.accountId}`)
                           }
-                        >
-                          <EditOutlined />
-                        </button>
-                        <button
-                          className="icon-btn"
+                        />
+                        <DeleteOutlined
+                          className="action-icon delete-icon"
+                          title="Xóa"
                           onClick={() =>
-                            setActiveModal(`deleteUser-${user.accountId}`)
+                            setActiveModal?.(`deleteUser-${user.accountId}`)
                           }
-                        >
-                          <DeleteOutlined />
-                        </button>
+                        />
                       </td>
                     );
                   }
