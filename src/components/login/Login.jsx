@@ -391,8 +391,6 @@ export default function Login() {
   }
 };
 
-  const handleFacebookLogin = () =>
-    alert("🔵 Facebook login đang phát triển (chỉ dành cho tài khoản cá nhân)");
 
   return (
     <MainLayout>
@@ -452,28 +450,12 @@ export default function Login() {
 
             <div className="social-login">
               <GoogleLogin
-  onSuccess={handleGoogleLogin}
-  onError={() => alert("Đăng nhập Google thất bại!")}
-  text="signin_with"
-  shape="pill"
-  width="300"
-/>
-
-              <button
-                type="button"
-                onClick={handleFacebookLogin}
-                className="social-btn facebook-btn"
-                disabled={loading}
-              >
-                Facebook
-              </button>
-            </div>
-
-            <div className="info-note">
-              <small>
-                💡 <strong>Ghi chú:</strong> Facebook login chỉ dành cho tài
-                khoản cá nhân
-              </small>
+                onSuccess={handleGoogleLogin}
+                onError={() => alert("Đăng nhập Google thất bại!")}
+                text="signin_with"
+                shape="pill"
+                width="300"
+              />
             </div>
 
             <div className="signup-link">

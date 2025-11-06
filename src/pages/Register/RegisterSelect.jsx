@@ -19,16 +19,11 @@ const RegisterSelect = () => {
 
   return (
     <div className="register-bg">
-      <div className="register-card register-card-select text-white ">
-        <h2
-          className="font-Sử mb-2"
-          style={{
-            fontSize: 30,
-          }}
-        >
+      <div className="register-card register-card-select">
+        <h2>
           CHÀO MỪNG BẠN!
         </h2>
-        <p className="mb-8" style={{ fontSize: 16 }}>
+        <p>
           Hãy chọn vai trò để bắt đầu hành trình cùng chúng tôi
         </p>
 

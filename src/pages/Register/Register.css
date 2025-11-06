@@ -1,114 +1,307 @@
-/* Background chung cho tất cả trang register */
+/* ====== BACKGROUND TOÀN MÀN HÌNH ====== */
 .register-bg {
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background-image: url("./background.jpg");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  position: relative;
   overflow: hidden;
+  isolation: isolate;
 }
 
-/* lớp phủ mờ tối trên background (nếu cần) */
+/* Ảnh nền phủ mờ phía sau - đồng bộ với login */
 .register-bg::before {
   content: "";
   position: absolute;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  z-index: 1;
+  z-index: 0;
+  background: 
+    linear-gradient(rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.25)),
+    url("/Parking_lotV4.png") center / cover no-repeat;
+  filter: brightness(1.1) saturate(1.15);
+  transform: scale(1.05);
 }
 
-/* Card chung cho các form và card chọn vai trò */
+/* ====== CARD CHUNG ====== */
 .register-card {
   position: relative;
   z-index: 2;
-  background: rgba(252, 252, 252, 0);
-  padding: 2rem 3rem;
-  border-radius: 20px;
-  box-shadow: 0 0 4px 4px rgba(255, 255, 255, 0.322);
+  background: #ffffff;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 3rem 4rem;
+  border-radius: 24px;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.25),
+    0 0 0 1.5px rgba(203, 213, 225, 0.9),
+    0 8px 32px rgba(0, 0, 0, 0.15);
   text-align: center;
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.89);
+  color: #000000;
+  border: 2px solid rgba(203, 213, 225, 0.9);
   max-width: 900px;
   width: 100%;
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.register-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 
+    0 24px 70px rgba(0, 0, 0, 0.3),
+    0 0 0 1.5px rgba(148, 163, 184, 0.9),
+    0 12px 40px rgba(0, 0, 0, 0.2);
+  border-color: rgba(148, 163, 184, 0.9);
+}
+
+/* Hiệu ứng nhẹ khi load */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 /* Chỉnh màu chữ của các label trong form */
 .register-card .ant-form-item-label > label {
-  color: white;
+  color: #334155;
 }
 
-/* Chỉ áp dụng cho trang lựa chọn vai trò */
+/* ====== CARD CHỌN VAI TRÒ ====== */
 .register-card-select {
-  max-width: 650px;
-  padding: 4rem 7rem;
+  max-width: 700px;
+  padding: 4rem 5rem;
 }
 
-/* Container cho 2 button */
+.register-card-select h2 {
+  font-size: 36px;
+  font-weight: 900;
+  margin-bottom: 16px;
+  letter-spacing: -0.5px;
+  color: #000000;
+  transition: color 0.3s ease;
+  line-height: 1.2;
+  text-shadow: none;
+}
+
+.register-card-select p {
+  font-size: 18px;
+  margin-bottom: 3rem;
+  font-weight: 600;
+  color: #1e293b;
+  transition: color 0.3s ease;
+  line-height: 1.7;
+  text-shadow: none;
+}
+
+/* ====== CONTAINER CHO 2 BUTTON ====== */
 .register-options {
   display: flex;
   justify-content: center;
-  align-items: center; /* Thêm để căn giữa theo chiều dọc */
-  gap: 2rem;
-  flex-wrap: nowrap; /* Đổi từ wrap sang nowrap để giữ 2 thẻ trên 1 hàng */
+  align-items: center;
+  gap: 2.5rem;
+  flex-wrap: nowrap;
   padding-top: 1rem;
 }
 
-/* Card chọn vai trò (Cá nhân / Doanh nghiệp) */
+/* ====== CARD CHỌN VAI TRÒ ====== */
 .register-option {
   cursor: pointer;
-  padding: 1.5rem;
+  padding: 2rem;
   border-radius: 16px;
-  transition: all 0.3s;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 200px;
+  height: 200px;
+  flex-shrink: 0;
   
-  /* Kích thước cố định */
-  width: 180px;
-  height: 180px;
-  flex-shrink: 0; /* Thêm để ngăn button bị co lại */
-  
-  /* Styling */
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 6px rgb(0, 0, 0);
-  border: 1px solid rgb(255, 255, 255);
-  box-shadow: 0 0 4px 4px rgba(255, 255, 255, 0.322);
+  /* Modern glassmorphism effect */
+  background: #ffffff;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 2.5px solid rgba(203, 213, 225, 0.8);
+  box-shadow: 
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 2px 6px rgba(0, 0, 0, 0.08);
+  position: relative;
+  overflow: hidden;
+  color: #000000;
+}
+
+.register-option::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.6s ease;
+}
+
+.register-option:hover::before {
+  left: 100%;
 }
 
 .register-option:hover {
-  background: rgba(179, 176, 176, 0);
-  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
-  transform: translateY(-2px); /* Thêm hiệu ứng nâng nhẹ khi hover */
+  background: #ffffff;
+  border-color: #06b6d4;
+  border-width: 3px;
+  transform: translateY(-8px) scale(1.05);
+  box-shadow: 
+    0 16px 48px rgba(0, 0, 0, 0.18),
+    0 0 0 4px rgba(6, 182, 212, 0.15),
+    0 8px 24px rgba(6, 182, 212, 0.25);
+}
+
+.register-option:active {
+  transform: translateY(-4px) scale(1.02);
+}
+
+.register-option.selected {
+  background: #ffffff;
+  border-color: #06b6d4;
+  border-width: 3px;
+  box-shadow: 
+    0 16px 48px rgba(6, 182, 212, 0.3),
+    0 0 0 4px rgba(6, 182, 212, 0.25),
+    0 8px 24px rgba(6, 182, 212, 0.3);
+}
+
+.register-option.selected::after {
+  content: "✓";
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: white;
+  box-shadow: 
+    0 2px 8px rgba(6, 182, 212, 0.4),
+    0 0 0 3px rgba(6, 182, 212, 0.2);
+  animation: checkmarkPop 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes checkmarkPop {
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .register-option-icon {
-  font-size: 90px;
-  color: rgb(255, 255, 255);
+  font-size: 64px;
+  color: #06b6d4;
+  transition: all 0.3s ease;
+  filter: drop-shadow(0 2px 4px rgba(6, 182, 212, 0.2));
 }
 
-/* Responsive cho màn hình nhỏ */
+.register-option:hover .register-option-icon {
+  transform: scale(1.1);
+  color: #0891b2;
+  filter: drop-shadow(0 4px 8px rgba(6, 182, 212, 0.3));
+}
+
+.register-option.selected .register-option-icon {
+  color: #06b6d4;
+  transform: scale(1.05);
+  filter: drop-shadow(0 4px 12px rgba(6, 182, 212, 0.4));
+}
+
+.register-option p {
+  margin-top: 1rem;
+  font-size: 18px;
+  font-weight: 800;
+  color: #000000;
+  transition: all 0.3s ease;
+  text-shadow: none;
+}
+
+.register-option:hover p {
+  color: #000000;
+  transform: translateY(-2px);
+  font-weight: 900;
+}
+
+.register-option.selected p {
+  color: #06b6d4;
+  font-weight: 900;
+  text-shadow: none;
+}
+
+/* ====== RESPONSIVE ====== */
 @media (max-width: 768px) {
   .register-card-select {
-    padding: 3rem 2rem;
+    padding: 3rem 2.5rem;
     max-width: 90%;
+    margin: 20px;
   }
-  
+
+  .register-card-select h2 {
+    font-size: 28px;
+    font-weight: 800;
+  }
+
+  .register-card-select p {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 2rem;
+    color: #334155;
+  }
+
   .register-options {
-    flex-wrap: wrap; /* Cho phép xuống dòng trên mobile */
-    gap: 1.5rem;
+    flex-direction: column;
+    gap: 2rem;
   }
-  
+
   .register-option {
-    width: 150px;
-    height: 150px;
+    width: 180px;
+    height: 180px;
   }
-  
+
   .register-option-icon {
     font-size: 70px;
+  }
+
+  .register-option p {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .register-card-select {
+    padding: 2.5rem 2rem;
+  }
+
+  .register-card-select h2 {
+    font-size: 24px;
+  }
+
+  .register-option {
+    width: 160px;
+    height: 160px;
+    padding: 1.5rem;
+  }
+
+  .register-option-icon {
+    font-size: 60px;
   }
 }
