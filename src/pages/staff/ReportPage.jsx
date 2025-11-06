@@ -140,7 +140,8 @@ export default function ReportPage() {
           (s) =>
             ["completed", "done"].includes(s.status?.toLowerCase?.() || "") &&
             myChargerIds.includes(s.portId)
-        );
+        )
+        .sort((a, b) => new Date(b.endedAt) - new Date(a.endedAt));
 
         // === Tính thời lượng (endedAt - startedAt) ===
         const formatDuration = (start, end) => {
