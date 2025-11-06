@@ -1,49 +1,240 @@
+/* ====== SIDEBAR CONTAINER ====== */
 .admin-sidebar {
-  width: 240px;
-  background: #000;
+  width: 260px;
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
   color: #fff;
-  padding: 24px 16px;
-  border-radius: 0 20px 20px 0;
+  padding: 0;
+  border-radius: 0 24px 24px 0;
   display: flex;
   flex-direction: column;
   position: fixed;
   top: 0;
   left: 0;
   bottom: 0;
+  z-index: 1000;
+  box-shadow: 
+    4px 0 24px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.admin-sidebar.collapsed {
+  width: 80px;
+}
+
+/* ====== SIDEBAR HEADER ====== */
+.sidebar-header {
+  padding: 24px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+
+.sidebar-toggle {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(96, 165, 250, 0.2);
+  color: #60a5fa;
+  transform: scale(1.05);
+}
+
+.sidebar-toggle:active {
+  transform: scale(0.95);
 }
 
 .sidebar-title {
   font-size: 20px;
-  font-weight: 700;
-  margin-bottom: 40px;
+  font-weight: 800;
+  margin: 0;
   text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
+.sidebar-icon {
+  font-size: 24px;
+  display: inline-block;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.sidebar-title-text {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.admin-sidebar.collapsed .sidebar-title-text {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+}
+
+/* ====== MENU ====== */
 .sidebar-menu {
   list-style: none;
-  padding: 0;
+  padding: 16px 12px;
   margin: 0;
   flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-menu::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.sidebar-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.sidebar-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: 10px;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
   cursor: pointer;
-  color: #aaa;
+  color: rgba(255, 255, 255, 0.7);
   font-size: 15px;
-  transition: all 0.25s ease;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.menu-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #60a5fa;
+  transform: scaleY(0);
+  transition: transform 0.3s ease;
+  border-radius: 0 3px 3px 0;
 }
 
 .menu-item:hover {
-  background: #111;
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
+  transform: translateX(4px);
+}
+
+.menu-item:hover::before {
+  transform: scaleY(1);
 }
 
 .menu-item.active {
-  background: #1a1a1a;
-  color: #fff;
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0.15) 0%, rgba(96, 165, 250, 0.05) 100%);
+  color: #60a5fa;
+  font-weight: 600;
+  box-shadow: 
+    0 2px 8px rgba(96, 165, 250, 0.12),
+    inset 0 0 0 1px rgba(96, 165, 250, 0.15);
+}
+
+.menu-item.active::before {
+  transform: scaleY(1);
+}
+
+.menu-icon {
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.menu-item:hover .menu-icon {
+  transform: scale(1.1);
+}
+
+.menu-item.active .menu-icon {
+  transform: scale(1.15);
+  color: #60a5fa;
+}
+
+.menu-label {
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  flex: 1;
+}
+
+.admin-sidebar.collapsed .menu-label {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+}
+
+.admin-sidebar.collapsed .menu-item {
+  justify-content: center;
+  padding: 14px;
+}
+
+.admin-sidebar.collapsed .menu-item:hover {
+  transform: translateX(0) scale(1.05);
+}
+
+/* ====== RESPONSIVE ====== */
+@media (max-width: 768px) {
+  .admin-sidebar {
+    width: 80px;
+  }
+  
+  .admin-sidebar:not(.collapsed) {
+    width: 260px;
+  }
+  
+  .sidebar-title-text {
+    display: none;
+  }
+  
+  .menu-label {
+    display: none;
+  }
 }
