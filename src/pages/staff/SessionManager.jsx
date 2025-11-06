@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { Pagination } from "antd";
 import MessageBox from "../../components/staff/MessageBox";
 import ConfirmDialog from "../../components/staff/ConfirmDialog";
@@ -25,7 +26,25 @@ function vnd(n) {
   return (Number(n) || 0).toLocaleString("vi-VN") + " ₫";
 }
 
+function toArray(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw.items)) return raw.items;
+  if (Array.isArray(raw.data)) return raw.data;
+  if (Array.isArray(raw.results)) return raw.results;
+  if (Array.isArray(raw.$values)) return raw.$values;
+  if (typeof raw === "object") return [raw];
+  try {
+    return toArray(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
 export default function SessionManager() {
+  const { user } = useAuth();
+  const currentAccountId = user?.accountId || localStorage.getItem("accountId");
+
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -37,9 +56,46 @@ export default function SessionManager() {
   const pageSize = 8;
   const navigate = useNavigate();
 
+  // ✅ Trạm staff phụ trách
+  const [stations, setStations] = useState([]);
+  const [myStations, setMyStations] = useState([]);
+  const [selectedStationId, setSelectedStationId] = useState(null);
+
+  /* ---------------- Load danh sách trạm staff ---------------- */
   useEffect(() => {
+    async function loadStations() {
+      try {
+        const allStations = await fetchAuthJSON(`${API_BASE}/Stations`);
+        const stationsArr = toArray(allStations);
+        const myStationIds = [];
+
+        for (const st of stationsArr) {
+          try {
+            const res = await fetchAuthJSON(`${API_BASE}/station-staffs?stationId=${st.stationId}`);
+            const staffs = toArray(res);
+            const found = staffs.some((s) => String(s.staffId) === String(currentAccountId));
+            if (found) myStationIds.push(st.stationId);
+          } catch {
+            console.warn("Không lấy được staff của trạm:", st.stationId);
+          }
+        }
+
+        const mine = stationsArr.filter((s) => myStationIds.includes(s.stationId));
+        setStations(stationsArr);
+        setMyStations(mine);
+        if (mine.length > 0) setSelectedStationId(mine[0].stationId);
+      } catch (err) {
+        console.error("Lỗi khi tải danh sách trạm:", err);
+      }
+    }
+    loadStations();
+  }, [currentAccountId]);
+
+  /* ---------------- Load danh sách phiên sạc theo trạm ---------------- */
+  useEffect(() => {
+    if (!selectedStationId) return;
     loadSessions();
-  }, []);
+  }, [selectedStationId]);
 
   async function loadSessions() {
     setLoading(true);
@@ -48,14 +104,31 @@ export default function SessionManager() {
       let sessionArr = res?.data ?? res?.$values ?? res?.items ?? res ?? [];
       if (!Array.isArray(sessionArr)) sessionArr = [sessionArr];
 
-      const vehiclesRaw = await fetchAuthJSON(`${API_BASE}/Vehicles`);
-      let vehicles = [];
-      if (Array.isArray(vehiclesRaw)) vehicles = vehiclesRaw;
-      else if (Array.isArray(vehiclesRaw.data)) vehicles = vehiclesRaw.data;
-      else if (Array.isArray(vehiclesRaw.$values)) vehicles = vehiclesRaw.$values;
-      else if (Array.isArray(vehiclesRaw.items)) vehicles = vehiclesRaw.items;
-      else vehicles = Object.values(vehiclesRaw || {});
+      // Lọc phiên theo stationId
+      const portsRes = await fetchAuthJSON(`${API_BASE}/Ports`);
+      const ports = toArray(portsRes);
+      const chargersRes = await fetchAuthJSON(`${API_BASE}/Chargers`);
+      const chargers = toArray(chargersRes);
 
+      const portToCharger = {};
+      for (const p of ports) {
+        portToCharger[p.portId] = p.chargerId;
+      }
+      const chargerToStation = {};
+      for (const c of chargers) {
+        chargerToStation[c.chargerId] = c.stationId;
+      }
+
+      // ✅ Giới hạn session chỉ thuộc trạm hiện tại
+      sessionArr = sessionArr.filter((s) => {
+        const portId = s.portId ?? s.PortId;
+        const chargerId = portToCharger[portId];
+        const stationId = chargerToStation[chargerId];
+        return String(stationId) === String(selectedStationId);
+      });
+
+      const vehiclesRaw = await fetchAuthJSON(`${API_BASE}/Vehicles`);
+      const vehicles = toArray(vehiclesRaw);
       const vehicleMap = {};
       for (const v of vehicles) {
         const id = v.vehicleId ?? v.VehicleId;
@@ -63,21 +136,15 @@ export default function SessionManager() {
       }
 
       const invRes = await fetchAuthJSON(`${API_BASE}/Invoices`);
-      let invoices =
-        invRes?.data ?? invRes?.$values ?? invRes?.items ?? invRes ?? [];
-      if (!Array.isArray(invoices)) invoices = [invoices];
+      let invoices = toArray(invRes);
 
       const sessionToInvoiceStatus = {};
       for (const inv of invoices) {
         try {
-          const invDetail = await fetchAuthJSON(
-            `${API_BASE}/Invoices/${inv.invoiceId || inv.id}`
-          );
+          const invDetail = await fetchAuthJSON(`${API_BASE}/Invoices/${inv.invoiceId || inv.id}`);
           const invoiceData = invDetail?.data || invDetail;
           const sessionsList =
-            invoiceData?.chargingSessions ||
-            invoiceData?.$values?.chargingSessions ||
-            [];
+            invoiceData?.chargingSessions || invoiceData?.$values?.chargingSessions || [];
 
           sessionsList.forEach((session) => {
             const sessionId = session.chargingSessionId || session.id;
@@ -94,9 +161,7 @@ export default function SessionManager() {
       const detailed = await Promise.all(
         sessionArr.map(async (s) => {
           try {
-            const det = await fetchAuthJSON(
-              `${API_BASE}/ChargingSessions/${s.chargingSessionId || s.id}`
-            );
+            const det = await fetchAuthJSON(`${API_BASE}/ChargingSessions/${s.chargingSessionId || s.id}`);
             return { ...s, ...det };
           } catch {
             return s;
@@ -111,26 +176,37 @@ export default function SessionManager() {
           const invoiceStatus = invoiceInfo?.status || "UNPAID";
 
           const vId =
-            s.vehicleId ||
-            s.VehicleId ||
-            s.vehicle?.vehicleId ||
-            s.vehicle?.VehicleId ||
+            s.vehicleId ??
+            s.VehicleId ??
+            s.vehicle?.vehicleId ??
+            s.vehicle?.VehicleId ??
             null;
           const v = vehicleMap[vId] || {};
 
-          const licensePlate =
-            v.licensePlate ??
-            v.LicensePlate ??
+          let licensePlate =
             s.licensePlate ??
             s.LicensePlate ??
+            v.licensePlate ??
+            v.LicensePlate ??
             "—";
 
-          const custId = s.customerId ?? s.CustomerId;
-          const companyId = s.companyId ?? v.companyId ?? v.CompanyId ?? 0;
+          const companyId =
+            s.companyId ??
+            v.companyId ??
+            v.CompanyId ??
+            null;
 
+          const custId = s.customerId ?? s.CustomerId;
           let customerType = "Khách bình thường";
           if (!custId || custId === 0) customerType = "Khách vãng lai";
-          else if (companyId > 0) customerType = "Xe công ty";
+          else if (companyId) customerType = "Xe công ty";
+
+          if (customerType === "Xe công ty" && (!licensePlate || licensePlate === "—")) {
+            const fallback = vehicleMap[vId];
+            if (fallback && fallback.licensePlate) {
+              licensePlate = fallback.licensePlate;
+            }
+          }
 
           return {
             ...s,
@@ -281,6 +357,21 @@ export default function SessionManager() {
       <div className="sess-card">
         <div className="sess-head">
           <h3>Phiên sạc (đang chạy / lịch sử)</h3>
+
+          {myStations.length > 1 && (
+            <select
+              value={selectedStationId || ""}
+              onChange={(e) => setSelectedStationId(Number(e.target.value))}
+              className="station-select"
+            >
+              {myStations.map((st) => (
+                <option key={st.stationId} value={st.stationId}>
+                  {st.stationName}
+                </option>
+              ))}
+            </select>
+          )}
+
           <div className="sess-filters">
             <input
               type="text"
