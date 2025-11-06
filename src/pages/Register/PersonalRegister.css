@@ -93,6 +93,7 @@
 
 .form-label {
   display: block;
+  text-align: left;
   margin-bottom: 6px;
   color: #ffffff;
   font-weight: 600;

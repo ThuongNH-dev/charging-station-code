@@ -62,7 +62,7 @@ export default function PersonalRegister() {
           visible={!!message.text}
           onClose={() => setMessage({ type: "", text: "" })}
         />
-        
+
         <div className="register-card">
           <h2 className="register-title">Đăng ký cá nhân</h2>
 
@@ -93,18 +93,7 @@ export default function PersonalRegister() {
             </div>
 
             <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Email</label>
-                <input
-                  className="form-input"
-                  name="email"
-                  type="email"
-                  value={form.email}
-                  onChange={handleChange}
-                  required
-                  placeholder="example@email.com"
-                />
-              </div>
+
               <div className="form-group">
                 <label className="form-label">Số điện thoại</label>
                 <input
@@ -116,9 +105,6 @@ export default function PersonalRegister() {
                   placeholder="+84xxxxxxxxx"
                 />
               </div>
-            </div>
-
-            <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Mật khẩu</label>
                 <input
@@ -129,6 +115,21 @@ export default function PersonalRegister() {
                   onChange={handleChange}
                   required
                   placeholder="Tạo mật khẩu"
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input
+                  className="form-input"
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  required
+                  placeholder="example@email.com"
                 />
               </div>
               <div className="form-group">
