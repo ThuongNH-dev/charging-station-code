@@ -664,3 +664,61 @@ th {
   cursor: not-allowed;
   background: #fafafa;
 }
+
+.link-like {
+  color: #1f7a40;
+  cursor: pointer;
+  font-weight: 600;
+}
+.link-like:hover {
+  text-decoration: underline;
+}
+
+.plan-name-cell {
+  position: relative;
+}
+
+.tiny-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  padding: 6px;
+  min-width: 180px;
+  z-index: 50;
+}
+.tiny-dropdown button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.tiny-dropdown button:hover {
+  background: #f3f4f6;
+}
+/* Alias để hỗ trợ class cũ */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999; /* cao hơn mọi thứ */
+}
+.modal-container {
+  background: #fff;
+  color: #111;
+  padding: 24px;
+  border-radius: 12px;
+  width: 420px;
+  max-width: calc(100% - 32px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}

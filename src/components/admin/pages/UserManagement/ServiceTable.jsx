@@ -1,6 +1,7 @@
 // 📁 src/components/UserManagement/ServiceTable.jsx
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 
 /**
  * Bảng danh sách gói dịch vụ (Subscription Plans)
@@ -13,6 +14,21 @@ const ServiceTable = ({
   setActiveModal,
   isLoading = false,
 }) => {
+  const navigate = useNavigate();
+
+  // ======= DROPDOWN STATE =======
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const menuRef = useRef(null);
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, []);
+
   // ======= UI STATES =======
   if (isLoading) return <p>Đang tải dữ liệu gói dịch vụ...</p>;
   if (!Array.isArray(filteredData) || filteredData.length === 0) {
@@ -110,7 +126,7 @@ const ServiceTable = ({
         <table className="minimal-table">
           <thead>
             <tr>
-              <th style={{ width: 220 }}>Tên gói</th>
+              <th style={{ width: 260 }}>Tên gói</th>
               <th style={{ width: 140 }}>Loại</th>
               <th style={{ width: 140 }}>Giá/tháng</th>
               <th style={{ width: 110 }}>Giảm giá</th>
@@ -124,6 +140,8 @@ const ServiceTable = ({
           <tbody>
             {paginatedData.map((pkg) => {
               const rowId = getId(pkg);
+              const planId =
+                pkg?.subscriptionPlanId ?? pkg?.id ?? pkg?.packageId;
               const price = formatVND(pkg?.priceMonthly);
               const discount =
                 pkg?.discountPercent != null
@@ -140,8 +158,38 @@ const ServiceTable = ({
 
               return (
                 <tr key={rowId}>
-                  {/* 📦 Tên gói */}
-                  <td title={pkg?.planName || ""}>{pkg?.planName || "—"}</td>
+                  {/* 📦 Tên gói + dropdown chọn hành động */}
+                  <td
+                    className="plan-name-cell"
+                    style={{ position: "relative" }}
+                  >
+                    <span
+                      className="link-like"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuId(openMenuId === rowId ? null : rowId);
+                      }}
+                      title="Mở lựa chọn"
+                    >
+                      {pkg?.planName || "—"}
+                    </span>
+
+                    {openMenuId === rowId && (
+                      <div ref={menuRef} className="tiny-dropdown">
+                        <button onClick={() => setOpenMenuId(null)}>
+                          Xem gói
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenMenuId(null);
+                            navigate(`/admin/subscriptions/plan/${planId}`);
+                          }}
+                        >
+                          Người dùng đăng ký
+                        </button>
+                      </div>
+                    )}
+                  </td>
 
                   {/* 🏷️ Loại */}
                   <td>{formatCategory(pkg?.category)}</td>
@@ -178,9 +226,7 @@ const ServiceTable = ({
                   <td className="action-cell">
                     <EditOutlined
                       onClick={() =>
-                        setActiveModal(
-                          `editService-${pkg?.subscriptionPlanId ?? rowId}`
-                        )
+                        setActiveModal(`editService-${planId ?? rowId}`)
                       }
                       className="action-icon edit-icon"
                       title="Chỉnh sửa"
@@ -188,9 +234,7 @@ const ServiceTable = ({
 
                     <DeleteOutlined
                       onClick={() =>
-                        setActiveModal(
-                          `deleteService-${pkg?.subscriptionPlanId ?? rowId}`
-                        )
+                        setActiveModal(`deleteService-${planId ?? rowId}`)
                       }
                       className="action-icon delete-icon"
                       title="Xóa"

@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+// 📁 src/components/admin/pages/UserManagement/UserManagement.jsx
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import "../UserManagement.css";
 import { userApi } from "../../../../api/userApi";
@@ -8,6 +15,8 @@ import ServiceTable from "./ServiceTable";
 import AdminModals from "./Modals/AdminModals";
 import ServiceFilterBar from "./ServiceFilterBar";
 import VehicleFilterBar from "./VehicleFilterBar";
+import { useNavigate } from "react-router-dom";
+import SelectPlanModal from "./Modals/SelectPlanModal";
 
 const useUserServicesHook = () => {
   const [allAccounts, setAllAccounts] = useState([]);
@@ -386,6 +395,24 @@ const UserManagement = () => {
   const [activeModal, setActiveModal] = useState(null);
   const [userTypeFilter, setUserTypeFilter] = useState("all");
 
+  // ➕ Dropdown ở nút "Gói dịch vụ" + modal chọn gói
+  const navigate = useNavigate();
+  const [openServiceMenu, setOpenServiceMenu] = useState(false);
+  const [openSelectPlan, setOpenSelectPlan] = useState(false);
+  const serviceMenuRef = useRef(null);
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (
+        serviceMenuRef.current &&
+        !serviceMenuRef.current.contains(e.target)
+      ) {
+        setOpenServiceMenu(false);
+      }
+    };
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, []);
+
   const {
     allAccounts,
     allVehicles,
@@ -559,6 +586,7 @@ const UserManagement = () => {
             Người dùng
           </button>
         </div>
+
         <div className="tabs">
           <button
             className={`btn ${
@@ -569,15 +597,77 @@ const UserManagement = () => {
             Thông số xe
           </button>
         </div>
-        <div className="tabs">
+
+        {/* 🔽 Nút Gói dịch vụ có menu xổ ra */}
+        <div
+          className="tabs"
+          ref={serviceMenuRef}
+          style={{ position: "relative" }}
+        >
           <button
             className={`btn ${
               activeTab === "service" ? "primary" : "secondary"
             }`}
-            onClick={() => setActiveTab("service")}
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpenServiceMenu((v) => !v);
+            }}
           >
             Gói dịch vụ
           </button>
+
+          {openServiceMenu && (
+            <div
+              className="tiny-dropdown"
+              style={{
+                position: "absolute",
+                top: "110%",
+                left: 0,
+                background: "#fff",
+                border: "1px solid #e5e7eb",
+                boxShadow: "0 8px 20px rgba(0,0,0,.08)",
+                borderRadius: 10,
+                padding: 6,
+                minWidth: 220,
+                zIndex: 40,
+              }}
+            >
+              <button
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                }}
+                onClick={() => {
+                  setActiveTab("service");
+                  setOpenServiceMenu(false);
+                }}
+              >
+                Xem gói
+              </button>
+
+              <button
+                type="button"
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setOpenServiceMenu(false);
+                  navigate("/admin/subscriptions");
+                }}
+              >
+                Người dùng đăng ký
+              </button>
+            </div>
+          )}
         </div>
 
         {activeTab === "service" && (
@@ -671,6 +761,17 @@ const UserManagement = () => {
         allVehicles={allVehicles}
         servicePackages={servicePackages}
         crudActions={crudActions}
+      />
+
+      {/* 🔳 Modal chọn gói để điều hướng trang "Người dùng đăng ký" */}
+      <SelectPlanModal
+        open={openSelectPlan}
+        onClose={() => setOpenSelectPlan(false)}
+        plans={servicePackages}
+        onSelect={(planId) => {
+          setOpenSelectPlan(false);
+          navigate(`/admin/subscriptions/plan/${planId}`);
+        }}
       />
     </div>
   );

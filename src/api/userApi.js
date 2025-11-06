@@ -97,33 +97,47 @@ export const userApi = {
   },
 
   // === SUBSCRIPTIONS (chi tiết theo swagger) ===
-// Lấy toàn bộ (đã có): fetchAllSubscriptions()
+  // Lấy toàn bộ (đã có): fetchAllSubscriptions()
 
-fetchSubscriptionsByPlan: async (subscriptionPlanId) => {
-  const all = await userApi.fetchAllSubscriptions();
-  return all.filter(s =>
-    String(s.subscriptionPlanId ?? s.servicePackageId ?? s.planId) === String(subscriptionPlanId)
-  );
-},
+  fetchSubscriptionsByPlan: async (subscriptionPlanId) => {
+    const all = await userApi.fetchAllSubscriptions();
+    return all.filter(
+      (s) =>
+        String(s.subscriptionPlanId ?? s.servicePackageId ?? s.planId) ===
+        String(subscriptionPlanId)
+    );
+  },
 
-createSubscription: async (payload) => {
-  const res = await axios.post(`${BASE_URL}/Subscriptions`, payload);
-  return res.data;
-},
+  createSubscription: async (payload) => {
+    const res = await axios.post(`${BASE_URL}/Subscriptions`, payload);
+    return res.data;
+  },
 
-updateSubscription: async (id, payload) => {
-  const res = await axios.put(`${BASE_URL}/Subscriptions/${id}`, payload);
-  return res.data;
-},
+  updateSubscription: async (id, payload) => {
+    const res = await axios.put(`${BASE_URL}/Subscriptions/${id}`, payload);
+    return res.data;
+  },
 
-changeSubscriptionStatus: async (id, status) => {
-  const res = await axios.put(`${BASE_URL}/Subscriptions/${id}/status`, { status });
-  return res.data;
-},
+  changeSubscriptionStatus: async (id, status) => {
+    const res = await axios.put(`${BASE_URL}/Subscriptions/${id}/status`, {
+      status,
+    });
+    return res.data;
+  },
 
-deleteSubscription: async (id) => {
-  const res = await axios.delete(`${BASE_URL}/Subscriptions/${id}`);
-  return res.data;
-},
+  deleteSubscription: async (id) => {
+    const res = await axios.delete(`${BASE_URL}/Subscriptions/${id}`);
+    return res.data;
+  },
+  fetchAllCustomers: async () => {
+    const res = await axios.get(`${BASE_URL}/Customers`);
+    // trả mảng customers [{ customerId, fullName, ... }]
+    return Array.isArray(res.data) ? res.data : res.data?.items || [];
+  },
 
+  fetchAllCompanies: async () => {
+    const res = await axios.get(`${BASE_URL}/Companies`);
+    // trả mảng companies [{ companyId, name, ... }]
+    return Array.isArray(res.data) ? res.data : res.data?.items || [];
+  },
 };
