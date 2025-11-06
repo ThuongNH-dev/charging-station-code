@@ -28,7 +28,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --login-bg-overlay: rgba(0, 0, 0, 0.35);
-    --login-card-bg: rgba(30, 41, 59, 0.98);
+    --login-card-bg: rgba(255, 255, 255, 0.162);
     --login-card-border: rgba(148, 163, 184, 0.4);
     --login-title-color: #f8fafc;
     --login-label-color: #e2e8f0;
@@ -153,8 +153,11 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-sizing: border-box;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  margin-bottom: 10px;
 }
-
+.login-text{
+  background-color: rgba(255, 255, 255, 0) !important;
+}
 .form-input::placeholder {
   color: var(--login-input-placeholder);
   font-weight: 400;
