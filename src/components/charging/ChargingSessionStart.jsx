@@ -5,20 +5,22 @@ import { ThunderboltOutlined, CheckOutlined } from "@ant-design/icons";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import { resolveCustomerIdFromAuth } from "../../api/authHelpers";
+const API_BASE = getApiBase(); // dùng cho resolveCustomerIdFromAuth
+import { toInt } from "../../utils/number";
 import "./ChargingSessionStart.css";
 
 /* ===== Helpers ===== */
-async function fetchOne(paths) {
-  const list = Array.isArray(paths) ? paths : [paths];
-  for (const p of list) {
-    try {
-      // p là path tương đối, ví dụ '/Ports/1'
-      const res = await fetchAuthJSON(p, { method: "GET" });
-      if (res) return res;
-    } catch {}
-  }
-  throw new Error("Not found");
-}
+// async function fetchOne(paths) {
+//     const list = Array.isArray(paths) ? paths : [paths];
+//     for (const p of list) {
+//         try {
+//             // p là path tương đối, ví dụ '/Ports/1'
+//             const res = await fetchAuthJSON(p, { method: "GET" });
+//             if (res) return res;
+//         } catch { }
+//     }
+//     throw new Error("Not found");
+// }
 
 
 const toNumId = (v) => {
@@ -31,13 +33,12 @@ const normId = (x) =>
     x?.id ?? x?.Id ?? x?.stationId ?? x?.StationId ?? x?.chargerId ?? x?.ChargerId ?? x?.portId ?? x?.PortId;
 const normText = (x) => (x == null || x === "" ? "—" : x);
 const fmtAddress = (s = {}) => s.address || s.Address || s.fullAddress || s.FullAddress || "—";
-
+// ✅ Dùng path tương đối, để utils/api.resolveUrl() tự gắn base/proxy
 async function fetchOne(paths) {
     const list = Array.isArray(paths) ? paths : [paths];
     for (const p of list) {
         try {
-            const url = p.startsWith("http") ? p : `${API_ABS}${p.startsWith("/") ? "" : "/"}${p}`;
-            const res = await fetchAuthJSON(url, { method: "GET" });
+            const res = await fetchAuthJSON(p, { method: "GET" });
             if (res) return res;
         } catch { }
     }
@@ -237,7 +238,7 @@ export default function ChargingSessionStart() {
         let alive = true;
         (async () => {
             try {
-                const cid = await resolveCustomerIdFromAuth(API_ABS);
+                const cid = await resolveCustomerIdFromAuth(API_BASE);
                 if (!Number.isFinite(cid)) {
                     setVehicleError("Không xác định được khách hàng.");
                     return;
@@ -322,13 +323,13 @@ export default function ChargingSessionStart() {
             // Charger
             const chId = port?.chargerId ?? port?.ChargerId ?? gun?.chargerId ?? gun?.ChargerId ?? normId(charger);
             if (!Number.isFinite(toNumId(chId))) throw new Error("Không tìm thấy trụ sạc từ port.");
-            const chg = await fetchOne([`/Chargers/${chId}`, `/api/Chargers/${chId}`]);
+            const chg = await fetchOne([`/Chargers/${chId}`]);
             setCharger(chg || {});
 
             // Station
             const stId = chg?.stationId ?? chg?.StationId ?? normId(station);
             if (!Number.isFinite(toNumId(stId))) throw new Error("Không tìm thấy trạm từ trụ sạc.");
-            const st = await fetchOne([`/Stations/${stId}`, `/api/Stations/${stId}`]);
+            const st = await fetchOne([`/Stations/${stId}`]);
             setStation(st || {});
 
             setInfoReady(true);
@@ -351,8 +352,8 @@ export default function ChargingSessionStart() {
     async function resolveFirstVehicleIdForCustomer(customerId) {
         try {
             const tryUrls = [
-                `${API_ABS}/Vehicles?page=1&pageSize=10&customerId=${encodeURIComponent(customerId)}`,
-                `${API_ABS}/Vehicles?page=1&pageSize=50`,
+                `/Vehicles?page=1&pageSize=10&customerId=${encodeURIComponent(customerId)}`,
+                `/Vehicles?page=1&pageSize=50`,
             ];
             for (const url of tryUrls) {
                 const r = await fetchAuthJSON(url, { method: "GET" });
@@ -366,6 +367,7 @@ export default function ChargingSessionStart() {
         } catch { }
         return null;
     }
+
 
     async function handleStart() {
         if (!infoReady) {
@@ -393,41 +395,37 @@ export default function ChargingSessionStart() {
             return;
         }
 
+        const clean = {
+            station,
+            charger,
+            gun,
+            startedAt: Date.now(),
+        };
 
-        const portId = toNumId(normId(gun));
-        let vehicleId = toNumId(state?.vehicleId ?? state?.vehicle?.id ?? state?.vehicle?.vehicleId);
-        let customerId = toNumId(
-            state?.customerId ?? state?.customer?.id ?? (await resolveCustomerIdFromAuth(API_ABS))
-        );
-        const bookingRaw = state?.bookingId ?? state?.booking?.id ?? state?.booking?.bookingId ?? null;
-        const nBooking = toNumId(bookingRaw);
-        const bookingId = Number.isFinite(nBooking) ? nBooking : null;
-        const companyId = pickCompanyId(state, charger, gun);
+        // ép số an toàn
+        const _portId = toInt(portId);
+        const _customerId = toInt(customerId);
+        const _vehicleId = toInt(vehicleId);
+        const _bookingId = toInt(bookingId);
+        const _companyId = toInt(companyId);
 
-        if (!Number.isFinite(portId)) return message.error("Thiếu portId hợp lệ.");
-        if (!Number.isFinite(customerId)) return message.error("Thiếu customerId hợp lệ.");
-
-        if (!Number.isFinite(vehicleId)) {
-            vehicleId = await resolveFirstVehicleIdForCustomer(customerId);
-        }
-        if (!Number.isFinite(vehicleId)) {
-            return message.error("Không tìm được vehicleId cho khách hàng này.");
-        }
+        // validate trước khi navigate
+        if (!_portId) return message.error("Thiếu portId hợp lệ.");
+        if (!_customerId) return message.error("Thiếu customerId hợp lệ.");
+        if (!_vehicleId) return message.error("Thiếu vehicleId hợp lệ.");
 
         navigate("/charging", {
             replace: true,
             state: {
-                station,
-                charger,
-                gun,
-                customerId,
-                companyId: Number.isFinite(companyId) ? companyId : undefined,
-                vehicleId,
-                bookingId,
-                portId,
+                ...clean,
+                portId: _portId,
+                customerId: _customerId,
+                vehicleId: _vehicleId,
+                ...(Number.isFinite(_companyId) ? { companyId: _companyId } : {}),
+                ...(Number.isFinite(_bookingId) ? { bookingId: _bookingId } : {}),
+                // giữ thêm label tuỳ thích
                 carModel: state?.carModel ?? undefined,
                 plate: state?.plate ?? undefined,
-                startedAt: Date.now(),
             },
         });
     }

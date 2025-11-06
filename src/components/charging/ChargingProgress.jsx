@@ -7,7 +7,7 @@ import "./ChargingProgress.css";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchJSON, fetchAuthJSON, getApiBase, getToken } from "../../utils/api";
 import { resolveCustomerIdFromAuth } from "../../api/authHelpers";
-
+import { toInt } from "../../utils/number";
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " VND";
 // --- DEMO SPEED SETTINGS ---
 // Bật/tắt tăng tốc (đặt DEMO_SPEED=1 là tốc độ thật)
@@ -339,8 +339,8 @@ const ChargingProgress = () => {
         let seed = state?.startSessionData || null;
         if (!seed) {
           try {
-            const s = await fetchAuthJSON(`${API_ABS}/ChargingSessions/${encodeURIComponent(state.chargingSessionId)}`, { method: "GET" });
-            seed = s?.data || s || null;
+            const s = await fetchAuthJSON(`/ChargingSessions/${encodeURIComponent(state.chargingSessionId)}`),
+              seed = s?.data || s || null;
           } catch { }
         }
         if (!seed) return;
@@ -349,14 +349,14 @@ const ChargingProgress = () => {
         let port = null, charger = null;
         try {
           const pId = seed.portId ?? state?.portId ?? state?.gun?.id ?? state?.gun?.portId ?? state?.gun?.PortId;
-          if (pId != null) port = await fetchAuthJSON(`${API_ABS}/Ports/${encodeURIComponent(pId)}`, { method: "GET" });
+          if (pId != null) port = await fetchAuthJSON(`/Ports/${encodeURIComponent(pId)}`, { method: "GET" });
         } catch { }
         try {
           const chId =
             port?.chargerId ?? port?.ChargerId ??
             seed?.chargerId ?? seed?.ChargerId ??
             state?.charger?.id ?? state?.charger?.chargerId ?? state?.charger?.ChargerId ?? null;
-          if (chId != null) charger = await fetchAuthJSON(`${API_ABS}/Chargers/${encodeURIComponent(chId)}`, { method: "GET" });
+          if (chId != null) charger = await fetchAuthJSON(`/Chargers/${encodeURIComponent(chId)}`, { method: "GET" });
           if (charger) setChargerInfo(charger);
         } catch { }
 
@@ -431,7 +431,7 @@ const ChargingProgress = () => {
       }
 
       try {
-        const url = `${API_ABS}/ChargingSessions/start`;
+        const url = `/ChargingSessions/start`;
         const body = {
           customerId: Number(customerId),
           vehicleId: Number(vehicleId),
@@ -630,21 +630,22 @@ const ChargingProgress = () => {
         const chargerType = (chargerRaw?.type ?? chargerRaw?.Type ?? state?.charger?.type ?? state?.charger?.Type ?? "").toString();
 
         let rules = null;
-        const tryEndpoints = [
-          `${API_ABS}/PricingRules?chargerId=${encodeURIComponent(chNorm.id || chargerId || "")}`,
-          `${API_ABS}/PricingRule?chargerId=${encodeURIComponent(chNorm.id || chargerId || "")}`,
-          `${API_ABS}/PricingRules`,
-        ];
-        for (const url of tryEndpoints) {
+        try {
+          // 1) Nếu BE hỗ trợ filter theo chargerId:
+          const r = await fetchJSON(`/PricingRule?chargerId=${encodeURIComponent(chNorm.id || chargerId || "")}`);
+          const arr = Array.isArray(r) ? r : Array.isArray(r?.items) ? r.items : (r ? [r] : []);
+          if (arr && arr.length) rules = arr;
+        } catch { }
+
+        if (!rules) {
+          // 2) Fallback: lấy tất cả rồi lọc client
           try {
-            const r = await fetchJSON(url);
-            const arr = Array.isArray(r) ? r : Array.isArray(r?.items) ? r.items : null;
-            if (arr && arr.length) {
-              rules = arr;
-              break;
-            }
+            const r = await fetchJSON(`/PricingRule`);
+            const arr = Array.isArray(r) ? r : Array.isArray(r?.items) ? r.items : (r ? [r] : []);
+            rules = arr || [];
           } catch { }
         }
+
 
         let pricePerKwh = chNorm.pricePerKwh;
         let idleFeePerMin = chNorm.idleFeePerMin;
@@ -700,7 +701,7 @@ const ChargingProgress = () => {
     let alive = true;
     (async () => {
       try {
-        // Ưu tiên lấy từ token
+        // 1) Lấy customerId / companyId từ state hoặc token
         let customerId = state?.customerId ?? null;
         let companyId = state?.companyId ?? null;
         try {
@@ -711,68 +712,39 @@ const ChargingProgress = () => {
           companyId = companyId ?? decoded?.companyId ?? null;
         } catch { }
 
-        // Thử các endpoint khả dĩ của BE
-        const candidates = [];
-        if (customerId && companyId) {
-          candidates.push(`${API_ABS}/Subscriptions/active?customerId=${customerId}&companyId=${companyId}`);
-        }
-        if (customerId) {
-          candidates.push(`${API_ABS}/Subscriptions/active?customerId=${customerId}`);
-          candidates.push(`${API_ABS}/Subscriptions/by-customer/${customerId}?status=active`);
-        }
-        if (companyId) {
-          candidates.push(`${API_ABS}/Subscriptions/active?companyId=${companyId}`);
-          candidates.push(`${API_ABS}/Subscriptions/by-company/${companyId}?status=active`);
-        }
+        // 2) Gọi đúng 1 endpoint chuẩn: /Subscriptions
+        const r = await fetchAuthJSON(`/Subscriptions`, { method: "GET" });
+        // Chuẩn hoá mảng
+        const list = Array.isArray(r?.items) ? r.items : (Array.isArray(r) ? r : (r?.data ? [r.data] : []));
 
-        let found = null;
-        for (const url of candidates) {
-          try {
-            const r = await fetchAuthJSON(url, { method: "GET" });
-            const data = r?.data || r;
-            if (!data) continue;
+        // 3) Lọc client: status === active, khớp customer/company nếu có
+        const actives = list.filter(x => {
+          const status = (x?.status ?? x?.Status ?? "").toString().toLowerCase();
+          const okStatus = status === "active";
+          const okCustomer = customerId ? String(x?.customerId ?? x?.CustomerId) === String(customerId) : true;
+          const okCompany = companyId ? String(x?.companyId ?? x?.CompanyId) === String(companyId) : true;
+          return okStatus && okCustomer && okCompany;
+        });
 
-            // Chuẩn hoá
-            const plan =
-              data?.subscriptionPlan ??
-              data?.plan ??
-              data?.SubscriptionPlan ??
-              data?.Plan ??
-              null;
-
-            const discountPercent =
-              data?.discountPercent ??
-              plan?.discountPercent ??
-              plan?.DiscountPercent ??
-              0;
-
-            const freeIdleMinutes =
-              data?.freeIdleMinutes ??
-              plan?.freeIdleMinutes ??
-              plan?.FreeIdleMinutes ??
-              0;
-
-            found = {
-              discountPercent: Number(discountPercent) || 0,
-              freeIdleMinutes: Number(freeIdleMinutes) || 0,
-            };
-            break;
-          } catch { }
-        }
+        // 4) Gộp thông tin ưu đãi
+        const chosen = actives[0] || null;
+        const plan = chosen?.subscriptionPlan ?? chosen?.plan ?? chosen?.SubscriptionPlan ?? chosen?.Plan ?? null;
+        const discountPercent =
+          Number(chosen?.discountPercent ?? plan?.discountPercent ?? plan?.DiscountPercent ?? 0) || 0;
+        const freeIdleMinutes =
+          Number(chosen?.freeIdleMinutes ?? plan?.freeIdleMinutes ?? plan?.FreeIdleMinutes ?? 0) || 0;
 
         if (!alive) return;
-        if (found) setActiveSub(found);
-        else setActiveSub({ discountPercent: 0, freeIdleMinutes: 0 });
-      } catch {
+        setActiveSub({ discountPercent, freeIdleMinutes });
+      } catch (e) {
         if (!alive) return;
         setActiveSub({ discountPercent: 0, freeIdleMinutes: 0 });
       }
     })();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [API_ABS, state?.customerId, state?.companyId]);
+  }, [state?.customerId, state?.companyId]);
+
 
   // ==== Ước tính theo BE ====
   const needKWhToFull = useMemo(() => ((100 - initialBattery) / 100) * batteryCapacity, [initialBattery, batteryCapacity]);
@@ -988,10 +960,13 @@ const ChargingProgress = () => {
       const idleMinToSend = Math.floor(chargeableSecs / 60);
 
       const body = {
-        chargingSessionId: Number(chargingSessionId),
-        endSoc: Math.round(Number(endSoc) || 0),
-        idleMin: idleMinToSend,
+        customerId: Number(customerId),
+        companyId: state?.companyId ?? null, // thêm nếu BE có field này
+        vehicleId: Number(vehicleId),
+        bookingId: bookingId == null ? null : Number(bookingId),
+        portId: Number(portIdToUse),
       };
+
       console.debug("[Charging] END payload:", { ...body, overtimeSecs, GRACE_SECONDS });
 
       const res = await fetchAuthJSON(url, {
