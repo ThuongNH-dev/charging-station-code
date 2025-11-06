@@ -8,12 +8,18 @@ import { resolveCustomerIdFromAuth } from "../../api/authHelpers";
 import "./ChargingSessionStart.css";
 
 /* ===== Helpers ===== */
-function normalizeApiBase(s) {
-    const raw = (s || "").trim();
-    if (!raw) return "https://localhost:7268/api";
-    return raw.replace(/\/+$/, "");
+async function fetchOne(paths) {
+  const list = Array.isArray(paths) ? paths : [paths];
+  for (const p of list) {
+    try {
+      // p là path tương đối, ví dụ '/Ports/1'
+      const res = await fetchAuthJSON(p, { method: "GET" });
+      if (res) return res;
+    } catch {}
+  }
+  throw new Error("Not found");
 }
-const API_ABS = normalizeApiBase(getApiBase()) || "https://localhost:7268/api";
+
 
 const toNumId = (v) => {
     const s = String(v ?? "").trim();
