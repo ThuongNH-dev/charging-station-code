@@ -1,3 +1,56 @@
+/* ====== CSS VARIABLES - THEME SUPPORT ====== */
+:root {
+  /* Light Mode Colors - Modern & Bright */
+  --login-bg-overlay: rgba(0, 0, 0, 0.2);
+  --login-card-bg: rgba(255, 255, 255, 1);
+  --login-card-border: rgba(203, 213, 225, 0.8);
+  --login-title-color: #0f172a;
+  --login-label-color: #475569;
+  --login-input-bg: #ffffff;
+  --login-input-border: #cbd5e1;
+  --login-input-border-hover: #94a3b8;
+  --login-input-text: #0f172a;
+  --login-input-placeholder: #94a3b8;
+  --login-text-primary: #1e293b;
+  --login-text-secondary: #64748b;
+  --login-text-muted: #64748b;
+  --login-divider-bg: #cbd5e1;
+  --login-divider-text-bg: rgba(255, 255, 255, 1);
+  --login-error-bg: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  --login-error-border: #f87171;
+  --login-error-text: #991b1b;
+  --login-accent: #06b6d4;
+  --login-accent-hover: #0891b2;
+  --login-social-border: #cbd5e1;
+}
+
+/* Dark Mode Colors - Modern & Bright */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --login-bg-overlay: rgba(0, 0, 0, 0.35);
+    --login-card-bg: rgba(30, 41, 59, 0.98);
+    --login-card-border: rgba(148, 163, 184, 0.4);
+    --login-title-color: #f8fafc;
+    --login-label-color: #e2e8f0;
+    --login-input-bg: rgba(30, 41, 59, 0.9);
+    --login-input-border: rgba(148, 163, 184, 0.5);
+    --login-input-border-hover: rgba(148, 163, 184, 0.7);
+    --login-input-text: #f8fafc;
+    --login-input-placeholder: #94a3b8;
+    --login-text-primary: #f8fafc;
+    --login-text-secondary: #cbd5e1;
+    --login-text-muted: #94a3b8;
+    --login-divider-bg: rgba(148, 163, 184, 0.5);
+    --login-divider-text-bg: rgba(30, 41, 59, 0.98);
+    --login-error-bg: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
+    --login-error-border: #ef4444;
+    --login-error-text: #fecaca;
+    --login-accent: #22d3ee;
+    --login-accent-hover: #06b6d4;
+    --login-social-border: rgba(148, 163, 184, 0.5);
+  }
+}
+
 /* ====== BACKGROUND TOÀN MÀN HÌNH ====== */
 .login-wrapper {
   position: relative;
@@ -6,7 +59,7 @@
   justify-content: center;
   align-items: center;
   overflow: hidden;
-  isolation: isolate; /* để z-index hoạt động đúng */
+  isolation: isolate;
 }
 
 /* Ảnh nền phủ mờ phía sau */
@@ -16,33 +69,38 @@
   inset: 0;
   z-index: -1;
   background: 
-    linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)),
+    linear-gradient(var(--login-bg-overlay), var(--login-bg-overlay)),
     url("/Parking_lotV4.png") center / cover no-repeat;
-  filter: brightness(0.9);
+  filter: brightness(1.1) saturate(1.15);
   transform: scale(1.05);
 }
 
 /* ====== FORM CARD ====== */
 .login-card {
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 20px;
+  background: var(--login-card-bg);
+  border-radius: 24px;
   box-shadow: 
-    0 20px 60px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(255, 255, 255, 0.5);
+    0 20px 60px rgba(0, 0, 0, 0.2),
+    0 0 0 1.5px var(--login-card-border),
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 0 0 0.5px rgba(255, 255, 255, 0.5);
   padding: 44px 40px;
   width: 100%;
   max-width: 420px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease, border-color 0.3s ease;
+  border: 1.5px solid var(--login-card-border);
 }
 
 .login-card:hover {
   transform: translateY(-2px);
   box-shadow: 
-    0 24px 70px rgba(0, 0, 0, 0.35),
-    0 0 0 1px rgba(255, 255, 255, 0.6);
+    0 24px 70px rgba(0, 0, 0, 0.3),
+    0 0 0 1.5px var(--login-card-border),
+    0 12px 40px rgba(0, 0, 0, 0.2);
+  border-color: var(--login-input-border-hover);
 }
 
 /* Hiệu ứng nhẹ khi load */
@@ -63,8 +121,9 @@
   font-size: 30px;
   font-weight: 700;
   margin-bottom: 24px;
-  color: #0f172a;
+  color: var(--login-title-color);
   letter-spacing: -0.3px;
+  transition: color 0.3s ease;
 }
 
 /* ====== INPUT ====== */
@@ -75,75 +134,96 @@
 .form-label {
   display: block;
   margin-bottom: 8px;
-  color: #334155;
+  color: var(--login-label-color);
   font-weight: 600;
   font-size: 14px;
+  transition: color 0.3s ease;
 }
 
 .form-input {
   width: 100%;
   padding: 12px 16px;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--login-input-border);
   border-radius: 10px;
   outline: none;
-  background-color: #fff;
+  background-color: var(--login-input-bg);
   font-size: 15px;
-  color: #1e293b !important;
+  color: var(--login-input-text) !important;
+  font-weight: 500;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .form-input::placeholder {
-  color: #94a3b8;
+  color: var(--login-input-placeholder);
+  font-weight: 400;
 }
 
 .form-input:hover {
-  border-color: #cbd5e1;
-  background-color: #f8fafc;
-  color: #1e293b !important;
+  border-color: var(--login-input-border-hover);
+  background-color: var(--login-input-bg);
+  color: var(--login-input-text) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
 
 .form-input:focus {
-  border-color: #0f766e;
-  background-color: #ffffff;
-  color: #1e293b !important;
+  border-color: var(--login-accent);
+  border-width: 2.5px;
+  background-color: var(--login-input-bg);
+  color: var(--login-input-text) !important;
   box-shadow: 
-    0 0 0 4px rgba(15, 118, 110, 0.1),
-    0 4px 12px rgba(15, 118, 110, 0.15);
+    0 0 0 4px rgba(6, 182, 212, 0.12),
+    0 4px 12px rgba(6, 182, 212, 0.15),
+    0 2px 4px rgba(0, 0, 0, 0.1);
   transform: translateY(-1px);
+  outline: 2px solid transparent;
+  outline-offset: 2px;
 }
 
 .form-input:disabled {
-  background-color: #f1f5f9;
-  color: #64748b !important;
+  background-color: var(--login-input-bg);
+  opacity: 0.6;
   cursor: not-allowed;
-  opacity: 0.7;
+  color: var(--login-text-secondary) !important;
 }
 
 .form-input:-webkit-autofill,
 .form-input:-webkit-autofill:hover,
 .form-input:-webkit-autofill:focus {
-  -webkit-text-fill-color: #1e293b !important;
-  -webkit-box-shadow: 0 0 0px 1000px #fff inset;
-  box-shadow: 0 0 0px 1000px #fff inset;
+  -webkit-text-fill-color: var(--login-input-text) !important;
+  -webkit-box-shadow: 0 0 0px 1000px var(--login-input-bg) inset;
+  box-shadow: 0 0 0px 1000px var(--login-input-bg) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Dark mode autofill fix */
+@media (prefers-color-scheme: dark) {
+  .form-input:-webkit-autofill,
+  .form-input:-webkit-autofill:hover,
+  .form-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #f1f5f9 !important;
+    -webkit-box-shadow: 0 0 0px 1000px rgba(51, 65, 85, 0.8) inset;
+    box-shadow: 0 0 0px 1000px rgba(51, 65, 85, 0.8) inset;
+  }
 }
 
 /* ====== BUTTON LOGIN ====== */
 .submit-btn {
   width: 100%;
-  background-color: #0f766e;
+  background: linear-gradient(135deg, var(--login-accent) 0%, var(--login-accent-hover) 100%);
   color: white;
   font-weight: 600;
   font-size: 16px;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 13px 24px;
   margin-top: 16px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 
-    0 4px 12px rgba(15, 118, 110, 0.3),
-    0 2px 4px rgba(15, 118, 110, 0.2);
+    0 4px 16px rgba(6, 182, 212, 0.35),
+    0 2px 8px rgba(6, 182, 212, 0.25);
   position: relative;
   overflow: hidden;
 }
@@ -167,11 +247,11 @@
 }
 
 .submit-btn:hover {
-  background-color: #0b615a;
+  background: linear-gradient(135deg, var(--login-accent-hover) 0%, var(--login-accent) 100%);
   transform: translateY(-2px);
   box-shadow: 
-    0 6px 20px rgba(15, 118, 110, 0.4),
-    0 4px 8px rgba(15, 118, 110, 0.3);
+    0 6px 24px rgba(6, 182, 212, 0.45),
+    0 4px 12px rgba(6, 182, 212, 0.35);
 }
 
 .submit-btn:active {
@@ -217,39 +297,39 @@
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  color: #475569;
+  color: var(--login-text-muted);
   user-select: none;
   transition: color 0.2s ease;
 }
 
 .checkbox-label:hover {
-  color: #334155;
+  color: var(--login-label-color);
 }
 
 .checkbox {
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #0f766e;
+  accent-color: var(--login-accent);
 }
 
 .forgot-link {
-  color: #0f766e;
+  color: var(--login-accent);
   text-decoration: none;
   font-weight: 500;
   transition: all 0.2s ease;
 }
 
 .forgot-link:hover {
-  color: #0b615a;
+  color: var(--login-accent-hover);
   text-decoration: underline;
 }
 
 /* ====== ERROR ====== */
 .error-message {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-  color: #991b1b;
-  border: 2px solid #fca5a5;
+  background: var(--login-error-bg);
+  color: var(--login-error-text);
+  border: 2.5px solid var(--login-error-border);
   border-radius: 10px;
   padding: 12px 16px;
   text-align: center;
@@ -257,7 +337,8 @@
   font-size: 14px;
   font-weight: 500;
   animation: shake 0.5s ease;
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25), 0 0 0 1px rgba(220, 38, 38, 0.1);
+  transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
 @keyframes shake {
@@ -271,10 +352,11 @@
   display: flex;
   align-items: center;
   text-align: center;
-  color: #64748b;
+  color: var(--login-text-secondary);
   margin: 28px 0;
   font-size: 14px;
   position: relative;
+  transition: color 0.3s ease;
 }
 
 .divider::before,
@@ -282,12 +364,14 @@
   content: "";
   flex: 1;
   height: 1px;
-  background: linear-gradient(to right, transparent, #e2e8f0, transparent);
+  background: linear-gradient(to right, transparent, var(--login-divider-bg), transparent);
+  transition: background 0.3s ease;
 }
 
 .divider span {
   padding: 0 16px;
-  background: rgba(255, 255, 255, 0.98);
+  background: var(--login-divider-text-bg);
+  transition: background 0.3s ease;
 }
 
 .divider:not(:empty)::before {
@@ -315,10 +399,10 @@
 
 .social-btn {
   width: 100%;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--login-social-border);
   border-radius: 10px;
   padding: 12px 16px;
-  background: #fff;
+  background: var(--login-input-bg);
   cursor: pointer;
   font-weight: 500;
   font-size: 15px;
@@ -327,14 +411,17 @@
   justify-content: center;
   gap: 8px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  color: #475569;
+  color: var(--login-text-muted);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .social-btn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: var(--login-input-bg);
+  border-color: var(--login-input-border-hover);
+  border-width: 2.5px;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: var(--login-text-primary);
 }
 
 .social-btn:active {
@@ -359,28 +446,31 @@
 /* ====== NOTE + SIGNUP ====== */
 .info-note {
   font-size: 13px;
-  color: #64748b;
+  color: var(--login-text-secondary);
   margin-top: 16px;
   text-align: center;
   line-height: 1.6;
   padding: 12px;
-  background: #f8fafc;
+  background: var(--login-input-bg);
   border-radius: 8px;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 .info-note strong {
-  color: #475569;
+  color: var(--login-text-muted);
+  transition: color 0.3s ease;
 }
 
 .signup-link {
   text-align: center;
   margin-top: 20px;
   font-size: 14px;
-  color: #64748b;
+  color: var(--login-text-secondary);
+  transition: color 0.3s ease;
 }
 
 .signup-link a {
-  color: #0f766e;
+  color: var(--login-accent);
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
@@ -395,7 +485,7 @@
   left: 0;
   width: 0;
   height: 2px;
-  background: #0f766e;
+  background: var(--login-accent);
   transition: width 0.3s ease;
 }
 
@@ -404,7 +494,7 @@
 }
 
 .signup-link a:hover {
-  color: #0b615a;
+  color: var(--login-accent-hover);
 }
 
 /* ====== RESPONSIVE ====== */
@@ -429,3 +519,101 @@
     font-size: 15px;
   }
 }
+
+/* ====== IMPROVED CONTRAST & VISIBILITY ====== */
+/* Đảm bảo text luôn có độ tương phản tốt */
+.login-card {
+  color: var(--login-text-primary);
+}
+
+/* Tăng độ tương phản cho input trong dark mode */
+@media (prefers-color-scheme: dark) {
+  .form-input {
+    border-width: 2px;
+    background-color: rgba(30, 41, 59, 0.95);
+    border-color: rgba(148, 163, 184, 0.5);
+  }
+  
+  .form-input:hover {
+    border-color: rgba(148, 163, 184, 0.7);
+  }
+  
+  .form-input:focus {
+    background-color: rgba(30, 41, 59, 1);
+    border-color: var(--login-accent);
+    border-width: 2.5px;
+    box-shadow: 
+      0 0 0 4px rgba(34, 211, 238, 0.15),
+      0 4px 12px rgba(34, 211, 238, 0.2),
+      0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+  
+  .login-card {
+    box-shadow: 
+      0 20px 60px rgba(0, 0, 0, 0.4),
+      0 0 0 1.5px rgba(148, 163, 184, 0.4),
+      0 8px 32px rgba(0, 0, 0, 0.25),
+      0 0 0 0.5px rgba(148, 163, 184, 0.2);
+    border-color: rgba(148, 163, 184, 0.4);
+  }
+  
+  .login-card:hover {
+    border-color: rgba(148, 163, 184, 0.6);
+  }
+  
+  .social-btn {
+    background-color: rgba(30, 41, 59, 0.95);
+    border-color: rgba(148, 163, 184, 0.5);
+  }
+  
+  .social-btn:hover {
+    background-color: rgba(30, 41, 59, 1);
+    border-color: rgba(148, 163, 184, 0.7);
+    border-width: 2.5px;
+  }
+}
+
+/* Light mode contrast improvements */
+@media (prefers-color-scheme: light) {
+  .form-input {
+    background-color: #ffffff;
+    border-color: #cbd5e1;
+  }
+  
+  .form-input:hover {
+    border-color: #94a3b8;
+  }
+  
+  .form-input:focus {
+    background-color: #ffffff;
+    border-color: var(--login-accent);
+    border-width: 2.5px;
+    box-shadow: 
+      0 0 0 4px rgba(6, 182, 212, 0.12),
+      0 4px 12px rgba(6, 182, 212, 0.15),
+      0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .login-card {
+    box-shadow: 
+      0 20px 60px rgba(0, 0, 0, 0.15),
+      0 0 0 1.5px rgba(203, 213, 225, 0.8),
+      0 8px 32px rgba(0, 0, 0, 0.08),
+      0 0 0 0.5px rgba(255, 255, 255, 0.6);
+    border-color: rgba(203, 213, 225, 0.8);
+  }
+  
+  .login-card:hover {
+    border-color: rgba(148, 163, 184, 0.9);
+  }
+  
+  .social-btn {
+    border-color: #cbd5e1;
+  }
+  
+  .social-btn:hover {
+    border-color: #94a3b8;
+    border-width: 2.5px;
+  }
+}
+

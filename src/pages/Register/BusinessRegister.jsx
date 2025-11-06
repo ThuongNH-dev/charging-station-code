@@ -180,13 +180,26 @@ export default function BusinessRegister() {
               </div>
             </div>
 
-            <div className="checkbox">
-              <input
-                type="checkbox"
-                checked={agree}
-                onChange={() => setAgree(!agree)}
-              />
-              Tôi đồng ý với điều khoản & chính sách
+            <div className="checkbox-wrapper">
+              <label className="checkbox-label-wrapper">
+                <input
+                  type="checkbox"
+                  className="terms-checkbox"
+                  checked={agree}
+                  onChange={() => setAgree(!agree)}
+                />
+                <span className="checkbox-custom"></span>
+                <span className="checkbox-text">
+                  Tôi đồng ý với{" "}
+                  <a href="/terms" className="terms-link" onClick={(e) => e.stopPropagation()}>
+                    điều khoản
+                  </a>
+                  {" & "}
+                  <a href="/privacy" className="terms-link" onClick={(e) => e.stopPropagation()}>
+                    chính sách
+                  </a>
+                </span>
+              </label>
             </div>
 
             <button type="submit" className="primary-btn" disabled={loading}>
