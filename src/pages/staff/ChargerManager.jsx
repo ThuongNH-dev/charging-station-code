@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
 import { getApiBase, fetchAuthJSON } from "../../utils/api";
 import "./ChargerManager.css";
 
@@ -38,125 +37,7 @@ const normCharger = (c = {}) => ({
   stationId: c.stationId ?? c.StationId,
 });
 
-/* ---------- Extract user-friendly error message ---------- */
-function extractErrorMessage(error) {
-  if (!error) return "Đã xảy ra lỗi không xác định";
-
-  // Try to get error from response body (if it's a JSON string)
-  let message = error.message || error.error || "";
-  
-  if (typeof message === "string" && message.length > 0) {
-    // Try to parse as JSON
-    try {
-      const parsed = JSON.parse(message);
-      if (parsed?.error) {
-        message = typeof parsed.error === "string" ? parsed.error : parsed.error.error || "";
-      } else if (typeof parsed === "string") {
-        message = parsed;
-      } else if (parsed?.message) {
-        message = parsed.message;
-      }
-    } catch {
-      // Not JSON, use message as is
-    }
-  }
-
-  if (typeof message !== "string") {
-    if (message?.error) {
-      message = typeof message.error === "string" ? message.error : "";
-    } else if (message?.message) {
-      message = message.message;
-    } else {
-      message = "";
-    }
-  }
-
-  // Clean up the message - remove stack traces and technical details
-  if (message) {
-    // First, try to extract meaningful error from common patterns
-    // Look for user-friendly Vietnamese error messages (these are usually the first meaningful text)
-    const userMessagePatterns = [
-      /Trụ sạc đang bận hoặc không khả dụng[\.!。！]?/i,
-      /Cổng sạc đang được sử dụng hoặc bị khóa[\.!。！]?/i,
-      /Không tìm thấy[^\.!。！\n]*[\.!。！]?/i,
-      /Không thể[^\.!。！\n]*[\.!。！]?/i,
-      /Đã xảy ra lỗi[^\.!。！\n]*[\.!。！]?/i,
-    ];
-    
-    let foundUserMessage = false;
-    for (const pattern of userMessagePatterns) {
-      const match = message.match(pattern);
-      if (match && match[0]) {
-        const extracted = match[0].trim();
-        // Only use if it's a reasonable length (not too short, not too long)
-        if (extracted.length >= 10 && extracted.length < 200) {
-          message = extracted;
-          foundUserMessage = true;
-          break;
-        }
-      }
-    }
-    
-    // If we didn't find a user-friendly message, clean up the original message
-    if (!foundUserMessage) {
-      // Remove stack trace (lines starting with "at " or containing file paths)
-      message = message.split("\n")
-        .filter(line => {
-          const trimmed = line.trim();
-          // Keep lines that don't look like stack traces or technical info
-          return !trimmed.startsWith("at ") && 
-                 !trimmed.includes("System.Exception") &&
-                 !trimmed.includes("Stack Trace") &&
-                 !trimmed.match(/^\s*at\s+\w+/) &&
-                 !trimmed.match(/\.(js|ts|cs|dll|exe):\d+/) &&
-                 !trimmed.match(/^at\s+/i) &&
-                 !trimmed.toLowerCase().includes("user-agent") &&
-                 !trimmed.toLowerCase().includes("accept-encoding") &&
-                 !trimmed.toLowerCase().includes("cookie") &&
-                 !trimmed.toLowerCase().includes("referer") &&
-                 !trimmed.toLowerCase().includes("x-requested-with") &&
-                 !trimmed.toLowerCase().includes("content-length") &&
-                 !trimmed.toLowerCase().match(/^host:/) &&
-                 !trimmed.match(/^\d{3}\s+[a-z]/i) && // HTTP status codes
-                 trimmed.length > 0;
-        })
-        .join(" ")
-        .trim();
-    }
-
-    // Remove common technical prefixes
-    message = message
-      .replace(/^System\.Exception:\s*/i, "")
-      .replace(/^Error:\s*/i, "")
-      .replace(/^Lỗi:\s*/i, "")
-      .replace(/\s*at\s+.*$/i, "")
-      .replace(/Stack Trace:.*$/is, "")
-      .trim();
-
-    // Extract message from JSON-like structures
-    const jsonMatch = message.match(/\{\s*"error"\s*:\s*"([^"]+)"\s*\}/i);
-    if (jsonMatch && jsonMatch[1]) {
-      message = jsonMatch[1];
-    }
-
-
-    // If message is too long, take first sentence or first 200 chars
-    if (message.length > 200) {
-      const firstSentence = message.split(/[.!?。！？]/)[0];
-      message = firstSentence.length > 0 && firstSentence.length < 200 
-        ? firstSentence.trim() 
-        : message.substring(0, 200).trim() + "...";
-    }
-  }
-
-  return message || "Đã xảy ra lỗi không xác định";
-}
-
 export default function ChargerManager() {
-  const [sp] = useSearchParams();
-  const navigate = useNavigate();
-  const stationId = sp.get("stationId") || "";
-
   const [rows, setRows] = useState([]);
   const [latestSessions, setLatestSessions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -165,34 +46,26 @@ export default function ChargerManager() {
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [type, setType] = useState("guest");
-  const [vehicleType, setVehicleType] = useState("Car");
+  const [vehicleType, setVehicleType] = useState("");
   const [chargerId, setChargerId] = useState("");
   const [portId, setPortId] = useState("");
   const [licensePlate, setLicensePlate] = useState("");
   const [ports, setPorts] = useState([]);
   const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const redirectTimerRef = React.useRef(null);
 
-  /* ---------- Cleanup timer on unmount ---------- */
-  useEffect(() => {
-    return () => {
-      if (redirectTimerRef.current) {
-        clearTimeout(redirectTimerRef.current);
-      }
-    };
-  }, []);
+  // New states for company flow
+  const [companies, setCompanies] = useState([]);
+  const [selectedCompany, setSelectedCompany] = useState("");
+  const [companyVehicles, setCompanyVehicles] = useState([]);
 
-  /* ---------- Load chargers + lấy phiên gần nhất ---------- */
+  /* ---------- Load chargers + latest sessions ---------- */
   useEffect(() => {
     let alive = true;
     async function load() {
       setLoading(true);
       setErr("");
       try {
-        const q = stationId ? `?stationId=${encodeURIComponent(stationId)}` : "";
-        const chargersRaw = await fetchAuthJSON(`${API_BASE}/Chargers${q}`);
+        const chargersRaw = await fetchAuthJSON(`${API_BASE}/Chargers`);
         const chargers = toArray(chargersRaw).map(normCharger);
 
         const sessionsRaw = await fetchAuthJSON(`${API_BASE}/ChargingSessions`);
@@ -202,7 +75,10 @@ export default function ChargerManager() {
         for (const s of sessions) {
           const key = s.portId ?? s.PortId ?? s.chargerId ?? s.ChargerId;
           if (!key) continue;
-          if (!latestMap[key] || new Date(s.startedAt) > new Date(latestMap[key].startedAt)) {
+          if (
+            !latestMap[key] ||
+            new Date(s.startedAt) > new Date(latestMap[key].startedAt)
+          ) {
             latestMap[key] = s;
           }
         }
@@ -223,9 +99,9 @@ export default function ChargerManager() {
     return () => {
       alive = false;
     };
-  }, [stationId]);
+  }, []);
 
-  /* ---------- Lấy cổng theo chargerId ---------- */
+  /* ---------- Load ports theo chargerId ---------- */
   useEffect(() => {
     async function loadPorts() {
       if (!chargerId) {
@@ -246,7 +122,67 @@ export default function ChargerManager() {
     loadPorts();
   }, [chargerId]);
 
-  /* ---------- Hiển thị phiên gần nhất ---------- */
+  /* ---------- Load danh sách công ty khi chọn "Xe công ty" ---------- */
+  useEffect(() => {
+    async function loadCompanies() {
+      if (type !== "company") return;
+      try {
+        const res = await fetchAuthJSON(`${API_BASE}/Auth`);
+        const all = Array.isArray(res) ? res : res?.$values || [];
+        const comps = all
+          .filter((a) => a.role === "Company" && a.company)
+          .map((a) => ({
+            companyId: a.company.companyId,
+            name: a.company.name,
+            email: a.company.email,
+          }));
+        setCompanies(comps);
+      } catch (e) {
+        console.error("❌ Lỗi tải danh sách công ty:", e);
+        setCompanies([]);
+      }
+    }
+    loadCompanies();
+  }, [type]);
+
+  /* ---------- Load xe theo công ty & loại xe (lọc thủ công ở frontend) ---------- */
+  useEffect(() => {
+    async function loadVehiclesByCompany() {
+      if (!selectedCompany) {
+        setCompanyVehicles([]);
+        return;
+      }
+      try {
+        const res = await fetchAuthJSON(`${API_BASE}/Vehicles?page=1&pageSize=999`);
+        const items = res?.items ?? res?.data?.items ?? res?.$values ?? [];
+
+        // 🔍 Lọc xe đúng companyId
+        const filteredByCompany = items.filter(
+          (v) => String(v.companyId) === String(selectedCompany)
+        );
+
+        // 🔍 Lọc thêm theo loại xe
+        const filteredByType = vehicleType
+          ? filteredByCompany.filter(
+              (v) =>
+                v.vehicleType?.toLowerCase() === vehicleType?.toLowerCase()
+            )
+          : filteredByCompany;
+
+        console.log(
+          `🚗 Xe công ty ${selectedCompany}:`,
+          filteredByType.map((v) => v.licensePlate)
+        );
+        setCompanyVehicles(filteredByType);
+      } catch (e) {
+        console.error("❌ Lỗi tải xe công ty:", e);
+        setCompanyVehicles([]);
+      }
+    }
+    loadVehiclesByCompany();
+  }, [selectedCompany, vehicleType]);
+
+  /* ---------- Render phiên gần nhất ---------- */
   const renderLatest = (r) => {
     const found = latestSessions.find(
       (s) =>
@@ -261,22 +197,14 @@ export default function ChargerManager() {
     return <span title={`Bắt đầu: ${start}`}>S-{id}</span>;
   };
 
-  /* ---------- Cập nhật trạng thái ---------- */
+  /* ---------- Update charger status ---------- */
   async function updateChargerStatus(chargerId, newStatus) {
     try {
       const statusMap = {
         Available: "Online",
-        available: "Online",
         Charging: "Online",
-        charging: "Online",
         Offline: "Offline",
-        offline: "Offline",
-        Off: "Offline",
-        off: "Offline",
         Error: "OutOfOrder",
-        error: "OutOfOrder",
-        Fault: "OutOfOrder",
-        fault: "OutOfOrder",
       };
       const apiStatus = statusMap[newStatus] || newStatus;
 
@@ -289,40 +217,31 @@ export default function ChargerManager() {
       const chargersRaw = await fetchAuthJSON(`${API_BASE}/Chargers`);
       setRows(toArray(chargersRaw).map(normCharger));
     } catch (err) {
-      setFormError(`❌ ${err.message}`);
-      setTimeout(() => setFormError(""), 5000);
+      alert(`❌ ${err.message}`);
     }
   }
 
   /* ---------- Bắt đầu phiên ---------- */
   async function handleStartNew() {
-    if (!chargerId || !portId || !licensePlate) {
-      setFormError("⚠️ Vui lòng chọn trụ, cổng và nhập biển số!");
-      return;
-    }
+    if (!chargerId || !portId)
+      return alert("⚠️ Vui lòng chọn trụ và cổng sạc!");
+    if (type === "guest" && !licensePlate)
+      return alert("⚠️ Nhập biển số cho khách vãng lai!");
+    if (type === "company" && (!selectedCompany || !licensePlate))
+      return alert("⚠️ Chọn công ty và xe thuộc công ty!");
 
-    setFormError("");
     setSubmitting(true);
     try {
-      const selectedPort = ports.find((p) => String(p.portId) === String(portId));
+      const selectedPort = ports.find(
+        (p) => String(p.portId) === String(portId)
+      );
       const charger = rows.find((c) => String(c.id) === String(chargerId));
 
       let portCode =
-  selectedPort?.code ||
-  selectedPort?.Code ||
-  selectedPort?.portCode ||
-  selectedPort?.PortCode;
-
-if (!portCode) {
-  // ✅ Tự sinh PortCode fallback nếu API không trả về
-  const portNum = String(portId).padStart(3, "0"); // -> 001, 002...
-  portCode = `P${portNum}`;
-  console.warn(`⚠️ API /Ports không có Code, sinh tạm PortCode = ${portCode}`);
-}
-
-
-      const chargerCode =
-        charger?.code || charger?.Code || `C${chargerId}`;
+        selectedPort?.code ||
+        selectedPort?.portCode ||
+        `P${String(portId).padStart(3, "0")}`;
+      const chargerCode = charger?.code || `C${chargerId}`;
 
       if (type === "guest") {
         const body = {
@@ -334,44 +253,29 @@ if (!portCode) {
         };
 
         console.log("🚀 Guest start body:", body);
-
-        const res = await fetchAuthJSON(`${API_BASE}/ChargingSessions/guest/start`, {
-          method: "POST",
-          body: JSON.stringify(body),
-        });
-        // Success - show success message and redirect
-        setShowModal(false);
-        setLicensePlate("");
-        setPortId("");
-        setType("guest");
-        setFormError("");
-        setSuccessMessage(res?.message || "✅ Phiên sạc (guest) đã được khởi động thành công!");
-        
-        // Clear any existing timer
-        if (redirectTimerRef.current) {
-          clearTimeout(redirectTimerRef.current);
-        }
-        
-        // Redirect to sessions after 2 seconds
-        redirectTimerRef.current = setTimeout(() => {
-          navigate("/staff/sessions");
-        }, 2000);
-      } else {
-        const found = await fetchAuthJSON(
-          `${API_BASE}/Vehicles?licensePlate=${encodeURIComponent(
-            licensePlate
-          )}&vehicleType=${vehicleType}`
+        const res = await fetchAuthJSON(
+          `${API_BASE}/ChargingSessions/guest/start`,
+          {
+            method: "POST",
+            body: JSON.stringify(body),
+          }
         );
-        const v = toArray(
-          found.items || found.data || found.results || found.$values || found
-        )[0];
-        if (!v?.vehicleId)
-          throw new Error("Không tìm thấy xe này trong hệ thống công ty!");
+        alert(res?.message || "✅ Phiên sạc (guest) đã được khởi động!");
+      } else {
+        const vehicle = companyVehicles.find(
+          (v) => v.licensePlate === licensePlate
+        );
+        if (!vehicle)
+          throw new Error("Không tìm thấy xe trong công ty đã chọn!");
+
+        const fullVehicle = await fetchAuthJSON(
+          `${API_BASE}/Vehicles/${vehicle.vehicleId}`
+        );
 
         const body = {
-          customerId: v.customerId,
-          companyId: v.companyId,
-          vehicleId: v.vehicleId,
+          customerId: fullVehicle.customerId,
+          companyId: fullVehicle.companyId || Number(selectedCompany),
+          vehicleId: fullVehicle.vehicleId,
           bookingId: null,
           portId: Number(portId),
           PortCode: portCode,
@@ -379,39 +283,27 @@ if (!portCode) {
         };
 
         console.log("🚀 Company start body:", body);
-
         const res = await fetchAuthJSON(`${API_BASE}/ChargingSessions/start`, {
           method: "POST",
           body: JSON.stringify(body),
         });
-        // Success - show success message and redirect
-        setShowModal(false);
-        setLicensePlate("");
-        setPortId("");
-        setType("guest");
-        setFormError("");
-        setSuccessMessage(res?.message || "✅ Phiên sạc (company) đã được khởi động thành công!");
-        
-        // Clear any existing timer
-        if (redirectTimerRef.current) {
-          clearTimeout(redirectTimerRef.current);
-        }
-        
-        // Redirect to sessions after 2 seconds
-        redirectTimerRef.current = setTimeout(() => {
-          navigate("/staff/sessions");
-        }, 2000);
+        alert(res?.message || "✅ Phiên sạc (company) đã được khởi động!");
       }
+
+      setShowModal(false);
+      setLicensePlate("");
+      setPortId("");
+      setSelectedCompany("");
+      setVehicleType("");
+      setType("guest");
     } catch (e) {
-      // Extract user-friendly error message
-      const errorMsg = extractErrorMessage(e);
-      setFormError(errorMsg);
+      alert(`❌ Lỗi: ${e.message || JSON.stringify(e)}`);
     } finally {
       setSubmitting(false);
     }
   }
 
-  /* ---------- Render Action ---------- */
+  /* ---------- Render action ---------- */
   const renderAction = (r) => {
     const s = (r.status || "").toLowerCase();
     if (s === "online") {
@@ -456,11 +348,7 @@ if (!portCode) {
         <h2>Danh sách trụ sạc</h2>
         <div className="sc-actions">
           <input className="sc-search" placeholder="🔍  Tìm kiếm" />
-          <button className="sc-primary" onClick={() => {
-            setShowModal(true);
-            setFormError("");
-            setSuccessMessage("");
-          }}>
+          <button className="sc-primary" onClick={() => setShowModal(true)}>
             + Bắt đầu phiên
           </button>
         </div>
@@ -468,26 +356,6 @@ if (!portCode) {
 
       {loading && <div className="sc-empty">Đang tải…</div>}
       {err && <div className="sc-error">{err}</div>}
-      
-      {/* Success message */}
-      {successMessage && (
-        <div className="success-message-box">
-          <div className="success-message-icon">
-            ✓
-          </div>
-          <div className="success-message-content">
-            {successMessage}
-          </div>
-          <button
-            className="success-message-close"
-            onClick={() => setSuccessMessage("")}
-            aria-label="Đóng thông báo"
-            title="Đóng"
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
       {!loading && !err && (
         <div className="sc-table">
@@ -542,35 +410,15 @@ if (!portCode) {
           <div className="modal">
             <div className="modal-header">
               <h3>Khởi động phiên sạc</h3>
-              <button className="modal-close" onClick={() => {
-                setShowModal(false);
-                setFormError("");
-              }}>
+              <button
+                className="modal-close"
+                onClick={() => setShowModal(false)}
+              >
                 ✕
               </button>
             </div>
 
             <p>Chọn loại khách hàng và thông tin cần thiết.</p>
-
-            {/* Inline error message */}
-            {formError && (
-              <div className="error-message-box">
-                <div className="error-message-icon">
-                  ⚠
-                </div>
-                <div className="error-message-content">
-                  {formError}
-                </div>
-                <button
-                  className="error-message-close"
-                  onClick={() => setFormError("")}
-                  aria-label="Đóng thông báo lỗi"
-                  title="Đóng"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
 
             <label>Loại khách hàng</label>
             <div className="type-select">
@@ -596,17 +444,87 @@ if (!portCode) {
               </label>
             </div>
 
-            <label>Loại xe</label>
-            <select
-              value={vehicleType}
-              onChange={(e) => setVehicleType(e.target.value)}
-            >
-              <option value="Car">Ô tô</option>
-              <option value="Motorbike">Xe máy</option>
-            </select>
+            {type === "company" && (
+              <>
+                <label>Công ty</label>
+                <select
+                  value={selectedCompany}
+                  onChange={(e) => {
+                    setSelectedCompany(e.target.value);
+                    setLicensePlate("");
+                  }}
+                >
+                  <option value="">-- Chọn công ty --</option>
+                  {companies.map((c) => (
+                    <option key={c.companyId} value={c.companyId}>
+                      {c.name} ({c.email})
+                    </option>
+                  ))}
+                </select>
+
+                <label>Loại xe</label>
+                <select
+                  value={vehicleType}
+                  onChange={(e) => {
+                    setVehicleType(e.target.value);
+                    setLicensePlate("");
+                  }}
+                  disabled={!selectedCompany}
+                >
+                  <option value="">-- Chọn loại xe --</option>
+                  <option value="Car">Ô tô</option>
+                  <option value="Motorbike">Xe máy</option>
+                </select>
+
+                <label>Xe thuộc công ty</label>
+                <select
+                  value={licensePlate}
+                  onChange={(e) => setLicensePlate(e.target.value)}
+                  disabled={!selectedCompany || !vehicleType}
+                >
+                  <option value="">
+                    {selectedCompany
+                      ? vehicleType
+                        ? "-- Chọn xe --"
+                        : "Chọn loại xe trước"
+                      : "Chọn công ty trước"}
+                  </option>
+                  {companyVehicles.map((v) => (
+                    <option key={v.vehicleId} value={v.licensePlate}>
+                      {v.licensePlate} • {v.vehicleType} • {v.connectorType}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            {type === "guest" && (
+              <>
+                <label>Loại xe</label>
+                <select
+                  value={vehicleType}
+                  onChange={(e) => setVehicleType(e.target.value)}
+                >
+                  <option value="Car">Ô tô</option>
+                  <option value="Motorbike">Xe máy</option>
+                </select>
+
+                <label>Biển số xe</label>
+                <input
+                  type="text"
+                  value={licensePlate}
+                  onChange={(e) => setLicensePlate(e.target.value)}
+                  placeholder="VD: 51H-12345"
+                  required
+                />
+              </>
+            )}
 
             <label>Trụ sạc</label>
-            <select value={chargerId} onChange={(e) => setChargerId(e.target.value)}>
+            <select
+              value={chargerId}
+              onChange={(e) => setChargerId(e.target.value)}
+            >
               <option value="">-- Chọn trụ sạc --</option>
               {rows.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -626,23 +544,17 @@ if (!portCode) {
               </option>
               {ports.map((p) => (
                 <option key={p.portId} value={p.portId}>
-                  {p.code || p.Code || `P-${p.portId}`} • {p.connectorType} • {p.status} •{" "}
-                  {p.maxPowerKw}kW
+                  {p.code || p.portCode || `P-${p.portId}`} •{" "}
+                  {p.connectorType} • {p.status} • {p.maxPowerKw}kW
                 </option>
               ))}
             </select>
 
-            <label>Biển số xe</label>
-            <input
-              type="text"
-              value={licensePlate}
-              onChange={(e) => setLicensePlate(e.target.value)}
-              placeholder="VD: 51H-12345"
-              required
-            />
-
             <div className="modal-actions">
-              <button className="sc-cancel" onClick={() => setShowModal(false)}>
+              <button
+                className="sc-cancel"
+                onClick={() => setShowModal(false)}
+              >
                 Hủy
               </button>
               <button
