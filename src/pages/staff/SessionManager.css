@@ -208,3 +208,8 @@
   margin-top: 12px;
   text-align: center;
 }
+/* Ẩn cột TT trong bảng */
+.sess-table th:nth-child(10),
+.sess-table td:nth-child(10) {
+  display: none;
+}

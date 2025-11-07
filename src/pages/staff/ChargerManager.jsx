@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getApiBase, fetchAuthJSON } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
+import { message } from "antd";
 import "./ChargerManager.css";
 
 const API_BASE = getApiBase();
@@ -244,18 +245,19 @@ export default function ChargerManager() {
         .filter((c) => String(c.stationId) === String(selectedStationId));
       setRows(chargers);
     } catch (err) {
-      alert(`❌ ${err.message}`);
+      message.error(`❌ ${err.message}`);
+
     }
   }
 
   /* ---------- Bắt đầu phiên ---------- */
   async function handleStartNew() {
     if (!chargerId || !portId)
-      return alert("⚠️ Vui lòng chọn trụ và cổng sạc!");
+      return message.warning("⚠️ Vui lòng chọn trụ và cổng sạc!");
     if (type === "guest" && !licensePlate)
-      return alert("⚠️ Nhập biển số cho khách vãng lai!");
+      return message.warning("⚠️ Nhập biển số cho khách vãng lai!");
     if (type === "company" && (!selectedCompany || !licensePlate))
-      return alert("⚠️ Chọn công ty và xe thuộc công ty!");
+      return message.warning("⚠️ Chọn công ty và xe thuộc công ty!");
 
     setSubmitting(true);
     try {
@@ -286,7 +288,7 @@ export default function ChargerManager() {
             body: JSON.stringify(body),
           }
         );
-        alert(res?.message || "✅ Phiên sạc (guest) đã được khởi động!");
+        message.success(res?.message || "✅ Phiên sạc (guest) đã được khởi động!");
       } else {
         const vehicle = companyVehicles.find(
           (v) => v.licensePlate === licensePlate
@@ -323,7 +325,7 @@ export default function ChargerManager() {
           method: "POST",
           body: JSON.stringify(body),
         });
-        alert(res?.message || "✅ Phiên sạc (company) đã được khởi động!");
+        message.success(res?.message || "✅ Phiên sạc (company) đã được khởi động!");
       }
 
       setShowModal(false);
@@ -333,7 +335,7 @@ export default function ChargerManager() {
       setVehicleType("");
       setType("guest");
     } catch (e) {
-      alert(`❌ Lỗi: ${e.message || JSON.stringify(e)}`);
+      message.error(`❌ Lỗi: ${e.message || "Không thể khởi động phiên sạc"}`);
     } finally {
       setSubmitting(false);
     }
