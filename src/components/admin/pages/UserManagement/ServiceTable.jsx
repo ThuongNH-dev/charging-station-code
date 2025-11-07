@@ -1,7 +1,6 @@
 // 📁 src/components/UserManagement/ServiceTable.jsx
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState } from "react";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
 
 /**
  * Bảng danh sách gói dịch vụ (Subscription Plans)
@@ -14,21 +13,6 @@ const ServiceTable = ({
   setActiveModal,
   isLoading = false,
 }) => {
-  const navigate = useNavigate();
-
-  // ======= DROPDOWN STATE =======
-  const [openMenuId, setOpenMenuId] = useState(null);
-  const menuRef = useRef(null);
-  useEffect(() => {
-    const onDocClick = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setOpenMenuId(null);
-      }
-    };
-    document.addEventListener("click", onDocClick);
-    return () => document.removeEventListener("click", onDocClick);
-  }, []);
-
   // ======= UI STATES =======
   if (isLoading) return <p>Đang tải dữ liệu gói dịch vụ...</p>;
   if (!Array.isArray(filteredData) || filteredData.length === 0) {
@@ -54,21 +38,18 @@ const ServiceTable = ({
 
   const formatStatus = (status) => {
     if (!status) return "—";
-    if (String(status).toLowerCase() === "active") return "Đang hoạt động";
-    if (String(status).toLowerCase() === "inactive") return "Ngừng hoạt động";
+    const s = String(status).toLowerCase();
+    if (s === "active") return "Đang hoạt động";
+    if (s === "inactive") return "Ngừng hoạt động";
     return status;
   };
 
-  const formatVND = (num) => {
-    const n = Number(num ?? 0);
-    return n.toLocaleString("vi-VN") + " VND";
-  };
+  const formatVND = (num) => Number(num ?? 0).toLocaleString("vi-VN") + " VND";
 
   // === “Quyền lợi”: tách & gộp giống trang ServicePlans ===
   const cleanText = (x) => {
     const s = String(x ?? "").trim();
-    if (!s) return "";
-    if (s.toLowerCase() === "string") return "";
+    if (!s || s.toLowerCase() === "string") return "";
     return s;
   };
   const splitToList = (s) =>
@@ -93,6 +74,7 @@ const ServiceTable = ({
       items.push(`Giảm ${discount}% khi thanh toán đủ điều kiện`);
     }
 
+    // unique
     const seen = new Set();
     const uniq = [];
     for (const it of items) {
@@ -158,37 +140,9 @@ const ServiceTable = ({
 
               return (
                 <tr key={rowId}>
-                  {/* 📦 Tên gói + dropdown chọn hành động */}
-                  <td
-                    className="plan-name-cell"
-                    style={{ position: "relative" }}
-                  >
-                    <span
-                      className="link-like"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenMenuId(openMenuId === rowId ? null : rowId);
-                      }}
-                      title="Mở lựa chọn"
-                    >
-                      {pkg?.planName || "—"}
-                    </span>
-
-                    {openMenuId === rowId && (
-                      <div ref={menuRef} className="tiny-dropdown">
-                        <button onClick={() => setOpenMenuId(null)}>
-                          Xem gói
-                        </button>
-                        <button
-                          onClick={() => {
-                            setOpenMenuId(null);
-                            navigate(`/admin/subscriptions/plan/${planId}`);
-                          }}
-                        >
-                          Người dùng đăng ký
-                        </button>
-                      </div>
-                    )}
+                  {/* 📦 Tên gói: KHÔNG còn dropdown */}
+                  <td className="plan-name-cell">
+                    <span>{pkg?.planName || "—"}</span>
                   </td>
 
                   {/* 🏷️ Loại */}
@@ -231,7 +185,6 @@ const ServiceTable = ({
                       className="action-icon edit-icon"
                       title="Chỉnh sửa"
                     />
-
                     <DeleteOutlined
                       onClick={() =>
                         setActiveModal(`deleteService-${planId ?? rowId}`)

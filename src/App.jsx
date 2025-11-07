@@ -55,8 +55,6 @@ import ManageSubscriptions from "./components/subscription/ManageSubcription";
 import Dashboard from "./components/admin/pages/dashboard/Dashboard";
 import AdminNotificationsSendPage from "./components/admin/pages/AdminNotificationsSendPage";
 import PricingRulesPage from "./components/admin/pages/pricing/PricingRulesPage";
-import SubscriptionMembersPage from "./components/admin/pages/UserManagement/SubscriptionMembersPage";
-import AllSubscriptionsPage from "./components/admin/pages/UserManagement/AllSubscriptionsPage";
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
@@ -364,9 +362,6 @@ export default function App() {
           path="notifications/send"
           element={<AdminNotificationsSendPage />}
         />
-
-        <Route path="subscriptions" element={<AllSubscriptionsPage />} />
-  <Route path="subscriptions/plan/:planId" element={<SubscriptionMembersPage />} />
       </Route>
       {/*Notification */}
       <Route
