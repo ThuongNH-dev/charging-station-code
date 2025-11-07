@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { Pagination } from "antd";
 import MessageBox from "../../components/staff/MessageBox";
 import ConfirmDialog from "../../components/staff/ConfirmDialog";
@@ -25,7 +26,25 @@ function vnd(n) {
   return (Number(n) || 0).toLocaleString("vi-VN") + " ₫";
 }
 
+function toArray(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw.items)) return raw.items;
+  if (Array.isArray(raw.data)) return raw.data;
+  if (Array.isArray(raw.results)) return raw.results;
+  if (Array.isArray(raw.$values)) return raw.$values;
+  if (typeof raw === "object") return [raw];
+  try {
+    return toArray(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
 export default function SessionManager() {
+  const { user } = useAuth();
+  const currentAccountId = user?.accountId || localStorage.getItem("accountId");
+
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -34,12 +53,45 @@ export default function SessionManager() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [message, setMessage] = useState({ type: "", text: "" });
   const [confirmDialog, setConfirmDialog] = useState({ open: false, session: null });
+  const [stations, setStations] = useState([]);
+  const [myStations, setMyStations] = useState([]);
+  const [selectedStationId, setSelectedStationId] = useState(null);
   const pageSize = 8;
   const navigate = useNavigate();
 
+  /* ---------------- Load danh sách trạm staff ---------------- */
   useEffect(() => {
+    async function loadStations() {
+      try {
+        const allStations = await fetchAuthJSON(`${API_BASE}/Stations`);
+        const stationsArr = toArray(allStations);
+        const myStationIds = [];
+
+        for (const st of stationsArr) {
+          try {
+            const res = await fetchAuthJSON(`${API_BASE}/station-staffs?stationId=${st.stationId}`);
+            const staffs = toArray(res);
+            const found = staffs.some((s) => String(s.staffId) === String(currentAccountId));
+            if (found) myStationIds.push(st.stationId);
+          } catch {}
+        }
+
+        const mine = stationsArr.filter((s) => myStationIds.includes(s.stationId));
+        setStations(stationsArr);
+        setMyStations(mine);
+        if (mine.length > 0) setSelectedStationId(mine[0].stationId);
+      } catch (err) {
+        console.error("Lỗi khi tải danh sách trạm:", err);
+      }
+    }
+    loadStations();
+  }, [currentAccountId]);
+
+  /* ---------------- Load danh sách phiên sạc theo trạm ---------------- */
+  useEffect(() => {
+    if (!selectedStationId) return;
     loadSessions();
-  }, []);
+  }, [selectedStationId]);
 
   async function loadSessions() {
     setLoading(true);
@@ -48,14 +100,26 @@ export default function SessionManager() {
       let sessionArr = res?.data ?? res?.$values ?? res?.items ?? res ?? [];
       if (!Array.isArray(sessionArr)) sessionArr = [sessionArr];
 
-      const vehiclesRaw = await fetchAuthJSON(`${API_BASE}/Vehicles`);
-      let vehicles = [];
-      if (Array.isArray(vehiclesRaw)) vehicles = vehiclesRaw;
-      else if (Array.isArray(vehiclesRaw.data)) vehicles = vehiclesRaw.data;
-      else if (Array.isArray(vehiclesRaw.$values)) vehicles = vehiclesRaw.$values;
-      else if (Array.isArray(vehiclesRaw.items)) vehicles = vehiclesRaw.items;
-      else vehicles = Object.values(vehiclesRaw || {});
+      // Lọc phiên theo stationId
+      const portsRes = await fetchAuthJSON(`${API_BASE}/Ports`);
+      const ports = toArray(portsRes);
+      const chargersRes = await fetchAuthJSON(`${API_BASE}/Chargers`);
+      const chargers = toArray(chargersRes);
 
+      const portToCharger = {};
+      for (const p of ports) portToCharger[p.portId] = p.chargerId;
+      const chargerToStation = {};
+      for (const c of chargers) chargerToStation[c.chargerId] = c.stationId;
+
+      sessionArr = sessionArr.filter((s) => {
+        const portId = s.portId ?? s.PortId;
+        const chargerId = portToCharger[portId];
+        const stationId = chargerToStation[chargerId];
+        return String(stationId) === String(selectedStationId);
+      });
+
+      const vehiclesRaw = await fetchAuthJSON(`${API_BASE}/Vehicles`);
+      const vehicles = toArray(vehiclesRaw);
       const vehicleMap = {};
       for (const v of vehicles) {
         const id = v.vehicleId ?? v.VehicleId;
@@ -63,22 +127,14 @@ export default function SessionManager() {
       }
 
       const invRes = await fetchAuthJSON(`${API_BASE}/Invoices`);
-      let invoices =
-        invRes?.data ?? invRes?.$values ?? invRes?.items ?? invRes ?? [];
-      if (!Array.isArray(invoices)) invoices = [invoices];
+      let invoices = toArray(invRes);
 
       const sessionToInvoiceStatus = {};
       for (const inv of invoices) {
         try {
-          const invDetail = await fetchAuthJSON(
-            `${API_BASE}/Invoices/${inv.invoiceId || inv.id}`
-          );
+          const invDetail = await fetchAuthJSON(`${API_BASE}/Invoices/${inv.invoiceId || inv.id}`);
           const invoiceData = invDetail?.data || invDetail;
-          const sessionsList =
-            invoiceData?.chargingSessions ||
-            invoiceData?.$values?.chargingSessions ||
-            [];
-
+          const sessionsList = invoiceData?.chargingSessions || invoiceData?.$values?.chargingSessions || [];
           sessionsList.forEach((session) => {
             const sessionId = session.chargingSessionId || session.id;
             if (sessionId) {
@@ -94,9 +150,7 @@ export default function SessionManager() {
       const detailed = await Promise.all(
         sessionArr.map(async (s) => {
           try {
-            const det = await fetchAuthJSON(
-              `${API_BASE}/ChargingSessions/${s.chargingSessionId || s.id}`
-            );
+            const det = await fetchAuthJSON(`${API_BASE}/ChargingSessions/${s.chargingSessionId || s.id}`);
             return { ...s, ...det };
           } catch {
             return s;
@@ -109,28 +163,24 @@ export default function SessionManager() {
           const sessionId = s.chargingSessionId || s.id;
           const invoiceInfo = sessionToInvoiceStatus[sessionId];
           const invoiceStatus = invoiceInfo?.status || "UNPAID";
-
-          const vId =
-            s.vehicleId ||
-            s.VehicleId ||
-            s.vehicle?.vehicleId ||
-            s.vehicle?.VehicleId ||
-            null;
+          const vId = s.vehicleId ?? s.VehicleId ?? s.vehicle?.vehicleId ?? s.vehicle?.VehicleId ?? null;
           const v = vehicleMap[vId] || {};
 
-          const licensePlate =
-            v.licensePlate ??
-            v.LicensePlate ??
-            s.licensePlate ??
-            s.LicensePlate ??
-            "—";
+          let licensePlate =
+            s.licensePlate ?? s.LicensePlate ?? v.licensePlate ?? v.LicensePlate ?? "—";
 
+          const companyId = s.companyId ?? v.companyId ?? v.CompanyId ?? null;
           const custId = s.customerId ?? s.CustomerId;
-          const companyId = s.companyId ?? v.companyId ?? v.CompanyId ?? 0;
-
           let customerType = "Khách bình thường";
           if (!custId || custId === 0) customerType = "Khách vãng lai";
-          else if (companyId > 0) customerType = "Xe công ty";
+          else if (companyId) customerType = "Xe công ty";
+
+          if (customerType === "Xe công ty" && (!licensePlate || licensePlate === "—")) {
+            const fallback = vehicleMap[vId];
+            if (fallback && fallback.licensePlate) {
+              licensePlate = fallback.licensePlate;
+            }
+          }
 
           return {
             ...s,
@@ -138,6 +188,8 @@ export default function SessionManager() {
             total: s.total ?? s.amount ?? 0,
             startedAt: s.startedAt ?? s.startTime,
             endedAt: s.endedAt ?? s.endTime,
+            startSoc: s.startSoc ?? s.StartSoc ?? null, // ✅ thêm cột % bắt đầu
+            endSoc: s.endSoc ?? s.EndSoc ?? null,       // ✅ thêm cột % kết thúc
             invoiceStatus,
             invoiceId: invoiceInfo?.invoiceId || null,
             customerType,
@@ -170,18 +222,30 @@ export default function SessionManager() {
         ? `${API_BASE}/ChargingSessions/guest/end`
         : `${API_BASE}/ChargingSessions/end`;
 
-      const payload = isGuest
-        ? {
-            chargingSessionId: s.chargingSessionId,
-            licensePlate: s.licensePlate ?? "UNKNOWN",
-            portId: s.portId,
-            PortCode: s.portCode ?? `P${String(s.portId).padStart(3, "0")}`,
-            endSoc: s.endSoc ?? 80,
-          }
-        : {
-            chargingSessionId: s.chargingSessionId,
-            endSoc: s.endSoc ?? 80,
-          };
+      // ✅ Lấy endSoc thật từ localStorage nếu có
+let realEndSoc = 80;
+try {
+  const live = JSON.parse(localStorage.getItem("charging:live:v1") || "null");
+  if (live && Number.isFinite(live.batteryAtLastUpdate)) {
+    realEndSoc = Math.round(live.batteryAtLastUpdate);
+  }
+} catch {
+  realEndSoc = s.endSoc ?? 80;
+}
+
+const payload = isGuest
+  ? {
+      chargingSessionId: s.chargingSessionId,
+      licensePlate: s.licensePlate ?? "UNKNOWN",
+      portId: s.portId,
+      PortCode: s.portCode ?? `P${String(s.portId).padStart(3, "0")}`,
+      endSoc: realEndSoc,   // ✅ thay vì cố định 80
+    }
+  : {
+      chargingSessionId: s.chargingSessionId,
+      endSoc: realEndSoc,   // ✅ thay vì cố định 80
+    };
+
 
       const res = await fetchAuthJSON(endpoint, {
         method: "POST",
@@ -228,12 +292,9 @@ export default function SessionManager() {
     }
   }
 
-  /* ===== Filtering + Search ===== */
   const filteredSessions = sessions.filter((s) => {
     const matchSearch = search
-      ? String(s.chargingSessionId)
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
+      ? String(s.chargingSessionId).includes(search) ||
         String(s.licensePlate).toLowerCase().includes(search.toLowerCase())
       : true;
     const matchStatus =
@@ -253,10 +314,7 @@ export default function SessionManager() {
 
   const totalPages = Math.ceil(filteredSessions.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedSessions = filteredSessions.slice(
-    startIndex,
-    startIndex + pageSize
-  );
+  const paginatedSessions = filteredSessions.slice(startIndex, startIndex + pageSize);
 
   return (
     <div className="sess-wrap">
@@ -266,7 +324,7 @@ export default function SessionManager() {
         visible={!!message.text}
         onClose={() => setMessage({ type: "", text: "" })}
       />
-      
+
       <ConfirmDialog
         open={confirmDialog.open}
         title="Xác nhận dừng phiên sạc"
@@ -281,6 +339,21 @@ export default function SessionManager() {
       <div className="sess-card">
         <div className="sess-head">
           <h3>Phiên sạc (đang chạy / lịch sử)</h3>
+
+          {myStations.length > 1 && (
+            <select
+              value={selectedStationId || ""}
+              onChange={(e) => setSelectedStationId(Number(e.target.value))}
+              className="station-select"
+            >
+              {myStations.map((st) => (
+                <option key={st.stationId} value={st.stationId}>
+                  {st.stationName}
+                </option>
+              ))}
+            </select>
+          )}
+
           <div className="sess-filters">
             <input
               type="text"
@@ -327,6 +400,8 @@ export default function SessionManager() {
                 <th>Loại</th>
                 <th>Bắt đầu</th>
                 <th>Kết thúc</th>
+                <th>% bắt đầu</th>
+                <th>% kết thúc</th>
                 <th>kWh</th>
                 <th>Chi phí</th>
                 <th>TT</th>
@@ -336,17 +411,17 @@ export default function SessionManager() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="center muted">
+                  <td colSpan={13} className="center muted">
                     Đang tải…
                   </td>
                 </tr>
               ) : err ? (
                 <tr>
-                  <td colSpan={11} className="center error">{err}</td>
+                  <td colSpan={13} className="center error">{err}</td>
                 </tr>
               ) : filteredSessions.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="center muted">
+                  <td colSpan={13} className="center muted">
                     Không tìm thấy phiên phù hợp.
                   </td>
                 </tr>
@@ -372,6 +447,8 @@ export default function SessionManager() {
                     </td>
                     <td>{fmtTime(s.startedAt)}</td>
                     <td>{fmtTime(s.endedAt)}</td>
+                    <td>{s.startSoc != null ? `${s.startSoc}%` : "—"}</td>
+                    <td>{s.endSoc != null ? `${s.endSoc}%` : "—"}</td>
                     <td>{s.energyKwh?.toFixed(2) ?? "—"}</td>
                     <td>{vnd(s.total)}</td>
                     <td>
@@ -398,12 +475,7 @@ export default function SessionManager() {
                       ) : (
                         <button
                           className="btn-light"
-                          onClick={() =>
-                            navigate(
-                              `/staff/invoice?order=S${s.chargingSessionId}`,
-                              { state: s }
-                            )
-                          }
+                          onClick={() => navigate(`/staff/invoice?session=${s.chargingSessionId}`)}
                         >
                           Chi tiết
                         </button>
@@ -416,13 +488,12 @@ export default function SessionManager() {
           </table>
         </div>
 
-        {/* ✅ Thanh phân trang Ant Design */}
-        <div style={{ textAlign: "center", marginTop: 16 }}>
+        <div className="sess-footer">
           <Pagination
             current={currentPage}
-            pageSize={pageSize}
             total={filteredSessions.length}
-            onChange={(page) => setCurrentPage(page)}
+            pageSize={pageSize}
+            onChange={(p) => setCurrentPage(p)}
             showSizeChanger={false}
           />
         </div>

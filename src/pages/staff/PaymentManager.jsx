@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Card, Button, message, Table, Tag, Radio, Spin } from "antd";
+import { Card, Button, message, Table, Tag, Radio, Spin, Select } from "antd";
 import {
   QrcodeOutlined,
   CreditCardOutlined,
@@ -7,24 +7,79 @@ import {
   CarOutlined,
 } from "@ant-design/icons";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
+import { useAuth } from "../../context/AuthContext";
 import "./PaymentManager.css";
 
 const API_BASE = getApiBase();
 const vnd = (n) =>
   !n && n !== 0 ? "—" : (Number(n) || 0).toLocaleString("vi-VN") + " ₫";
 
+function toArray(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw.items)) return raw.items;
+  if (Array.isArray(raw.data)) return raw.data;
+  if (Array.isArray(raw.results)) return raw.results;
+  if (Array.isArray(raw.$values)) return raw.$values;
+  if (typeof raw === "object") return [raw];
+  try {
+    return toArray(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
 export default function PaymentManager() {
+  const { user } = useAuth();
+  const currentAccountId = user?.accountId || localStorage.getItem("accountId");
+
   const [guestSessions, setGuestSessions] = useState([]);
-  const [paidSessions, setPaidSessions] = useState([]); // ✅ Chỉ chứa phiên đã thanh toán
+  const [paidSessions, setPaidSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [payingId, setPayingId] = useState(null);
   const [method, setMethod] = useState("VNPAY");
 
+  // ✅ Trạm Staff phụ trách
+  const [stations, setStations] = useState([]);
+  const [myStations, setMyStations] = useState([]);
+  const [selectedStationId, setSelectedStationId] = useState(null);
+
   useEffect(() => {
-    loadData();
+    loadStations();
   }, []);
 
+  async function loadStations() {
+    try {
+      const allStations = await fetchAuthJSON(`${API_BASE}/Stations`);
+      const stationsArr = toArray(allStations);
+      const myStationIds = [];
+
+      for (const st of stationsArr) {
+        try {
+          const res = await fetchAuthJSON(`${API_BASE}/station-staffs?stationId=${st.stationId}`);
+          const staffs = toArray(res);
+          const found = staffs.some((s) => String(s.staffId) === String(currentAccountId));
+          if (found) myStationIds.push(st.stationId);
+        } catch {
+          console.warn("Không lấy được staff của trạm:", st.stationId);
+        }
+      }
+
+      const mine = stationsArr.filter((s) => myStationIds.includes(s.stationId));
+      setStations(stationsArr);
+      setMyStations(mine);
+      if (mine.length > 0) setSelectedStationId(mine[0].stationId);
+    } catch (err) {
+      console.error("Lỗi khi tải danh sách trạm:", err);
+    }
+  }
+
   /* ======================= LOAD DỮ LIỆU ======================= */
+  useEffect(() => {
+    if (!selectedStationId) return;
+    loadData();
+  }, [selectedStationId]);
+
   async function loadData() {
     setLoading(true);
     try {
@@ -34,12 +89,27 @@ export default function PaymentManager() {
       if (!Array.isArray(sessions)) sessions = [sessions];
 
       const resVeh = await fetchAuthJSON(`${API_BASE}/Vehicles`);
-      let vehicles =
-        resVeh?.data ?? resVeh?.$values ?? resVeh?.items ?? resVeh ?? [];
-      if (!Array.isArray(vehicles)) vehicles = [vehicles];
+      const vehicles = toArray(resVeh);
       const vehicleMap = {};
       vehicles.forEach((v) => {
         vehicleMap[v.vehicleId || v.VehicleId] = v;
+      });
+
+      // ✅ Load Ports và Chargers để lọc theo station
+      const ports = toArray(await fetchAuthJSON(`${API_BASE}/Ports`));
+      const chargers = toArray(await fetchAuthJSON(`${API_BASE}/Chargers`));
+
+      const portToCharger = {};
+      const chargerToStation = {};
+      ports.forEach((p) => (portToCharger[p.portId] = p.chargerId));
+      chargers.forEach((c) => (chargerToStation[c.chargerId] = c.stationId));
+
+      // 🔍 Lọc session chỉ thuộc trạm staff đang chọn
+      sessions = sessions.filter((s) => {
+        const portId = s.portId ?? s.PortId;
+        const chargerId = portToCharger[portId];
+        const stationId = chargerToStation[chargerId];
+        return String(stationId) === String(selectedStationId);
       });
 
       const sessionDetailed = await Promise.all(
@@ -55,15 +125,14 @@ export default function PaymentManager() {
         })
       );
 
-      // 🔍 Lọc khách vãng lai (ko có customerId & companyId)
+      // 🔍 Lọc khách vãng lai
       const guestAll = sessionDetailed
         .map((s) => {
           const vid =
             s.vehicleId || s.VehicleId || s.vehicle?.vehicleId || null;
           const vehicle = vehicleMap[vid] || {};
           return {
-            chargingSessionId:
-              s.chargingSessionId || s.id || s.sessionId || null,
+            chargingSessionId: s.chargingSessionId || s.id || s.sessionId || null,
             status: s.status || "Unknown",
             energyKwh: s.energyKwh ?? s.EnergyKwh ?? s.measuredEnergy ?? 0,
             total: s.total ?? s.Total ?? 0,
@@ -130,7 +199,6 @@ export default function PaymentManager() {
       message.success(`Đang mở thanh toán cho phiên #${s.chargingSessionId}`);
       window.open(data.paymentUrl, "_blank");
 
-      // ✅ Thêm bản ghi tạm (đã thanh toán)
       const newPaid = {
         sessionId: s.chargingSessionId,
         total: s.total ?? 0,
@@ -139,13 +207,11 @@ export default function PaymentManager() {
         status: "PAID",
       };
 
-      // 🔹 Cập nhật localStorage
       const stored =
         JSON.parse(localStorage.getItem("staff_paid_sessions") || "[]") || [];
       stored.unshift(newPaid);
       localStorage.setItem("staff_paid_sessions", JSON.stringify(stored));
 
-      // 🔄 Cập nhật UI
       setPaidSessions((prev) => [newPaid, ...prev]);
       setGuestSessions((prev) =>
         prev.filter((x) => x.chargingSessionId !== s.chargingSessionId)
@@ -211,7 +277,7 @@ export default function PaymentManager() {
     },
   ];
 
-  /* ======================= CỘT PHẢI (CHỈ PHIÊN ĐÃ THANH TOÁN) ======================= */
+  /* ======================= CỘT PHẢI ======================= */
   const paidCols = [
     {
       title: "Phiên sạc",
@@ -249,6 +315,21 @@ export default function PaymentManager() {
   /* ======================= HIỂN THỊ ======================= */
   return (
     <div className="pay-wrap two-column">
+      <div className="station-header">
+        <h3>Quản lý thanh toán khách vãng lai</h3>
+        {myStations.length > 1 && (
+          <Select
+            value={selectedStationId}
+            onChange={(v) => setSelectedStationId(v)}
+            options={myStations.map((s) => ({
+              value: s.stationId,
+              label: s.stationName,
+            }))}
+            style={{ width: 240 }}
+          />
+        )}
+      </div>
+
       {/* CỘT TRÁI - CHƯA THANH TOÁN */}
       <div className="pay-left">
         <Card

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getApiBase, fetchAuthJSON } from "../../utils/api";
+import { useAuth } from "../../context/AuthContext";
 import "./ChargerManager.css";
 
 const API_BASE = getApiBase();
@@ -38,12 +39,15 @@ const normCharger = (c = {}) => ({
 });
 
 export default function ChargerManager() {
+  const { user } = useAuth();
+  const currentAccountId = user?.accountId || localStorage.getItem("accountId");
+
   const [rows, setRows] = useState([]);
   const [latestSessions, setLatestSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // Modal state
+  // Modal
   const [showModal, setShowModal] = useState(false);
   const [type, setType] = useState("guest");
   const [vehicleType, setVehicleType] = useState("");
@@ -53,20 +57,64 @@ export default function ChargerManager() {
   const [ports, setPorts] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // New states for company flow
+  // Company
   const [companies, setCompanies] = useState([]);
   const [selectedCompany, setSelectedCompany] = useState("");
   const [companyVehicles, setCompanyVehicles] = useState([]);
 
-  /* ---------- Load chargers + latest sessions ---------- */
+  // Station restriction
+  const [stations, setStations] = useState([]);
+  const [myStations, setMyStations] = useState([]);
+  const [selectedStationId, setSelectedStationId] = useState(null);
+
+  /* ---------- Load trạm của staff ---------- */
   useEffect(() => {
+    async function loadStations() {
+      try {
+        const allStations = await fetchAuthJSON(`${API_BASE}/Stations`);
+        const stationsArr = toArray(allStations);
+        const myStationIds = [];
+
+        for (const st of stationsArr) {
+          try {
+            const res = await fetchAuthJSON(
+              `${API_BASE}/station-staffs?stationId=${st.stationId}`
+            );
+            const staffs = toArray(res);
+            const found = staffs.some(
+              (s) => String(s.staffId) === String(currentAccountId)
+            );
+            if (found) myStationIds.push(st.stationId);
+          } catch {
+            console.warn("Không lấy được staff của trạm:", st.stationId);
+          }
+        }
+
+        const mine = stationsArr.filter((s) =>
+          myStationIds.includes(s.stationId)
+        );
+        setStations(stationsArr);
+        setMyStations(mine);
+        if (mine.length > 0) setSelectedStationId(mine[0].stationId);
+      } catch (err) {
+        console.error("Lỗi khi tải danh sách trạm:", err);
+      }
+    }
+    loadStations();
+  }, [currentAccountId]);
+
+  /* ---------- Load chargers + latest sessions theo trạm ---------- */
+  useEffect(() => {
+    if (!selectedStationId) return;
     let alive = true;
     async function load() {
       setLoading(true);
       setErr("");
       try {
         const chargersRaw = await fetchAuthJSON(`${API_BASE}/Chargers`);
-        const chargers = toArray(chargersRaw).map(normCharger);
+        const chargers = toArray(chargersRaw)
+          .map(normCharger)
+          .filter((c) => String(c.stationId) === String(selectedStationId));
 
         const sessionsRaw = await fetchAuthJSON(`${API_BASE}/ChargingSessions`);
         const sessions = toArray(sessionsRaw);
@@ -99,7 +147,7 @@ export default function ChargerManager() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [selectedStationId]);
 
   /* ---------- Load ports theo chargerId ---------- */
   useEffect(() => {
@@ -122,7 +170,7 @@ export default function ChargerManager() {
     loadPorts();
   }, [chargerId]);
 
-  /* ---------- Load danh sách công ty khi chọn "Xe công ty" ---------- */
+  /* ---------- Load danh sách công ty ---------- */
   useEffect(() => {
     async function loadCompanies() {
       if (type !== "company") return;
@@ -145,7 +193,7 @@ export default function ChargerManager() {
     loadCompanies();
   }, [type]);
 
-  /* ---------- Load xe theo công ty & loại xe (lọc thủ công ở frontend) ---------- */
+  /* ---------- Load xe theo công ty ---------- */
   useEffect(() => {
     async function loadVehiclesByCompany() {
       if (!selectedCompany) {
@@ -155,24 +203,15 @@ export default function ChargerManager() {
       try {
         const res = await fetchAuthJSON(`${API_BASE}/Vehicles?page=1&pageSize=999`);
         const items = res?.items ?? res?.data?.items ?? res?.$values ?? [];
-
-        // 🔍 Lọc xe đúng companyId
         const filteredByCompany = items.filter(
           (v) => String(v.companyId) === String(selectedCompany)
         );
-
-        // 🔍 Lọc thêm theo loại xe
         const filteredByType = vehicleType
           ? filteredByCompany.filter(
               (v) =>
                 v.vehicleType?.toLowerCase() === vehicleType?.toLowerCase()
             )
           : filteredByCompany;
-
-        console.log(
-          `🚗 Xe công ty ${selectedCompany}:`,
-          filteredByType.map((v) => v.licensePlate)
-        );
         setCompanyVehicles(filteredByType);
       } catch (e) {
         console.error("❌ Lỗi tải xe công ty:", e);
@@ -181,21 +220,6 @@ export default function ChargerManager() {
     }
     loadVehiclesByCompany();
   }, [selectedCompany, vehicleType]);
-
-  /* ---------- Render phiên gần nhất ---------- */
-  const renderLatest = (r) => {
-    const found = latestSessions.find(
-      (s) =>
-        String(s.portId) === String(r.id) ||
-        String(s.chargerId) === String(r.id)
-    );
-    if (!found) return "—";
-    const id = found.chargingSessionId || found.id;
-    const start = found.startedAt
-      ? new Date(found.startedAt).toLocaleString("vi-VN")
-      : "Không rõ";
-    return <span title={`Bắt đầu: ${start}`}>S-{id}</span>;
-  };
 
   /* ---------- Update charger status ---------- */
   async function updateChargerStatus(chargerId, newStatus) {
@@ -215,7 +239,10 @@ export default function ChargerManager() {
       });
 
       const chargersRaw = await fetchAuthJSON(`${API_BASE}/Chargers`);
-      setRows(toArray(chargersRaw).map(normCharger));
+      const chargers = toArray(chargersRaw)
+        .map(normCharger)
+        .filter((c) => String(c.stationId) === String(selectedStationId));
+      setRows(chargers);
     } catch (err) {
       alert(`❌ ${err.message}`);
     }
@@ -250,9 +277,8 @@ export default function ChargerManager() {
           PortCode: portCode,
           ChargerCode: chargerCode,
           vehicleType,
+          stationId: selectedStationId,
         };
-
-        console.log("🚀 Guest start body:", body);
         const res = await fetchAuthJSON(
           `${API_BASE}/ChargingSessions/guest/start`,
           {
@@ -268,21 +294,31 @@ export default function ChargerManager() {
         if (!vehicle)
           throw new Error("Không tìm thấy xe trong công ty đã chọn!");
 
-        const fullVehicle = await fetchAuthJSON(
+        const fullVehicleRes = await fetchAuthJSON(
           `${API_BASE}/Vehicles/${vehicle.vehicleId}`
         );
+        const fullVehicle =
+          fullVehicleRes?.data ??
+          fullVehicleRes?.item ??
+          fullVehicleRes?.$values?.[0] ??
+          fullVehicleRes;
 
         const body = {
-          customerId: fullVehicle.customerId,
-          companyId: fullVehicle.companyId || Number(selectedCompany),
-          vehicleId: fullVehicle.vehicleId,
+          customerId: fullVehicle?.customerId ?? null,
+          companyId:
+            fullVehicle?.companyId != null
+              ? Number(fullVehicle.companyId)
+              : selectedCompany
+              ? Number(selectedCompany)
+              : null,
+          vehicleId: fullVehicle?.vehicleId ?? vehicle.vehicleId,
           bookingId: null,
           portId: Number(portId),
           PortCode: portCode,
           ChargerCode: chargerCode,
+          stationId: selectedStationId,
         };
 
-        console.log("🚀 Company start body:", body);
         const res = await fetchAuthJSON(`${API_BASE}/ChargingSessions/start`, {
           method: "POST",
           body: JSON.stringify(body),
@@ -303,7 +339,21 @@ export default function ChargerManager() {
     }
   }
 
-  /* ---------- Render action ---------- */
+  /* ---------- Render ---------- */
+  const renderLatest = (r) => {
+    const found = latestSessions.find(
+      (s) =>
+        String(s.portId) === String(r.id) ||
+        String(s.chargerId) === String(r.id)
+    );
+    if (!found) return "—";
+    const id = found.chargingSessionId || found.id;
+    const start = found.startedAt
+      ? new Date(found.startedAt).toLocaleString("vi-VN")
+      : "Không rõ";
+    return <span title={`Bắt đầu: ${start}`}>S-{id}</span>;
+  };
+
   const renderAction = (r) => {
     const s = (r.status || "").toLowerCase();
     if (s === "online") {
@@ -346,8 +396,20 @@ export default function ChargerManager() {
     <div className="sc-wrap">
       <div className="sc-header">
         <h2>Danh sách trụ sạc</h2>
+        {myStations.length > 1 && (
+          <select
+            value={selectedStationId || ""}
+            onChange={(e) => setSelectedStationId(Number(e.target.value))}
+            className="station-select"
+          >
+            {myStations.map((st) => (
+              <option key={st.stationId} value={st.stationId}>
+                {st.stationName}
+              </option>
+            ))}
+          </select>
+        )}
         <div className="sc-actions">
-          <input className="sc-search" placeholder="🔍  Tìm kiếm" />
           <button className="sc-primary" onClick={() => setShowModal(true)}>
             + Bắt đầu phiên
           </button>
@@ -373,7 +435,7 @@ export default function ChargerManager() {
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="center">
-                    Chưa có trụ sạc nào.
+                    Không có trụ sạc thuộc trạm này.
                   </td>
                 </tr>
               ) : (
@@ -420,6 +482,7 @@ export default function ChargerManager() {
 
             <p>Chọn loại khách hàng và thông tin cần thiết.</p>
 
+            {/* ---- Loại khách hàng ---- */}
             <label>Loại khách hàng</label>
             <div className="type-select">
               <label>
@@ -444,7 +507,7 @@ export default function ChargerManager() {
               </label>
             </div>
 
-            {type === "company" && (
+            {type === "company" ? (
               <>
                 <label>Công ty</label>
                 <select
@@ -496,9 +559,7 @@ export default function ChargerManager() {
                   ))}
                 </select>
               </>
-            )}
-
-            {type === "guest" && (
+            ) : (
               <>
                 <label>Loại xe</label>
                 <select
