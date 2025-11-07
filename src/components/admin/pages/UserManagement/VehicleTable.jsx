@@ -2,14 +2,22 @@ import React from "react";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 
 /* =========================================================
+   🔹 Helpers
+   ========================================================= */
+// ID hợp lệ: số nguyên dương > 0
+const hasId = (v) => Number.isInteger(v) && v > 0;
+// Số hợp lệ (cho year, battery...): là số hữu hạn
+const isFiniteNum = (v) => Number.isFinite(v);
+
+/* =========================================================
    🔹 HÀM XÁC ĐỊNH CỘT BẢNG
    ========================================================= */
 const getColumns = () => {
   return [
     { key: "STT", header: "STT" },
     { key: "vehicleId", header: "ID Xe" },
-    { key: "ownerType", header: "Loại chủ sở hữu" }, // 👈 mới thêm
-    { key: "ownerId", header: "ID Chủ sở hữu" }, // CustomerId / CompanyId
+    { key: "ownerType", header: "Loại chủ sở hữu" },
+    { key: "ownerId", header: "ID Chủ sở hữu" }, // CompanyId / CustomerId
     { key: "carMaker", header: "Hãng" },
     { key: "model", header: "Dòng xe" },
     { key: "vehicleType", header: "Loại xe" },
@@ -27,26 +35,42 @@ const renderCell = (vehicle, key, index) => {
   switch (key) {
     case "STT":
       return index + 1;
+
     case "vehicleId":
-      return vehicle.vehicleId || "—";
+      return hasId(vehicle.vehicleId) ? vehicle.vehicleId : "—";
+
     case "ownerType":
-      if (vehicle.companyId) return "Công ty";
-      if (vehicle.customerId) return "Cá nhân";
+      if (hasId(vehicle.companyId)) return "Công ty";
+      if (hasId(vehicle.customerId)) return "Cá nhân";
       return "Không xác định";
+
     case "ownerId":
-      return vehicle.customerId || vehicle.companyId || "—";
+      if (hasId(vehicle.companyId)) return vehicle.companyId; // Ưu tiên công ty
+      if (hasId(vehicle.customerId)) return vehicle.customerId; // Fallback cá nhân
+      return "—";
+
     case "carMaker":
-      return vehicle.carMaker || "—";
+      return vehicle.carMaker ?? "—";
+
     case "model":
-      return vehicle.model || "—";
+      return vehicle.model ?? "—";
+
     case "vehicleType":
-      return vehicle.vehicleType || "—";
+      return vehicle.vehicleType ?? "—";
+
     case "batteryCapacity":
-      return vehicle.batteryCapacity ? `${vehicle.batteryCapacity} kWh` : "—";
+      return isFiniteNum(vehicle.batteryCapacity)
+        ? `${vehicle.batteryCapacity} kWh`
+        : "—";
+
     case "licensePlate":
-      return vehicle.licensePlate || "—";
+      return vehicle.licensePlate ?? "—";
+
     case "manufactureYear":
-      return vehicle.manufactureYear || "—";
+      return isFiniteNum(vehicle.manufactureYear)
+        ? vehicle.manufactureYear
+        : "—";
+
     default:
       return "—";
   }
@@ -58,7 +82,7 @@ const renderCell = (vehicle, key, index) => {
 const VehicleTable = ({ filteredData = [], setActiveModal }) => {
   const columns = getColumns();
 
-  if (filteredData.length === 0) {
+  if (!filteredData || filteredData.length === 0) {
     return <p>Không tìm thấy thông số xe nào phù hợp với bộ lọc.</p>;
   }
 
@@ -77,11 +101,9 @@ const VehicleTable = ({ filteredData = [], setActiveModal }) => {
 
         <tbody>
           {filteredData.map((vehicle, index) => (
-            <tr key={vehicle.vehicleId || index}>
+            <tr key={hasId(vehicle.vehicleId) ? vehicle.vehicleId : index}>
               {columns.map((col) => {
                 if (col.key === "action") {
-                  const vehicleId = vehicle.vehicleId;
-
                   return (
                     <td key={col.key} className="action-cell">
                       <EditOutlined
