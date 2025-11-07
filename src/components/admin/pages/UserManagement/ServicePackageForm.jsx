@@ -1,12 +1,8 @@
-// src/components/UserManagement/ServicePackageForm.jsx
+// 📁 src/components/UserManagement/ServicePackageForm.jsx
 import React, { useState, useEffect } from "react";
 
 // 🔹 Form thêm / chỉnh sửa gói dịch vụ
-//   - initialData: dữ liệu ban đầu khi chỉnh sửa
-//   - crudActions: chứa các hàm updateServicePackage, createServicePackage
-//   - setActiveModal: dùng để đóng modal sau khi xử lý
 const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
-  // Khởi tạo state form từ dữ liệu ban đầu hoặc giá trị mặc định
   const [formData, setFormData] = useState({
     planName: "",
     description: "",
@@ -22,43 +18,44 @@ const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Đồng bộ lại khi initialData thay đổi
   useEffect(() => {
-    setFormData({
-      planName: "",
-      description: "",
-      category: "Individual",
-      priceMonthly: 0,
-      discountPercent: 0,
-      freeIdleMinutes: 0,
-      benefits: "",
-      isForCompany: false,
-      status: "Active",
-      ...initialData,
-    });
+    setFormData((prev) => ({
+      ...prev,
+      planName: initialData?.planName ?? "",
+      description: initialData?.description ?? "",
+      category: initialData?.category ?? "Individual",
+      priceMonthly: Number(initialData?.priceMonthly ?? 0),
+      discountPercent: Number(initialData?.discountPercent ?? 0),
+      freeIdleMinutes: Number(initialData?.freeIdleMinutes ?? 0),
+      benefits: initialData?.benefits ?? "",
+      isForCompany: Boolean(initialData?.isForCompany ?? false),
+      status: initialData?.status ?? "Active",
+    }));
   }, [initialData]);
 
-  // Xử lý thay đổi input
+  // Ép kiểu number cho input type="number"
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]:
+        type === "checkbox"
+          ? checked
+          : e.target.type === "number"
+          ? Number(value)
+          : value,
     }));
   };
 
-  // Lấy packageId luôn cập nhật từ initialData
   const packageId =
     (initialData?.subscriptionPlanId ||
       initialData?.id ||
       initialData?.packageId) ??
     null;
 
-  // Xử lý submit form
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate cơ bản
     if (!formData.planName.trim()) {
       alert("Tên gói dịch vụ không được để trống!");
       return;
@@ -73,7 +70,6 @@ const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
 
     try {
       if (packageId) {
-        // 🔸 Gọi API update
         if (crudActions.updateServicePackage) {
           await crudActions.updateServicePackage(packageId, formData);
           success = true;
@@ -81,14 +77,11 @@ const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
           alert("Chức năng cập nhật chưa được triển khai API!");
         }
       } else {
-        // 🔸 Gọi API create
         if (crudActions.createServicePackage) {
           await crudActions.createServicePackage(formData);
           success = true;
         } else {
-          alert(
-            "Chức năng thêm mới chưa được triển khai API! Tạm thời mô phỏng thành công."
-          );
+          alert("Chức năng thêm mới chưa được triển khai API!");
           success = true;
         }
       }
@@ -99,10 +92,8 @@ const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
     }
 
     if (success) {
-      setActiveModal(null); // Đóng modal
-      // 👉 Nếu cần, gọi hàm refresh dữ liệu ở component cha tại đây
+      setActiveModal(null);
     }
-
     setIsSubmitting(false);
   };
 
@@ -129,6 +120,7 @@ const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
           value={formData.priceMonthly}
           onChange={handleChange}
           required
+          min="0"
         />
       </div>
 
@@ -155,6 +147,7 @@ const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
           value={formData.discountPercent}
           onChange={handleChange}
           max="100"
+          min="0"
         />
       </div>
 
@@ -166,6 +159,7 @@ const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
           name="freeIdleMinutes"
           value={formData.freeIdleMinutes}
           onChange={handleChange}
+          min="0"
         />
       </div>
 
@@ -197,12 +191,37 @@ const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
 
       {/* Mô tả / Quyền lợi */}
       <div className="form-group">
-        <label>Mô tả / Quyền lợi:</label>
+        <label>
+          Mô tả / Quyền lợi:
+          <span
+            className="hint"
+            style={{ marginLeft: 6, color: "#888", fontSize: 12 }}
+          >
+            Mỗi lợi ích 1 dòng (hoặc dùng dấu “;” hay “•”). Ví dụ:
+            <em> “Phù hợp đi lại hằng ngày”</em>
+          </span>
+        </label>
         <textarea
           name="benefits"
           value={formData.benefits}
           onChange={handleChange}
           rows="3"
+          placeholder={`Ví dụ:
+• Phù hợp cá nhân đi lại hằng ngày
+• Miễn phí chờ 5 phút mỗi phiên
+• Giảm 5% khi thanh toán đủ điều kiện`}
+        />
+      </div>
+
+      {/* Mô tả ngắn (tuỳ chọn) */}
+      <div className="form-group">
+        <label>Mô tả ngắn (tùy chọn):</label>
+        <textarea
+          name="description"
+          value={formData.description}
+          onChange={handleChange}
+          rows="2"
+          placeholder="Nội dung sẽ được gộp chung với Quyền lợi khi hiển thị"
         />
       </div>
 

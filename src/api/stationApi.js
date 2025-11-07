@@ -117,11 +117,11 @@ async function _getActiveSessionByPort(portId) {
 
 async function _getConnectorTypesFromDB() {
   const candidates = [
-    "/api/Ports/connector-types",
-    "/api/ports/connector-types",
-    "/api/ConnectorTypes",
-    "/ConnectorTypes",
-    "/Ports/connector-types",
+    "/ConnectorTypes", // /api/ConnectorTypes (phổ biến nhất với ASP.NET)
+    "/Ports/connector-types", // /api/Ports/connector-types (nếu BE có action này)
+    "/ports/connector-types",
+    "/Ports/ConnectorTypes",
+    "/ports/ConnectorTypes",
   ];
   for (const ep of candidates) {
     try {
@@ -451,34 +451,35 @@ export const stationApi = {
   /* ---- PRICING RULES (stub) ---- */
   async getConnectorTypes() {
     try {
-      const list = await _getConnectorTypesFromDB();
-      if (list.length) return list;
-
-      // Fallback: suy luận từ danh sách port
-      try {
-        const ports = await this.getAllPorts();
-        const fromPorts = Array.isArray(ports)
-          ? Array.from(
-              new Set(
-                ports
-                  .map((p) => p?.ConnectorType)
-                  .filter((x) => typeof x === "string" && x.trim())
-              )
+      // Gọi endpoint CÓ THẬT: GET /api/Ports
+      const ports = await this.getAllPorts();
+      const types = Array.isArray(ports)
+        ? Array.from(
+            new Set(
+              ports
+                .map(
+                  (p) =>
+                    p?.ConnectorType ??
+                    p?.connectorType ??
+                    p?.Type ??
+                    p?.type ??
+                    null
+                )
+                .filter((x) => typeof x === "string" && x.trim())
             )
-          : [];
-        return fromPorts;
-      } catch {
-        return [];
-      }
+          )
+        : [];
+      return types;
     } catch (e) {
-      console.warn("[stationApi] getConnectorTypes()", e?.message || e);
+      console.warn("[stationApi] getConnectorTypes() from Ports failed:", e);
       return [];
     }
   },
 
   async getPricingRules() {
     try {
-      const res = await fetchAuthJSON(resolveUrl("/api/PricingRules"));
+      // ĐÚNG theo Swagger: GET /api/PricingRule
+      const res = await fetchAuthJSON(resolveUrl("/PricingRule"));
       return Array.isArray(res) ? res : [];
     } catch (e) {
       console.warn("[stationApi] getPricingRules() failed:", e);

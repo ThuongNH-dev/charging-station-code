@@ -82,7 +82,7 @@ export const userApi = {
   // === SUBSCRIPTIONS ===
   fetchAllSubscriptions: async () => {
     const res = await axios.get(`${BASE_URL}/Subscriptions`);
-    return res.data;
+    return Array.isArray(res.data) ? res.data : res.data?.items || [];
   },
   // === GET USER BY ID ===
   getUserById: async (id) => {
@@ -94,5 +94,60 @@ export const userApi = {
       console.error("❌ Lỗi khi gọi API getUserById:", error);
       throw error;
     }
+  },
+
+  // === SUBSCRIPTIONS (chi tiết theo swagger) ===
+  // Lấy toàn bộ (đã có): fetchAllSubscriptions()
+
+  fetchSubscriptionsByPlan: async (subscriptionPlanId) => {
+    const all = await userApi.fetchAllSubscriptions();
+    return all.filter(
+      (s) => String(s.subscriptionPlanId) === String(subscriptionPlanId)
+    );
+  },
+
+  createSubscription: async (payload) => {
+    const res = await axios.post(`${BASE_URL}/Subscriptions`, payload);
+    return res.data;
+  },
+
+  updateSubscription: async (id, payload) => {
+    const res = await axios.put(`${BASE_URL}/Subscriptions/${id}`, payload);
+    return res.data;
+  },
+
+  changeSubscriptionStatus: async (id, status) => {
+    const res = await axios.put(`${BASE_URL}/Subscriptions/${id}/status`, {
+      status,
+    });
+    return res.data;
+  },
+
+  deleteSubscription: async (id) => {
+    const res = await axios.delete(`${BASE_URL}/Subscriptions/${id}`);
+    return res.data;
+  },
+  fetchAllCustomers: async () => {
+    const res = await axios.get(`${BASE_URL}/Customers`);
+    // trả mảng customers [{ customerId, fullName, ... }]
+    return Array.isArray(res.data) ? res.data : res.data?.items || [];
+  },
+
+  fetchAllCompanies: async () => {
+    const res = await axios.get(`${BASE_URL}/Companies`);
+    // trả mảng companies [{ companyId, name, ... }]
+    return Array.isArray(res.data) ? res.data : res.data?.items || [];
+  },
+
+  // === INVOICES ===
+  fetchInvoicesByCompany: async (companyId) => {
+    const res = await axios.get(`${BASE_URL}/Invoices/by-company/${companyId}`);
+    return Array.isArray(res.data) ? res.data : res.data?.items || [];
+  },
+  fetchInvoicesByCustomer: async (customerId) => {
+    const res = await axios.get(
+      `${BASE_URL}/Invoices/by-customer/${customerId}`
+    );
+    return Array.isArray(res.data) ? res.data : res.data?.items || [];
   },
 };
