@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Typography } from "antd";
+import { Typography, Modal } from "antd";
 
 import MainLayout from "../../layouts/MainLayout";
 import HoverCarousel from "../../components/others/HoverCarousel";
@@ -33,6 +33,7 @@ export default function Homepage() {
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [showVehicleWarn, setShowVehicleWarn] = useState(false);
 
   // ==== Geolocation ====
   const [userPos, setUserPos] = useState(null); // {lat, lng}
@@ -44,7 +45,7 @@ export default function Homepage() {
   // ==== Pagination ====
   const [page, setPage] = useState(0);
 
-  // ---- Fetch all stations (giữ nguyên API hiện có) ----
+  // ---- Fetch all stations ----
   useEffect(() => {
     let mounted = true;
     fetchStations()
@@ -54,7 +55,60 @@ export default function Homepage() {
     return () => (mounted = false);
   }, []);
 
-  // ---- Lấy vị trí hiện tại (không cần BE) ----
+  // ---- Kiểm tra trạng thái xe từ storage để hiện popup ----
+  useEffect(() => {
+    const toIntOrNaN = (v) => {
+      if (v === null || v === undefined) return NaN;
+      const s = String(v).trim().toLowerCase();
+      if (s === "" || s === "null" || s === "undefined") return NaN;
+      const n = parseInt(s, 10);
+      return Number.isInteger(n) && n > 0 ? n : NaN;
+    };
+
+    try {
+      const userStr =
+        localStorage.getItem("user") || sessionStorage.getItem("user");
+      const user = userStr ? JSON.parse(userStr) : null;
+
+      const role = String(user?.role || "").toLowerCase();
+
+      const customerId =
+        toIntOrNaN(localStorage.getItem("customerId")) ??
+        toIntOrNaN(sessionStorage.getItem("customerId"));
+
+      let vehicleId = toIntOrNaN(user?.vehicleId);
+
+      if (!Number.isFinite(vehicleId)) {
+        const scopedKey = Number.isFinite(customerId)
+          ? `vehicleId__${customerId}`
+          : null;
+
+        const scopedVal = scopedKey
+          ? toIntOrNaN(localStorage.getItem(scopedKey)) ??
+            toIntOrNaN(sessionStorage.getItem(scopedKey))
+          : NaN;
+
+        const globalVal =
+          toIntOrNaN(localStorage.getItem("vehicleId")) ??
+          toIntOrNaN(sessionStorage.getItem("vehicleId"));
+
+        vehicleId = Number.isFinite(scopedVal) ? scopedVal : globalVal;
+      }
+
+      const hasCustomer = Number.isFinite(customerId);
+      const hasVehicle = Number.isFinite(vehicleId);
+
+      if (role === "customer" && hasCustomer && !hasVehicle) {
+        setShowVehicleWarn(true);
+      } else {
+        setShowVehicleWarn(false);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // ---- Lấy vị trí hiện tại ----
   const askGeolocation = () => {
     setGeoError("");
     if (!navigator.geolocation) {
@@ -65,7 +119,7 @@ export default function Homepage() {
       (pos) => {
         const { latitude, longitude } = pos.coords;
         setUserPos({ lat: latitude, lng: longitude });
-        setPage(0); // reset về trang đầu khi vừa xác định vị trí
+        setPage(0);
       },
       (err) => {
         setGeoError(err?.message || "Không thể truy cập vị trí.");
@@ -75,12 +129,10 @@ export default function Homepage() {
   };
 
   useEffect(() => {
-    // tự gọi 1 lần khi vào trang
     askGeolocation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- Tính danh sách trạm gần bạn, có sẵn distance ----
+  // ---- Danh sách trạm gần bạn ----
   const nearbyStations = useMemo(() => {
     if (!userPos || !Array.isArray(stations)) return [];
     return stations
@@ -88,7 +140,9 @@ export default function Homepage() {
         const lat = Number(s.latitude ?? s.lat);
         const lng = Number(s.longitude ?? s.lng);
         const valid = Number.isFinite(lat) && Number.isFinite(lng);
-        const distance = valid ? haversineKm(userPos.lat, userPos.lng, lat, lng) : Infinity;
+        const distance = valid
+          ? haversineKm(userPos.lat, userPos.lng, lat, lng)
+          : Infinity;
         return { ...s, distance };
       })
       .filter((s) => s.distance < Infinity && s.distance <= DEFAULT_RADIUS_KM)
@@ -107,7 +161,6 @@ export default function Homepage() {
 
   // ==== Marker Click ====
   const handleMarkerClick = (id) => {
-    // Tìm index theo danh sách gần đây (để nhảy đúng trang đang hiển thị)
     const idx = nearbyStations.findIndex((s) => String(s.id) === String(id));
     if (idx >= 0) {
       const targetPage = Math.floor(idx / PER_PAGE);
@@ -124,7 +177,6 @@ export default function Homepage() {
     }
   };
 
-  // ==== Pagination controls ====
   const gotoPrev = () => setPage((p) => (p > 0 ? p - 1 : totalPages - 1));
   const gotoNext = () => setPage((p) => (p < totalPages - 1 ? p + 1 : 0));
   const gotoPage = (i) => setPage(i);
@@ -136,8 +188,38 @@ export default function Homepage() {
     "/homepage/component4.jpg",
   ];
 
+  // ==== Popup handlers ====
+  const goRegisterVehicle = () => {
+    navigate("/profile/vehicle-info");
+  };
+
+  const dismissVehiclePopup = () => {
+    setShowVehicleWarn(false);
+  };
+
   return (
     <MainLayout>
+      {/* ===== Popup cảnh báo chưa có xe ===== */}
+      <Modal
+        open={showVehicleWarn}
+        onOk={goRegisterVehicle}
+        onCancel={dismissVehiclePopup}
+        okText="Đăng ký xe"
+        cancelText="Để sau"
+        centered
+        maskClosable={false}
+        width={520}
+        title="Bạn chưa có xe"
+      >
+        <p style={{ marginBottom: 8 }}>
+          Tài khoản của bạn chưa có <b>vehicleId</b>. Hãy đăng ký xe để có thể đặt chỗ và sạc.
+        </p>
+        <ul style={{ margin: 0, paddingLeft: 18 }}>
+          <li>Điền thông tin xe cơ bản</li>
+          <li>Xác nhận xong là có thể đặt chỗ ngay</li>
+        </ul>
+      </Modal>
+
       <div className="homepage-container">
         <main className="homepage-content">
           {/* ===== HERO ===== */}
@@ -181,8 +263,6 @@ export default function Homepage() {
           <div className="mapCard">
             <div className="mapPanel">
               <div className="stations-map-canvas">
-                {/* vẫn truyền full stations để map hiển thị đầy đủ,
-                    hoặc bạn có thể đổi sang nearbyStations nếu muốn chỉ thấy gần đây */}
                 <StationMap stations={stations} onMarkerClick={handleMarkerClick} />
               </div>
             </div>
@@ -202,7 +282,6 @@ export default function Homepage() {
             </div>
           </section>
 
-
           {/* ===== STRIP TRẠM GẦN BẠN ===== */}
           <section className="station-strip">
             <div className="strip-head" style={{ gap: 8, alignItems: "center" }}>
@@ -210,7 +289,6 @@ export default function Homepage() {
                 Trạm sạc gần bạn
               </Title>
 
-              {/* trạng thái định vị gọn nhẹ */}
               {userPos ? (
                 <span className="pill ok">📍 {userPos.lat.toFixed(4)}, {userPos.lng.toFixed(4)}</span>
               ) : geoError ? (
@@ -251,8 +329,9 @@ export default function Homepage() {
                           ref={(el) => {
                             if (el && st.id != null) itemRefs.current[st.id] = el;
                           }}
-                          className={`station-card stationListItemWrapper station-card-clickable${String(st.id) === String(selectedStationId) ? " highlight-card" : ""
-                            }`}
+                          className={`station-card stationListItemWrapper station-card-clickable${
+                            String(st.id) === String(selectedStationId) ? " highlight-card" : ""
+                          }`}
                           role="button"
                           tabIndex={0}
                           onClick={() => navigate(`/stations/${st.id}`)}
@@ -263,8 +342,6 @@ export default function Homepage() {
                           aria-label={`Xem chi tiết trạm ${st.name}`}
                           title={Number.isFinite(st.distance) ? `${st.distance.toFixed(2)} km` : ""}
                         >
-                          {/* Nếu StationListItem hỗ trợ props distance, bạn có thể truyền thêm:
-                              <StationListItem station={st} distanceKm={st.distance} /> */}
                           <StationListItem station={st} />
                           {Number.isFinite(st.distance) && (
                             <div className="distance-chip">{st.distance.toFixed(2)} km</div>

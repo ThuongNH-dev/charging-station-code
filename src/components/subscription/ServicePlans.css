@@ -259,3 +259,29 @@
 @media (prefers-reduced-motion: reduce){
   *{ animation: none!important; transition: none!important; }
 }
+
+/* ✅ Tắt cơ chế auto-bullet cho mọi <p> trong card */
+.card p + p { padding-left: 0 !important; }
+.card p + p::before { content: none !important; }
+
+/* ✅ Bullet list mới – đồng nhất màu & chỉ hiện khi có dữ liệu */
+.benefit-list{
+  list-style: none;
+  padding-left: 0;
+  margin: 8px 0 12px;
+}
+.benefit-list li{
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+}
+.benefit-dot{
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #1f7a3a; /* một màu duy nhất */
+  margin-top: 6px;
+  flex-shrink: 0;
+}

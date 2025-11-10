@@ -55,6 +55,8 @@ import ManageSubscriptions from "./components/subscription/ManageSubcription";
 import Dashboard from "./components/admin/pages/dashboard/Dashboard";
 import AdminNotificationsSendPage from "./components/admin/pages/AdminNotificationsSendPage";
 import PricingRulesPage from "./components/admin/pages/pricing/PricingRulesPage";
+import InfoDriver from "./pages/enterInfo/InfoDriver";
+import RegisterInfo from "./layouts/RegisterInfo";
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
@@ -95,6 +97,8 @@ export default function App() {
       <Route path="/register/business" element={<BusinessRegister />} />
       <Route path="/register/payment" element={<BusinessPayment />} />
       <Route path="/register/success" element={<BusinessSuccess />} />
+      <Route path="/register/vehicle" element={<InfoDriver mode="register"/>}/> 
+      <Route path="/register-info" element={<RegisterInfo/>}/>
       {/* các route khác của bạn */}
       <Route
         path="/login"
@@ -278,7 +282,7 @@ export default function App() {
       <Route
         path="/profile/vehicle-info"
         element={
-          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
+          <ProtectedRoute allowedRoles={["Customer"]}>
             <VehicleInfo />
           </ProtectedRoute>
         }

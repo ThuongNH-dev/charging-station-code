@@ -66,6 +66,53 @@ function getRoleFromToken(token) {
   );
 }
 
+// ==== Vehicles helper (dùng ngay trong Login) ====
+async function fetchFirstVehicleId(token, { customerId, companyId }) {
+  try {
+    const apiAbs = (getApiBase() || "").replace(/\/+$/, "");
+    const qs = new URLSearchParams();
+    // Nếu có customerId ⇒ chỉ lọc theo customerId
+    if (Number.isFinite(customerId) && customerId > 0) {
+      qs.set("customerId", String(customerId));
+      qs.set("page", "1");
+      qs.set("pageSize", "50");
+    } else if (Number.isFinite(companyId) && companyId > 0) {
+      // Nếu chưa có customerId thì mới dùng companyId
+      qs.set("companyId", String(companyId));
+      qs.set("page", "1");
+      qs.set("pageSize", "50");
+    } else {
+      // Không có gì để lọc ⇒ không cố gọi
+      return null;
+    }
+
+    const res = await fetch(`${apiAbs}/Vehicles?${qs.toString()}`, {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${token}`,
+      },
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+    if (!items.length) return null;
+    const pickId = (o) => Number(o?.vehicleId ?? o?.VehicleId ?? o?.id ?? o?.Id);
+    // Chỉ nhận khi khớp customer/company, KHÔNG fallback items[0]
+    let hit = null;
+    if (Number.isFinite(customerId) && customerId > 0) {
+      hit = items.find(v => Number(v?.customerId) === Number(customerId)) || null;
+    } else if (Number.isFinite(companyId) && companyId > 0) {
+      hit = items.find(v => Number(v?.companyId) === Number(companyId)) || null;
+    }
+    if (!hit) return null;
+    const vid = pickId(hit);
+    return Number.isFinite(vid) ? vid : null;
+  } catch {
+    return null;
+  }
+}
+
 function storeCustomerId(n) {
   try {
     if (Number.isFinite(n) && n > 0) {
@@ -271,6 +318,26 @@ export default function Login() {
 
       // 🔹 LẤY customerId & companyId (Auth → Customers/me → claim)
       const { customerId, companyId } = await resolveIdentity(token, accountId);
+      // 🔹 LẤY vehicleId nếu đã có xe
+      const vehicleId = await fetchFirstVehicleId(token, { customerId, companyId });
+      const keyGlobal = "vehicleId";
+      const keyScoped = Number.isFinite(customerId) ? `vehicleId__${customerId}` : null;
+      // clear cũ
+      localStorage.removeItem(keyGlobal);
+      sessionStorage.removeItem(keyGlobal);
+      if (keyScoped) {
+        localStorage.removeItem(`vehicleId__${customerId}`);
+        sessionStorage.removeItem(`vehicleId__${customerId}`);
+      }
+      // set mới (chỉ khi có match thật sự)
+      if (Number.isFinite(vehicleId)) {
+        localStorage.setItem(keyGlobal, String(vehicleId));            // tiện cho code cũ
+        sessionStorage.setItem(keyGlobal, String(vehicleId));
+        if (keyScoped) {
+          localStorage.setItem(keyScoped, String(vehicleId));          // scoped theo customer
+          sessionStorage.setItem(keyScoped, String(vehicleId));
+        }
+      }
 
       if (companyId !== null && companyId !== undefined) {
         localStorage.setItem("companyId", String(companyId));
@@ -298,6 +365,7 @@ export default function Login() {
         token,
         customerId,     // ✅
         companyId,      // ✅ thêm vào context
+        vehicleId: Number.isFinite(vehicleId) ? vehicleId : null,
       };
 
       // Persist user depending on rememberMe
@@ -318,9 +386,17 @@ export default function Login() {
       console.log("[LOGIN OK]", user);
 
       // ✅ Điều hướng (tránh race với guard)
-      const from = location.state?.from?.pathname;
-      const target = from || roleToPath(role);
-      setTimeout(() => navigate(target, { replace: true }), 0);
+      // Nếu là Customer và CHƯA có vehicle → buộc đi đăng ký xe
+      if (String(role).toLowerCase() === "customer" && !Number.isFinite(vehicleId) && Number.isFinite(customerId)) {
+        setTimeout(() => navigate("/profile/vehicle-info", {
+          replace: true,
+          state: { reason: "missingVehicle" }
+        }), 0);
+      } else {
+        const from = location.state?.from?.pathname;
+        const target = from || roleToPath(role);
+        setTimeout(() => navigate(target, { replace: true }), 0);
+      }
       // Fallback cứng nếu guard cứ kéo về login:
       // setTimeout(() => window.location.assign(target), 50);
       return;
@@ -344,52 +420,52 @@ export default function Login() {
 
   // Social placeholders
   const handleGoogleLogin = async (credentialResponse) => {
-  try {
-    const idToken = credentialResponse?.credential;
-    if (!idToken) {
-      alert("Không lấy được idToken từ Google!");
-      return;
+    try {
+      const idToken = credentialResponse?.credential;
+      if (!idToken) {
+        alert("Không lấy được idToken từ Google!");
+        return;
+      }
+
+      const res = await fetch(`${API_BASE}/Auth/login-google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+
+      if (!res.ok) {
+        const msg = await res.text();
+        throw new Error(`Đăng nhập Google thất bại: ${msg}`);
+      }
+
+      const data = await res.json();
+      const token = data?.token || data?.message?.token;
+      if (!token) throw new Error("Thiếu JWT trong phản hồi backend!");
+
+      // ✅ Lưu token
+      storeToken(token);
+
+      const role = getRoleFromToken(token);
+      const accountId = getAccountIdFromLoginResponse(data, token);
+      const { customerId, companyId } = await resolveIdentity(token, accountId);
+
+      const user = {
+        name: data?.user?.fullName || data?.user?.name || "Google User",
+        email: data?.user?.email,
+        role,
+        token,
+        customerId,
+        companyId,
+      };
+
+      localStorage.setItem("user", JSON.stringify(user));
+      login(user, true);
+      navigate(roleToPath(role), { replace: true });
+    } catch (err) {
+      console.error("Google Login Error:", err);
+      alert("Đăng nhập Google thất bại: " + err.message);
     }
-
-    const res = await fetch(`${API_BASE}/Auth/login-google`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken }),
-    });
-
-    if (!res.ok) {
-      const msg = await res.text();
-      throw new Error(`Đăng nhập Google thất bại: ${msg}`);
-    }
-
-    const data = await res.json();
-    const token = data?.token || data?.message?.token;
-    if (!token) throw new Error("Thiếu JWT trong phản hồi backend!");
-
-    // ✅ Lưu token
-    storeToken(token);
-
-    const role = getRoleFromToken(token);
-    const accountId = getAccountIdFromLoginResponse(data, token);
-    const { customerId, companyId } = await resolveIdentity(token, accountId);
-
-    const user = {
-      name: data?.user?.fullName || data?.user?.name || "Google User",
-      email: data?.user?.email,
-      role,
-      token,
-      customerId,
-      companyId,
-    };
-
-    localStorage.setItem("user", JSON.stringify(user));
-    login(user, true);
-    navigate(roleToPath(role), { replace: true });
-  } catch (err) {
-    console.error("Google Login Error:", err);
-    alert("Đăng nhập Google thất bại: " + err.message);
-  }
-};
+  };
 
 
   return (
