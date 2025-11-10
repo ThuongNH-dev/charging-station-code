@@ -1,72 +1,242 @@
-/* ✅ src/pages/admin/dashboard/Dashboard.css */
+/* =============== Dashboard.css (makeover) =============== */
 
+/* ---- Theme tokens ---- */
+:root {
+  --bg: #f6f8fb;
+  --card: #ffffff;
+  --text: #0f172a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --ring: #3b82f6; /* accent */
+  --shadow: 0 6px 20px rgba(2, 6, 23, 0.06);
+  --shadow-soft: 0 2px 10px rgba(2, 6, 23, 0.05);
+  --radius: 14px;
+  --radius-sm: 10px;
+  --gap: 16px;
+}
+
+/* ---- Page ---- */
 .db-page {
-  padding: 20px;
-  background: #f5f7fb;
+  padding: 24px;
+  background: linear-gradient(180deg, #f8fafc, var(--bg));
   min-height: 100%;
 }
 
 .db-title {
   font-size: 28px;
-  font-weight: 700;
-  margin: 0 0 16px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 0.2px;
+  margin: 0 0 18px;
 }
 
+/* ---- Loading ---- */
 .db-loading {
   padding: 24px;
-  background: #fff;
-  border: 1px solid #eee;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  position: relative;
+  overflow: hidden;
+}
+.db-loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(59, 130, 246, 0.08),
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
 }
 
+/* ---- Filters ---- */
+.db-filters {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+}
+
+.db-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.db-filter label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.db-filter input[type="month"],
+.db-filter select {
+  height: 40px;
+  min-width: 220px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transition: border 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+}
+.db-filter input[type="month"]:focus,
+.db-filter select:focus {
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+}
+
+.db-refresh-btn {
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 0.05s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-shadow: var(--shadow-soft);
+}
+.db-refresh-btn:hover {
+  background: #f3f6fc;
+  box-shadow: var(--shadow);
+}
+.db-refresh-btn:active {
+  transform: translateY(1px);
+}
+
+/* ---- KPI Cards ---- */
 .db-kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(220px, 1fr));
-  gap: 16px;
-  margin-bottom: 28px;
+  gap: var(--gap);
+  margin-bottom: 22px;
+}
+@media (max-width: 1200px) {
+  .db-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .db-kpi-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .db-card {
-  background: #fff;
-  border: 1px solid #eee;
-  border-radius: 12px;
-  padding: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 16px 14px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: transform 0.12s ease, box-shadow 0.2s ease;
+  isolation: isolate;
+}
+.db-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: radial-gradient(
+      1200px 180px at -20% -40%,
+      rgba(59, 130, 246, 0.08),
+      transparent 55%
+    ),
+    radial-gradient(
+      1200px 180px at 120% 140%,
+      rgba(16, 185, 129, 0.08),
+      transparent 55%
+    );
+  z-index: 0;
+}
+.db-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(2, 6, 23, 0.12);
 }
 
 .db-card-title {
-  color: #6c757d;
-  font-weight: 600;
-  margin-bottom: 6px;
+  position: relative;
+  z-index: 1;
+  color: var(--muted);
+  font-weight: 700;
+  margin-bottom: 8px;
+  letter-spacing: 0.2px;
 }
 
 .db-card-value {
-  font-size: 24px;
+  position: relative;
+  z-index: 1;
+  font-size: 26px;
   font-weight: 800;
-  color: #111;
+  color: var(--text);
+  line-height: 1.15;
 }
 
 .db-card-sub {
-  margin-top: 4px;
-  color: #888;
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+  color: #94a3b8;
   font-size: 13px;
 }
 
+/* ---- Section ---- */
 .db-section {
-  background: #fff;
-  border: 1px solid #eee;
-  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 16px 16px 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow);
 }
-
 .db-section h3 {
   margin: 0 0 10px;
   font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: 0.2px;
 }
 
+/* ---- Chart wrapper ---- */
 .db-chart {
   width: 100%;
   height: 320px;
+}
+@media (max-width: 640px) {
+  .db-chart {
+    height: 260px;
+  }
+}
+
+/* ---- Small utilities (optional) ---- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #dbeafe;
+}
+
+/* Focus-visible for better a11y */
+:where(.db-filter input, .db-filter select, .db-refresh-btn):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }

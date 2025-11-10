@@ -31,21 +31,24 @@ const RegisterSelect = () => {
           <button
             aria-label="Chọn vai trò cá nhân"
             onClick={() => handleSelect("personal")}
-            className={`register-option ${selected === "personal" ? "selected" : ""}`}
+            className={`register-option ${
+              selected === "personal" ? "selected" : ""
+            }`}
           >
-            <UserOutlined className="register-option-icon icon-personal" />
+            <UserOutlined className="register-option-icon" />
             <p className="mt-2 font-medium">Cá nhân</p>
           </button>
 
           <button
             aria-label="Chọn vai trò doanh nghiệp"
             onClick={() => handleSelect("business")}
-            className={`register-option ${selected === "business" ? "selected" : ""}`}
+            className={`register-option ${
+              selected === "business" ? "selected" : ""
+            }`}
           >
-            <HiOutlineUserGroup className="register-option-icon icon-business" />
+            <HiOutlineUserGroup className="register-option-icon" />
             <p className="mt-2 font-medium">Doanh nghiệp</p>
           </button>
-
         </div>
       </div>
     </div>
