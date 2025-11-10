@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getApiBase, fetchAuthJSON } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { message } from "antd";
 import "./ChargerManager.css";
 
@@ -41,6 +42,7 @@ const normCharger = (c = {}) => ({
 
 export default function ChargerManager() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const currentAccountId = user?.accountId || localStorage.getItem("accountId");
 
   const [rows, setRows] = useState([]);
@@ -299,6 +301,10 @@ const sid =
 if (sid) sessionStorage.setItem("staffLiveSessionId", sid);
 console.log("🔌 Guest session started:", sid);
         message.success(res?.message || "✅ Phiên sạc (guest) đã được khởi động!");
+        // Tự động chuyển sang trang sessions sau 1.5 giây
+        setTimeout(() => {
+          navigate("/staff/sessions");
+        }, 1500);
       } else {
         const vehicle = companyVehicles.find(
           (v) => v.licensePlate === licensePlate
@@ -340,6 +346,10 @@ const sid = res?.chargingSessionId || res?.data?.chargingSessionId;
 if (sid) sessionStorage.setItem("staffLiveSessionId", sid);
 console.log("🏢 Company session started:", sid);
         message.success(res?.message || "✅ Phiên sạc (company) đã được khởi động!");
+        // Tự động chuyển sang trang sessions sau 1.5 giây
+        setTimeout(() => {
+          navigate("/staff/sessions");
+        }, 1500);
       }
 
       setShowModal(false);

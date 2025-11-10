@@ -722,3 +722,109 @@ th {
   max-width: calc(100% - 32px);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
+/* ===== Users table ONLY (scoped) ===== */
+.user-table--users .table-responsive-wrapper {
+  position: relative;
+  max-height: 420px; /* đổi nếu muốn cao hơn/thấp hơn */
+  overflow-y: auto; /* vùng cuộn dọc của bảng */
+  overflow-x: auto; /* cuộn ngang khi nhiều cột */
+  width: 100%;
+  padding-bottom: 12px; /* chừa chỗ cho pagination sticky */
+}
+
+/* Pagination dính ở đáy vùng cuộn (không trượt mất) */
+.user-table--users .table-pagination {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  margin-top: 0;
+  padding: 8px 0 6px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #fff 50%);
+  border-top: 1px solid #eee;
+}
+
+/* AntD Pagination — nút tròn “← Trước | 1 | 2 | … | Sau →” */
+.user-table--users .ant-pagination {
+  display: inline-flex;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+}
+
+.user-table--users .ant-pagination-item {
+  min-width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid #d0d7de;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.user-table--users .ant-pagination-item a {
+  color: #111827;
+  font-weight: 600;
+}
+.user-table--users .ant-pagination-item:hover {
+  background: #f6f8fa;
+}
+
+.user-table--users .ant-pagination-item-active {
+  border-color: #1677ff;
+}
+.user-table--users .ant-pagination-item-active a {
+  color: #1677ff;
+  font-weight: 700;
+}
+
+/* “Trước/Sau” (render bằng itemRender) */
+.user-table--users .ant-pagination-prev .ant-pagination-item-link,
+.user-table--users .ant-pagination-next .ant-pagination-item-link {
+  border-radius: 999px !important;
+  border: 1px solid #d0d7de !important;
+  height: 36px;
+  padding: 0 12px;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #0f172a;
+  transition: background 0.15s ease;
+}
+.user-table--users .ant-pagination-prev .ant-pagination-item-link:hover,
+.user-table--users .ant-pagination-next .ant-pagination-item-link:hover {
+  background: #f6f8fa;
+}
+
+/* Disable */
+.user-table--users .ant-pagination-disabled .ant-pagination-item-link {
+  color: #9aa2af !important;
+  border-color: #e5e7eb !important;
+  background: #fafafa !important;
+}
+
+/* Ẩn size changer nếu lỡ bật */
+.user-table--users .ant-pagination-options {
+  display: none !important;
+}
+/* ✅ Giữ bảng cuộn bên trong, phân trang cố định dưới cùng */
+.table-scroll-area {
+  max-height: 400px; /* giới hạn chiều cao hiển thị */
+  overflow-y: auto; /* nội dung cuộn dọc */
+  overflow-x: auto;
+  width: 100%;
+  border-radius: 10px;
+}
+
+/* Giữ phân trang bên ngoài vùng cuộn */
+.vehicle-table .table-pagination {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}

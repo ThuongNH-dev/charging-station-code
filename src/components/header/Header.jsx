@@ -331,6 +331,36 @@ export default function Head() {
             </Badge>
           </Dropdown>
         )}
+        {/* {showBell && (
+          <Tooltip title="Trang thông báo">
+            <NotificationOutlined
+              className="bell-icon"
+              onClick={() => {
+                // điều hướng sang trang thông báo đầy đủ
+                navigate("/notifications");
+                // đánh dấu đã xem giống footer dropdown
+                try {
+                  if (isCustomer) {
+                    const cid = getCustomerId(user);
+                    if (cid)
+                      localStorage.setItem(
+                        `NOTI_LAST_SEEN_CUSTOMER_${cid}`,
+                        String(latestMark || Date.now())
+                      );
+                  } else if (isCompany) {
+                    const compId = getCompanyId(user);
+                    if (compId)
+                      localStorage.setItem(
+                        `NOTI_LAST_SEEN_COMPANY_${compId}`,
+                        String(latestMark || Date.now())
+                      );
+                  }
+                } catch { }
+                setHasNew(false);
+              }}
+            />
+          </Tooltip>
+        )} */}
 
         {isAdmin && (
           <>

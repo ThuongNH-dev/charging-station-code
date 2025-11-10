@@ -16,6 +16,8 @@
 .homepage-container {
   background: var(--bg);
   min-height: 100dvh;
+  position: relative;
+  isolation: isolate;
 }
 
 .homepage-content {
@@ -469,4 +471,25 @@
 }
 @media (max-width: 560px) {
   .strip-row.stations-3-col { gap: 12px; }
+}
+
+/* Hiệu ứng tuyết rơi nhẹ */
+.homepage-container::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.9) 1.2px, transparent 1.2px),
+    radial-gradient(rgba(148, 163, 184, 0.45) 1.1px, transparent 1.1px),
+    radial-gradient(rgba(255, 255, 255, 0.6) 0.8px, transparent 0.8px);
+  background-size: 28px 28px, 44px 44px, 60px 60px;
+  background-position: 0 0, 14px 18px, 28px 32px;
+  opacity: 0.45;
+  mix-blend-mode: normal;
+  animation: snow 30s linear infinite;
+}
+@keyframes snow {
+  from { background-position: 0 0, 20px 20px; }
+  to   { background-position: 0 800px, 20px 820px; }
 }

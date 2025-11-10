@@ -106,3 +106,170 @@
 .fb-page--ghost{ background:#f8fafc; }
 .fb-page:disabled{ opacity:.55; cursor:not-allowed; }
 .fb-ellipsis{ color:#64748b; padding:0 6px; }
+/* =========================
+   OUTSIDE LIST (bp-*)
+   ========================= */
+
+/* Khung panel ngoài (khớp tone fb-card) */
+.bp-panel{
+  background:#ffffff;
+  border-radius:24px;
+  box-shadow:0 8px 28px rgba(2,24,17,0.08);
+  border:1px solid #e7edf3;
+  padding:18px;
+}
+
+/* Tiêu đề */
+.bp-title{
+  margin:0 0 12px 0;
+  color:#0b615a;
+  font-weight:800;
+  font-size:20px;
+}
+
+/* Danh sách review rút gọn */
+.bp-review-list{
+  list-style:none;
+  margin:0;
+  padding:0;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+
+/* Mỗi item */
+.bp-review-item{
+  background:#f8fafb;
+  border:1px solid #e8eef3;
+  border-radius:12px;
+  padding:12px 14px;
+  box-shadow:0 4px 14px rgba(15,23,42,0.06);
+}
+
+/* Bố cục avatar + nội dung */
+.bp-review{
+  display:grid;
+  grid-template-columns: 44px 1fr;
+  gap:12px;
+  align-items:flex-start;
+}
+
+/* Avatar giả (tròn) */
+.bp-avatar{
+  width:36px;
+  height:36px;
+  border-radius:999px;
+  background:radial-gradient(circle at 30% 30%, #a7f3d0, #34d399);
+  border:1px solid #cfe7d9;
+  box-shadow:inset 0 0 0 2px rgba(255,255,255,0.7);
+}
+
+/* Header: tên + sao + thời gian */
+.bp-review-head{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  color:#0f172a;
+}
+
+.bp-review-head b{
+  font-weight:700;
+}
+
+/* Chuỗi sao emoji + thời gian */
+.bp-review-head > span{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-size:14px;
+  color:#111827;
+}
+
+/* Gợi ý/nhãn mờ */
+.bp-subtle{
+  color:#111827;
+  line-height:1.4;
+}
+
+/* Hint/gợi ý chung */
+.bp-hint{
+  color:#64748b;
+  font-size:14px;
+}
+
+/* Lỗi */
+.error-text{
+  color:#b91c1c;
+  font-weight:600;
+}
+
+/* Nút xem tất cả/thu gọn (khớp tone fb-more) */
+.bp-btn-secondary{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  background:#f0f7f3;
+  border:1px solid #cfe7d9;
+  color:#0b7a38;
+  border-radius:999px;
+  padding:8px 14px;
+  font-weight:700;
+  cursor:pointer;
+  transition:background .15s ease, transform .04s ease;
+}
+.bp-btn-secondary:hover{ background:#e6f2eb; }
+.bp-btn-secondary:active{ transform:translateY(1px); }
+
+/* Đếm ký tự/ghi chú phụ nếu cần */
+.bp-note{
+  color:#0f172a;
+  font-weight:600;
+}
+
+/* Responsive tinh gọn một chút */
+@media (max-width: 520px){
+  .bp-review{
+    grid-template-columns: 36px 1fr;
+    gap:10px;
+  }
+  .bp-title{
+    font-size:18px;
+  }
+  .bp-review-item{
+    padding:10px 12px;
+  }
+}
+
+/* =========================
+   REUSE/UTILITY (tùy chọn)
+   ========================= */
+
+/* Bọc phần modal toolbar khi dùng trong FeedbackSection */
+.fb-toolbar .bp-hint{ margin-left: 6px; }
+/* Avatar tròn có chữ cái đầu, canh giữa tuyệt đối */
+.bp-avatar{
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #f0f7f3;
+  border: 1px solid #e4ebe8;
+  box-shadow:
+    inset 2px 2px 4px rgba(0,0,0,0.05),
+    inset -2px -2px 4px rgba(255,255,255,0.9),
+    0 4px 8px rgba(15,23,42,0.08);
+
+  /* canh giữa chữ */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* style chữ */
+  font-weight: 700;
+  font-size: 14px;
+  color: #0b615a;
+  text-transform: uppercase;
+  line-height: 1;        /* tránh đẩy chữ lệch theo baseline */
+  user-select: none;
+  overflow: hidden;      /* phòng khi font quá to */
+}

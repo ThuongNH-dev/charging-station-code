@@ -1,164 +1,524 @@
+/* ============================================
+   Main Container
+   ============================================ */
 .station-wrap {
-  padding: 24px;
-  background: #f6f7fb;
+  padding: 32px;
+  background: #F6F7F9;
   min-height: 100vh;
-  border-radius: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
 }
 
-/* ==== Tổng quan ==== */
+/* ============================================
+   KPI Cards - Enhanced
+   ============================================ */
 .sum-card {
   background: #fff;
-  border-radius: 12px;
+  border-radius: 16px;
+  border: 1px solid #E5E7EB;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 28px 24px;
   text-align: center;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+}
+
+.sum-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #3B82F6, #60A5FA);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .sum-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: #3B82F6;
+}
+
+.sum-card:hover::before {
+  opacity: 1;
 }
 
 .sum-card h3 {
-  font-size: 16px;
-  color: #555;
-  margin-bottom: 6px;
+  font-size: 13px;
+  color: #6B7280;
+  margin: 0 0 12px 0;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-/* ==== Thanh tìm kiếm ==== */
+.sum-card p {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+  transition: transform 0.2s ease;
+}
+
+.sum-card:hover p {
+  transform: scale(1.05);
+}
+
+/* ============================================
+   Search & Filter Section
+   ============================================ */
 .station-search {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 16px;
+  margin-bottom: 24px;
+  background: #fff;
+  padding: 20px 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #E5E7EB;
 }
 
-.station-search input {
-  font-size: 15px;
-  padding: 8px 12px;
+.station-search .ant-input-affix-wrapper {
   border-radius: 8px;
+  border: 1px solid #D1D5DB;
+  transition: all 0.2s ease;
+  height: 40px;
 }
 
-/* ==== Bảng ==== */
-.actions button {
-  padding: 0 6px;
-  font-weight: 500;
+.station-search .ant-input-affix-wrapper:hover {
+  border-color: #3B82F6;
 }
 
+.station-search .ant-input-affix-wrapper:focus-within {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.station-search .ant-input-affix-wrapper .anticon {
+  color: #9CA3AF;
+}
+
+.station-search .ant-select {
+  height: 40px;
+}
+
+.station-search .ant-select .ant-select-selector {
+  border-radius: 8px;
+  border: 1px solid #D1D5DB;
+  transition: all 0.2s ease;
+  height: 40px;
+  display: flex;
+  align-items: center;
+}
+
+.station-search .ant-select:hover .ant-select-selector {
+  border-color: #3B82F6;
+}
+
+.station-search .ant-select.ant-select-focused .ant-select-selector {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* ============================================
+   Table Styles - Enhanced
+   ============================================ */
 .ant-table {
   background: #fff;
   border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #E5E7EB;
 }
 
 .ant-table-thead > tr > th {
-  background: #fafafa;
+  background: #F9FAFB;
+  border-bottom: 2px solid #E5E7EB;
   font-weight: 600;
+  font-size: 14px;
+  color: #374151;
+  padding: 16px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
-/* ==== Modal chi tiết ==== */
-.ant-modal-title {
-  font-weight: 700 !important;
+.ant-table-tbody > tr {
+  transition: all 0.2s ease;
 }
 
-.muted {
-  color: #999;
-  font-style: italic;
+.ant-table-tbody > tr:hover {
+  background-color: #F9FAFB !important;
+  transform: scale(1.001);
 }
 
-.ant-list {
-  background: #fafafa;
+.ant-table-tbody > tr > td {
+  padding: 16px 16px;
+  border-bottom: 1px solid #F3F4F6;
+  font-size: 14px;
+  color: #1F2937;
+}
+
+.ant-table-tbody > tr:last-child > td {
+  border-bottom: none;
+}
+
+/* Remove vertical borders for cleaner look */
+.ant-table-thead > tr > th:not(:last-child),
+.ant-table-tbody > tr > td:not(:last-child) {
+  border-right: none;
+}
+
+/* Table Image */
+.ant-table-tbody .ant-image {
   border-radius: 8px;
-  padding: 4px 8px;
-  margin-top: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.ant-list-item {
-  padding: 8px 12px !important;
-  border-radius: 6px;
-  transition: background 0.2s ease;
+/* Table Links */
+.ant-table-tbody .ant-btn-link {
+  padding: 0;
+  height: auto;
+  font-size: 14px;
+  color: #3B82F6;
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
 
-.ant-list-item:hover {
-  background: #f0f5ff;
+.ant-table-tbody .ant-btn-link:hover {
+  color: #2563EB;
+  text-decoration: underline;
 }
 
-.ant-list-item div strong {
-  color: #222;
+.ant-table-tbody .ant-btn-link .anticon {
+  margin-right: 6px;
+  font-size: 14px;
 }
 
-.ant-list-item .ant-btn-text {
-  color: #ff4d4f;
+/* ============================================
+   Status Tags - Enhanced
+   ============================================ */
+.ant-tag {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 500;
+  border: 1px solid;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ant-tag-green {
+  background-color: #D1FAE5 !important;
+  color: #059669 !important;
+  border-color: #10B981 !important;
+}
+
+.ant-tag-red {
+  background-color: #FEE2E2 !important;
+  color: #DC2626 !important;
+  border-color: #EF4444 !important;
+}
+
+/* ============================================
+   Pagination - Enhanced
+   ============================================ */
+.ant-pagination {
+  margin: 24px 0 0 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.ant-pagination-item {
+  width: 36px;
+  height: 36px;
+  line-height: 34px;
+  border-radius: 8px;
+  border: 1px solid #D1D5DB;
+  transition: all 0.2s ease;
   font-weight: 500;
 }
 
-/* ==== Form thêm nhân viên ==== */
+.ant-pagination-item:hover {
+  border-color: #3B82F6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.ant-pagination-item-active {
+  background: #3B82F6;
+  border-color: #3B82F6;
+}
+
+.ant-pagination-item-active a {
+  color: #FFFFFF;
+}
+
+.ant-pagination-prev,
+.ant-pagination-next {
+  width: 36px;
+  height: 36px;
+  line-height: 34px;
+  border-radius: 8px;
+  border: 1px solid #D1D5DB;
+  transition: all 0.2s ease;
+}
+
+.ant-pagination-prev:hover,
+.ant-pagination-next:hover {
+  border-color: #3B82F6;
+  color: #3B82F6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   Buttons - Enhanced
+   ============================================ */
+.ant-btn {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ant-btn-primary {
+  background: #3B82F6;
+  border-color: #3B82F6;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.ant-btn-primary:hover {
+  background: #2563EB;
+  border-color: #2563EB;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+.ant-btn-primary:active {
+  transform: translateY(0);
+}
+
+.ant-btn-link {
+  color: #3B82F6;
+  padding: 0;
+}
+
+.ant-btn-link:hover {
+  color: #2563EB;
+}
+
+/* ============================================
+   Modal Styles
+   ============================================ */
+.ant-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1F2937;
+}
+
+.ant-modal-content {
+  border-radius: 12px;
+}
+
+.muted {
+  color: #9CA3AF;
+  font-style: italic;
+}
+
+.center {
+  text-align: center;
+}
+
+/* ============================================
+   List Styles
+   ============================================ */
+.ant-list {
+  background: #F9FAFB;
+  border-radius: 8px;
+  padding: 8px;
+  margin-top: 8px;
+  border: 1px solid #E5E7EB;
+}
+
+.ant-list-item {
+  padding: 12px 16px !important;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  margin-bottom: 4px;
+}
+
+.ant-list-item:hover {
+  background: #F3F4F6;
+  transform: translateX(4px);
+}
+
+.ant-list-item div strong {
+  color: #1F2937;
+  font-weight: 600;
+}
+
+.ant-list-item .ant-btn-text {
+  color: #EF4444;
+  font-weight: 500;
+}
+
+.ant-list-item .ant-btn-text:hover {
+  color: #DC2626;
+}
+
+/* ============================================
+   Form Styles
+   ============================================ */
 .ant-form-inline {
-  margin-top: 12px;
-  gap: 8px;
+  margin-top: 16px;
+  gap: 12px;
 }
 
 .ant-form-item-label label {
   font-weight: 500;
+  color: #374151;
 }
 
 .ant-input {
   border-radius: 8px !important;
+  border: 1px solid #D1D5DB;
+  transition: all 0.2s ease;
 }
 
-.ant-btn-primary {
-  border-radius: 8px;
-  font-weight: 600;
+.ant-input:hover {
+  border-color: #3B82F6;
 }
 
-/* ==== Thẻ trạng thái ==== */
-.ant-tag {
-  font-size: 13px;
-  padding: 2px 8px;
-  border-radius: 6px;
+.ant-input:focus {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-/* ==== Responsive ==== */
-@media (max-width: 768px) {
-  .sum-card h3 {
-    font-size: 14px;
-  }
-
-  .station-search input {
-    width: 100% !important;
-  }
-
-  .station-wrap {
-    padding: 16px;
-  }
-
-  .ant-modal {
-    width: 95% !important;
-  }
-}
-.my-station-banner {
-  background: #e6f4ff;
-  border-left: 4px solid #1677ff;
-  padding: 10px 16px;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  font-size: 15px;
-  color: #1e40af;
+/* ============================================
+   Actions
+   ============================================ */
+.actions button {
+  padding: 4px 12px;
   font-weight: 500;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  transition: all 0.2s ease;
 }
+
+.actions button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   My Station Banner
+   ============================================ */
+.my-station-banner {
+  background: linear-gradient(135deg, #DBEAFE 0%, #EFF6FF 100%);
+  border-left: 4px solid #3B82F6;
+  padding: 16px 20px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  color: #1E40AF;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
 .my-station-banner ul {
   list-style: none;
   padding-left: 0;
+  margin: 8px 0 0 0;
+}
+
+.my-station-banner li {
+  margin-bottom: 4px;
 }
 
 .my-station-banner li::before {
   content: "•";
-  color: #1677ff;
+  color: #3B82F6;
   font-weight: bold;
   display: inline-block;
-  width: 10px;
-  margin-right: 6px;
+  width: 12px;
+  margin-right: 8px;
+}
+
+/* ============================================
+   Responsive Design
+   ============================================ */
+
+/* Mobile (375px - 767px) */
+@media (max-width: 767px) {
+  .station-wrap {
+    padding: 16px;
+  }
+
+  .sum-card {
+    padding: 20px 16px;
+    margin-bottom: 16px;
+  }
+
+  .sum-card h3 {
+    font-size: 12px;
+  }
+
+  .sum-card p {
+    font-size: 32px;
+  }
+
+  .station-search {
+    padding: 16px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .station-search .ant-input-affix-wrapper,
+  .station-search .ant-select {
+    width: 100% !important;
+  }
+
+  .ant-table-thead > tr > th,
+  .ant-table-tbody > tr > td {
+    padding: 12px 8px;
+    font-size: 13px;
+  }
+
+  .ant-pagination {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+}
+
+/* Tablet (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .station-wrap {
+    padding: 24px;
+  }
+
+  .sum-card p {
+    font-size: 36px;
+  }
+}
+
+/* Desktop (1024px+) */
+@media (min-width: 1024px) {
+  .station-wrap {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
 }

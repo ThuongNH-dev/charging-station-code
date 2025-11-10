@@ -138,3 +138,142 @@
 /* Nếu đã có .station-card-clickable & highlight-card thì dùng lại, nếu chưa có: */
 .station-card-clickable { cursor: pointer; }
 .highlight-card { outline: 2px solid #22c55e; outline-offset: 2px; }
+
+/* === StationList.css (full merge) === */
+
+/* Grid 3 cột cố định */
+.stationListGrid.three-cols {
+  margin-top: 30px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+@media (max-width: 1024px) {
+  .stationListGrid.three-cols {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .stationListGrid.three-cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* (removed) highlight khi nhảy từ map — tránh đụng vào card trạm */
+
+/* Selected banner */
+.bp-selected-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+.bp-selected-banner .label { font-size: 15px; color: #374151; }
+.bp-selected-banner strong { color: #1e3a8a; font-weight: 600; }
+.bp-selected-banner .btn-ghost {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 4px 10px;
+  color: #334155;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.bp-selected-banner .btn-ghost:hover { background: #e2e8f0; }
+
+/* (removed) single-selected centering — tránh đụng vào card trạm */
+
+/* Pagination */
+.bp-breadcrumbs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 30px 0 6px;
+  flex-wrap: wrap;
+}
+.bp-breadcrumb,
+.bp-breadcrumb.nav {
+  border: 1px solid var(--bp-border, #e5e7eb);
+  background: #fff;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.bp-breadcrumb:hover { box-shadow: var(--bp-shadow, 0 1px 3px rgba(0,0,0,0.1)); }
+.bp-breadcrumb.active {
+  background: var(--bp-primary-soft, #eff6ff);
+  color: var(--bp-primary-strong, #1e3a8a);
+  border-color: var(--bp-primary, #3b82f6);
+  cursor: default;
+}
+.bp-breadcrumb.nav:disabled { opacity: 0.5; cursor: not-allowed; }
+.bp-ellipsis { padding: 0 4px; color: var(--bp-muted, #94a3b8); }
+
+/* Nearby strip nhỏ gọn giống trang chủ */
+.nearby-strip { padding: 12px 16px; }
+.nearby-head { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.nearby-title { margin:0; font-size:18px; }
+
+.nearby-strip-body { display:flex; align-items:center; gap:8px; }
+.nearby-viewport { overflow:hidden; flex:1 1 auto; }
+.nearby-row { display:flex; gap:12px; will-change:transform; }
+
+.nearby-card.compact {
+  flex: 0 0 auto;
+  width: 280px;
+  max-width: 100%;
+  transform: translateZ(0);
+}
+.nearby-card.compact .distance-chip {
+  margin-top:6px;
+  font-size:12px;
+  padding:4px 8px;
+  border-radius:12px;
+  border:1px solid #e5e7eb;
+  background:#fff;
+  display:inline-block;
+}
+
+/* Nút điều hướng — scope trong nearby-strip để tránh xung đột */
+.nearby-strip .nav-arrow {
+  width:32px; height:32px; border-radius:50%;
+  border:1px solid #e5e7eb;
+  background:#fff; cursor:pointer;
+  font-size:20px; line-height:30px;
+  display:flex; align-items:center; justify-content:center;
+}
+.nearby-strip .nav-arrow:disabled { opacity:.4; cursor:default; }
+.nearby-strip .nav-arrow.left { margin-right:4px; }
+.nearby-strip .nav-arrow.right { margin-left:4px; }
+
+/* Dots — scope trong nearby-strip để không đè class .dot nơi khác */
+.nearby-strip .dots { display:flex; gap:8px; justify-content:center; margin-top:8px; }
+.nearby-strip .dots .dot {
+  width:8px; height:8px; border-radius:50%;
+  border:1px solid #e5e7eb; background:#fff; cursor:pointer;
+}
+.nearby-strip .dots .dot.active { background:#111; }
+
+/* Pills & ghost btn tái sử dụng */
+.pill {
+  font-size:12px; padding:4px 8px; border-radius:999px;
+  border:1px solid #e5e7eb; background:#fff;
+}
+.pill.ok { border-color:#a7f3d0; }
+.pill.warn { border-color:#fecaca; }
+
+.btn-ghost {
+  background:transparent; border:1px solid #e5e7eb;
+  border-radius:10px; padding:6px 10px; cursor:pointer;
+}
+
+.station-card-clickable { cursor: pointer; }

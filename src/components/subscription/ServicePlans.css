@@ -260,59 +260,28 @@
   *{ animation: none!important; transition: none!important; }
 }
 
-.feature-list {
-  margin: 8px 0 16px;
-  padding-left: 18px;
-}
-.feature-list li {
-  margin: 4px 0;
-  opacity: .9;
-}
+/* ✅ Tắt cơ chế auto-bullet cho mọi <p> trong card */
+.card p + p { padding-left: 0 !important; }
+.card p + p::before { content: none !important; }
 
-/* optional: ribbon */
-.card .ribbon {
-  position: absolute;
-  top: 12px;
-  right: -6px;
-  background: #1d7f4a;
-  color: #fff;
-  padding: 4px 10px;
-  font-size: 12px;
-  transform: rotate(15deg);
-  border-radius: 4px;
-}
-
-/* 🔹 Danh sách ưu đãi: luôn đồng nhất, không chấm “tự mọc” */
-.features{
+/* ✅ Bullet list mới – đồng nhất màu & chỉ hiện khi có dữ liệu */
+.benefit-list{
   list-style: none;
-  margin: 8px 0 16px;
-  padding: 0;
-  /* Giữ chiều cao tối thiểu để các thẻ card đều nhau */
-  min-height: 72px; /* chỉnh 60–96 tuỳ content */
-  display: grid;
-  gap: 6px;
+  padding-left: 0;
+  margin: 8px 0 12px;
 }
-.features li{
-  position: relative;
-  padding-left: 18px;
-  line-height: 1.55;
-  color: var(--ink-2);
+.benefit-list li{
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 6px;
 }
-.features li::before{
-  content: "";
-  position: absolute; left: 0; top: 0.72em;
-  width: 6px; height: 6px; border-radius: 999px;
-  background: var(--green-2);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--green-2), transparent 82%);
-  opacity: .9;
+.benefit-dot{
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #1f7a3a; /* một màu duy nhất */
+  margin-top: 6px;
+  flex-shrink: 0;
 }
-
-.card .name,
-.card h4{ margin: 2px 0 2px; letter-spacing: -0.01em; }
-.card .price{
-  margin: 4px 0 8px;
-  letter-spacing: -0.02em;
-}
-.card p{ margin: 0; }          /* tránh “dính chữ” do margin lẫn nhau */
-.upgrade-btn{ margin-top: 6px; }
-

@@ -1,3 +1,4 @@
+// ✅ src/utils/dashboardProcessing.js
 import moment from "moment";
 
 export const formatCurrency = (v) =>
@@ -7,7 +8,6 @@ export const formatCurrency = (v) =>
     minimumFractionDigits: 0,
   }).format(Number(v) || 0);
 
-// Hỗ trợ nhiều shape: Array | {items: []} | {data: []}
 const toArr = (x) =>
   Array.isArray(x)
     ? x
@@ -17,93 +17,85 @@ const toArr = (x) =>
     ? x.data
     : [];
 
-export function buildDashboardData(raw) {
-  // raw = { sessions, stations } từ API
+const getSafe = (obj, keys, fallback = undefined) => {
+  for (const k of keys) {
+    if (obj?.[k] !== undefined && obj?.[k] !== null) return obj[k];
+  }
+  return fallback;
+};
+
+/**
+ * Xây dữ liệu cho Dashboard theo THÁNG
+ * @param {{sessions:any[], stations:any[]}} raw
+ * @param {string} startISO - startDate ISO (inclusive)
+ * @param {string} endISO   - endDate ISO (inclusive)
+ * @returns {{kpis:{sessionsMonth:number,revenueMonth:number,stationsOnline:number,usagePercent:number}, series:Array<{day:string,value:number}> , stations:Array}}
+ */
+export function buildDashboardDataMonthly(raw, startISO, endISO) {
   const sessions = toArr(raw?.sessions);
   const stations = toArr(raw?.stations);
 
-  const todayStr = moment().format("YYYY-MM-DD");
+  const start = moment(startISO);
+  const end = moment(endISO);
+  const daysInRange = end.diff(start, "days") + 1;
 
-  // --- KPI hôm nay ---
-  let sessionsToday = 0;
-  let revenueToday = 0;
+  // Khởi tạo map ngày -> số phiên
+  const daily = Array.from({ length: daysInRange }, (_, i) => {
+    const d = moment(start).add(i, "days");
+    return { key: d.format("YYYY-MM-DD"), count: 0 };
+  });
+
+  let sessionsMonth = 0;
+  let revenueMonth = 0;
 
   sessions.forEach((s) => {
-    const status = s.status ?? s.Status;
-    const end =
-      s.endedAt ??
-      s.EndedAt ??
-      s.startedAt ??
-      s.StartedAt ??
-      s.startTime ??
-      s.StartTime;
+    const status = getSafe(s, ["status", "Status"], "");
+    const endTime = getSafe(s, [
+      "endedAt",
+      "EndedAt",
+      "endTime",
+      "EndTime",
+      "startedAt",
+      "StartedAt",
+      "startTime",
+      "StartTime",
+    ]);
+    const total = Number(getSafe(s, ["total", "Total"], 0));
+    const m = moment(endTime);
+    if (!m.isValid()) return;
+    if (status !== "Completed") return;
+    if (m.isBefore(start, "day") || m.isAfter(end, "day")) return;
 
-    const m = moment(end);
-    if (
-      status === "Completed" &&
-      m.isValid() &&
-      m.format("YYYY-MM-DD") === todayStr
-    ) {
-      sessionsToday += 1;
-      revenueToday += Number(s.total ?? s.Total ?? 0);
+    // gộp theo ngày
+    const idx = m.startOf("day").diff(start.startOf("day"), "days");
+    if (idx >= 0 && idx < daily.length) {
+      daily[idx].count += 1;
     }
+    sessionsMonth += 1;
+    revenueMonth += total || 0;
   });
 
   const totalStations = stations.length;
   const stationsOnline = stations.filter(
-    (x) => (x.status ?? x.Status) === "Open"
+    (x) => getSafe(x, ["status", "Status"], "") === "Open"
   ).length;
   const usagePercent = totalStations
     ? Math.round((stationsOnline / totalStations) * 100)
     : 0;
 
-  // --- Chuỗi theo giờ (đếm phiên) ---
-  const hours = [6, 9, 12, 15, 18, 21]; // hoặc làm đủ 24h nếu muốn
-  const hourlyMap = Object.fromEntries(hours.map((h) => [h, 0]));
-
-  sessions.forEach((s) => {
-    const status = s.status ?? s.Status;
-    const end =
-      s.endedAt ??
-      s.EndedAt ??
-      s.startedAt ??
-      s.StartedAt ??
-      s.startTime ??
-      s.StartTime;
-
-    const m = moment(end);
-    if (
-      status === "Completed" &&
-      m.isValid() &&
-      m.format("YYYY-MM-DD") === todayStr
-    ) {
-      const h = m.hour();
-      // Gán về mốc gần nhất trong mảng hours
-      let nearest = hours[0];
-      let minDiff = Math.abs(h - nearest);
-      for (const hh of hours) {
-        const d = Math.abs(h - hh);
-        if (d < minDiff) {
-          minDiff = d;
-          nearest = hh;
-        }
-      }
-      hourlyMap[nearest] += 1; // đếm số phiên (không có kWh trong sample)
-    }
-  });
-
-  const powerSeries = hours.map((h) => ({
-    hour: `${h}h`,
-    value: hourlyMap[h],
+  const series = daily.map((d) => ({
+    day: moment(d.key).format("DD"),
+    value: d.count,
   }));
 
   return {
     kpis: {
-      sessionsToday,
-      revenueToday,
+      sessionsMonth,
+      revenueMonth,
       stationsOnline,
-      usagePercent, // <- tên field thống nhất
+      usagePercent,
     },
-    powerSeries, // <- tên field thống nhất
+    series,
+    stations,
   };
 }

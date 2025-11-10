@@ -155,24 +155,6 @@ export default function OverviewKPIs({ data }) {
           <KPIBox key={idx} {...i} />
         ))}
       </div>
-
-      <div className="panel">
-        <h3>Cảnh báo</h3>
-        {warnings.length ? (
-          warnings.map((w, i) => <WarningItem key={i} {...w} />)
-        ) : (
-          <div className="empty">Không có cảnh báo.</div>
-        )}
-      </div>
-
-      <div className="panel">
-        <h3>Danh sách trạm</h3>
-        {stationList.length ? (
-          stationList.map((s, i) => <StationItem key={i} {...s} />)
-        ) : (
-          <div className="empty">Chưa có dữ liệu trạm.</div>
-        )}
-      </div>
     </aside>
   );
 }

@@ -3,8 +3,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams, Link } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
 import "./Invoice.css";
+import { getApiBase } from "../../utils/api";
+import InvoiceFeedbackPanel from "../../components/feedback/InvoiceFeedbackPanel";
+import { getChargeContext, mergeIds, setChargeContext } from "../../utils/chargeSessionCtx";
 
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " VND";
+const API_BASE = getApiBase();
 
 export default function InvoicePage() {
   const { state } = useLocation();
@@ -54,47 +58,72 @@ export default function InvoicePage() {
         if (obj?.data?.data && (obj.data.data.energyKwh || obj.data.data.total)) {
           return obj.data.data;
         }
-      } catch (_) {}
+      } catch (_) { }
     }
     return null;
   }, [state, orderId]);
 
+    // Ghép thêm Station/Charger/Port từ context đã lưu
+  const enriched = useMemo(() => {
+    const ctx = getChargeContext(orderId);
+    return mergeIds(endData || {}, ctx || {});
+  }, [endData, orderId]);
+
+  // Option: ghi ngược lại bản đã "enrich" vào storage để chỗ khác dùng
+  useEffect(() => {
+    if (!enriched) return;
+    try {
+      setChargeContext({
+        orderId,
+        stationId: enriched.stationId,
+        stationCode: enriched.stationCode,
+        chargerId: enriched.chargerId,
+        chargerCode: enriched.chargerCode,
+        portId: enriched.portId,
+        portCode: enriched.portCode,
+        endedAt: enriched.endedAt || endData?.endedAt || null,
+      });
+    } catch {}
+  }, [enriched, endData?.endedAt, orderId]);
+
+
   useEffect(() => {
     setLoading(false);
-    if (!endData) {
+    if (!enriched) {
       setError(
         "Không tìm thấy dữ liệu hóa đơn của phiên sạc. Hãy kết thúc phiên sạc và điều hướng lại, " +
-          "hoặc đảm bảo đã lưu payload BE vào sessionStorage trước khi mở trang này."
+        "hoặc đảm bảo đã lưu payload BE vào sessionStorage trước khi mở trang này."
       );
     } else {
       setError("");
     }
-  }, [endData]);
+  }, [enriched]);
+
 
   // ==== Giá trị hiển thị (fallback an toàn) ====
-  const customerId = endData?.customerId ?? "—";
-  const companyId = endData?.companyId ?? "—";
-  const vehicleId = endData?.vehicleId ?? "—";
-  const portId = endData?.portId ?? "—";
+  const customerId = enriched?.customerId ?? "—";
+  const companyId = enriched?.companyId ?? "—";
+  const vehicleId = enriched?.vehicleId ?? "—";
+  const portId = enriched?.portId ?? "—";
 
-  const startSoc = endData?.startSoc ?? endData?.socStart ?? null;
-  const endSoc = endData?.endSoc ?? endData?.socEnd ?? null;
+  const startSoc = enriched?.startSoc ?? enriched?.socStart ?? null;
+  const endSoc = enriched?.endSoc ?? enriched?.socEnd ?? null;
 
-  const energyKwh = endData?.energyKwh ?? endData?.energyKWh ?? 0;
-  const durationMin = endData?.durationMin ?? endData?.duration ?? 0; // đang ẩn UI
-  const idleMin = endData?.idleMin ?? endData?.idleMinutes ?? 0;
+  const energyKwh = enriched?.energyKwh ?? enriched?.energyKWh ?? 0;
+  const durationMin = enriched?.durationMin ?? enriched?.duration ?? 0;
+  const idleMin = enriched?.idleMin ?? enriched?.idleMinutes ?? 0;
 
-  const subtotal = endData?.subtotal ?? 0;
-  const tax = endData?.tax ?? 0;
-  const total = endData?.total ?? 0;
+  const subtotal = enriched?.subtotal ?? 0;
+  const tax = enriched?.tax ?? 0;
+  const total = enriched?.total ?? 0;
 
-  const endedAt = endData?.endedAt ? new Date(endData.endedAt) : null;
-  const status = endData?.status ?? "Unpaid";
-  const billingMonth = endData?.billingMonth ?? (endedAt ? endedAt.getMonth() + 1 : "—");
-  const billingYear = endData?.billingYear ?? (endedAt ? endedAt.getFullYear() : "—");
+  const endedAt = enriched?.endedAt ? new Date(enriched.endedAt) : null;
+  const status = enriched?.status ?? "Unpaid";
+  const billingMonth = enriched?.billingMonth ?? (endedAt ? endedAt.getMonth() + 1 : "—");
+  const billingYear = enriched?.billingYear ?? (endedAt ? endedAt.getFullYear() : "—");
 
   // Gói đăng ký áp dụng (appliedSubscription)
-  const sub = endData?.appliedSubscription ?? null;
+  const sub = enriched?.appliedSubscription ?? null;
   const subPlanName = sub?.planName ?? "—";
   const subDiscountPercent = sub?.discountPercent ?? 0;
   const subFreeIdleMinutes = sub?.freeIdleMinutes ?? 0;
@@ -196,6 +225,13 @@ export default function InvoicePage() {
             <div className="v total">{vnd(total)}</div>
           </div>
         </div>
+
+        {/* Panel đánh giá – CHỈ hiện khi đã kết thúc phiên (endedAt) */}
+        <InvoiceFeedbackPanel
+          apiBase={API_BASE}
+          endData={enriched}
+          orderId={orderId}
+        />
 
         {/* Hành động */}
         <div
