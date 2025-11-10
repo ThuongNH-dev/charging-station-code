@@ -189,7 +189,7 @@ setUsers(userMap);
             charger: s.portId,
             customer:
   users.find((u) => String(u.accountId) === String(s.customerId))
-    ?.fullName || `#${s.customerId}`,
+    ?.fullName || "Vãng lai",
 
 
             duration: formatDuration(s.startedAt, s.endedAt),
