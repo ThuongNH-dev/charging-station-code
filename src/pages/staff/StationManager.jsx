@@ -396,12 +396,15 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
 
       {/* === Bảng trạm === */}
       <Table
-        columns={columns}
-        dataSource={filteredStations.map((s) => ({ ...s, key: s.stationId }))}
-        loading={loading}
-        pagination={{ pageSize: 8 }}
-        bordered
-      />
+  columns={columns}
+  dataSource={filteredStations
+    .filter((s) => s.isMyStation) // ✅ chỉ hiển thị trạm bạn quản lý
+    .map((s) => ({ ...s, key: s.stationId }))}
+  loading={loading}
+  pagination={{ pageSize: 8 }}
+  bordered
+/>
+
 
       {/* === Modal chi tiết === */}
       <Modal
