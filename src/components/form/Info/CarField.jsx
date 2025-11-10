@@ -5,7 +5,10 @@ import { Row, Col, Form, Input, InputNumber, Select, Typography } from "antd";
 const { Option } = Select;
 const { Title } = Typography;
 
-export default function CarField() {
+export default function CarField({
+  hideStatus = false,
+  lockStatus = false,
+}) {
   return (
     <>
       <Title level={5} style={{ marginBottom: 12 }}>
@@ -116,18 +119,32 @@ export default function CarField() {
             <Input placeholder="https://..." allowClear />
           </Form.Item>
 
-          <Form.Item
-            label={<strong>Trạng thái</strong>}
-            name="status" // ✅
-            rules={[{ required: true, message: "Chọn trạng thái" }]}
-          >
-            <Select placeholder="Chọn trạng thái" disabled>
-              <Option value="Active">Hoạt động</Option>
-              <Option value="Inactive">Vô hiệu hóa</Option>
-              <Option value="Blacklisted">Cấm</Option>
-              <Option value="Retired">Ngừng sử dụng</Option>
-            </Select>
-          </Form.Item>
+          {!hideStatus && (
+            <Form.Item
+              label={<strong>Trạng thái</strong>}
+              name="status"
+              rules={[{ required: true, message: "Chọn trạng thái" }]}
+            >
+              {/* Khi cập nhật: disabled như cũ bằng lockStatus */}
+              <Select
+                placeholder="Chọn trạng thái"
+                disabled={lockStatus}
+                style={{
+                  backgroundColor: lockStatus ? "rgba(255, 255, 255, 0.85)" : "transparent",
+                  color: "#000",
+                  borderRadius: 6,
+                }}
+                dropdownStyle={{ backgroundColor: "#fff" }}
+              >
+
+                {/* (Khuyến nghị) dùng value lowercase cho thống nhất API */}
+                <Select.Option value="active">Hoạt động</Select.Option>
+                <Select.Option value="inactive">Vô hiệu hóa</Select.Option>
+                <Select.Option value="blacklisted">Cấm</Select.Option>
+                <Select.Option value="retired">Ngừng sử dụng</Select.Option>
+              </Select>
+            </Form.Item>
+          )}
         </Col>
       </Row>
     </>

@@ -219,3 +219,55 @@
     font-size: 50px;
   }
 }
+
+/* ===== Banner thông báo cố định đầu trang ===== */
+.top-alert {
+  position: fixed;
+  top: 0; /* nếu có header cố định thì đổi top: 64px */
+  left: 0;
+  right: 0;
+  z-index: 2000;
+  padding: 10px 16px;
+  box-sizing: border-box;
+}
+
+.top-alert__inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+
+/* Màu loại thông báo */
+.top-alert.error   .top-alert__inner { background: #ffe9e9; border: 1px solid #ffb3b3; }
+.top-alert.success .top-alert__inner { background: #eaffea; border: 1px solid #b7f0b7; }
+.top-alert.info    .top-alert__inner { background: #eef6ff; border: 1px solid #cfe3ff; }
+
+.top-alert__text {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-line;
+}
+
+.top-alert__close {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 6px;
+  opacity: 0.6;
+}
+.top-alert__close:hover {
+  opacity: 1;
+}
+
+/* Chừa chỗ cho banner cố định */
+.register-bg {
+  padding-top: 60px; /* để nội dung không bị che bởi banner */
+}

@@ -14,6 +14,12 @@ const NEAR_LIMIT = 12;          // lấy tối đa 12 trạm gần (để có v�
 const DEFAULT_RADIUS_KM = 10;   // bán kính lọc “gần bạn”
 const NEAR_PER_PAGE = 3;        // 3 card / trang cho strip
 
+// ==== helper: chuẩn hoá id về string, fallback rỗng nếu không có
+const toStationId = (s) => {
+  const id = s?.id ?? s?.stationId ?? s?.StationId;
+  return id != null ? String(id) : "";
+};
+
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
   const toRad = (d) => (d * Math.PI) / 180;
@@ -34,6 +40,9 @@ export default function StationList() {
   // 🔎 Search + 🏙️ City
   const [q, setQ] = useState("");
   const [city, setCity] = useState("");
+
+  // ✅ NEW: khi bấm marker, có thể chuyển qua “xem 1 trạm”
+  const [selectedId, setSelectedId] = useState(null);
 
   // 🔢 Pagination cho lưới
   const [page, setPage] = useState(1);
@@ -83,7 +92,7 @@ export default function StationList() {
     return Array.from(new Set(fromData)).sort((a, b) => a.localeCompare(b, "vi"));
   }, [stations]);
 
-  // ✅ Lọc theo keyword + city (cho Map + Grid)
+  // ✅ Lọc theo keyword + city (base list)
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
     return stations.filter((st) => {
@@ -96,6 +105,13 @@ export default function StationList() {
       return hitCity && hitKW;
     });
   }, [stations, q, city]);
+
+  // ✅ NEW: danh sách thực sự hiển thị (nếu đã chọn trạm -> chỉ còn 1 trạm)
+  const visibleList = useMemo(() => {
+    if (!selectedId) return filtered;
+    const found = filtered.find((s) => toStationId(s) === String(selectedId));
+    return found ? [found] : filtered;
+  }, [filtered, selectedId]);
 
   // 👇 “Trạm sạc gần bạn” — dùng full data (độc lập filter)
   const nearbyStations = useMemo(() => {
@@ -124,28 +140,34 @@ export default function StationList() {
   const nearNext = () => setNearPage(p => (p < nearTotalPages - 1 ? p + 1 : 0));
   const nearGoto = (i) => setNearPage(i);
 
-  // 👉 Tổng trang & data cho trang hiện tại (lưới)
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  // 👉 Tổng trang & data cho trang hiện tại (lưới) — dựa trên visibleList
+  const totalPages = Math.max(1, Math.ceil(visibleList.length / PAGE_SIZE));
   const current = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, page]);
+    return visibleList.slice(start, start + PAGE_SIZE);
+  }, [visibleList, page]);
 
   // Nếu filter làm tổng trang < page hiện tại thì kéo về trang cuối
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [totalPages, page]);
 
-  // Marker -> nhảy tới đúng trang rồi highlight item
-  const handleMarkerClick = (id) => {
-    const idxInFiltered = filtered.findIndex((s) => (s.id ?? s.name) === id || s.id === id);
-    if (idxInFiltered === -1) return;
-    const targetPage = Math.floor(idxInFiltered / PAGE_SIZE) + 1;
-    setPage(targetPage);
-    setPendingScrollId(id);
+  // Marker -> CHỈ HIỆN đúng trạm đó + scroll tới card
+  const handleMarkerClick = (rawId) => {
+    const idStr = String(rawId);
+    setSelectedId(idStr);
+    // tìm index theo visibleList (sau khi chọn chỉ còn 1, nhưng vẫn cố đảm bảo)
+    const idxVisible = visibleList.findIndex((s) => toStationId(s) === idStr);
+    const base = idxVisible === -1 ? filtered : visibleList;
+    const pos = base.findIndex((s) => toStationId(s) === idStr);
+    if (pos !== -1) {
+      const targetPage = Math.floor(pos / PAGE_SIZE) + 1;
+      setPage(targetPage);
+      setPendingScrollId(idStr);
+    }
   };
 
-  // Sau khi page đổi và list render, scroll & highlight
+  // Sau khi list render, scroll & highlight phần tử được chọn
   useEffect(() => {
     if (!pendingScrollId) return;
     const t = setTimeout(() => {
@@ -218,6 +240,14 @@ export default function StationList() {
     );
   };
 
+  // Helper: thông tin trạm đang chọn (nếu có)
+  const selectedStation = useMemo(() => {
+    if (!selectedId) return null;
+    return stations.find((s) => toStationId(s) === String(selectedId)) || null;
+  }, [stations, selectedId]);
+
+  const clearSelected = () => setSelectedId(null);
+
   return (
     <MainLayout>
       <div className="bp-container">
@@ -273,20 +303,24 @@ export default function StationList() {
 
                 <div className="nearby-viewport">
                   <div className="nearby-row">
-                    {nearItems.map((st) => (
-                      <div
-                        key={st.id ?? `${st.name}-${st.city}`}
-                        className="nearby-card compact station-card-clickable"
-                        role="button"
-                        tabIndex={0}
-                        title={`${st.distance.toFixed(2)} km`}
-                        onClick={() => navigate(`/stations/${st.id}`)}
-                        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && navigate(`/stations/${st.id}`)}
-                      >
-                        <StationListItem station={st} />
-                        <div className="distance-chip">{st.distance.toFixed(2)} km</div>
-                      </div>
-                    ))}
+                    {nearItems.map((st) => {
+                      const sid = toStationId(st);
+                      const canGo = !!sid;
+                      return (
+                        <div
+                          key={sid || `${st.name}-${st.city}`}
+                          className={`nearby-card compact station-card-clickable ${!canGo ? "disabled" : ""}`}
+                          role={canGo ? "button" : "group"}
+                          tabIndex={canGo ? 0 : -1}
+                          title={`${st.distance.toFixed(2)} km`}
+                          onClick={() => canGo && navigate(`/stations/${encodeURIComponent(sid)}`)}
+                          onKeyDown={(e) => (canGo && (e.key === "Enter" || e.key === " ")) && navigate(`/stations/${encodeURIComponent(sid)}`)}
+                        >
+                          <StationListItem station={st} />
+                          <div className="distance-chip">{st.distance.toFixed(2)} km</div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -319,41 +353,60 @@ export default function StationList() {
           )}
         </section>
 
+        {/* Banner hiển thị trạng thái chọn 1 trạm */}
+        {selectedStation && (
+          <div className="bp-selected-banner">
+            <div className="label">
+              Đang xem 1 trạm từ bản đồ:
+              <strong> {selectedStation.name}</strong>
+            </div>
+            <button className="btn-ghost" onClick={clearSelected}>
+              Hiển thị tất cả trạm
+            </button>
+          </div>
+        )}
+
         {/* ===== Map ===== */}
         {loading && <div className="bp-note">Đang tải dữ liệu...</div>}
         {error && <div className="error-text">Lỗi: {error}</div>}
 
         {!loading && !error && (
-          filtered.length === 0 ? (
+          visibleList.length === 0 ? (
             <p className="bp-subtle">Không có trạm phù hợp với điều kiện</p>
           ) : (
             <>
               <div className="bp-panel stations-map-panel">
                 <div className="stations-map-canvas">
-                  <StationMap stations={filtered} onMarkerClick={handleMarkerClick} />
+                  {/* Map chỉ nhận visibleList (nếu chọn -> chỉ 1 marker) */}
+                  <StationMap stations={selectedId ? visibleList : filtered} onMarkerClick={handleMarkerClick} />
                 </div>
               </div>
 
               {/* ===== Grid danh sách ===== */}
-              <div className="stationListGrid three-cols">
-                {current.map((st) => (
-                  <div
-                    key={st.id ?? `${st.name}-${st.city}`}
-                    ref={(el) => { if (el && st.id != null) itemRefs.current[st.id] = el; }}
-                    className="stationListItemWrapper station-card-clickable"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => navigate(`/stations/${st.id}`)}
-                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && navigate(`/stations/${st.id}`)}
-                    aria-label={`Xem chi tiết trạm ${st.name}`}
-                  >
-                    <StationListItem station={st} />
-                  </div>
-                ))}
+              <div className={`stationListGrid three-cols ${selectedStation ? "single-selected" : ""}`}>
+                {current.map((st) => {
+                  const sid = toStationId(st);
+                  const canGo = !!sid;
+                  return (
+                    <div
+                      key={sid || `${st.name}-${st.city}`}
+                      ref={(el) => { if (el && sid) itemRefs.current[sid] = el; }}
+                      className={`stationListItemWrapper station-card-clickable ${!canGo ? "disabled" : ""}`}
+                      role={canGo ? "button" : "group"}
+                      tabIndex={canGo ? 0 : -1}
+                      onClick={() => canGo && navigate(`/stations/${encodeURIComponent(sid)}`)}
+                      onKeyDown={(e) => (canGo && (e.key === "Enter" || e.key === " ")) && navigate(`/stations/${encodeURIComponent(sid)}`)}
+                      aria-label={`Xem chi tiết trạm ${st.name || sid}`}
+                      title={!canGo ? "Trạm thiếu id, không thể chuyển trang" : undefined}
+                    >
+                      <StationListItem station={st} />
+                    </div>
+                  );
+                })}
               </div>
 
               {/* ===== Pagination ===== */}
-              {renderPagination()}
+              {!selectedStation && renderPagination()}
             </>
           )
         )}

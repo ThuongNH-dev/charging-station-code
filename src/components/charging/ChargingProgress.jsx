@@ -7,6 +7,8 @@ import "./ChargingProgress.css";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchJSON, fetchAuthJSON, getApiBase, getToken } from "../../utils/api";
 import { resolveCustomerIdFromAuth } from "../../api/authHelpers";
+import { setChargeContext } from "../../utils/chargeSessionCtx";
+
 
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " VND";
 // --- DEMO SPEED SETTINGS ---
@@ -22,6 +24,17 @@ function normalizeApiBase(s) {
   return raw.replace(/\/+$/, "");
 }
 const API_ABS = normalizeApiBase(getApiBase()) || "https://localhost:7268/api";
+
+function saveCtx({ orderId = null, stationId = null, chargerId = null, portId = null, stationCode = null, chargerCode = null, portCode = null, endedAt = null }) {
+  try {
+    setChargeContext({
+      orderId, stationId, chargerId, portId,
+      stationCode, chargerCode, portCode,
+      endedAt
+    });
+  } catch { }
+}
+
 
 // ============ Live persistence (localStorage) ============
 const LS_KEY = "charging:live:v1";
@@ -370,6 +383,28 @@ const ChargingProgress = () => {
         sessionStorage.setItem("charging:start:data", JSON.stringify({ message: "Bắt đầu phiên sạc", data: merged }));
         showStartSessionToast(merged);
 
+        // Lưu context (chưa có orderId) để Invoice merge được nếu reload
+        saveCtx({
+          stationId: merged?.stationId
+            ?? port?.stationId
+            ?? state?.station?.id
+            ?? state?.station?.stationId
+            ?? null,
+          chargerId: merged?.chargerId
+            ?? port?.chargerId
+            ?? state?.charger?.id
+            ?? state?.charger?.chargerId
+            ?? null,
+          portId: merged?.portId
+            ?? state?.gun?.id
+            ?? state?.portId
+            ?? null,
+          stationCode: state?.station?.code ?? null,
+          chargerCode: state?.charger?.code ?? charger?.code ?? null,
+          portCode: state?.gun?.name ?? state?.gun?.code ?? port?.code ?? null,
+        });
+
+
         // NEW: init/update live persisted state
         const kwFromState = Number(state?.charger?.powerKw);
         const kwFromSession = Number(merged?.chargerPowerKw);
@@ -472,6 +507,28 @@ const ChargingProgress = () => {
         setSession(merged);
         sessionStorage.setItem("charging:start:data", JSON.stringify({ message: msg, data: merged }));
         showStartSessionToast(merged);
+
+        // Lưu context (chưa có orderId)
+        saveCtx({
+          stationId: merged?.stationId
+            ?? port?.stationId
+            ?? state?.station?.id
+            ?? state?.station?.stationId
+            ?? null,
+          chargerId: merged?.chargerId
+            ?? port?.chargerId
+            ?? state?.charger?.id
+            ?? state?.charger?.chargerId
+            ?? null,
+          portId: merged?.portId
+            ?? state?.gun?.id
+            ?? state?.portId
+            ?? null,
+          stationCode: state?.station?.code ?? null,
+          chargerCode: state?.charger?.code ?? charger?.code ?? null,
+          portCode: state?.gun?.name ?? state?.gun?.code ?? port?.code ?? null,
+        });
+
 
         // NEW: init live persisted state for new session
         const kwFromState = Number(state?.charger?.powerKw);
@@ -608,6 +665,8 @@ const ChargingProgress = () => {
     return () => { ignore = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, API_ABS]);
+
+
 
 
   // ==== Pricing theo trụ/cổng ====
@@ -1040,7 +1099,25 @@ const ChargingProgress = () => {
     setNoActiveSession(true);
     setBooting(false);
 
-    const orderId = `CHG${beData.chargingSessionId || Date.now()}`;
+    const orderId = `CHG${beData.chargingSessionId || Date.now()}`;// Ghi context theo orderId để Invoice.jsx đọc được charge:ctx:{orderId}
+    saveCtx({
+      orderId,
+      stationId: beData?.stationId
+        ?? session?.stationId
+        ?? state?.station?.id
+        ?? null,
+      chargerId: beData?.chargerId
+        ?? session?.chargerId
+        ?? chargerInfo?.chargerId
+        ?? chargerInfo?.id
+        ?? null,
+      portId: beData?.portId
+        ?? session?.portId
+        ?? state?.gun?.id
+        ?? state?.portId
+        ?? null,
+      endedAt: beData?.endedAt ?? new Date().toISOString(),
+    });
 
     // Lưu theo 2 key mà Invoice.jsx có thể đọc
     sessionStorage.setItem(`chargepay:${orderId}`, JSON.stringify({ orderId, ...beData }));
