@@ -470,3 +470,22 @@
 @media (max-width: 560px) {
   .strip-row.stations-3-col { gap: 12px; }
 }
+
+/* Hiệu ứng tuyết rơi nhẹ */
+.login-wrapper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(white 1px, transparent 1px),
+    radial-gradient(white 1px, transparent 1px);
+  background-size: 40px 40px, 60px 60px;
+  background-position: 0 0, 20px 20px;
+  opacity: 0.25;
+  animation: snow 30s linear infinite;
+}
+@keyframes snow {
+  from { background-position: 0 0, 20px 20px; }
+  to   { background-position: 0 800px, 20px 820px; }
+}
