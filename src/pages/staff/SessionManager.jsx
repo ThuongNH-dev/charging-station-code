@@ -30,9 +30,12 @@ function toArray(raw) {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw;
   if (Array.isArray(raw.items)) return raw.items;
+  if (Array.isArray(raw.data?.items)) return raw.data.items;
   if (Array.isArray(raw.data)) return raw.data;
   if (Array.isArray(raw.results)) return raw.results;
   if (Array.isArray(raw.$values)) return raw.$values;
+  if (Array.isArray(raw.value)) return raw.value; // 🧩 fallback nếu API trả về { value: [...] }
+
   if (typeof raw === "object") return [raw];
   try {
     return toArray(JSON.parse(raw));
@@ -40,6 +43,7 @@ function toArray(raw) {
     return [];
   }
 }
+
 
 // ==== Helper: tính tốc độ tăng phần trăm pin mỗi giây ====
 function calcRate(powerKw = 7, capacityKwh = 60) {
@@ -172,13 +176,23 @@ const myStationIds = [];
         return String(stationId) === String(selectedStationId);
       });
 
-      const vehiclesRaw = await fetchAuthJSON(`${API_BASE}/Vehicles`);
-      const vehicles = toArray(vehiclesRaw);
+      // 🚗 Lấy danh sách xe (trả về { items: [...] })
+const vehiclesRaw = await fetchAuthJSON(`${API_BASE}/Vehicles?page=1&pageSize=1000`);
+const vehicles = toArray(
+  vehiclesRaw?.data?.items ?? vehiclesRaw?.items ?? vehiclesRaw
+);
+
       const vehicleMap = {};
-      for (const v of vehicles) {
-        const id = v.vehicleId ?? v.VehicleId;
-        if (id) vehicleMap[id] = v;
-      }
+for (const v of vehicles) {
+  const id = v.vehicleId || v.VehicleId;
+  if (id !== undefined && id !== null) {
+    vehicleMap[String(id)] = v; // dùng key string cho chắc
+  }
+}
+console.log("🚗 Tổng số xe lấy được:", Object.keys(vehicleMap).length);
+console.log("🔧 Mẫu xe đầu tiên:", Object.values(vehicleMap)[0]);
+
+
 
       const invRes = await fetchAuthJSON(`${API_BASE}/Invoices`);
       let invoices = toArray(invRes);
@@ -228,12 +242,19 @@ const myStationIds = [];
             null;
           const v = vehicleMap[vId] || {};
 
-          let licensePlate =
-            s.licensePlate ??
-            s.LicensePlate ??
-            v.licensePlate ??
-            v.LicensePlate ??
-            "—";
+          let licensePlate = "—";
+const vid = s.vehicleId ?? s.VehicleId;
+const vFound = vehicleMap[String(vid)] || vehicleMap[vid];
+if (vid && vehicleMap[String(vid)]) {
+  licensePlate = vehicleMap[String(vid)].licensePlate || "—";
+} else if (s.vehicle?.licensePlate) {
+  licensePlate = s.vehicle.licensePlate;
+}
+console.log(
+  `🔎 Phiên ${s.chargingSessionId}: vehicleId=${s.vehicleId} -> biển số=${licensePlate}`
+);
+
+
 
           const companyId =
             s.companyId ??
