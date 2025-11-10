@@ -187,7 +187,15 @@ const unpaid = guestAll.filter(
 );
 
 setGuestSessions(unpaid);
-setPaidSessions(paidSessionsArr);
+
+// 🔹 Sắp xếp các phiên đã thanh toán theo thời gian mới nhất (paidAt giảm dần)
+const sortedPaid = [...paidSessionsArr].sort(
+  (a, b) =>
+    new Date(b.paidAt || 0).getTime() - new Date(a.paidAt || 0).getTime()
+);
+
+setPaidSessions(sortedPaid);
+
 
     } catch (e) {
       console.error(e);
