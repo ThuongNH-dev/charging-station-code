@@ -161,16 +161,42 @@ export default function PaymentManager() {
         );
 
       // 🔹 Lấy các phiên đã thanh toán tạm (localStorage)
-      const paidLocal =
-        JSON.parse(localStorage.getItem("staff_paid_sessions") || "[]") || [];
+// 🔹 Lấy thông tin thanh toán thật từ API (chỉ cho các phiên vãng lai)
+const paidSessionsArr = [];
 
-      // 🔸 Loại bỏ các session đã thanh toán khỏi danh sách bên trái
-      const unpaid = guestAll.filter(
-        (s) => !paidLocal.some((p) => p.sessionId === s.chargingSessionId)
-      );
+for (const s of guestAll) {
+  try {
+    const res = await fetchAuthJSON(
+      `${API_BASE}/PaymentCrud/by-session/${s.chargingSessionId}`
+    );
+    const payments = toArray(res?.data || res);
+    if (payments.length > 0) {
+      paidSessionsArr.push({
+        ...payments[0], // dữ liệu thanh toán
+        licensePlate: s.licensePlate, // thêm thông tin để hiển thị
+      });
+    }
+  } catch (err) {
+    console.warn("Không lấy được thanh toán cho session", s.chargingSessionId, err);
+  }
+}
 
-      setGuestSessions(unpaid);
-      setPaidSessions(paidLocal);
+// 🔸 Loại bỏ các session đã thanh toán khỏi danh sách chưa thanh toán
+const unpaid = guestAll.filter(
+  (s) => !paidSessionsArr.some((p) => String(p.chargingSessionId) === String(s.chargingSessionId))
+);
+
+setGuestSessions(unpaid);
+
+// 🔹 Sắp xếp các phiên đã thanh toán theo thời gian mới nhất (paidAt giảm dần)
+const sortedPaid = [...paidSessionsArr].sort(
+  (a, b) =>
+    new Date(b.paidAt || 0).getTime() - new Date(a.paidAt || 0).getTime()
+);
+
+setPaidSessions(sortedPaid);
+
+
     } catch (e) {
       console.error(e);
       message.error("Không thể tải dữ liệu!");
@@ -265,39 +291,47 @@ export default function PaymentManager() {
   ];
 
   /* ======================= CỘT PHẢI ======================= */
-  const paidCols = [
-    {
-      title: "Phiên sạc",
-      dataIndex: "sessionId",
-      key: "sessionId",
-      render: (id) => <strong>{id ? `S-${id}` : "—"}</strong>,
-    },
-    {
-      title: "Tổng tiền",
-      dataIndex: "total",
-      render: vnd,
-    },
-    {
-      title: "Phương thức",
-      dataIndex: "method",
-      render: (m) => m || "VNPAY",
-    },
-    {
-      title: "Thời gian",
-      dataIndex: "createdAt",
-      render: (t) =>
-        t ? new Date(t).toLocaleString("vi-VN") : new Date().toLocaleString(),
-    },
-    {
-      title: "TT",
-      dataIndex: "status",
-      render: (st) => (
-        <Tag color={st === "PAID" ? "green" : "orange"}>
-          {st === "PAID" ? "Đã thanh toán" : "Chưa"}
-        </Tag>
-      ),
-    },
-  ];
+const paidCols = [
+  {
+    title: "Phiên sạc",
+    dataIndex: "chargingSessionId",
+    key: "chargingSessionId",
+    render: (id) => <strong>{id ? `S-${id}` : "—"}</strong>,
+  },
+  {
+    title: "Biển số",
+    dataIndex: "licensePlate",
+    render: (plate) => (
+      <span>
+        <CarOutlined /> {plate || "—"}
+      </span>
+    ),
+  },
+  {
+    title: "Tổng tiền",
+    dataIndex: "amount",
+    render: vnd,
+  },
+  {
+    title: "Phương thức",
+    dataIndex: "method",
+  },
+  {
+    title: "Thời gian",
+    dataIndex: "paidAt",
+    render: (t) => (t ? new Date(t).toLocaleString("vi-VN") : "—"),
+  },
+  {
+    title: "Trạng thái",
+    dataIndex: "status",
+    render: (st) => (
+      <Tag color={st?.toLowerCase() === "success" ? "green" : "orange"}>
+        {st?.toLowerCase() === "success" ? "Đã thanh toán" : st}
+      </Tag>
+    ),
+  },
+];
+
 
   /* ======================= HIỂN THỊ ======================= */
   return (

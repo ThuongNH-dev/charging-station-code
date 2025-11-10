@@ -176,7 +176,7 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
           title: values.title,
           description: values.description,
           severity: values.severity,
-          status: values.status || "Pending",
+          status: "Pending",
         }),
       });
       message.success("✅ Đã gửi báo cáo sự cố!");
@@ -334,7 +334,7 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
     <div className="station-wrap">
       {/* === Tổng quan === */}
       {/* ✅ Hiển thị trạm đang phụ trách */}
-{myStations.length > 0 && (
+{/*{myStations.length > 0 && (
   <div className="my-station-banner">
     🏷️ <strong>Các trạm bạn đang phụ trách:</strong>
     <ul style={{ margin: "6px 0 0 16px" }}>
@@ -346,7 +346,7 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
       ))}
     </ul>
   </div>
-)}
+)}*/}
 
 
       <Row gutter={16} style={{ marginBottom: 20 }}>
@@ -396,12 +396,15 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
 
       {/* === Bảng trạm === */}
       <Table
-        columns={columns}
-        dataSource={filteredStations.map((s) => ({ ...s, key: s.stationId }))}
-        loading={loading}
-        pagination={{ pageSize: 8 }}
-        bordered
-      />
+  columns={columns}
+  dataSource={filteredStations
+    .filter((s) => s.isMyStation) // ✅ chỉ hiển thị trạm bạn quản lý
+    .map((s) => ({ ...s, key: s.stationId }))}
+  loading={loading}
+  pagination={{ pageSize: 8 }}
+  bordered
+/>
+
 
       {/* === Modal chi tiết === */}
       <Modal
@@ -591,22 +594,6 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
                                 { label: "Medium", value: "Medium" },
                                 { label: "High", value: "High" },
                                 { label: "Critical", value: "Critical" },
-                              ]}
-                            />
-                          </Form.Item>
-
-                          <Form.Item
-                            name="status"
-                            label="Trạng thái ban đầu"
-                            initialValue="Pending"
-                            rules={[{ required: true, message: "Chọn trạng thái!" }]}
-                          >
-                            <Select
-                              options={[
-                                { label: "Pending", value: "Pending" },
-                                { label: "In Progress", value: "InProgress" },
-                                { label: "Resolved", value: "Resolved" },
-                                { label: "Closed", value: "Closed" },
                               ]}
                             />
                           </Form.Item>

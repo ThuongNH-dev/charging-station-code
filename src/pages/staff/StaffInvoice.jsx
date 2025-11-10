@@ -130,7 +130,7 @@ export default function StaffInvoice() {
           )}
         </h2>
         <div className="actions no-print">
-          <button className="btn" onClick={() => navigate("/staff/sessions")}>
+          <button className="btn" onClick={() => navigate(-1)}>
             ← Quay lại
           </button>
           <button className="btn primary" onClick={handlePrint}>
