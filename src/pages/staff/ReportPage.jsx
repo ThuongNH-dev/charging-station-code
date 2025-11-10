@@ -17,6 +17,7 @@ import "./ReportPage.css";
 export default function ReportPage() {
   const { user } = useAuth();
   const [stations, setStations] = useState([]);
+  const [users, setUsers] = useState([]);
   const [myStations, setMyStations] = useState([]);
   const [selectedStationId, setSelectedStationId] = useState(null);
   const [report, setReport] = useState({
@@ -47,6 +48,27 @@ export default function ReportPage() {
       try {
         setLoading(true);
         const allStations = await fetchAuthJSON("/Stations");
+        const allUsers = await fetchAuthJSON("/Auth");
+        const authList = toArray(allUsers);
+
+// Lấy danh sách user có role là Customer
+// Lấy tất cả loại tài khoản có thể xuất hiện trong hệ thống
+const userMap = authList
+  .filter((a) =>
+    ["Customer", "Company", "Staff", "Admin"].includes(a.role)
+  )
+  .map((a) => ({
+    accountId: a.accountId,
+    fullName:
+      a.company?.companyName || // nếu là Company
+      a.customers?.[0]?.fullName || // nếu là Customer
+      a.userName, // nếu là Staff hoặc Admin
+    role: a.role,
+    avatar: a.avatarUrl || null,
+  }));
+
+setUsers(userMap);
+
         const stationsArr = toArray(allStations);
         const myStationIds = [];
 
@@ -165,7 +187,11 @@ export default function ReportPage() {
           return {
             session: `S-${s.chargingSessionId}`,
             charger: s.portId,
-            customer: s.customerId || "—",
+            customer:
+  users.find((u) => String(u.accountId) === String(s.customerId))
+    ?.fullName || `#${s.customerId}`,
+
+
             duration: formatDuration(s.startedAt, s.endedAt),
             kWh: s.energyKwh || 0,
             cost: s.total || 0,
@@ -213,7 +239,7 @@ export default function ReportPage() {
   );
 
   const exportCSV = () => {
-    const header = "Phiên,Trụ,Khách,Thời lượng,kWh,Chi phí,Hóa đơn\n";
+    const header = "Phiên,Trụ,Người bắt đầu,Thời lượng,kWh,Chi phí,Hóa đơn\n";
     const rows = history.map(
       (h) =>
         `${h.session},${h.charger},${h.customer},${h.duration},${h.kWh},${h.cost},${h.invoice}`
@@ -318,7 +344,7 @@ export default function ReportPage() {
             <tr>
               <th>Phiên</th>
               <th>Trụ</th>
-              <th>Khách</th>
+              <th>Người bắt đầu</th>
               <th>Thời lượng</th>
               {/*<th>kWh</th>*/}
               <th>Chi phí</th>
