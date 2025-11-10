@@ -112,53 +112,73 @@ export default function PaymentManager() {
         return String(stationId) === String(selectedStationId);
       });
 
-      const sessionDetailed = await Promise.all(
-        sessions.map(async (s) => {
-          let full = s;
-          try {
-            const detail = await fetchAuthJSON(
-              `${API_BASE}/ChargingSessions/${s.chargingSessionId || s.id}`
-            );
-            if (detail && typeof detail === "object") full = { ...s, ...detail };
-          } catch {}
-          return full;
-        })
+const sessionDetailed = await Promise.all(
+  sessions.map(async (s) => {
+    let full = s;
+    try {
+      const detail = await fetchAuthJSON(
+        `${API_BASE}/ChargingSessions/${s.chargingSessionId || s.id}`
       );
+      if (detail && typeof detail === "object") full = { ...s, ...detail };
+    } catch {}
+
+    // ✅ Nếu session không có vehicle info → fetch riêng
+    if (!full.vehicle && full.vehicleId) {
+      try {
+        const v = await fetchAuthJSON(`${API_BASE}/Vehicles/${full.vehicleId}`);
+        if (v) full.vehicle = v;
+      } catch {
+        console.warn("Không thể lấy vehicle:", full.vehicleId);
+      }
+    }
+
+    return full;
+  })
+);
+
 
       // 🔍 Lọc khách vãng lai
-      const guestAll = sessionDetailed
-        .map((s) => {
-          const vid =
-            s.vehicleId || s.VehicleId || s.vehicle?.vehicleId || null;
-          const vehicle = vehicleMap[vid] || {};
-          return {
-            chargingSessionId: s.chargingSessionId || s.id || s.sessionId || null,
-            status: s.status || "Unknown",
-            energyKwh: s.energyKwh ?? s.EnergyKwh ?? s.measuredEnergy ?? 0,
-            total: s.total ?? s.Total ?? 0,
-            portId: s.portId ?? s.PortId ?? null,
-            customerId: s.customerId ?? s.CustomerId ?? 0,
-            companyId: s.companyId ?? s.CompanyId ?? 0,
-            licensePlate:
-              s.licensePlate ??
-              s.LicensePlate ??
-              vehicle.licensePlate ??
-              vehicle.LicensePlate ??
-              "—",
-            startedAt: s.startedAt ?? s.StartedAt ?? null,
-            endedAt: s.endedAt ?? s.EndedAt ?? null,
-          };
-        })
-        .filter(
-          (x) =>
-            (!x.customerId || x.customerId === 0) &&
-            (!x.companyId || x.companyId === 0)
-        )
-        .sort(
-          (a, b) =>
-            new Date(b.startedAt || 0).getTime() -
-            new Date(a.startedAt || 0).getTime()
-        );
+const guestAll = sessionDetailed
+  .map((s) => {
+    // Ưu tiên lấy vehicle info từ session nếu có
+    const v = s.vehicle || {};
+    const vid = s.vehicleId || s.VehicleId || v.vehicleId || v.VehicleId || null;
+    const vehicle = vehicleMap[vid] || v || {};
+
+    // ✅ Lấy biển số giống SessionManager, có fallback nhiều cấp
+    const licensePlate =
+      s.licensePlate ||
+      s.LicensePlate ||
+      vehicle.licensePlate ||
+      vehicle.LicensePlate ||
+      s.vehiclePlate ||
+      "—";
+
+    return {
+      chargingSessionId: s.chargingSessionId || s.id || s.sessionId || null,
+      status: s.status || "Unknown",
+      energyKwh: s.energyKwh ?? s.EnergyKwh ?? s.measuredEnergy ?? 0,
+      total: s.total ?? s.Total ?? 0,
+      portId: s.portId ?? s.PortId ?? null,
+      customerId: s.customerId ?? s.CustomerId ?? 0,
+      companyId: s.companyId ?? s.CompanyId ?? 0,
+      licensePlate,
+      startedAt: s.startedAt ?? s.StartedAt ?? null,
+      endedAt: s.endedAt ?? s.EndedAt ?? null,
+    };
+  })
+  // ✅ Chỉ giữ lại khách vãng lai
+  .filter(
+    (x) =>
+      (!x.customerId || x.customerId === 0) &&
+      (!x.companyId || x.companyId === 0)
+  )
+  .sort(
+    (a, b) =>
+      new Date(b.startedAt || 0).getTime() -
+      new Date(a.startedAt || 0).getTime()
+  );
+
 
       // 🔹 Lấy các phiên đã thanh toán tạm (localStorage)
 // 🔹 Lấy thông tin thanh toán thật từ API (chỉ cho các phiên vãng lai)
@@ -370,9 +390,6 @@ const paidCols = [
             >
               <Radio.Button value="VNPAY">
                 <QrcodeOutlined /> VNPay
-              </Radio.Button>
-              <Radio.Button value="CASH">
-                <CreditCardOutlined /> Tiền mặt
               </Radio.Button>
             </Radio.Group>
           </div>
