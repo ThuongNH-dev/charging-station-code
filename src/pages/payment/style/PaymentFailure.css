@@ -1,0 +1,211 @@
+/* src/pages/payment/PaymentFailure.css */
+:root {
+  --pf-bg1: 255, 71, 87;    /* đỏ cam */
+  --pf-bg2: 52, 86, 255;    /* xanh dương */
+  --pf-surface: 255, 255, 255;
+  --pf-text: 17, 24, 39;    /* slate-900 */
+  --pf-muted: 100, 116, 139;/* slate-500 */
+  --pf-border: 226, 232, 240;/* slate-200 */
+  --pf-danger: 220, 38, 38; /* red-600 */
+}
+
+
+
+* { box-sizing: border-box; }
+
+.pf-wrap {
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: clamp(16px, 3vw, 32px);
+  background: radial-gradient(1200px 600px at 10% 10%, rgba(var(--pf-bg1), .15), transparent 60%),
+              radial-gradient(1000px 500px at 90% 20%, rgba(var(--pf-bg2), .14), transparent 60%),
+              linear-gradient(180deg, rgba(0,0,0,.04), rgba(0,0,0,.02));
+}
+
+.pf-bg {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(255,255,255,.04) 0px,
+    rgba(255,255,255,.04) 2px,
+    transparent 2px,
+    transparent 10px
+  );
+  pointer-events: none;
+}
+
+/* CARD */
+.pf-card {
+  width: min(880px, 100%);
+  background: color-mix(in srgb, rgb(var(--pf-surface)) 86%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(var(--pf-border), 0.8);
+  box-shadow: 0 10px 30px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
+  border-radius: 20px;
+  padding: clamp(20px, 3vw, 28px);
+  color: rgb(var(--pf-text));
+}
+
+/* Header status */
+.pf-status {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.pf-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 30% 30%, rgba(var(--pf-danger), .18), rgba(var(--pf-danger), .05));
+  border: 1px solid rgba(var(--pf-danger), .25);
+  color: rgb(var(--pf-danger));
+}
+
+.pf-title {
+  margin: 0;
+  font-size: clamp(22px, 3.2vw, 28px);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.pf-subtitle {
+  margin: 6px 0 0;
+  color: rgb(var(--pf-muted));
+  font-size: clamp(14px, 2.4vw, 16px);
+}
+
+.pf-badge {
+  display: inline-flex;
+  margin-top: 10px;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px dashed rgba(var(--pf-border), 0.9);
+  color: rgb(var(--pf-muted));
+}
+.pf-badge span {
+  font-weight: 600;
+  color: rgb(var(--pf-text));
+}
+
+/* Details */
+.pf-details {
+  margin-top: 18px;
+  border: 1px solid rgba(var(--pf-border), 0.9);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.pf-row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(var(--pf-border), 0.7);
+}
+.pf-row:last-child { border-bottom: none; }
+
+.pf-label {
+  color: rgb(var(--pf-muted));
+  font-weight: 500;
+}
+.pf-value {
+  color: rgb(var(--pf-text));
+}
+.pf-money {
+  font-weight: 700;
+}
+
+/* Actions */
+.pf-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.pf-btn {
+  appearance: none;
+  outline: none;
+  border: 1px solid rgba(var(--pf-border), 0.9);
+  background: linear-gradient(180deg, rgba(255,255,255,.85), rgba(255,255,255,.65));
+  color: rgb(var(--pf-text));
+  padding: 12px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform .08s ease, box-shadow .15s ease, background .15s ease, border-color .15s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme: dark) {
+  .pf-btn {
+    background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.04));
+  }
+}
+.pf-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0,0,0,.10);
+}
+.pf-btn:active { transform: translateY(0); }
+
+.pf-btn-primary {
+  background:
+    radial-gradient(120% 220% at 0% 0%, rgba(var(--pf-bg1), .22), transparent 40%),
+    radial-gradient(120% 220% at 100% 0%, rgba(var(--pf-bg2), .22), transparent 40%),
+    linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.78));
+  border-color: rgba(var(--pf-bg1), .35);
+}
+@media (prefers-color-scheme: dark) {
+  .pf-btn-primary {
+    background:
+      radial-gradient(120% 220% at 0% 0%, rgba(var(--pf-bg1), .25), transparent 40%),
+      radial-gradient(120% 220% at 100% 0%, rgba(var(--pf-bg2), .25), transparent 40%),
+      linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.06));
+  }
+}
+
+.pf-btn-ghost {
+  background: transparent;
+}
+
+.pf-empty {
+  margin-top: 8px;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px dashed rgba(var(--pf-border), 0.9);
+  color: rgb(var(--pf-muted));
+}
+.pf-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(var(--pf-border), 0.9);
+  padding-bottom: 2px;
+}
+
+/* Animation */
+.pf-animate-in {
+  animation: pfFloatIn .4s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes pfFloatIn {
+  from { transform: translateY(10px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+/* Responsive */
+@media (max-width: 720px) {
+  .pf-status { grid-template-columns: 44px 1fr; }
+  .pf-icon { width: 44px; height: 44px; border-radius: 12px; }
+  .pf-row { grid-template-columns: 140px 1fr; }
+}

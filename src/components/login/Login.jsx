@@ -1,16 +1,15 @@
 // src/pages/auth/Login.jsx
 import React, { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import MainLayout from "../../layouts/MainLayout";
 import { setToken as storeToken, getApiBase } from "../../utils/api";
 import "./Login.css";
-import { roleToPath } from "../../utils/roleRedirect";
 import { GoogleLogin } from "@react-oauth/google";
-
 
 const API_BASE = getApiBase();
 const LOGIN_URL = `${API_BASE}/Auth/login`;
+const HOME_PATH = "/";
 
 // ===== Helper: Giải mã JWT =====
 function decodeJwtPayload(token) {
@@ -53,7 +52,6 @@ function getAccountIdFromLoginResponse(data, token) {
   const n = Number(fromResp ?? fromToken);
   return Number.isFinite(n) ? n : null;
 }
-
 
 // ===== Lấy role từ token =====
 function getRoleFromToken(token) {
@@ -124,6 +122,7 @@ function storeCustomerId(n) {
     console.warn("[LOGIN] storeCustomerId error:", e);
   }
 }
+
 // Trả về { customerId, companyId } – ƯU TIÊN /Auth/{accountId}, rồi /Customers/me, rồi claim
 async function resolveIdentity(token, accountId) {
   const apiAbs = (getApiBase() || "").replace(/\/+$/, "");
@@ -242,7 +241,6 @@ async function resolveIdentity(token, accountId) {
 
 export default function Login() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { login } = useAuth();
 
   const [userName, setUserName] = useState("");
@@ -353,7 +351,6 @@ export default function Login() {
         sessionStorage.setItem("accountId", String(accountId));
       }
 
-
       // Build user object and role
       const msg = data?.message || data || {};
       const role = getRoleFromToken(token) || "Customer";
@@ -363,8 +360,8 @@ export default function Login() {
         email: msg?.email || msg?.user?.email || null,
         role,
         token,
-        customerId,     // ✅
-        companyId,      // ✅ thêm vào context
+        customerId,
+        companyId,
         vehicleId: Number.isFinite(vehicleId) ? vehicleId : null,
       };
 
@@ -385,20 +382,8 @@ export default function Login() {
       login(user, rememberMe);
       console.log("[LOGIN OK]", user);
 
-      // ✅ Điều hướng (tránh race với guard)
-      // Nếu là Customer và CHƯA có vehicle → buộc đi đăng ký xe
-      if (String(role).toLowerCase() === "customer" && !Number.isFinite(vehicleId) && Number.isFinite(customerId)) {
-        setTimeout(() => navigate("/profile/vehicle-info", {
-          replace: true,
-          state: { reason: "missingVehicle" }
-        }), 0);
-      } else {
-        const from = location.state?.from?.pathname;
-        const target = from || roleToPath(role);
-        setTimeout(() => navigate(target, { replace: true }), 0);
-      }
-      // Fallback cứng nếu guard cứ kéo về login:
-      // setTimeout(() => window.location.assign(target), 50);
+      // ✅ Điều hướng: LUÔN về homepage
+      setTimeout(() => navigate(HOME_PATH, { replace: true }), 0);
       return;
     } catch (err) {
       console.error("❌ Login error:", err);
@@ -460,13 +445,14 @@ export default function Login() {
 
       localStorage.setItem("user", JSON.stringify(user));
       login(user, true);
-      navigate(roleToPath(role), { replace: true });
+
+      // ✅ Điều hướng: LUÔN về homepage
+      navigate(HOME_PATH, { replace: true });
     } catch (err) {
       console.error("Google Login Error:", err);
       alert("Đăng nhập Google thất bại: " + err.message);
     }
   };
-
 
   return (
     <MainLayout>

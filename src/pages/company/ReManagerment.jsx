@@ -15,6 +15,61 @@ import "./ReManagerment.css";
 const { Option } = Select;
 const API_BASE = (getApiBase() || "").replace(/\/+$/, "");
 
+// ================= CSV helpers (NEW) =================
+function csvEscape(v) {
+  if (v == null) return "";
+  const s = String(v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function downloadCSV(filename, csvText) {
+  const BOM = "\uFEFF"; // để Excel hiển thị Unicode
+  const blob = new Blob([BOM + csvText], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function buildVehiclesCSV(list = []) {
+  const header = [
+    "Vehicle ID",
+    "License Plate",
+    "Customer ID",
+    "Car Maker",
+    "Model",
+    "Connector Type",
+    "Vehicle Type",
+    "Manufacture Year",
+    "Battery Capacity (kWh)",
+    "Current SoC (%)",
+    "Max Charge Power (kW)",
+    "Status",
+    "Company ID",
+  ];
+  const rows = list.map((r) => [
+    r?.vehicleId ?? "",
+    r?.licensePlate ?? "",
+    r?.customerId ?? "",
+    r?.carMaker ?? "",
+    r?.model ?? "",
+    r?.connectorType ?? "",
+    r?.vehicleType ?? "",
+    r?.manufactureYear ?? "",
+    r?.batteryCapacity ?? "",
+    r?.currentSoc ?? "",
+    (r?.maxChargePower ?? r?.chargingPower ?? r?.batteryCapacity ?? "") ?? "",
+    r?.status ?? "",
+    r?.companyId ?? r?.CompanyId ?? r?.company?.companyId ?? r?.company?.id ?? "",
+  ]);
+
+  const lines = [header, ...rows].map((row) => row.map(csvEscape).join(","));
+  return lines.join("\n");
+}
+// =====================================================
+
 // Helper: lấy companyId từ object xe
 function getVehicleCompanyId(v) {
   return Number(
@@ -421,6 +476,21 @@ export default function ResourceManagement() {
     },
   ];
 
+  // ===== NEW: Export CSV handler =====
+  const handleExportCSV = () => {
+    try {
+      const csv = buildVehiclesCSV(dataSource || []);
+      const ts = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      const stamp = `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}-${pad(ts.getHours())}${pad(ts.getMinutes())}`;
+      const fname = `vehicles_${companyId || "all"}_${stamp}.csv`;
+      downloadCSV(fname, csv);
+    } catch (e) {
+      console.error("Export CSV error:", e);
+      notification.error({ message: "Xuất CSV thất bại", description: String(e?.message || e) });
+    }
+  };
+
   return (
     <MainLayout>
       <div className="page vehicles">
@@ -464,8 +534,9 @@ export default function ResourceManagement() {
             Thêm xe
           </Button>
 
-          <Button icon={<DownloadOutlined />} onClick={() => window.print()}>
-            Tải file về
+          {/* ✅ THAY in -> xuất CSV */}
+          <Button icon={<DownloadOutlined />} onClick={handleExportCSV}>
+            Tải CSV
           </Button>
         </Space>
 

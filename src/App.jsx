@@ -61,7 +61,7 @@ import RegisterInfo from "./layouts/RegisterInfo";
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
     case "customer":
-      return "/stations";
+      return "/homepage";
     case "admin":
       return "/admin/dashboard";
     case "staff":
@@ -150,7 +150,7 @@ export default function App() {
         }
       />
       <Route
-        path="/payment/failure"
+        path="/payment/failluer"
         element={
           <ProtectedRoute allowedRoles={["Customer"]}>
             <PaymentFailure />
