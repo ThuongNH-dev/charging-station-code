@@ -1,5 +1,6 @@
 import React from "react";
 import { Modal } from "antd";
+import { getApiBase } from "../../../../../utils/api";
 
 export default function AddEditStationModal({
   open,
@@ -59,15 +60,53 @@ export default function AddEditStationModal({
           className="input-field"
         />
 
-        {/* ✅ Thêm field hình ảnh */}
-        <input
-          type="text"
-          placeholder="Ảnh (Image URL)"
-          name="ImageUrl"
-          value={data?.ImageUrl || ""}
-          onChange={onChange}
-          className="input-field"
-        />
+        {/* ✅ Ảnh trạm - upload file thay vì URL */}
+        <div style={{ display: "grid", gap: 8 }}>
+          {data?.ImageUrl ? (
+            <img
+              src={data.ImageUrl}
+              alt="Station"
+              style={{ width: "100%", height: 140, objectFit: "cover", borderRadius: 8, border: "1px solid #eee" }}
+            />
+          ) : null}
+          <input
+            type="file"
+            accept="image/*"
+            className="input-field"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              try {
+                const fd = new FormData();
+                fd.append("file", file);
+                const res = await fetch(`${getApiBase()}/api/stations/image/upload`, {
+                  method: "POST",
+                  body: fd,
+                });
+                const j = await res.json().catch(() => ({}));
+                const url =
+                  j?.url ||
+                  j?.imageUrl ||
+                  j?.ImageUrl ||
+                  j?.data?.url ||
+                  j?.message?.url ||
+                  "";
+                if (url) {
+                  onChange({ target: { name: "ImageUrl", value: url } });
+                } else {
+                  // fallback: nếu BE trả thẳng string
+                  if (typeof j === "string" && j.startsWith("http")) {
+                    onChange({ target: { name: "ImageUrl", value: j } });
+                  }
+                }
+              } catch {
+                // silent; UI có thể bổ sung message nếu cần
+              } finally {
+                e.target.value = "";
+              }
+            }}
+          />
+        </div>
 
         <select
           name="Status"
