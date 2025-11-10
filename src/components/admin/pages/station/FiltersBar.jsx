@@ -1,5 +1,5 @@
 import React from "react";
-import { PlusOutlined } from "@ant-design/icons";
+import { PlusOutlined, SearchOutlined, FilterOutlined } from "@ant-design/icons";
 
 export default function StationFiltersBar({
   statusFilter,
@@ -10,25 +10,30 @@ export default function StationFiltersBar({
 }) {
   return (
     <div className="station-actions">
-      <select
-        className="input-field"
-        value={statusFilter}
-        onChange={(e) => onStatusFilterChange(e.target.value)}
-        style={{ maxWidth: 160 }}
-      >
-        <option value="All">Tất cả trạng thái</option>
-        <option value="Open">🟢 Open</option>
-        <option value="Closed">⚫ Closed</option>
-        <option value="Maintenance">🟠 Maintenance</option>
-      </select>
+      <div className="filter-group">
+        <FilterOutlined className="filter-icon" />
+        <select
+          className="input-field filter-select"
+          value={statusFilter}
+          onChange={(e) => onStatusFilterChange(e.target.value)}
+        >
+          <option value="All">Tất cả trạng thái</option>
+          <option value="Open">🟢 Open</option>
+          <option value="Closed">⚫ Closed</option>
+          <option value="Maintenance">🟠 Maintenance</option>
+        </select>
+      </div>
 
-      <input
-        type="text"
-        className="input-field"
-        placeholder="Tìm theo tên trạm…"
-        value={searchTerm}
-        onChange={(e) => onSearchTermChange(e.target.value)}
-      />
+      <div className="search-group">
+        <SearchOutlined className="search-icon" />
+        <input
+          type="text"
+          className="input-field search-input"
+          placeholder="Tìm theo tên trạm…"
+          value={searchTerm}
+          onChange={(e) => onSearchTermChange(e.target.value)}
+        />
+      </div>
 
       <button className="btn primary" onClick={onAddStation}>
         <PlusOutlined /> Thêm trạm mới

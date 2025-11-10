@@ -1,5 +1,6 @@
 // =========================================================
 // Reports.jsx - PHIÊN BẢN HOÀN CHỈNH + LIÊN KẾT API & DỮ LIỆU
+// (Chỉ cập nhật FILTER: Từ ngày – Đến ngày – Trạm)
 // =========================================================
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -23,11 +24,18 @@ import {
   processWarnings,
 } from "../../../../utils/reportProcessing";
 
+// ⏱️ Mặc định 7 ngày gần nhất
+const todayISO = new Date().toISOString().slice(0, 10);
+const sevenDaysAgoISO = new Date(Date.now() - 6 * 24 * 3600 * 1000)
+  .toISOString()
+  .slice(0, 10);
+
 export default function Reports() {
   const [reportFilter, setReportFilter] = useState({
-    scope: "all",
+    startDate: sevenDaysAgoISO,
+    endDate: todayISO,
     station: "all",
-    viewType: "area-comparison",
+    viewType: "time-chart", // mặc định
   });
 
   const [rawData, setRawData] = useState(null);
@@ -49,6 +57,8 @@ export default function Reports() {
         });
         if (isMounted) setRawData(data);
         console.log("📥 Dữ liệu thô:", data);
+        // ép Recharts re-calc khi dữ liệu/filter đổi
+        setTimeout(() => window.dispatchEvent(new Event("resize")), 0);
       } catch (error) {
         console.error("❌ Lỗi tải dữ liệu báo cáo:", error);
       } finally {
@@ -60,15 +70,22 @@ export default function Reports() {
     return () => {
       isMounted = false;
     };
-  }, [reportFilter]);
+  }, [reportFilter.startDate, reportFilter.endDate, reportFilter.station]);
+
+  // Danh sách trạm cho dropdown
+  const stationsList = useMemo(() => {
+    if (!rawData) return [];
+    const d = rawData.stationsData;
+    if (Array.isArray(d?.items)) return d.items;
+    if (Array.isArray(d)) return d;
+    return [];
+  }, [rawData]);
 
   // =========================================================
   // TIỀN XỬ LÝ DỮ LIỆU
   // =========================================================
   const dataToRender = useMemo(() => {
     if (!rawData) return null;
-
-    console.log("🟢 Đang xử lý dữ liệu...");
 
     const kpi = calculateKpiOverview(rawData);
     const serviceStructure = processServiceStructure(rawData);
@@ -112,20 +129,29 @@ export default function Reports() {
       {/* --- Bộ lọc --- */}
       <div className="report-header-controls">
         <div className="filter-group">
-          <span className="filter-label">Phạm vi:</span>
-          <select
+          <span className="filter-label">Từ ngày:</span>
+          <input
+            type="date"
             className="filter-dropdown"
-            value={reportFilter.scope}
+            value={reportFilter.startDate}
+            max={reportFilter.endDate}
             onChange={(e) =>
-              setReportFilter({ ...reportFilter, scope: e.target.value })
+              setReportFilter({ ...reportFilter, startDate: e.target.value })
             }
-          >
-            <option value="all">Tất cả</option>
-            <option value="day">Ngày</option>
-            <option value="month">Tháng</option>
-            <option value="year">Năm</option>
-          </select>
+          />
 
+          <span className="filter-label">Đến ngày:</span>
+          <input
+            type="date"
+            className="filter-dropdown"
+            value={reportFilter.endDate}
+            min={reportFilter.startDate}
+            onChange={(e) =>
+              setReportFilter({ ...reportFilter, endDate: e.target.value })
+            }
+          />
+
+          <span className="filter-label">Trạm:</span>
           <select
             className="filter-dropdown"
             value={reportFilter.station}
@@ -134,16 +160,39 @@ export default function Reports() {
             }
           >
             <option value="all">Tất cả trạm</option>
-            {/* 🔹 Gợi ý: bạn có thể map danh sách trạm từ rawData.stationsData */}
+            {stationsList.map((s) => {
+              const id = s.stationId ?? s.StationId ?? s.id ?? s.Id;
+              const name = s.stationName ?? s.name ?? `Trạm #${id}`;
+              return (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              );
+            })}
           </select>
+
+          <button
+            className="btn"
+            onClick={() => {
+              setReportFilter({
+                ...reportFilter,
+                startDate: sevenDaysAgoISO,
+                endDate: todayISO,
+                station: "all",
+              });
+              setTimeout(() => window.dispatchEvent(new Event("resize")), 0);
+            }}
+          >
+            ĐẶT LẠI
+          </button>
         </div>
 
         <div className="export-buttons">
           <button className="btn secondary">
-            <DownloadOutlined /> Xuất CSV
+            <DownloadOutlined /> XUẤT CSV
           </button>
           <button className="btn secondary">
-            <DownloadOutlined /> Xuất PDF
+            <DownloadOutlined /> XUẤT PDF
           </button>
         </div>
       </div>
@@ -151,8 +200,6 @@ export default function Reports() {
       {/* --- Nút chọn chế độ xem --- */}
       <div className="report-view-options">
         {[
-          ["station-output", "Hiệu suất trạm"],
-          ["area-comparison", "So sánh khu vực"],
           ["time-chart", "Biểu đồ thời gian"],
           ["service-structure", "Cơ cấu dịch vụ"],
         ].map(([key, label]) => (
@@ -161,7 +208,10 @@ export default function Reports() {
             className={`view-btn ${
               reportFilter.viewType === key ? "active" : ""
             }`}
-            onClick={() => setReportFilter({ ...reportFilter, viewType: key })}
+            onClick={() => {
+              setReportFilter({ ...reportFilter, viewType: key });
+              setTimeout(() => window.dispatchEvent(new Event("resize")), 0);
+            }}
           >
             {label}
           </button>

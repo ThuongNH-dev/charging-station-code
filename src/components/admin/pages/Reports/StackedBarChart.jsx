@@ -165,7 +165,7 @@ const StackedBarChart = ({ data = [] }) => {
         Doanh thu theo gói dịch vụ
       </h4>
 
-      <ResponsiveContainer width="100%" height={360}>
+      <ResponsiveContainer width="100%" height={360} minWidth={0}>
         <BarChart
           data={data}
           margin={{ top: 20, right: 30, left: 20, bottom: 5 }}

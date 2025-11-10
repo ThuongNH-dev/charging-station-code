@@ -49,6 +49,9 @@ export default function StationManager() {
   const [reasonForm] = Form.useForm();
   const [staffForm] = Form.useForm();
   const [reportForm] = Form.useForm();
+  const [myStations, setMyStations] = useState([]); // ✅ danh sách nhiều trạm phụ trách
+
+
 
   const currentAccountId = localStorage.getItem("accountId") || "12";
 
@@ -59,22 +62,48 @@ export default function StationManager() {
 
   // === Load danh sách trạm ===
   async function loadStations() {
-    setLoading(true);
+  setLoading(true);
+  try {
+    const res = await fetchAuthJSON(`${API_BASE}/Stations`);
+    let data = res?.data ?? res?.$values ?? res ?? [];
+    if (!Array.isArray(data)) data = [data];
+
+    const accountId = String(currentAccountId);
+    let assignedStations = [];
+
+const withOwnership = await Promise.all(
+  data.map(async (st) => {
     try {
-      const res = await fetchAuthJSON(`${API_BASE}/Stations`);
-      let data = res?.data ?? res?.$values ?? res ?? [];
-      if (!Array.isArray(data)) data = [data];
-      setStations(data);
-      setStats({
-        open: data.filter((s) => s.status === "Open").length,
-        closed: data.filter((s) => s.status === "Closed").length,
-      });
+      const resStaff = await fetchAuthJSON(
+        `${API_BASE}/station-staffs?stationId=${st.stationId}`
+      );
+      let staffArr = resStaff?.data ?? resStaff?.$values ?? resStaff ?? [];
+      if (!Array.isArray(staffArr)) staffArr = [staffArr];
+      const mine = staffArr.some(
+        (s) => String(s.staffId) === accountId
+      );
+      if (mine) assignedStations.push(st); // ✅ thêm vào danh sách
+      return { ...st, isMyStation: mine };
     } catch {
-      message.error("Không thể tải danh sách trạm!");
-    } finally {
-      setLoading(false);
+      return { ...st, isMyStation: false };
     }
+  })
+);
+
+setStations(withOwnership);
+setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
+
+    setStats({
+      open: withOwnership.filter((s) => s.status === "Open").length,
+      closed: withOwnership.filter((s) => s.status === "Closed").length,
+    });
+  } catch {
+    message.error("Không thể tải danh sách trạm!");
+  } finally {
+    setLoading(false);
   }
+}
+
 
   // === Load danh sách trụ ===
   async function loadChargers() {
@@ -147,7 +176,7 @@ export default function StationManager() {
           title: values.title,
           description: values.description,
           severity: values.severity,
-          status: values.status || "Pending",
+          status: "Pending",
         }),
       });
       message.success("✅ Đã gửi báo cáo sự cố!");
@@ -304,6 +333,22 @@ export default function StationManager() {
   return (
     <div className="station-wrap">
       {/* === Tổng quan === */}
+      {/* ✅ Hiển thị trạm đang phụ trách */}
+{/*{myStations.length > 0 && (
+  <div className="my-station-banner">
+    🏷️ <strong>Các trạm bạn đang phụ trách:</strong>
+    <ul style={{ margin: "6px 0 0 16px" }}>
+      {myStations.map((st) => (
+        <li key={st.stationId}>
+          <span style={{ fontWeight: 600 }}>{st.stationName}</span>{" "}
+          <span style={{ color: "#555" }}>({st.city})</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+)}*/}
+
+
       <Row gutter={16} style={{ marginBottom: 20 }}>
         <Col xs={24} sm={12} md={8}>
           <Card className="sum-card">
@@ -351,12 +396,15 @@ export default function StationManager() {
 
       {/* === Bảng trạm === */}
       <Table
-        columns={columns}
-        dataSource={filteredStations.map((s) => ({ ...s, key: s.stationId }))}
-        loading={loading}
-        pagination={{ pageSize: 8 }}
-        bordered
-      />
+  columns={columns}
+  dataSource={filteredStations
+    .filter((s) => s.isMyStation) // ✅ chỉ hiển thị trạm bạn quản lý
+    .map((s) => ({ ...s, key: s.stationId }))}
+  loading={loading}
+  pagination={{ pageSize: 8 }}
+  bordered
+/>
+
 
       {/* === Modal chi tiết === */}
       <Modal
@@ -546,22 +594,6 @@ export default function StationManager() {
                                 { label: "Medium", value: "Medium" },
                                 { label: "High", value: "High" },
                                 { label: "Critical", value: "Critical" },
-                              ]}
-                            />
-                          </Form.Item>
-
-                          <Form.Item
-                            name="status"
-                            label="Trạng thái ban đầu"
-                            initialValue="Pending"
-                            rules={[{ required: true, message: "Chọn trạng thái!" }]}
-                          >
-                            <Select
-                              options={[
-                                { label: "Pending", value: "Pending" },
-                                { label: "In Progress", value: "InProgress" },
-                                { label: "Resolved", value: "Resolved" },
-                                { label: "Closed", value: "Closed" },
                               ]}
                             />
                           </Form.Item>

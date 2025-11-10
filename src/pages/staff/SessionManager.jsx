@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { Pagination } from "antd";
 import MessageBox from "../../components/staff/MessageBox";
 import ConfirmDialog from "../../components/staff/ConfirmDialog";
@@ -25,7 +26,36 @@ function vnd(n) {
   return (Number(n) || 0).toLocaleString("vi-VN") + " ₫";
 }
 
+function toArray(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw.items)) return raw.items;
+  if (Array.isArray(raw.data?.items)) return raw.data.items;
+  if (Array.isArray(raw.data)) return raw.data;
+  if (Array.isArray(raw.results)) return raw.results;
+  if (Array.isArray(raw.$values)) return raw.$values;
+  if (Array.isArray(raw.value)) return raw.value; // 🧩 fallback nếu API trả về { value: [...] }
+
+  if (typeof raw === "object") return [raw];
+  try {
+    return toArray(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
+
+// ==== Helper: tính tốc độ tăng phần trăm pin mỗi giây ====
+function calcRate(powerKw = 7, capacityKwh = 60) {
+  // (kW / 3600) / capacity × 100 = %/giây
+  const pctPerSec = ((powerKw / 3600) / capacityKwh) * 100;
+  return pctPerSec * 8; // mô phỏng nhanh gấp 8 lần thực tế
+}
+
 export default function SessionManager() {
+  const { user } = useAuth();
+  const currentAccountId = user?.accountId || localStorage.getItem("accountId");
+
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -34,12 +64,87 @@ export default function SessionManager() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [message, setMessage] = useState({ type: "", text: "" });
   const [confirmDialog, setConfirmDialog] = useState({ open: false, session: null });
+  // ⚡ Tăng % pin realtime
+const [liveProgress, setLiveProgress] = useState({});
+
   const pageSize = 8;
   const navigate = useNavigate();
 
+  // ✅ Trạm staff phụ trách
+  const [stations, setStations] = useState([]);
+  const [users, setUsers] = useState([]);
+
+  const [myStations, setMyStations] = useState([]);
+  const [selectedStationId, setSelectedStationId] = useState(null);
+
+  // 🟢 Theo dõi phiên vừa khởi động (nếu ChargerManager đã lưu ID)
+useEffect(() => {
+  const liveId = sessionStorage.getItem("staffLiveSessionId");
+  if (liveId) {
+    console.log("🔋 Bắt đầu theo dõi phiên:", liveId);
+    startTrackingSession(Number(liveId));
+  }
+}, []);
+
+
+  /* ---------------- Load danh sách trạm staff ---------------- */
   useEffect(() => {
+    async function loadStations() {
+      try {
+        const allStations = await fetchAuthJSON(`${API_BASE}/Stations`);
+const stationsArr = toArray(allStations);
+
+// === Tải danh sách tài khoản từ /Auth ===
+const allUsers = await fetchAuthJSON(`${API_BASE}/Auth`);
+const authList = toArray(allUsers);
+
+// Lọc tất cả loại người dùng có thể xuất hiện (Customer, Company, Staff, Admin)
+const mappedUsers = authList
+  .filter((a) =>
+    ["Customer", "Company", "Staff", "Admin"].includes(a.role)
+  )
+  .map((a) => ({
+    accountId: a.accountId,
+    fullName:
+      a.company?.companyName ||
+      a.customers?.[0]?.fullName ||
+      a.userName,
+    role: a.role,
+    avatar: a.avatarUrl || null,
+  }));
+
+setUsers(mappedUsers);
+
+const myStationIds = [];
+
+
+        for (const st of stationsArr) {
+          try {
+            const res = await fetchAuthJSON(`${API_BASE}/station-staffs?stationId=${st.stationId}`);
+            const staffs = toArray(res);
+            const found = staffs.some((s) => String(s.staffId) === String(currentAccountId));
+            if (found) myStationIds.push(st.stationId);
+          } catch {
+            console.warn("Không lấy được staff của trạm:", st.stationId);
+          }
+        }
+
+        const mine = stationsArr.filter((s) => myStationIds.includes(s.stationId));
+        setStations(stationsArr);
+        setMyStations(mine);
+        if (mine.length > 0) setSelectedStationId(mine[0].stationId);
+      } catch (err) {
+        console.error("Lỗi khi tải danh sách trạm:", err);
+      }
+    }
+    loadStations();
+  }, [currentAccountId]);
+
+  /* ---------------- Load danh sách phiên sạc theo trạm ---------------- */
+  useEffect(() => {
+    if (!selectedStationId) return;
     loadSessions();
-  }, []);
+  }, [selectedStationId]);
 
   async function loadSessions() {
     setLoading(true);
@@ -48,36 +153,57 @@ export default function SessionManager() {
       let sessionArr = res?.data ?? res?.$values ?? res?.items ?? res ?? [];
       if (!Array.isArray(sessionArr)) sessionArr = [sessionArr];
 
-      const vehiclesRaw = await fetchAuthJSON(`${API_BASE}/Vehicles`);
-      let vehicles = [];
-      if (Array.isArray(vehiclesRaw)) vehicles = vehiclesRaw;
-      else if (Array.isArray(vehiclesRaw.data)) vehicles = vehiclesRaw.data;
-      else if (Array.isArray(vehiclesRaw.$values)) vehicles = vehiclesRaw.$values;
-      else if (Array.isArray(vehiclesRaw.items)) vehicles = vehiclesRaw.items;
-      else vehicles = Object.values(vehiclesRaw || {});
+      // Lọc phiên theo stationId
+      const portsRes = await fetchAuthJSON(`${API_BASE}/Ports`);
+      const ports = toArray(portsRes);
+      const chargersRes = await fetchAuthJSON(`${API_BASE}/Chargers`);
+      const chargers = toArray(chargersRes);
 
-      const vehicleMap = {};
-      for (const v of vehicles) {
-        const id = v.vehicleId ?? v.VehicleId;
-        if (id) vehicleMap[id] = v;
+      const portToCharger = {};
+      for (const p of ports) {
+        portToCharger[p.portId] = p.chargerId;
+      }
+      const chargerToStation = {};
+      for (const c of chargers) {
+        chargerToStation[c.chargerId] = c.stationId;
       }
 
+      // ✅ Giới hạn session chỉ thuộc trạm hiện tại
+      sessionArr = sessionArr.filter((s) => {
+        const portId = s.portId ?? s.PortId;
+        const chargerId = portToCharger[portId];
+        const stationId = chargerToStation[chargerId];
+        return String(stationId) === String(selectedStationId);
+      });
+
+      // 🚗 Lấy danh sách xe (trả về { items: [...] })
+const vehiclesRaw = await fetchAuthJSON(`${API_BASE}/Vehicles?page=1&pageSize=1000`);
+const vehicles = toArray(
+  vehiclesRaw?.data?.items ?? vehiclesRaw?.items ?? vehiclesRaw
+);
+
+      const vehicleMap = {};
+for (const v of vehicles) {
+  const id = v.vehicleId || v.VehicleId;
+  if (id !== undefined && id !== null) {
+    vehicleMap[String(id)] = v; // dùng key string cho chắc
+  }
+}
+console.log("🚗 Tổng số xe lấy được:", Object.keys(vehicleMap).length);
+console.log("🔧 Mẫu xe đầu tiên:", Object.values(vehicleMap)[0]);
+
+
+
       const invRes = await fetchAuthJSON(`${API_BASE}/Invoices`);
-      let invoices =
-        invRes?.data ?? invRes?.$values ?? invRes?.items ?? invRes ?? [];
-      if (!Array.isArray(invoices)) invoices = [invoices];
+      let invoices = toArray(invRes);
 
       const sessionToInvoiceStatus = {};
       for (const inv of invoices) {
         try {
-          const invDetail = await fetchAuthJSON(
-            `${API_BASE}/Invoices/${inv.invoiceId || inv.id}`
-          );
+          const invDetail = await fetchAuthJSON(`${API_BASE}/Invoices/${inv.invoiceId || inv.id}`);
           const invoiceData = invDetail?.data || invDetail;
           const sessionsList =
-            invoiceData?.chargingSessions ||
-            invoiceData?.$values?.chargingSessions ||
-            [];
+            invoiceData?.chargingSessions || invoiceData?.$values?.chargingSessions || [];
 
           sessionsList.forEach((session) => {
             const sessionId = session.chargingSessionId || session.id;
@@ -94,9 +220,7 @@ export default function SessionManager() {
       const detailed = await Promise.all(
         sessionArr.map(async (s) => {
           try {
-            const det = await fetchAuthJSON(
-              `${API_BASE}/ChargingSessions/${s.chargingSessionId || s.id}`
-            );
+            const det = await fetchAuthJSON(`${API_BASE}/ChargingSessions/${s.chargingSessionId || s.id}`);
             return { ...s, ...det };
           } catch {
             return s;
@@ -111,26 +235,44 @@ export default function SessionManager() {
           const invoiceStatus = invoiceInfo?.status || "UNPAID";
 
           const vId =
-            s.vehicleId ||
-            s.VehicleId ||
-            s.vehicle?.vehicleId ||
-            s.vehicle?.VehicleId ||
+            s.vehicleId ??
+            s.VehicleId ??
+            s.vehicle?.vehicleId ??
+            s.vehicle?.VehicleId ??
             null;
           const v = vehicleMap[vId] || {};
 
-          const licensePlate =
-            v.licensePlate ??
-            v.LicensePlate ??
-            s.licensePlate ??
-            s.LicensePlate ??
-            "—";
+          let licensePlate = "—";
+const vid = s.vehicleId ?? s.VehicleId;
+const vFound = vehicleMap[String(vid)] || vehicleMap[vid];
+if (vid && vehicleMap[String(vid)]) {
+  licensePlate = vehicleMap[String(vid)].licensePlate || "—";
+} else if (s.vehicle?.licensePlate) {
+  licensePlate = s.vehicle.licensePlate;
+}
+console.log(
+  `🔎 Phiên ${s.chargingSessionId}: vehicleId=${s.vehicleId} -> biển số=${licensePlate}`
+);
+
+
+
+          const companyId =
+            s.companyId ??
+            v.companyId ??
+            v.CompanyId ??
+            null;
 
           const custId = s.customerId ?? s.CustomerId;
-          const companyId = s.companyId ?? v.companyId ?? v.CompanyId ?? 0;
-
           let customerType = "Khách bình thường";
           if (!custId || custId === 0) customerType = "Khách vãng lai";
-          else if (companyId > 0) customerType = "Xe công ty";
+          else if (companyId) customerType = "Xe công ty";
+
+          if (customerType === "Xe công ty" && (!licensePlate || licensePlate === "—")) {
+            const fallback = vehicleMap[vId];
+            if (fallback && fallback.licensePlate) {
+              licensePlate = fallback.licensePlate;
+            }
+          }
 
           return {
             ...s,
@@ -147,6 +289,25 @@ export default function SessionManager() {
         .sort((a, b) => (b.chargingSessionId || 0) - (a.chargingSessionId || 0));
 
       setSessions(merged);
+      // ==== Khởi tạo mô phỏng % pin nếu đang sạc ====
+merged.forEach((s) => {
+  const id = s.chargingSessionId;
+  if (String(s.status).toLowerCase() === "charging" && s.startSoc != null) {
+    // Giả định mỗi trụ có công suất và dung lượng
+    const rate = calcRate(s.powerKw || 7, s.vehicleCapacityKwh || 60);
+    const intervalId = setInterval(() => {
+      setLiveProgress((prev) => {
+        const current = prev[id]?.currentSoc ?? s.startSoc ?? 0;
+        const nextSoc = Math.min(100, current + rate);
+        return {
+          ...prev,
+          [id]: { currentSoc: nextSoc, timer: intervalId },
+        };
+      });
+    }, 1000);
+  }
+});
+
     } catch (e) {
       console.error(e);
       setErr("Không thể tải danh sách phiên hoặc dữ liệu kWh!");
@@ -154,6 +315,33 @@ export default function SessionManager() {
       setLoading(false);
     }
   }
+
+  // 🟢 Hàm theo dõi session thực tế bằng API (GET /ChargingSessions/{id})
+async function startTrackingSession(id) {
+  try {
+    const data = await fetchAuthJSON(`${API_BASE}/ChargingSessions/${id}`);
+    const startSoc = data.startSoc ?? 0;
+    setLiveProgress((prev) => ({ ...prev, [id]: { currentSoc: startSoc } }));
+
+    const interval = setInterval(async () => {
+      const info = await fetchAuthJSON(`${API_BASE}/ChargingSessions/${id}`);
+      if (info.status === "Completed" || info.endedAt) {
+        clearInterval(interval);
+        console.log("✅ Phiên sạc", id, "đã hoàn tất");
+        sessionStorage.removeItem("staffLiveSessionId");
+      } else {
+        setLiveProgress((prev) => {
+          const current = prev[id]?.currentSoc ?? startSoc;
+          const next = Math.min(100, current + 1);
+          return { ...prev, [id]: { currentSoc: next } };
+        });
+      }
+    }, 2000);
+  } catch (err) {
+    console.error("❌ Không thể theo dõi phiên:", err);
+  }
+}
+
 
   async function handleStopSession(s) {
     setConfirmDialog({ open: true, session: s });
@@ -170,18 +358,29 @@ export default function SessionManager() {
         ? `${API_BASE}/ChargingSessions/guest/end`
         : `${API_BASE}/ChargingSessions/end`;
 
-      const payload = isGuest
-        ? {
-            chargingSessionId: s.chargingSessionId,
-            licensePlate: s.licensePlate ?? "UNKNOWN",
-            portId: s.portId,
-            PortCode: s.portCode ?? `P${String(s.portId).padStart(3, "0")}`,
-            endSoc: s.endSoc ?? 80,
-          }
-        : {
-            chargingSessionId: s.chargingSessionId,
-            endSoc: s.endSoc ?? 80,
-          };
+      // 🔧 Lấy phần trăm hiện tại (mô phỏng thực tế)
+// ✅ Lấy phần trăm pin cuối cùng (mô phỏng hoặc từ BE)
+const finalSoc =
+  liveProgress[s.chargingSessionId]?.currentSoc ??
+  s.endSoc ??
+  80;
+
+// ✅ Tạo payload chính xác theo loại khách
+const payload = isGuest
+  ? {
+      chargingSessionId: s.chargingSessionId,
+      endSoc: Math.min(100, Math.round(finalSoc)), // /guest/end chỉ cần 2 field
+    }
+  : {
+      chargingSessionId: s.chargingSessionId,
+      endSoc: Math.min(100, Math.round(finalSoc)), // /end cần thêm idleMin
+      idleMin: 0,
+    };
+
+// 🪶 Ghi log để kiểm tra dễ dàng
+console.log("🛑 Gửi yêu cầu dừng phiên:", endpoint, payload);
+
+
 
       const res = await fetchAuthJSON(endpoint, {
         method: "POST",
@@ -212,7 +411,16 @@ export default function SessionManager() {
 
       sessionStorage.setItem(`chargepay:${orderId}`, JSON.stringify(finalPayload));
       setMessage({ type: "success", text: "✅ Phiên sạc đã dừng! Đang chuyển đến hóa đơn..." });
-      
+      // 🛑 Ngừng tăng % realtime khi dừng phiên
+const sid = s.chargingSessionId;
+if (liveProgress[sid]?.timer) {
+  clearInterval(liveProgress[sid].timer);
+  setLiveProgress((prev) => {
+    const { [sid]: _, ...rest } = prev;
+    return rest;
+  });
+}
+
       setTimeout(() => {
         navigate(`/staff/invoice?order=${orderId}`, {
           state: finalPayload,
@@ -224,6 +432,9 @@ export default function SessionManager() {
       setMessage({ type: "error", text: `❌ Lỗi khi dừng phiên: ${err.message}` });
       setTimeout(() => setMessage({ type: "", text: "" }), 5000);
     } finally {
+      // 🟢 Xóa ID khi staff dừng phiên
+sessionStorage.removeItem("staffLiveSessionId");
+
       await loadSessions();
     }
   }
@@ -258,6 +469,15 @@ export default function SessionManager() {
     startIndex + pageSize
   );
 
+  useEffect(() => {
+  return () => {
+    // Dọn các interval mô phỏng khi unmount
+    Object.values(liveProgress).forEach((p) => {
+      if (p?.timer) clearInterval(p.timer);
+    });
+  };
+}, [liveProgress]);
+
   return (
     <div className="sess-wrap">
       <MessageBox
@@ -281,6 +501,21 @@ export default function SessionManager() {
       <div className="sess-card">
         <div className="sess-head">
           <h3>Phiên sạc (đang chạy / lịch sử)</h3>
+
+          {myStations.length > 1 && (
+            <select
+              value={selectedStationId || ""}
+              onChange={(e) => setSelectedStationId(Number(e.target.value))}
+              className="station-select"
+            >
+              {myStations.map((st) => (
+                <option key={st.stationId} value={st.stationId}>
+                  {st.stationName}
+                </option>
+              ))}
+            </select>
+          )}
+
           <div className="sess-filters">
             <input
               type="text"
@@ -327,6 +562,8 @@ export default function SessionManager() {
                 <th>Loại</th>
                 <th>Bắt đầu</th>
                 <th>Kết thúc</th>
+                <th>% Bắt đầu</th>
+<th>% Hiện tại</th>
                 <th>kWh</th>
                 <th>Chi phí</th>
                 <th>TT</th>
@@ -355,7 +592,20 @@ export default function SessionManager() {
                   <tr key={s.chargingSessionId}>
                     <td className="strong">S-{s.chargingSessionId}</td>
                     <td>{s.portId ?? "—"}</td>
-                    <td>{s.customerId ? `CUST-${s.customerId}` : "—"}</td>
+                    <td>
+  {(() => {
+    const matched = users.find(
+      (u) => String(u.accountId) === String(s.customerId)
+    );
+    return matched
+      ? matched.fullName
+      : s.customerId
+      ? `#${s.customerId}`
+      : "—";
+  })()}
+</td>
+
+
                     <td>{s.licensePlate}</td>
                     <td>
                       <span
@@ -372,6 +622,13 @@ export default function SessionManager() {
                     </td>
                     <td>{fmtTime(s.startedAt)}</td>
                     <td>{fmtTime(s.endedAt)}</td>
+                    <td>{s.startSoc != null ? `${Math.floor(s.startSoc)}%` : "—"}</td>
+<td>
+  {String(s.status).toLowerCase() === "charging"
+    ? `${Math.floor(liveProgress[s.chargingSessionId]?.currentSoc ?? s.startSoc ?? 0)}%`
+    : `${s.endSoc ?? s.startSoc ?? 0}%`}
+</td>
+
                     <td>{s.energyKwh?.toFixed(2) ?? "—"}</td>
                     <td>{vnd(s.total)}</td>
                     <td>

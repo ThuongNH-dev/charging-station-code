@@ -65,28 +65,61 @@ const useUserServicesHook = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleUpdate = async (apiFunc, id, data, successMsg, role) => {
-    if (typeof apiFunc !== "function") {
-      console.error("❌ apiFunc không phải là function", apiFunc);
-      return false;
+  // ... bên trong useUserServicesHook
+const handleUpdate = async (apiFunc, id, data, successMsg, role) => {
+  if (typeof apiFunc !== "function") {
+    console.error("❌ apiFunc không phải function", apiFunc);
+    return false;
+  }
+  setIsLoading(true);
+  setError(null);
+  try {
+    if (id !== undefined && id !== null) {
+      await apiFunc(id, data, role);
+    } else {
+      await apiFunc(data);
     }
-    setIsLoading(true);
-    setError(null);
-    try {
-      if (id) await apiFunc(id, data, role);
-      else await apiFunc(data);
-      alert(successMsg || "Cập nhật thành công!");
-      await fetchData();
-      return true;
-    } catch (err) {
-      console.error("❌ Lỗi xử lý:", err);
-      setError(err.message);
-      alert(`Lỗi: ${err.message}`);
-      return false;
-    } finally {
-      setIsLoading(false);
+    alert(successMsg || "Cập nhật thành công!");
+    await fetchData();
+    return true;
+  } catch (err) {
+    const resp = err?.response;
+    const pd = resp?.data; // ProblemDetails từ ASP.NET
+    const sentBody = resp?.config?.data;
+
+    // 🔎 In ra toàn bộ để debug nhanh
+    console.error("❌ AxiosError detail:", {
+      status: resp?.status,
+      url: resp?.config?.url,
+      method: resp?.config?.method,
+      sentBody,                 // <= body FE đã gửi
+      problemDetails: pd,       // <= ProblemDetails từ BE
+    });
+
+    // 🔎 Gom lỗi ModelState cho người dùng
+    let msg =
+      pd?.title ||
+      pd?.message ||
+      err?.message ||
+      "One or more validation errors occurred.";
+
+    if (pd?.errors && typeof pd.errors === "object") {
+      const lines = [];
+      for (const [field, arr] of Object.entries(pd.errors)) {
+        const joined = Array.isArray(arr) ? arr.join(", ") : String(arr);
+        lines.push(`${field}: ${joined}`);
+      }
+      if (lines.length) msg += `\n\n${lines.join("\n")}`;
     }
-  };
+
+    setError(msg);
+    alert(`Lỗi: ${msg}`);
+    return false;
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   return {
     allAccounts,
