@@ -41,6 +41,13 @@ function toArray(raw) {
   }
 }
 
+// ==== Helper: tính tốc độ tăng phần trăm pin mỗi giây ====
+function calcRate(powerKw = 7, capacityKwh = 60) {
+  // (kW / 3600) / capacity × 100 = %/giây
+  const pctPerSec = ((powerKw / 3600) / capacityKwh) * 100;
+  return pctPerSec * 8; // mô phỏng nhanh gấp 8 lần thực tế
+}
+
 export default function SessionManager() {
   const { user } = useAuth();
   const currentAccountId = user?.accountId || localStorage.getItem("accountId");
@@ -53,21 +60,59 @@ export default function SessionManager() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [message, setMessage] = useState({ type: "", text: "" });
   const [confirmDialog, setConfirmDialog] = useState({ open: false, session: null });
+  // ⚡ Tăng % pin realtime
+const [liveProgress, setLiveProgress] = useState({});
+
   const pageSize = 8;
   const navigate = useNavigate();
 
   // ✅ Trạm staff phụ trách
   const [stations, setStations] = useState([]);
+  const [users, setUsers] = useState([]);
+
   const [myStations, setMyStations] = useState([]);
   const [selectedStationId, setSelectedStationId] = useState(null);
+
+  // 🟢 Theo dõi phiên vừa khởi động (nếu ChargerManager đã lưu ID)
+useEffect(() => {
+  const liveId = sessionStorage.getItem("staffLiveSessionId");
+  if (liveId) {
+    console.log("🔋 Bắt đầu theo dõi phiên:", liveId);
+    startTrackingSession(Number(liveId));
+  }
+}, []);
+
 
   /* ---------------- Load danh sách trạm staff ---------------- */
   useEffect(() => {
     async function loadStations() {
       try {
         const allStations = await fetchAuthJSON(`${API_BASE}/Stations`);
-        const stationsArr = toArray(allStations);
-        const myStationIds = [];
+const stationsArr = toArray(allStations);
+
+// === Tải danh sách tài khoản từ /Auth ===
+const allUsers = await fetchAuthJSON(`${API_BASE}/Auth`);
+const authList = toArray(allUsers);
+
+// Lọc tất cả loại người dùng có thể xuất hiện (Customer, Company, Staff, Admin)
+const mappedUsers = authList
+  .filter((a) =>
+    ["Customer", "Company", "Staff", "Admin"].includes(a.role)
+  )
+  .map((a) => ({
+    accountId: a.accountId,
+    fullName:
+      a.company?.companyName ||
+      a.customers?.[0]?.fullName ||
+      a.userName,
+    role: a.role,
+    avatar: a.avatarUrl || null,
+  }));
+
+setUsers(mappedUsers);
+
+const myStationIds = [];
+
 
         for (const st of stationsArr) {
           try {
@@ -223,6 +268,25 @@ export default function SessionManager() {
         .sort((a, b) => (b.chargingSessionId || 0) - (a.chargingSessionId || 0));
 
       setSessions(merged);
+      // ==== Khởi tạo mô phỏng % pin nếu đang sạc ====
+merged.forEach((s) => {
+  const id = s.chargingSessionId;
+  if (String(s.status).toLowerCase() === "charging" && s.startSoc != null) {
+    // Giả định mỗi trụ có công suất và dung lượng
+    const rate = calcRate(s.powerKw || 7, s.vehicleCapacityKwh || 60);
+    const intervalId = setInterval(() => {
+      setLiveProgress((prev) => {
+        const current = prev[id]?.currentSoc ?? s.startSoc ?? 0;
+        const nextSoc = Math.min(100, current + rate);
+        return {
+          ...prev,
+          [id]: { currentSoc: nextSoc, timer: intervalId },
+        };
+      });
+    }, 1000);
+  }
+});
+
     } catch (e) {
       console.error(e);
       setErr("Không thể tải danh sách phiên hoặc dữ liệu kWh!");
@@ -230,6 +294,33 @@ export default function SessionManager() {
       setLoading(false);
     }
   }
+
+  // 🟢 Hàm theo dõi session thực tế bằng API (GET /ChargingSessions/{id})
+async function startTrackingSession(id) {
+  try {
+    const data = await fetchAuthJSON(`${API_BASE}/ChargingSessions/${id}`);
+    const startSoc = data.startSoc ?? 0;
+    setLiveProgress((prev) => ({ ...prev, [id]: { currentSoc: startSoc } }));
+
+    const interval = setInterval(async () => {
+      const info = await fetchAuthJSON(`${API_BASE}/ChargingSessions/${id}`);
+      if (info.status === "Completed" || info.endedAt) {
+        clearInterval(interval);
+        console.log("✅ Phiên sạc", id, "đã hoàn tất");
+        sessionStorage.removeItem("staffLiveSessionId");
+      } else {
+        setLiveProgress((prev) => {
+          const current = prev[id]?.currentSoc ?? startSoc;
+          const next = Math.min(100, current + 1);
+          return { ...prev, [id]: { currentSoc: next } };
+        });
+      }
+    }, 2000);
+  } catch (err) {
+    console.error("❌ Không thể theo dõi phiên:", err);
+  }
+}
+
 
   async function handleStopSession(s) {
     setConfirmDialog({ open: true, session: s });
@@ -246,18 +337,29 @@ export default function SessionManager() {
         ? `${API_BASE}/ChargingSessions/guest/end`
         : `${API_BASE}/ChargingSessions/end`;
 
-      const payload = isGuest
-        ? {
-            chargingSessionId: s.chargingSessionId,
-            licensePlate: s.licensePlate ?? "UNKNOWN",
-            portId: s.portId,
-            PortCode: s.portCode ?? `P${String(s.portId).padStart(3, "0")}`,
-            endSoc: s.endSoc ?? 80,
-          }
-        : {
-            chargingSessionId: s.chargingSessionId,
-            endSoc: s.endSoc ?? 80,
-          };
+      // 🔧 Lấy phần trăm hiện tại (mô phỏng thực tế)
+// ✅ Lấy phần trăm pin cuối cùng (mô phỏng hoặc từ BE)
+const finalSoc =
+  liveProgress[s.chargingSessionId]?.currentSoc ??
+  s.endSoc ??
+  80;
+
+// ✅ Tạo payload chính xác theo loại khách
+const payload = isGuest
+  ? {
+      chargingSessionId: s.chargingSessionId,
+      endSoc: Math.min(100, Math.round(finalSoc)), // /guest/end chỉ cần 2 field
+    }
+  : {
+      chargingSessionId: s.chargingSessionId,
+      endSoc: Math.min(100, Math.round(finalSoc)), // /end cần thêm idleMin
+      idleMin: 0,
+    };
+
+// 🪶 Ghi log để kiểm tra dễ dàng
+console.log("🛑 Gửi yêu cầu dừng phiên:", endpoint, payload);
+
+
 
       const res = await fetchAuthJSON(endpoint, {
         method: "POST",
@@ -288,7 +390,16 @@ export default function SessionManager() {
 
       sessionStorage.setItem(`chargepay:${orderId}`, JSON.stringify(finalPayload));
       setMessage({ type: "success", text: "✅ Phiên sạc đã dừng! Đang chuyển đến hóa đơn..." });
-      
+      // 🛑 Ngừng tăng % realtime khi dừng phiên
+const sid = s.chargingSessionId;
+if (liveProgress[sid]?.timer) {
+  clearInterval(liveProgress[sid].timer);
+  setLiveProgress((prev) => {
+    const { [sid]: _, ...rest } = prev;
+    return rest;
+  });
+}
+
       setTimeout(() => {
         navigate(`/staff/invoice?order=${orderId}`, {
           state: finalPayload,
@@ -300,6 +411,9 @@ export default function SessionManager() {
       setMessage({ type: "error", text: `❌ Lỗi khi dừng phiên: ${err.message}` });
       setTimeout(() => setMessage({ type: "", text: "" }), 5000);
     } finally {
+      // 🟢 Xóa ID khi staff dừng phiên
+sessionStorage.removeItem("staffLiveSessionId");
+
       await loadSessions();
     }
   }
@@ -333,6 +447,15 @@ export default function SessionManager() {
     startIndex,
     startIndex + pageSize
   );
+
+  useEffect(() => {
+  return () => {
+    // Dọn các interval mô phỏng khi unmount
+    Object.values(liveProgress).forEach((p) => {
+      if (p?.timer) clearInterval(p.timer);
+    });
+  };
+}, [liveProgress]);
 
   return (
     <div className="sess-wrap">
@@ -418,6 +541,8 @@ export default function SessionManager() {
                 <th>Loại</th>
                 <th>Bắt đầu</th>
                 <th>Kết thúc</th>
+                <th>% Bắt đầu</th>
+<th>% Hiện tại</th>
                 <th>kWh</th>
                 <th>Chi phí</th>
                 <th>TT</th>
@@ -446,7 +571,20 @@ export default function SessionManager() {
                   <tr key={s.chargingSessionId}>
                     <td className="strong">S-{s.chargingSessionId}</td>
                     <td>{s.portId ?? "—"}</td>
-                    <td>{s.customerId ? `CUST-${s.customerId}` : "—"}</td>
+                    <td>
+  {(() => {
+    const matched = users.find(
+      (u) => String(u.accountId) === String(s.customerId)
+    );
+    return matched
+      ? matched.fullName
+      : s.customerId
+      ? `#${s.customerId}`
+      : "—";
+  })()}
+</td>
+
+
                     <td>{s.licensePlate}</td>
                     <td>
                       <span
@@ -463,6 +601,13 @@ export default function SessionManager() {
                     </td>
                     <td>{fmtTime(s.startedAt)}</td>
                     <td>{fmtTime(s.endedAt)}</td>
+                    <td>{s.startSoc != null ? `${Math.floor(s.startSoc)}%` : "—"}</td>
+<td>
+  {String(s.status).toLowerCase() === "charging"
+    ? `${Math.floor(liveProgress[s.chargingSessionId]?.currentSoc ?? s.startSoc ?? 0)}%`
+    : `${s.endSoc ?? s.startSoc ?? 0}%`}
+</td>
+
                     <td>{s.energyKwh?.toFixed(2) ?? "—"}</td>
                     <td>{vnd(s.total)}</td>
                     <td>
