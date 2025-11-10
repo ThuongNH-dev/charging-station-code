@@ -811,3 +811,20 @@ th {
 .user-table--users .ant-pagination-options {
   display: none !important;
 }
+/* ✅ Giữ bảng cuộn bên trong, phân trang cố định dưới cùng */
+.table-scroll-area {
+  max-height: 400px; /* giới hạn chiều cao hiển thị */
+  overflow-y: auto; /* nội dung cuộn dọc */
+  overflow-x: auto;
+  width: 100%;
+  border-radius: 10px;
+}
+
+/* Giữ phân trang bên ngoài vùng cuộn */
+.vehicle-table .table-pagination {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
