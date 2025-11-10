@@ -164,18 +164,13 @@ export default function PaymentManager() {
       const paidLocal =
         JSON.parse(localStorage.getItem("staff_paid_sessions") || "[]") || [];
 
-      // ✅ Lọc chỉ hiển thị payment của staff hiện tại
-      const filteredPaid = paidLocal.filter(
-        (p) => String(p.staffId) === String(currentAccountId)
-      );
-
-      // 🔸 Loại bỏ các session đã thanh toán khỏi danh sách bên trái (chỉ tính các session của staff hiện tại)
+      // 🔸 Loại bỏ các session đã thanh toán khỏi danh sách bên trái
       const unpaid = guestAll.filter(
-        (s) => !filteredPaid.some((p) => p.sessionId === s.chargingSessionId)
+        (s) => !paidLocal.some((p) => p.sessionId === s.chargingSessionId)
       );
 
       setGuestSessions(unpaid);
-      setPaidSessions(filteredPaid);
+      setPaidSessions(paidLocal);
     } catch (e) {
       console.error(e);
       message.error("Không thể tải dữ liệu!");
@@ -210,7 +205,6 @@ export default function PaymentManager() {
         method,
         createdAt: new Date().toISOString(),
         status: "PAID",
-        staffId: currentAccountId, // ✅ Lưu staffId để lọc sau này
       };
 
       const stored =
