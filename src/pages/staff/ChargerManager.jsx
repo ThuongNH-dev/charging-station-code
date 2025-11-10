@@ -47,7 +47,8 @@ export default function ChargerManager() {
 
   const [rows, setRows] = useState([]);
   const [latestSessions, setLatestSessions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [err, setErr] = useState("");
 
   // Modal
@@ -111,7 +112,7 @@ export default function ChargerManager() {
     if (!selectedStationId) return;
     let alive = true;
     async function load() {
-      setLoading(true);
+      if (!isInitialLoad) setLoading(true);
       setErr("");
       try {
         const chargersRaw = await fetchAuthJSON(`${API_BASE}/Chargers`);
@@ -137,11 +138,13 @@ export default function ChargerManager() {
         if (alive) {
           setRows(chargers);
           setLatestSessions(Object.values(latestMap));
+          setIsInitialLoad(false);
           setLoading(false);
         }
       } catch (e) {
         if (alive) {
           setErr(e?.message || "Lỗi tải dữ liệu");
+          setIsInitialLoad(false);
           setLoading(false);
         }
       }
