@@ -334,7 +334,7 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
     <div className="station-wrap">
       {/* === Tổng quan === */}
       {/* ✅ Hiển thị trạm đang phụ trách */}
-{myStations.length > 0 && (
+{/*{myStations.length > 0 && (
   <div className="my-station-banner">
     🏷️ <strong>Các trạm bạn đang phụ trách:</strong>
     <ul style={{ margin: "6px 0 0 16px" }}>
@@ -346,7 +346,7 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
       ))}
     </ul>
   </div>
-)}
+)}*/}
 
 
       <Row gutter={16} style={{ marginBottom: 20 }}>
