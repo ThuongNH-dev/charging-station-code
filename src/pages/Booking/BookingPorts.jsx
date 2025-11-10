@@ -967,13 +967,22 @@ export default function BookingPorts() {
                     <div className="bp-subtle" style={{ marginBottom: 6 }}>Giờ</div>
                     <select
                       className="bp-input-select"
-                      value={startMinute}  // luôn hiển thị cùng phút với giờ bắt đầu
-                      disabled              // không cho người dùng chỉnh
+                      value={startHour}
+                      onChange={(e) => {
+                        const h = Number(e.target.value) || minStartHour;
+                        const mins = startMinuteOptionsForHour(h);
+                        // nếu phút hiện tại không còn hợp lệ với giờ mới -> chọn phút hợp lệ nhỏ nhất
+                        const nextMinute = mins.includes(startMinute) ? startMinute : (mins[0] ?? 0);
+                        setStartHour(h);
+                        setStartMinute(nextMinute);
+                      }}
+                      disabled={startDisabled}
                     >
-                      <option value={startMinute}>
-                        {String(startMinute).padStart(2, "0")}
-                      </option>
+                      {startHourOptions.map(h => (
+                        <option key={h} value={h}>{String(h).padStart(2, "0")}</option>
+                      ))}
                     </select>
+
                   </div>
 
                   <div className="bp-time-col">
@@ -1136,7 +1145,7 @@ export default function BookingPorts() {
               )}
             </div>
 
-            <FeedbackSection 
+            <FeedbackSection
               apiBase={API_BASE}          // để component tự fetch
               stationId={id}              // id trạm hiện tại từ useParams()
               chargerId={cid}             // id trụ hiện tại từ useParams()
@@ -1145,7 +1154,7 @@ export default function BookingPorts() {
               pageSize={10}               // modal lớn mỗi trang 10
               initialCount={3}            // hiển thị 3 đánh giá mới nhất
               className="bp-feedback"     // nếu cần áp style bên BookingPorts
-              style = {{marginTop : "10px"}}
+              style={{ marginTop: "10px" }}
             />
 
           </div>
