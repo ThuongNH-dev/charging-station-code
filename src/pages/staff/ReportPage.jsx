@@ -31,7 +31,7 @@ export default function ReportPage() {
   });
   const [history, setHistory] = useState([]);
   const [chartData, setChartData] = useState([]);
-  const [timeFilter, setTimeFilter] = useState("7d");
+  const [timeFilter, setTimeFilter] = useState("all");
   const [loading, setLoading] = useState(true);
 
   const currentAccountId = user?.accountId || localStorage.getItem("accountId");
@@ -281,14 +281,6 @@ setUsers(userMap);
             ))}
           </select>
         )}
-        <select
-          value={timeFilter}
-          onChange={(e) => setTimeFilter(e.target.value)}
-        >
-          <option value="7d">7 ngày qua</option>
-          <option value="month">Tháng này</option>
-          <option value="all">Toàn thời gian</option>
-        </select>
       </div>
 
       {currentStation && (
