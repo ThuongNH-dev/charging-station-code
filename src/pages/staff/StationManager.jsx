@@ -176,7 +176,7 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
           title: values.title,
           description: values.description,
           severity: values.severity,
-          status: values.status || "Pending",
+          status: "Pending",
         }),
       });
       message.success("✅ Đã gửi báo cáo sự cố!");
@@ -591,22 +591,6 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
                                 { label: "Medium", value: "Medium" },
                                 { label: "High", value: "High" },
                                 { label: "Critical", value: "Critical" },
-                              ]}
-                            />
-                          </Form.Item>
-
-                          <Form.Item
-                            name="status"
-                            label="Trạng thái ban đầu"
-                            initialValue="Pending"
-                            rules={[{ required: true, message: "Chọn trạng thái!" }]}
-                          >
-                            <Select
-                              options={[
-                                { label: "Pending", value: "Pending" },
-                                { label: "In Progress", value: "InProgress" },
-                                { label: "Resolved", value: "Resolved" },
-                                { label: "Closed", value: "Closed" },
                               ]}
                             />
                           </Form.Item>
