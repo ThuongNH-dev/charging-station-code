@@ -183,7 +183,9 @@ export default function PaymentManager() {
   async function handlePay(s) {
     setPayingId(s.chargingSessionId);
     try {
-      const returnUrl = `${window.location.origin}/staff/payment-success`;
+      const returnUrl = `${window.location.origin}/staff/payment-success?sessionId=${encodeURIComponent(
+        s.chargingSessionId
+      )}`;
 
       const res = await fetchAuthJSON(
         `${API_BASE}/Payment/create-for-guest-session?sessionId=${s.chargingSessionId}&returnUrl=${encodeURIComponent(
@@ -199,23 +201,8 @@ export default function PaymentManager() {
       message.success(`Đang mở thanh toán cho phiên #${s.chargingSessionId}`);
       window.open(data.paymentUrl, "_blank");
 
-      const newPaid = {
-        sessionId: s.chargingSessionId,
-        total: s.total ?? 0,
-        method,
-        createdAt: new Date().toISOString(),
-        status: "PAID",
-      };
-
-      const stored =
-        JSON.parse(localStorage.getItem("staff_paid_sessions") || "[]") || [];
-      stored.unshift(newPaid);
-      localStorage.setItem("staff_paid_sessions", JSON.stringify(stored));
-
-      setPaidSessions((prev) => [newPaid, ...prev]);
-      setGuestSessions((prev) =>
-        prev.filter((x) => x.chargingSessionId !== s.chargingSessionId)
-      );
+      // Không thêm vào danh sách đã thanh toán ngay lập tức.
+      // Chỉ khi trang /staff/payment-success xác nhận thành công mới ghi vào localStorage.
     } catch (err) {
       console.error(err);
       message.error(`❌ Lỗi khi tạo thanh toán: ${err.message}`);
