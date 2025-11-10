@@ -288,6 +288,16 @@ export default function ChargerManager() {
             body: JSON.stringify(body),
           }
         );
+        // 🟢 Thêm sau khi nhận phản hồi
+const sid =
+  res?.chargingSessionId ||
+  res?.id ||
+  res?.data?.chargingSessionId ||
+  res?.data?.id;
+  console.log("Guest start response:", res);
+
+if (sid) sessionStorage.setItem("staffLiveSessionId", sid);
+console.log("🔌 Guest session started:", sid);
         message.success(res?.message || "✅ Phiên sạc (guest) đã được khởi động!");
       } else {
         const vehicle = companyVehicles.find(
@@ -325,6 +335,10 @@ export default function ChargerManager() {
           method: "POST",
           body: JSON.stringify(body),
         });
+        // 🟢 Thêm sau khi nhận phản hồi
+const sid = res?.chargingSessionId || res?.data?.chargingSessionId;
+if (sid) sessionStorage.setItem("staffLiveSessionId", sid);
+console.log("🏢 Company session started:", sid);
         message.success(res?.message || "✅ Phiên sạc (company) đã được khởi động!");
       }
 
