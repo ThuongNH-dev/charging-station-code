@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { fetchAuthJSON } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -15,6 +16,7 @@ import {
 import "./ReportPage.css";
 
 export default function ReportPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [stations, setStations] = useState([]);
   const [users, setUsers] = useState([]);
@@ -160,7 +162,7 @@ setUsers(userMap);
 
         const completedSessions = sessions.filter(
           (s) =>
-            ["completed", "done"].includes(s.status?.toLowerCase?.() || "") &&
+            ["completed", "paid"].includes(s.status?.toLowerCase?.() || "") &&
             myChargerIds.includes(s.portId)
         )
         .sort((a, b) => new Date(b.endedAt) - new Date(a.endedAt));
@@ -337,7 +339,7 @@ setUsers(userMap);
       )}
 
       {/* Lịch sử */}
-      <h3>Lịch sử phiên đã thanh toán</h3>
+      <h3>Lịch sử phiên đã hoàn thành</h3>
       <div className="rep-table">
         <table>
           <thead>
@@ -351,27 +353,55 @@ setUsers(userMap);
               <th>Hóa đơn</th>
             </tr>
           </thead>
-          <tbody>
-            {history.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="center muted">
-                  Chưa có phiên thanh toán.
-                </td>
-              </tr>
-            ) : (
-              history.map((h, i) => (
-                <tr key={i}>
-                  <td>{h.session}</td>
-                  <td>{h.charger}</td>
-                  <td>{h.customer}</td>
-                  <td>{h.duration}</td>
-                  {/*<td>{h.kWh}</tdt*/}
-                  <td>{h.cost.toLocaleString("vi-VN")} đ</td>
-                  <td>{h.invoice}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
+<tbody>
+  {history.length === 0 ? (
+    <tr>
+      <td colSpan={7} className="center muted">
+        Chưa có phiên thanh toán.
+      </td>
+    </tr>
+  ) : (
+    history.map((h, i) => (
+      <tr key={i}>
+        <td>{h.session}</td>
+        <td>{h.charger}</td>
+        <td>{h.customer}</td>
+        <td>{h.duration}</td>
+        <td>{h.cost.toLocaleString("vi-VN")} đ</td>
+        <td>
+          <button
+            className="btn-light"
+            onClick={() => {
+              // Giống SessionManager: tạo order=S{sessionId}
+              const sessionId = h.session.replace("S-", "");
+              const orderId = `S${sessionId}`;
+              
+              // Gửi sang trang invoice với state chi tiết
+              navigate(`/staff/invoice?order=${orderId}`, {
+                state: {
+                  ...h,
+                  chargingSessionId: Number(sessionId),
+                  total: h.cost,
+                  customerId:
+                    users.find(
+                      (u) => u.fullName === h.customer
+                    )?.accountId || null,
+                  invoiceStatus: "PAID", // vì từ báo cáo
+                  endedAt: new Date().toISOString(),
+                  startedAt: new Date(Date.now() - 3600000).toISOString(),
+                  energyKwh: h.kWh,
+                },
+              });
+            }}
+          >
+            Chi tiết
+          </button>
+        </td>
+      </tr>
+    ))
+  )}
+</tbody>
+
         </table>
         <button className="export" onClick={exportCSV}>
           ⭳ Xuất CSV
