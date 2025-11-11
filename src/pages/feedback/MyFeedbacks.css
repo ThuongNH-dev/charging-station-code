@@ -1,0 +1,214 @@
+/* src/pages/me/MyFeedbacks.css */
+/* =========================
+   My Feedbacks — Light, Lively & Subtle
+   Phạm vi: chỉ trong .myfb-page
+   ========================= */
+
+/* --------- Tokens (tươi hơn chút) --------- */
+.myfb-page {
+  --bg: #f6f8f7;
+  --panel: #ffffffcc;
+  --panel-2: #ffffffee;
+  --border: rgba(15, 23, 42, 0.08);
+  --divider: rgba(15, 23, 42, 0.06);
+  --text: #0f1a13;
+  --muted: #556a5c;
+  --accent: #22c55e;            /* green-500 tươi nhưng không gắt */
+  --accent-weak: rgba(34,197,94,0.14);
+  --accent-weak-2: rgba(34,197,94,0.10);
+  --accent-strong: #16a34a;     /* dùng cho hover/active */
+  --danger: #ef4444;            /* red-500 */
+  --danger-weak: rgba(239,68,68,0.12);
+
+  --shadow-sm: 0 2px 10px rgba(0,0,0,0.06);
+  --shadow-md: 0 10px 24px rgba(0,0,0,0.08);
+  --shadow-lg: 0 22px 50px rgba(0,0,0,0.12);
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+
+  min-height: 100%;
+  padding: 24px;
+  background:
+    radial-gradient(700px 320px at 85% -10%, var(--accent-weak), transparent 70%),
+    radial-gradient(820px 380px at -10% 8%, rgba(134,239,172,0.20), transparent 60%),
+    var(--bg);
+  color: var(--text);
+}
+
+/* --------- Hero --------- */
+.myfb-hero {
+  position: relative;
+  overflow: clip;
+  border-radius: var(--radius-xl);
+  padding: 28px 22px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  margin-bottom: 18px;
+  isolation: isolate;
+}
+.myfb-hero::before {
+  content: "";
+  position: absolute; inset: 0 0 auto 0; height: 3px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: .8;
+}
+.myfb-hero::after {
+  content: "";
+  position: absolute; inset: -35% -35%;
+  background: conic-gradient(from 90deg, rgba(99,179,118,0.25), transparent 50%);
+  filter: blur(32px);
+  z-index: -1;
+  animation: myfb-rotate 18s linear infinite;
+  opacity: .8;
+}
+@keyframes myfb-rotate { to { transform: rotate(360deg); } }
+
+.myfb-title { margin: 0 !important; letter-spacing: .2px; color: var(--text) !important; }
+.myfb-title::after {
+  content: "";
+  position: absolute; left: 0; bottom: -6px;
+  width: 0%; height: 3px;
+  background: linear-gradient(90deg, var(--accent), rgba(134,239,172,0.9));
+  border-radius: 999px;
+  transition: width .45s cubic-bezier(.22,.8,.2,1);
+}
+.myfb-hero:hover .myfb-title::after { width: 100%; }
+
+/* --------- Card --------- */
+.myfb-card {
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
+  animation: myfb-drop 420ms cubic-bezier(.2,.8,.2,1);
+}
+@keyframes myfb-drop {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* --------- Nút chung --------- */
+.myfb-btn,
+.myfb-btn-outline,
+.myfb-btn-danger {
+  height: 34px !important;
+  line-height: 32px !important;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  font-weight: 600 !important;
+}
+.myfb-btn { /* nút Làm mới */
+  border: 1px solid rgba(34,197,94,0.30) !important;
+  background: linear-gradient(180deg, rgba(34,197,94,0.18), rgba(34,197,94,0.10)) !important;
+  color: var(--text) !important;
+  transition: transform .18s ease, box-shadow .18s ease, background .22s ease !important;
+}
+.myfb-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(34,197,94,0.18);
+  background: linear-gradient(180deg, rgba(22,163,74,0.22), rgba(34,197,94,0.12)) !important;
+}
+
+/* Nút Sửa: viền xanh đồng bộ */
+.myfb-btn-outline {
+  border: 1px solid rgba(34,197,94,0.6) !important;
+  background: rgba(34,197,94,0.08) !important;
+  color: var(--text) !important;
+}
+.myfb-btn-outline:hover {
+  background: rgba(34,197,94,0.16) !important;
+  box-shadow: 0 6px 16px rgba(34,197,94,0.15);
+}
+
+/* Nút Xoá: đỏ nhưng nhẹ */
+.myfb-btn-danger {
+  border: 1px solid rgba(239,68,68,0.55) !important;
+  background: var(--danger-weak) !important;
+  color: var(--text) !important;
+}
+.myfb-btn-danger:hover {
+  background: rgba(239,68,68,0.18) !important;
+  box-shadow: 0 6px 16px rgba(239,68,68,0.15);
+}
+
+/* --------- Table --------- */
+.myfb-table { width: 100%; max-width: none; margin: 0; }
+.myfb-table :global(.ant-table) { background: transparent !important; table-layout: fixed; width: 100%; }
+.myfb-table :global(.ant-table-container) {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+
+/* Header */
+.myfb-table :global(.ant-table-thead > tr > th) {
+  background: linear-gradient(180deg, rgba(15,23,42,0.03), rgba(15,23,42,0.00)) !important;
+  color: var(--text) !important;
+  border-bottom: 1px solid var(--divider) !important;
+  font-weight: 700; letter-spacing: .2px; padding-block: 12px !important;
+  position: relative;
+}
+.myfb-table :global(.ant-table-thead > tr > th)::after {
+  content: "";
+  position: absolute; left: 12px; right: 12px; bottom: 6px; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  transform: scaleX(0); transform-origin: left; transition: transform .35s ease; opacity: .85;
+}
+.myfb-table :global(.ant-table-thead > tr > th):hover::after { transform: scaleX(1); }
+
+/* Body rows */
+.myfb-row :global(td) {
+  background: #fff;
+  border-bottom: 1px solid var(--divider);
+  color: var(--text);
+  transition: background .25s ease, box-shadow .25s ease;
+}
+.myfb-row:hover :global(td) { background: #fbfffd; box-shadow: inset 0 0 0 1px var(--accent-weak-2); }
+
+/* No wrap cho 1,2,4 */
+.myfb-table :global(.ant-table-tbody > tr > td:nth-child(1)),
+.myfb-table :global(.ant-table-tbody > tr > td:nth-child(2)),
+.myfb-table :global(.ant-table-tbody > tr > td:nth-child(4)) { white-space: nowrap; }
+/* Comment co giãn */
+.myfb-table :global(.ant-table-tbody > tr > td:nth-child(3)) {
+  white-space: normal; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Station row scroll-x mượt */
+.myfb-station {
+  display: flex; gap: 8px; align-items: center; flex-wrap: nowrap;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+}
+
+/* Rate & Tag màu theo accent */
+.myfb-table :global(.ant-rate-star-full) :global(.ant-rate-star-first),
+.myfb-table :global(.ant-rate-star-full) :global(.ant-rate-star-second) { color: var(--accent) !important; }
+.myfb-table :global(.ant-tag) {
+  border-radius: 999px; border-color: rgba(34,197,94,0.30);
+  background: rgba(34,197,94,0.10); color: var(--text);
+  padding: 2px 10px;
+}
+
+/* Pagination center + màu accent */
+.myfb-table :global(.ant-pagination) {
+  padding: 12px 8px;
+  display: flex; justify-content: center; align-items: center; gap: 6px;
+}
+.myfb-table :global(.ant-pagination-item) {
+  border-radius: 10px !important;
+  transition: transform .12s ease, box-shadow .18s ease;
+}
+.myfb-table :global(.ant-pagination-item:hover) { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.myfb-table :global(.ant-pagination-item-active) { border-color: var(--accent) !important; }
+.myfb-table :global(.ant-pagination-item-active a) { color: var(--accent) !important; }
+.myfb-table :global(.ant-select-selector) { border-radius: 10px !important; }
+
+/* Focus states */
+.myfb-page :where(button, [tabindex], .ant-pagination-item a):focus-visible {
+  outline: 2px solid rgba(34,197,94,0.75);
+  outline-offset: 2px; border-radius: 10px;
+}

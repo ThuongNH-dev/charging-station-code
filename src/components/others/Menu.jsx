@@ -78,6 +78,12 @@ export default function AccountMenu() {
   const [roleText, setRoleText] = React.useState(userRole || user?.role || "");
   const [avatarUrl, setAvatarUrl] = React.useState("");
 
+  // ngay sau các useState/useAuth:
+  const normRole = React.useMemo(() => {
+    return (roleText || userRole || user?.role || "").toString().toLowerCase();
+  }, [roleText, userRole, user]);
+
+
   React.useEffect(() => {
     if (userName && !displayName) setDisplayName(userName);
     if (userRole && !roleText) setRoleText(userRole);
@@ -318,6 +324,24 @@ export default function AccountMenu() {
           Quản lý gói dịch vụ
         </MenuItem>
 
+        {normRole === "customer" && (
+          <MenuItem
+            onClick={() => {
+              handleClose();
+              navigate("/my-feedback"); 
+            }}
+            sx={{
+              borderRadius: "10px",
+              mx: 0.5,
+              margin: "5px 0px",
+              "&:hover": { background: "#f5f7fa" },
+            }}
+          >
+            Đánh giá của tôi
+          </MenuItem>
+        )}
+
+
         <Divider sx={{ my: 0.5 }} />
 
         <MenuItem
@@ -339,6 +363,7 @@ export default function AccountMenu() {
           </ListItemIcon>
           Đăng xuất
         </MenuItem>
+
       </Menu>
     </Box>
   );
