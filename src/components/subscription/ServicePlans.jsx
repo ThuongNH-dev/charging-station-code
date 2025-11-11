@@ -151,37 +151,65 @@ function cleanText(s) {
   if (!t) return "";
   const low = t.toLowerCase();
   if (low === "string" || t === "-" || t === "•" || t === ".") return "";
-  return t;
+  return t.replace(/\s+/g, " ");
 }
-function benefitLines(pkg) {
-  // 1) base text (benefits > description)
-  let base = (pkg?.benefits || pkg?.description || "").toString();
 
-  // 2) chuẩn hóa xuống dòng
-  base = base.replace(/\r\n/g, "\n").replace(/\|/g, "\n");
-
-  // 3) tách – lọc rác
-  let parts = base
+function splitLines(raw) {
+  if (!raw) return [];
+  return raw
+    .replace(/\r\n/g, "\n")
+    .replace(/\|/g, "\n")
     .split("\n")
-    .map((s) => cleanText(s))
+    .map(cleanText)
     .filter(Boolean);
-
-  // 4) thêm Idle fee nếu có
-  const freeIdle = Number(pkg?.freeIdleMinutes ?? 0);
-  if (Number.isFinite(freeIdle) && freeIdle > 0) {
-    parts.push(`Miễn phí Idle Fee ${freeIdle} phút`);
-  }
-
-  // 5) loại trùng liên tiếp
-  const cleaned = [];
-  for (const s of parts) {
-    if (cleaned.length === 0 || cleaned[cleaned.length - 1] !== s) cleaned.push(s);
-  }
-  return cleaned;
 }
+
+function uniqSoft(arr) {
+  const seen = new Set();
+  const out = [];
+  for (const s of arr) {
+    const key = s.toLowerCase().replace(/\s+/g, " ").trim();
+    if (!seen.has(key)) { seen.add(key); out.push(s); }
+  }
+  return out;
+}
+
+/** Build bullet lines từ benefits + các field khác của plan (nối chuỗi) */
+function benefitLines(plan) {
+  const lines = [];
+
+  // 1) Tách từ benefits (nếu có)
+  lines.push(...splitLines(plan?.benefits));
+
+  // 2) Nếu benefits rỗng, có thể lấy mô tả làm 1 dòng “gợi ý”
+  const desc = cleanText(plan?.description);
+  if (!lines.length && desc) lines.push(desc);
+
+  // 3) Nối chuỗi từ các field khác trong DB (ví dụ giảm giá, phút chờ…)
+  const freeIdle = Number(plan?.freeIdleMinutes ?? 0);
+  if (Number.isFinite(freeIdle) && freeIdle > 0) {
+    lines.push(`Miễn phí chờ ${freeIdle} phút mỗi phiên`);
+  }
+
+  const discount = Number(plan?.discountPercent ?? 0);
+  if (Number.isFinite(discount) && discount > 0) {
+    // ví dụ bạn yêu cầu: “giảm giá x% là x lấy từ DB”
+    lines.push(`Giảm ${discount}% khi thanh toán đủ điều kiện`);
+  }
+
+  // 4) (Tuỳ chọn) Nối thêm rule cho nhóm đối tượng
+  const cate = String(plan?.category || "").toLowerCase();
+  if (plan?.isForCompany === true || cate === "business") {
+    // có thể thêm thông tin dành riêng cho doanh nghiệp nếu muốn
+    // lines.push("Ưu tiên hỗ trợ doanh nghiệp");
+  }
+
+  // 5) Loại trùng “mềm”
+  return uniqSoft(lines);
+}
+
 function subtitleOf(plan) {
-  const t = cleanText(plan?.description || "");
-  return t;
+  return cleanText(plan?.description);
 }
 
 /* ==================== Component ==================== */
@@ -425,7 +453,7 @@ const ServicePlans = () => {
                 businessPlans.map((plan) => (
                   <div className="card" key={plan.subscriptionPlanId ?? plan.id}>
                     <p className="name">{plan.planName}</p>
-                    <p className="price">
+                    <p className="price-service">
                       {vnd(normalizeMonthlyPriceVND(plan.priceMonthly))}/tháng
                     </p>
 
@@ -460,7 +488,7 @@ const ServicePlans = () => {
                 personalPlans.map((plan) => (
                   <div className="card" key={plan.subscriptionPlanId ?? plan.id}>
                     <h4>{plan.planName}</h4>
-                    <p className="price">
+                    <p className="price-service">
                       {vnd(normalizeMonthlyPriceVND(plan.priceMonthly))}/tháng
                     </p>
 
