@@ -1,5 +1,5 @@
 // ✅ src/api/passwordRecoveryApi.js
-import { getApiBase } from "../utils/api"; // (cần hàm getApiBase giống bạn đã có)
+import { getApiBase } from "../utils/api";
 const API_BASE = getApiBase();
 
 /* =============== Helpers (debug) =============== */
@@ -18,7 +18,6 @@ function __logFetch(label, url, options) {
     if (j && typeof j === "object") {
       bodyPreview = {
         ...j,
-        // chỉ che các field nhạy cảm nếu có
         newPassword: __mask(j.newPassword),
         confirmPassword: __mask(j.confirmPassword),
         resetToken: j.resetToken
@@ -65,10 +64,36 @@ function assertResetPayload(p = {}) {
   return normalized;
 }
 
+/* =============== Token extractor =============== */
+/**
+ * Cố gắng trích token từ message trả về của BE, ví dụ:
+ * "Token đặt lại mật khẩu của bạn: <BASE64>"
+ */
+function extractTokenFromMessage(message = "") {
+  if (!message) return null;
+
+  // Ưu tiên sau dấu ":" hoặc sau từ "Token"
+  const afterColon = message.split(":").slice(1).join(":").trim();
+  // Token dạng base64 khá dài, cho pattern rộng 20+ ký tự
+  const base64ish = /[A-Za-z0-9+/=]{20,}/g;
+
+  const candidates = [];
+  if (afterColon) {
+    const m = afterColon.match(base64ish);
+    if (m && m[0]) candidates.push(m[0]);
+  }
+  if (!candidates.length) {
+    const m = message.match(base64ish);
+    if (m && m[0]) candidates.push(m[0]);
+  }
+
+  return candidates.length ? candidates[0] : null;
+}
+
 /* =============== APIs =============== */
 /**
  * 📩 Gửi yêu cầu quên mật khẩu
- * Swagger: POST /api/Auth/forgot-password
+ * POST /api/Auth/forgot-password
  * Body: { "userNameOrEmail": "string" }
  */
 export const forgotPassword = async (payload = {}, opts = {}) => {
@@ -86,14 +111,12 @@ export const forgotPassword = async (payload = {}, opts = {}) => {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      // thường endpoint này không yêu cầu token, nhưng giữ cho linh hoạt:
       Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
     },
     body: JSON.stringify(body),
   });
 
   if (!res.ok) {
-    // gom lỗi từ JSON/text
     let errText = "";
     try {
       const j = await res.json();
@@ -106,25 +129,29 @@ export const forgotPassword = async (payload = {}, opts = {}) => {
     );
   }
 
-  // 200 → thường trả message
   let data = null;
+  let rawText = "";
   try {
     data = await res.json();
   } catch {
-    data = null;
+    rawText = await res.text().catch(() => "");
   }
 
-  const msg =
+  const message =
     data?.message ||
     data?.Message ||
+    rawText ||
     "Đã gửi hướng dẫn đặt lại mật khẩu (nếu tài khoản tồn tại).";
-  return { success: true, message: msg };
+
+  // ✅ Trích token ngay nếu BE đang trả thẳng trong message
+  const token = extractTokenFromMessage(message);
+
+  return { success: true, message, token: token || null };
 };
 
 /**
  * 🔑 Đặt lại mật khẩu bằng token
- * Swagger: POST /api/Auth/reset-password
- * Body: { "resetToken": "string", "newPassword": "string", "confirmPassword": "string" }
+ * POST /api/Auth/reset-password
  */
 export const resetPassword = async (payload = {}, opts = {}) => {
   const body = assertResetPayload(payload);
@@ -141,7 +168,6 @@ export const resetPassword = async (payload = {}, opts = {}) => {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      // tuỳ BE, đa số reset by token KHÔNG cần Authorization
       Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
     },
     body: JSON.stringify(body),
@@ -167,7 +193,6 @@ export const resetPassword = async (payload = {}, opts = {}) => {
     );
   }
 
-  // 200
   let data = null;
   try {
     data = await res.json();

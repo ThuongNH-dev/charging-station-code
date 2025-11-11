@@ -1,4 +1,3 @@
-// 📁 src/components/admin/pages/UserManagement/UserManagement.jsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import "../UserManagement.css";
@@ -9,8 +8,6 @@ import ServiceTable from "./ServiceTable";
 import AdminModals from "./Modals/AdminModals";
 import ServiceFilterBar from "./ServiceFilterBar";
 import VehicleFilterBar from "./VehicleFilterBar";
-
-// ❌ Bỏ: useNavigate, useRef, SelectPlanModal
 
 const useUserServicesHook = () => {
   const [allAccounts, setAllAccounts] = useState([]);
@@ -34,7 +31,8 @@ const useUserServicesHook = () => {
 
       // 1) Map id -> planName
       const serviceMap = (services || []).reduce((map, pkg) => {
-        map[pkg.id] = pkg.planName;
+        const key = pkg.id ?? pkg.subscriptionPlanId ?? pkg.packageId;
+        if (key != null) map[key] = pkg.planName;
         return map;
       }, {});
 
@@ -68,23 +66,55 @@ const useUserServicesHook = () => {
     fetchData();
   }, [fetchData]);
 
+  // ... bên trong useUserServicesHook
   const handleUpdate = async (apiFunc, id, data, successMsg, role) => {
     if (typeof apiFunc !== "function") {
-      console.error("❌ apiFunc không phải là function", apiFunc);
+      console.error("❌ apiFunc không phải function", apiFunc);
       return false;
     }
     setIsLoading(true);
     setError(null);
     try {
-      if (id) await apiFunc(id, data, role);
-      else await apiFunc(data);
+      if (id !== undefined && id !== null) {
+        await apiFunc(id, data, role);
+      } else {
+        await apiFunc(data);
+      }
       alert(successMsg || "Cập nhật thành công!");
       await fetchData();
       return true;
     } catch (err) {
-      console.error("❌ Lỗi xử lý:", err);
-      setError(err.message);
-      alert(`Lỗi: ${err.message}`);
+      const resp = err?.response;
+      const pd = resp?.data; // ProblemDetails từ ASP.NET
+      const sentBody = resp?.config?.data;
+
+      // 🔎 In ra toàn bộ để debug nhanh
+      console.error("❌ AxiosError detail:", {
+        status: resp?.status,
+        url: resp?.config?.url,
+        method: resp?.config?.method,
+        sentBody, // <= body FE đã gửi
+        problemDetails: pd, // <= ProblemDetails từ BE
+      });
+
+      // 🔎 Gom lỗi ModelState cho người dùng
+      let msg =
+        pd?.title ||
+        pd?.message ||
+        err?.message ||
+        "One or more validation errors occurred.";
+
+      if (pd?.errors && typeof pd.errors === "object") {
+        const lines = [];
+        for (const [field, arr] of Object.entries(pd.errors)) {
+          const joined = Array.isArray(arr) ? arr.join(", ") : String(arr);
+          lines.push(`${field}: ${joined}`);
+        }
+        if (lines.length) msg += `\n\n${lines.join("\n")}`;
+      }
+
+      setError(msg);
+      alert(`Lỗi: ${msg}`);
       return false;
     } finally {
       setIsLoading(false);
@@ -157,7 +187,7 @@ const useFilterLogicHook = ({
     role: "all",
   });
 
-  // ✅ status cho serviceFilter
+  // ✅ BỔ SUNG status cho serviceFilter để lọc theo Active/Inactive/All
   const [serviceFilter, setServiceFilter] = useState({
     search: "",
     category: "all",
@@ -249,7 +279,7 @@ const useFilterLogicHook = ({
           !vehicle.companyId) ||
         (vehicleFilter.ownerType === "Công ty" && !!vehicle.companyId);
 
-      return matchMaker, matchModel, matchOwnerId, matchOwnerType;
+      return matchMaker && matchModel && matchOwnerId && matchOwnerType;
     });
   }, [allVehicles, vehicleFilter]);
 
@@ -389,8 +419,6 @@ const UserManagement = () => {
   const [activeModal, setActiveModal] = useState(null);
   const [userTypeFilter, setUserTypeFilter] = useState("all");
 
-  // ❌ Bỏ toàn bộ logic dropdown & navigate cho "Gói dịch vụ"
-
   const {
     allAccounts,
     allVehicles,
@@ -519,14 +547,27 @@ const UserManagement = () => {
     }
 
     if (activeTab === "vehicle") {
-      const rows = (filteredVehicles || []).map((v) => ({
-        ID: v.id ?? "",
-        Hang: v.carMaker ?? "",
-        DongXe: v.model ?? "",
-        NamSX: v.year ?? "",
-        ChuSoHuuLoai: v.companyId ? "Công ty" : "Cá nhân",
-        ChuSoHuuID: v.companyId ?? v.customerId ?? "",
-      }));
+      const rows = (filteredVehicles || []).map((v) => {
+        let ownerType = "Khách vãng lai";
+        let ownerId = "";
+
+        if (v.customerId) {
+          ownerType = "Cá nhân";
+          ownerId = v.customerId;
+        } else if (v.companyId) {
+          ownerType = "Công ty";
+          ownerId = v.companyId;
+        }
+
+        return {
+          ID: v.vehicleId ?? "",
+          Hang: v.carMaker ?? "",
+          DongXe: v.model ?? "",
+          NamSX: v.manufactureYear ?? "",
+          ChuSoHuuLoai: ownerType,
+          ChuSoHuuID: ownerId,
+        };
+      });
       exportCsv(rows, "vehicles.csv");
       return;
     }
@@ -564,7 +605,6 @@ const UserManagement = () => {
             Người dùng
           </button>
         </div>
-
         <div className="tabs">
           <button
             className={`btn ${
@@ -575,8 +615,6 @@ const UserManagement = () => {
             Thông số xe
           </button>
         </div>
-
-        {/* ✅ Nút "Gói dịch vụ" CHỈ đổi tab, không menu xổ */}
         <div className="tabs">
           <button
             className={`btn ${
@@ -680,8 +718,6 @@ const UserManagement = () => {
         servicePackages={servicePackages}
         crudActions={crudActions}
       />
-
-      {/* ❌ Bỏ hẳn SelectPlanModal và mọi điều hướng subscriptions */}
     </div>
   );
 };

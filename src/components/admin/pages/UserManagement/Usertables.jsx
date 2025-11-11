@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from "react";
+// src/components/admin/pages/UserManagement/Usertables.jsx
+import React, { useState, useMemo, useRef } from "react";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { Pagination } from "antd";
 
@@ -49,7 +50,6 @@ const getColumns = (userType) => {
 /* =========================================================
    🔹 HELPERS
    ========================================================= */
-// Chọn subscription đúng của KH cá nhân
 const pickUserSubscription = (subs, customerId) => {
   if (!customerId || !Array.isArray(subs)) return null;
   const cid = Number(customerId);
@@ -72,7 +72,6 @@ const pickUserSubscription = (subs, customerId) => {
   return candidates[0];
 };
 
-// Map { subscriptionPlanId: planName } từ danh sách gói
 const buildPlanMap = (servicePackages = []) =>
   servicePackages.reduce((acc, p) => {
     const id = Number(p?.subscriptionPlanId ?? p?.planId);
@@ -80,7 +79,6 @@ const buildPlanMap = (servicePackages = []) =>
     return acc;
   }, {});
 
-// ===== Invoices cho DOANH NGHIỆP =====
 const pickCompanyLatestInvoice = (invoices, companyId) => {
   if (!companyId || !Array.isArray(invoices)) return null;
   const cid = Number(companyId);
@@ -203,7 +201,7 @@ export const UserTables = ({
   setActiveModal,
   servicePackages = [],
   subscriptions = [],
-  invoices = [], // ✅ truyền mảng invoices đã fetch
+  invoices = [],
 }) => {
   const columns = useMemo(() => getColumns(userType), [userType]);
   const planMap = useMemo(
@@ -223,9 +221,16 @@ export const UserTables = ({
     return filteredData.slice(start, start + pageSize);
   }, [filteredData, safePage]);
 
+  // Vùng cuộn của bảng: để đưa scrollTop về đầu khi đổi trang
+  const wrapRef = useRef(null);
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    if (wrapRef.current) wrapRef.current.scrollTop = 0;
+  };
+
   if (total === 0) {
     return (
-      <div className="user-table-section">
+      <div className="user-table-section user-table--users">
         <h3>Thông tin {getTableTitle(userType)} (0 mục)</h3>
         <p>Không tìm thấy dữ liệu người dùng nào phù hợp với bộ lọc.</p>
       </div>
@@ -235,13 +240,14 @@ export const UserTables = ({
   const pageOffset = (safePage - 1) * pageSize;
 
   return (
-    <div className="user-table-section">
+    <div className="user-table-section user-table--users">
       <h3>
         Thông tin {getTableTitle(userType)} ({total} mục)
       </h3>
 
-      <div className="table-responsive-wrapper">
-        <table>
+      {/* ✅ Vùng CUỘN của nội dung bảng */}
+      <div className="table-responsive-wrapper" ref={wrapRef}>
+        <table className="minimal-table">
           <thead>
             <tr>
               {columns.map((col) => (
@@ -306,17 +312,26 @@ export const UserTables = ({
             ))}
           </tbody>
         </table>
+      </div>
 
-        <div style={{ marginTop: 12, textAlign: "right" }}>
+      {/* ✅ Phân trang đặt NGOÀI vùng cuộn (luôn ở dưới) */}
+      {total > pageSize && (
+        <div className="table-pagination table-pagination--outside">
           <Pagination
             current={safePage}
             pageSize={pageSize}
             total={total}
-            onChange={(page) => setCurrentPage(page)}
+            onChange={handlePageChange}
             showSizeChanger={false}
+            hideOnSinglePage
+            itemRender={(page, type) => {
+              if (type === "prev") return <span>← Trước</span>;
+              if (type === "next") return <span>Sau →</span>;
+              return <span>{page}</span>;
+            }}
           />
         </div>
-      </div>
+      )}
     </div>
   );
 };
