@@ -15,9 +15,12 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 
 import { useAuth } from "../../context/AuthContext";
+import { getApiBase } from "../../utils/api";
 
-const ME_URL = "https://localhost:7268/api/Auth";
+const API_BASE = (getApiBase() || "").replace(/\/+$/, "");
+const ME_URL = `${API_BASE}/Auth`;
 
+/* ================= Helpers ================= */
 function getInitials(name = "") {
   return name
     .trim()
@@ -66,11 +69,73 @@ function decodeJwtClaims(token) {
   }
 }
 
+function getStoredUser() {
+  try {
+    const s =
+      sessionStorage.getItem("user") || localStorage.getItem("user") || "";
+    return s ? JSON.parse(s) : null;
+  } catch {
+    return null;
+  }
+}
+function getStoredToken() {
+  const u = getStoredUser();
+  return u?.token || localStorage.getItem("token") || "";
+}
+function getStoredCustomerId() {
+  const s1 = sessionStorage.getItem("customerId");
+  const s2 = localStorage.getItem("customerId");
+  return (s1 && +s1) || (s2 && +s2) || null;
+}
+
+/** Lấy accountId đồng bộ từ storage/JWT; KHÔNG dùng fallback số cứng */
+function resolveAccountIdSync() {
+  const s1 = sessionStorage.getItem("accountId");
+  const s2 = localStorage.getItem("accountId");
+  if (s1 && !isNaN(+s1)) return +s1;
+  if (s2 && !isNaN(+s2)) return +s2;
+
+  const token = getStoredToken();
+  const claims = decodeJwtClaims(token) || {};
+  const idFromClaim =
+    claims?.nameid || claims?.nameId || claims?.sub || claims?.accountId;
+  if (idFromClaim && !isNaN(+idFromClaim)) return +idFromClaim;
+
+  // Thiếu accountId ⇒ để effect async dò bằng customerId
+  return null;
+}
+
+/** Nếu thiếu accountId mà có customerId → gọi GET /Auth (list) để match */
+async function findAccountIdByCustomerId(token, customerId) {
+  if (!customerId || !API_BASE) return null;
+  try {
+    const res = await fetch(`${ME_URL}`, {
+      headers: {
+        accept: "application/json",
+        authorization: token ? `Bearer ${token}` : undefined,
+      },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : [data];
+    const mine = list.find(
+      (acc) =>
+        Array.isArray(acc?.customers) &&
+        acc.customers.some((c) => Number(c?.customerId) === Number(customerId))
+    );
+    const accId = Number(mine?.accountId ?? mine?.id ?? mine?.userId);
+    return Number.isFinite(accId) ? accId : null;
+  } catch {
+    return null;
+  }
+}
+
+/* =============== Component =============== */
 export default function AccountMenu() {
   const [anchorEl, setAnchorEl] = React.useState(null);
   const open = Boolean(anchorEl);
   const navigate = useNavigate();
-  const { user, userName, userRole, token, logout } = useAuth();
+  const { user, userName, userRole, token: ctxToken, logout } = useAuth();
 
   const [displayName, setDisplayName] = React.useState(
     userName || pickName(user) || ""
@@ -78,12 +143,16 @@ export default function AccountMenu() {
   const [roleText, setRoleText] = React.useState(userRole || user?.role || "");
   const [avatarUrl, setAvatarUrl] = React.useState("");
 
-  // ngay sau các useState/useAuth:
+  // NEW: quản lý accountId cục bộ, tự tìm nếu thiếu
+  const [accountId, setAccountId] = React.useState(() =>
+    resolveAccountIdSync()
+  );
+
   const normRole = React.useMemo(() => {
     return (roleText || userRole || user?.role || "").toString().toLowerCase();
   }, [roleText, userRole, user]);
 
-
+  /* ======= Sync name/role từ context (giống code cũ) ======= */
   React.useEffect(() => {
     if (userName && !displayName) setDisplayName(userName);
     if (userRole && !roleText) setRoleText(userRole);
@@ -94,11 +163,13 @@ export default function AccountMenu() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, userName, userRole]);
 
+  /* ======= Fallback: lấy name/role/avatar từ /Auth (không id) như cũ ======= */
   React.useEffect(() => {
     let ignore = false;
     async function fetchMe() {
+      const token = ctxToken || getStoredToken();
       if (!token) return;
-      if (displayName && roleText) return;
+      if (displayName && roleText && avatarUrl) return;
       try {
         const res = await fetch(ME_URL, {
           method: "GET",
@@ -129,7 +200,7 @@ export default function AccountMenu() {
         if (apiRole && !roleText) setRoleText(apiRole);
         const apiAvatar =
           src.avatarUrl || src.avatar || src.profile?.avatarUrl || "";
-        if (apiAvatar) setAvatarUrl(apiAvatar);
+        if (apiAvatar && !avatarUrl) setAvatarUrl(apiAvatar);
       } catch {
         /* ignore */
       }
@@ -138,9 +209,11 @@ export default function AccountMenu() {
     return () => {
       ignore = true;
     };
-  }, [token, displayName, roleText]);
+  }, [ctxToken, displayName, roleText, avatarUrl]);
 
+  /* ======= Fallback: lấy name/role từ JWT claims ======= */
   React.useEffect(() => {
+    const token = ctxToken || getStoredToken();
     if (!token) return;
     if (displayName && roleText) return;
     const claims = decodeJwtClaims(token);
@@ -152,8 +225,72 @@ export default function AccountMenu() {
       const jwtRole = pickRole(claims);
       if (jwtRole) setRoleText(jwtRole);
     }
-  }, [token, displayName, roleText]);
+  }, [ctxToken, displayName, roleText]);
 
+  /* ======= NEW: nếu thiếu accountId, dùng customerId để tra /Auth (list) ======= */
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (accountId) return;
+      const token = ctxToken || getStoredToken();
+      const customerId = getStoredCustomerId();
+      if (!token || !customerId) return;
+      const accId = await findAccountIdByCustomerId(token, customerId);
+      if (alive && Number.isFinite(accId)) {
+        setAccountId(accId);
+        try {
+          localStorage.setItem("accountId", String(accId));
+          sessionStorage.setItem("accountId", String(accId));
+        } catch {}
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [accountId, ctxToken]);
+
+  /* ======= NEW: khi đã có accountId → GET /Auth/{accountId} để lấy avatarUrl thật ======= */
+  React.useEffect(() => {
+    let ignore = false;
+    async function fetchAccountById() {
+      if (!accountId) return;
+      const token = ctxToken || getStoredToken();
+      try {
+        const res = await fetch(`${ME_URL}/${accountId}`, {
+          headers: {
+            accept: "application/json",
+            authorization: token ? `Bearer ${token}` : undefined,
+          },
+        });
+        if (!res.ok) return;
+        const acc = await res.json();
+        if (ignore || !acc) return;
+
+        const realAvatar = acc?.avatarUrl || "";
+        if (realAvatar) setAvatarUrl(realAvatar);
+
+        // có thể cập nhật name/role “chuẩn” nếu muốn
+        if (!displayName) {
+          const name =
+            acc?.customers?.[0]?.fullName || acc?.userName || acc?.email || "";
+          if (name) setDisplayName(name);
+        }
+        if (!roleText) {
+          const r = acc?.role || "";
+          if (r) setRoleText(r);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    fetchAccountById();
+    return () => {
+      ignore = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountId, ctxToken]);
+
+  /* ============== UI handlers ============== */
   const handleClick = (e) => setAnchorEl(e.currentTarget);
   const handleClose = () => setAnchorEl(null);
 
@@ -267,7 +404,7 @@ export default function AccountMenu() {
         <MenuItem
           onClick={() => {
             handleClose();
-            navigate(manageAccountPath()); // ✅ dùng hàm chọn theo role
+            navigate(manageAccountPath());
           }}
           sx={{
             borderRadius: "10px",
@@ -328,7 +465,7 @@ export default function AccountMenu() {
           <MenuItem
             onClick={() => {
               handleClose();
-              navigate("/my-feedback"); 
+              navigate("/my-feedback");
             }}
             sx={{
               borderRadius: "10px",
@@ -340,7 +477,6 @@ export default function AccountMenu() {
             Đánh giá của tôi
           </MenuItem>
         )}
-
 
         <Divider sx={{ my: 0.5 }} />
 
@@ -363,7 +499,6 @@ export default function AccountMenu() {
           </ListItemIcon>
           Đăng xuất
         </MenuItem>
-
       </Menu>
     </Box>
   );
