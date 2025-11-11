@@ -17,7 +17,7 @@ function getToken() {
       localStorage.getItem("user") || sessionStorage.getItem("user") || "null"
     );
     if (u?.token) return u.token;
-  } catch {}
+  } catch { }
   const t =
     localStorage.getItem("token") || sessionStorage.getItem("token") || null;
   return t || null;
@@ -69,8 +69,8 @@ async function apiListVehicles({
   return Array.isArray(data?.items)
     ? data.items
     : Array.isArray(data)
-    ? data
-    : [];
+      ? data
+      : [];
 }
 
 async function apiCreateVehicle(payload) {
@@ -203,14 +203,14 @@ export default function VehicleInfo() {
         r?.customerId != null
           ? Number(r.customerId)
           : Number.isFinite(fallbackCustomerId)
-          ? Number(fallbackCustomerId)
-          : undefined,
+            ? Number(fallbackCustomerId)
+            : undefined,
       companyId:
         r?.companyId != null
           ? Number(r.companyId)
           : Number.isFinite(fallbackCompanyId)
-          ? Number(fallbackCompanyId)
-          : undefined,
+            ? Number(fallbackCompanyId)
+            : undefined,
       carMaker: r?.carMaker ?? "",
       model: r?.model ?? "",
       licensePlate: r?.licensePlate ?? "",
@@ -324,9 +324,19 @@ export default function VehicleInfo() {
           const vid = pickVehicleId(mine);
           if (vid) {
             try {
-              localStorage.setItem("vehicleId", String(vid));
-              sessionStorage.setItem("vehicleId", String(vid));
-            } catch {}
+              const customerId = Number(
+                currentUser?.customerId ??
+                form.getFieldValue("customerId")
+              );
+              const keyGlobal = "vehicleId";
+              const keyScoped = Number.isFinite(customerId) ? `vehicleId__${customerId}` : null;
+              localStorage.setItem(keyGlobal, String(vid));
+              sessionStorage.setItem(keyGlobal, String(vid));
+              if (keyScoped) {
+                localStorage.setItem(keyScoped, String(vid));
+                sessionStorage.setItem(keyScoped, String(vid));
+              }
+            } catch { }
           }
         }
       } catch (e) {
@@ -401,9 +411,9 @@ export default function VehicleInfo() {
       const payload = {
         customerId: Number(
           values.customerId ??
-            currentUser?.customerId ??
-            base.customerId ??
-            null
+          currentUser?.customerId ??
+          base.customerId ??
+          null
         ),
         companyId: Number(
           values.companyId ?? currentUser?.companyId ?? base.companyId ?? null

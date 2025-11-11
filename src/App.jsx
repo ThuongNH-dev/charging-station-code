@@ -56,6 +56,9 @@ import Dashboard from "./components/admin/pages/dashboard/Dashboard";
 import AdminNotificationsSendPage from "./components/admin/pages/AdminNotificationsSendPage";
 import PricingRulesPage from "./components/admin/pages/pricing/PricingRulesPage";
 import AdminIncidentReports from "./components/admin/pages/Reports/AdminIncidentReports";
+import InfoDriver from "./pages/enterInfo/InfoDriver";
+import RegisterInfo from "./layouts/RegisterInfo";
+import MyFeedbacks from "./pages/feedback/MyFeedbacks";
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
@@ -233,6 +236,15 @@ export default function App() {
         element={
           <ProtectedRoute allowedRoles={["Customer", "Company"]}>
             <ServicePlans />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/my-feedback"
+        element={
+          <ProtectedRoute allowedRoles={["Customer"]}>
+            <MyFeedbacks/>
           </ProtectedRoute>
         }
       />

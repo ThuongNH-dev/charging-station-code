@@ -7,6 +7,8 @@ import "./ChargingProgress.css";
 import MainLayout from "../../layouts/MainLayout";
 import { fetchJSON, fetchAuthJSON, getApiBase, getToken } from "../../utils/api";
 import { resolveCustomerIdFromAuth } from "../../api/authHelpers";
+import { setChargeContext } from "../../utils/chargeSessionCtx";
+
 
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " VND";
 // --- DEMO SPEED SETTINGS ---
@@ -22,6 +24,24 @@ function normalizeApiBase(s) {
   return raw.replace(/\/+$/, "");
 }
 const API_ABS = normalizeApiBase(getApiBase()) || "https://localhost:7268/api";
+
+function saveCtx({ orderId = null, stationId = null, chargerId = null, portId = null, stationCode = null, chargerCode = null, portCode = null, endedAt = null }) {
+  try {
+    setChargeContext({
+      orderId, stationId, chargerId, portId,
+      stationCode, chargerCode, portCode,
+      endedAt
+    });
+  } catch { }
+}
+function toId(v) {
+  const s = String(v ?? "").trim();
+  const m = s.match(/\d+/g);
+  if (!m) return null;
+  const n = Number(m.join(""));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 
 // ============ Live persistence (localStorage) ============
 const LS_KEY = "charging:live:v1";
@@ -335,11 +355,12 @@ const ChargingProgress = () => {
     let alive = true;
     async function startSessionIfNeeded() {
       setBooting(true);
-      if (state?.chargingSessionId) {
+      const stateSessionId = state?.chargingSessionId ?? state?.sessionId ?? null; // ✅ fallback
+      if (stateSessionId) {
         let seed = state?.startSessionData || null;
         if (!seed) {
           try {
-            const s = await fetchAuthJSON(`${API_ABS}/ChargingSessions/${encodeURIComponent(state.chargingSessionId)}`, { method: "GET" });
+            const s = await fetchAuthJSON(`${API_ABS}/ChargingSessions/${encodeURIComponent(stateSessionId)}`, { method: "GET" });
             seed = s?.data || s || null;
           } catch { }
         }
@@ -370,6 +391,28 @@ const ChargingProgress = () => {
         sessionStorage.setItem("charging:start:data", JSON.stringify({ message: "Bắt đầu phiên sạc", data: merged }));
         showStartSessionToast(merged);
 
+        // Lưu context (chưa có orderId) để Invoice merge được nếu reload
+        saveCtx({
+          stationId: merged?.stationId
+            ?? port?.stationId
+            ?? state?.station?.id
+            ?? state?.station?.stationId
+            ?? null,
+          chargerId: merged?.chargerId
+            ?? port?.chargerId
+            ?? state?.charger?.id
+            ?? state?.charger?.chargerId
+            ?? null,
+          portId: merged?.portId
+            ?? state?.gun?.id
+            ?? state?.portId
+            ?? null,
+          stationCode: state?.station?.code ?? null,
+          chargerCode: state?.charger?.code ?? charger?.code ?? null,
+          portCode: state?.gun?.name ?? state?.gun?.code ?? port?.code ?? null,
+        });
+
+
         // NEW: init/update live persisted state
         const kwFromState = Number(state?.charger?.powerKw);
         const kwFromSession = Number(merged?.chargerPowerKw);
@@ -392,7 +435,7 @@ const ChargingProgress = () => {
         const live = {
           isActive: true,
           isCharging: true,
-          chargingSessionId: merged?.chargingSessionId,
+          chargingSessionId: merged?.chargingSessionId ?? stateSessionId,
           portId: merged?.portId ?? state?.gun?.id ?? state?.portId ?? null,
           // ✅ KHÔNG dùng startedAt từ live cũ khi khác phiên
           startedAt: (merged?.startedAt ? new Date(merged.startedAt).getTime() : now),
@@ -413,16 +456,20 @@ const ChargingProgress = () => {
       }
 
       // Bắt đầu mới nếu chưa có id
-      const customerId =
+      // Ép về số an toàn
+      const customerId = toId(
         state?.customerId ??
         state?.customer?.customerId ??
-        (await resolveCustomerIdFromAuth(API_ABS));
-
-      const vehicleId = state?.vehicleId ?? state?.vehicle?.id ?? state?.vehicle?.vehicleId;
-      const bookingId = state?.bookingId ?? state?.booking?.id ?? state?.booking?.bookingId;
-      const portIdToUse = state?.gun?.id ?? state?.gun?.portId ?? state?.gun?.PortId ?? state?.portId;
+        (await resolveCustomerIdFromAuth(API_ABS))
+      );
+      const vehicleId = toId(state?.vehicleId ?? state?.vehicle?.id ?? state?.vehicle?.vehicleId);
+      const bookingId = toId(state?.bookingId ?? state?.booking?.id ?? state?.booking?.bookingId);
+      const portIdToUse = toId(state?.gun?.id ?? state?.gun?.portId ?? state?.gun?.PortId ?? state?.portId);
 
       if (!customerId || !vehicleId || !portIdToUse) {
+        console.warn("[ChargingProgress] Missing IDs for start", {
+          customerId, vehicleId, portIdToUse, bookingId
+        });
         // Không đủ dữ liệu để start: nếu không có live thì coi như no active
         const live = loadLive();
         if (!live?.isActive) setNoActiveSession(true);
@@ -431,18 +478,17 @@ const ChargingProgress = () => {
       }
 
       try {
-        const url = `${API_ABS}/ChargingSessions/start`;
-        const body = {
-          customerId: Number(customerId),
-          vehicleId: Number(vehicleId),
-          bookingId: bookingId == null ? null : Number(bookingId),
-          portId: Number(portIdToUse),
-        };
+        const body = { customerId, vehicleId, portId: portIdToUse, bookingId: bookingId ?? null };
+        console.log("[ChargingProgress] POST /ChargingSessions/start payload =", body);
+
+        const url = `${API_ABS}/ChargingSessions/start`;     // ✅ thêm dòng này
+
         const res = await fetchAuthJSON(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
+
 
         const msg = res?.message || "Bắt đầu phiên sạc";
         const raw = res?.data || res || null;
@@ -472,6 +518,28 @@ const ChargingProgress = () => {
         setSession(merged);
         sessionStorage.setItem("charging:start:data", JSON.stringify({ message: msg, data: merged }));
         showStartSessionToast(merged);
+
+        // Lưu context (chưa có orderId)
+        saveCtx({
+          stationId: merged?.stationId
+            ?? port?.stationId
+            ?? state?.station?.id
+            ?? state?.station?.stationId
+            ?? null,
+          chargerId: merged?.chargerId
+            ?? port?.chargerId
+            ?? state?.charger?.id
+            ?? state?.charger?.chargerId
+            ?? null,
+          portId: merged?.portId
+            ?? state?.gun?.id
+            ?? state?.portId
+            ?? null,
+          stationCode: state?.station?.code ?? null,
+          chargerCode: state?.charger?.code ?? charger?.code ?? null,
+          portCode: state?.gun?.name ?? state?.gun?.code ?? port?.code ?? null,
+        });
+
 
         // NEW: init live persisted state for new session
         const kwFromState = Number(state?.charger?.powerKw);
@@ -608,6 +676,8 @@ const ChargingProgress = () => {
     return () => { ignore = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, API_ABS]);
+
+
 
 
   // ==== Pricing theo trụ/cổng ====
@@ -925,7 +995,7 @@ const ChargingProgress = () => {
   // useEffect(() => { ... })  ← đã xoá
 
   function getChargingSessionIdSafe() {
-    let sid = session?.chargingSessionId ?? state?.chargingSessionId ?? null;
+    let sid = session?.chargingSessionId ?? state?.chargingSessionId ?? state?.sessionId ?? null; // ✅ thêm fallback
     if (!sid) {
       try {
         const cached = JSON.parse(sessionStorage.getItem("charging:start:data") || "null");
@@ -1040,7 +1110,25 @@ const ChargingProgress = () => {
     setNoActiveSession(true);
     setBooting(false);
 
-    const orderId = `CHG${beData.chargingSessionId || Date.now()}`;
+    const orderId = `CHG${beData.chargingSessionId || Date.now()}`;// Ghi context theo orderId để Invoice.jsx đọc được charge:ctx:{orderId}
+    saveCtx({
+      orderId,
+      stationId: beData?.stationId
+        ?? session?.stationId
+        ?? state?.station?.id
+        ?? null,
+      chargerId: beData?.chargerId
+        ?? session?.chargerId
+        ?? chargerInfo?.chargerId
+        ?? chargerInfo?.id
+        ?? null,
+      portId: beData?.portId
+        ?? session?.portId
+        ?? state?.gun?.id
+        ?? state?.portId
+        ?? null,
+      endedAt: beData?.endedAt ?? new Date().toISOString(),
+    });
 
     // Lưu theo 2 key mà Invoice.jsx có thể đọc
     sessionStorage.setItem(`chargepay:${orderId}`, JSON.stringify({ orderId, ...beData }));
@@ -1095,8 +1183,9 @@ const ChargingProgress = () => {
   };
 
   const canEnd = Boolean(
-    session?.chargingSessionId ||
-    state?.chargingSessionId ||
+  session?.chargingSessionId ||
+  state?.chargingSessionId ||
+  state?.sessionId ||  
     (() => {
       try {
         const cached = JSON.parse(sessionStorage.getItem("charging:start:data") || "null");

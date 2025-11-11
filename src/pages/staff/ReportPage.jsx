@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { fetchAuthJSON } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart,
   Bar,
@@ -15,8 +16,10 @@ import {
 import "./ReportPage.css";
 
 export default function ReportPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [stations, setStations] = useState([]);
+  const [users, setUsers] = useState([]);
   const [myStations, setMyStations] = useState([]);
   const [selectedStationId, setSelectedStationId] = useState(null);
   const [report, setReport] = useState({
@@ -28,7 +31,7 @@ export default function ReportPage() {
   });
   const [history, setHistory] = useState([]);
   const [chartData, setChartData] = useState([]);
-  const [timeFilter, setTimeFilter] = useState("7d");
+  const [timeFilter, setTimeFilter] = useState("all");
   const [loading, setLoading] = useState(true);
 
   const currentAccountId = user?.accountId || localStorage.getItem("accountId");
@@ -47,6 +50,27 @@ export default function ReportPage() {
       try {
         setLoading(true);
         const allStations = await fetchAuthJSON("/Stations");
+        const allUsers = await fetchAuthJSON("/Auth");
+        const authList = toArray(allUsers);
+
+// Lấy danh sách user có role là Customer
+// Lấy tất cả loại tài khoản có thể xuất hiện trong hệ thống
+const userMap = authList
+  .filter((a) =>
+    ["Customer", "Company", "Staff", "Admin"].includes(a.role)
+  )
+  .map((a) => ({
+    accountId: a.accountId,
+    fullName:
+      a.company?.companyName || // nếu là Company
+      a.customers?.[0]?.fullName || // nếu là Customer
+      a.userName, // nếu là Staff hoặc Admin
+    role: a.role,
+    avatar: a.avatarUrl || null,
+  }));
+
+setUsers(userMap);
+
         const stationsArr = toArray(allStations);
         const myStationIds = [];
 
@@ -138,7 +162,7 @@ export default function ReportPage() {
 
         const completedSessions = sessions.filter(
           (s) =>
-            ["completed", "done"].includes(s.status?.toLowerCase?.() || "") &&
+            ["completed", "paid"].includes(s.status?.toLowerCase?.() || "") &&
             myChargerIds.includes(s.portId)
         )
         .sort((a, b) => new Date(b.endedAt) - new Date(a.endedAt));
@@ -165,7 +189,11 @@ export default function ReportPage() {
           return {
             session: `S-${s.chargingSessionId}`,
             charger: s.portId,
-            customer: s.customerId || "—",
+            customer:
+  users.find((u) => String(u.accountId) === String(s.customerId))
+    ?.fullName || "Vãng lai",
+
+
             duration: formatDuration(s.startedAt, s.endedAt),
             kWh: s.energyKwh || 0,
             cost: s.total || 0,
@@ -213,7 +241,7 @@ export default function ReportPage() {
   );
 
   const exportCSV = () => {
-    const header = "Phiên,Trụ,Khách,Thời lượng,kWh,Chi phí,Hóa đơn\n";
+    const header = "Phiên,Trụ,Người bắt đầu,Thời lượng,kWh,Chi phí,Hóa đơn\n";
     const rows = history.map(
       (h) =>
         `${h.session},${h.charger},${h.customer},${h.duration},${h.kWh},${h.cost},${h.invoice}`
@@ -253,14 +281,6 @@ export default function ReportPage() {
             ))}
           </select>
         )}
-        <select
-          value={timeFilter}
-          onChange={(e) => setTimeFilter(e.target.value)}
-        >
-          <option value="7d">7 ngày qua</option>
-          <option value="month">Tháng này</option>
-          <option value="all">Toàn thời gian</option>
-        </select>
       </div>
 
       {currentStation && (
@@ -311,41 +331,69 @@ export default function ReportPage() {
       )}
 
       {/* Lịch sử */}
-      <h3>Lịch sử phiên đã thanh toán</h3>
+      <h3>Lịch sử phiên đã hoàn thành</h3>
       <div className="rep-table">
         <table>
           <thead>
             <tr>
               <th>Phiên</th>
               <th>Trụ</th>
-              <th>Khách</th>
+              <th>Người bắt đầu</th>
               <th>Thời lượng</th>
               {/*<th>kWh</th>*/}
               <th>Chi phí</th>
               <th>Hóa đơn</th>
             </tr>
           </thead>
-          <tbody>
-            {history.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="center muted">
-                  Chưa có phiên thanh toán.
-                </td>
-              </tr>
-            ) : (
-              history.map((h, i) => (
-                <tr key={i}>
-                  <td>{h.session}</td>
-                  <td>{h.charger}</td>
-                  <td>{h.customer}</td>
-                  <td>{h.duration}</td>
-                  {/*<td>{h.kWh}</tdt*/}
-                  <td>{h.cost.toLocaleString("vi-VN")} đ</td>
-                  <td>{h.invoice}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
+<tbody>
+  {history.length === 0 ? (
+    <tr>
+      <td colSpan={7} className="center muted">
+        Chưa có phiên thanh toán.
+      </td>
+    </tr>
+  ) : (
+    history.map((h, i) => (
+      <tr key={i}>
+        <td>{h.session}</td>
+        <td>{h.charger}</td>
+        <td>{h.customer}</td>
+        <td>{h.duration}</td>
+        <td>{h.cost.toLocaleString("vi-VN")} đ</td>
+        <td>
+          <button
+            className="btn-light"
+            onClick={() => {
+              // Giống SessionManager: tạo order=S{sessionId}
+              const sessionId = h.session.replace("S-", "");
+              const orderId = `S${sessionId}`;
+              
+              // Gửi sang trang invoice với state chi tiết
+              navigate(`/staff/invoice?order=${orderId}`, {
+                state: {
+                  ...h,
+                  chargingSessionId: Number(sessionId),
+                  total: h.cost,
+                  customerId:
+                    users.find(
+                      (u) => u.fullName === h.customer
+                    )?.accountId || null,
+                  invoiceStatus: "PAID", // vì từ báo cáo
+                  endedAt: new Date().toISOString(),
+                  startedAt: new Date(Date.now() - 3600000).toISOString(),
+                  energyKwh: h.kWh,
+                },
+              });
+            }}
+          >
+            Chi tiết
+          </button>
+        </td>
+      </tr>
+    ))
+  )}
+</tbody>
+
         </table>
         <button className="export" onClick={exportCSV}>
           ⭳ Xuất CSV

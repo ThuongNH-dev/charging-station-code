@@ -1,98 +1,123 @@
-/* src/components/form/Info/ProfileSidebar.css */
-
+/* ====== SIDEBAR TỔNG ====== */
 .profile-sidebar {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
 
-  padding: 30px 20px; /* thêm padding ngang cho cân đối */
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  width: 340px;
+  padding: 32px 20px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
 
   box-sizing: border-box;
-  gap: 10px;
-  width: 360px; /* vẫn có thể giữ cố định chiều rộng */
-
-  /* ❌ bỏ height để tự động giãn theo nội dung */
+  gap: 20px;
+  transition: all 0.3s ease;
 }
 
-/* ===== Thông tin người dùng ===== */
+/* ====== CARD NGƯỜI DÙNG ====== */
 .profile-card {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 24px;
 }
 
 .profile-avatar {
-  width: 90px;
-  height: 90px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
-  border: 2px solid #e2e2e2;
+  overflow: hidden;
+  margin: 0 auto 14px;
+  border: 3px solid #d9e6dc;
+  background: #f6faf7;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 25px auto 12px;
-  font-size: 32px;
-  color: #0b702e;
-  background: #f8faf9;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .profile-title {
+  font-size: 22px;
   font-weight: 700;
-  font-size: 25px;
   color: #222;
-  margin-bottom: 12px;
+  margin-top: 10px;
 }
 
 .profile-role {
-  margin-top: 6px;
-  font-size: 16px;
-  color: #fff;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #ffffff;
   background: #0b702e;
   display: inline-block;
-  padding: 6px 30px;
+  padding: 6px 24px;
   border-radius: 50px;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 6px rgba(11, 112, 46, 0.25);
 }
 
-/* ===== Điều hướng ===== */
+/* ====== MENU NAVIGATION ====== */
 .profile-nav {
   display: flex;
-  width: 250px;
-  margin-bottom: 32px;
-  padding: 0;
-  text-align: center;
-  justify-content: center;
   flex-direction: column;
-  gap: 25px;
+  gap: 14px;
+  width: 100%;
+  margin-top: 10px;
 }
 
 .profile-link {
-  display: flex;
-  justify-content: center;
+  display: block;
+  text-align: center;
   font-size: 16px;
-  width: 250px;
-  padding: 10px 14px;
-  border-radius: 8px;
+  color: #333;
+  background: #f8f9fa;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
   text-decoration: none;
-  color: #222;
-  border: 1px solid #a09e9e;
-  background: #ffffff;
+  font-weight: 500;
   transition: all 0.25s ease;
 }
 
-.profile-link.active,
 .profile-link:hover {
-  background: #f4f9f5;
-  border-color: #112c17;
-  color: #33c365;
-  font-weight: 600;
+  background: #eaf7ef;
+  border-color: #0b702e;
+  color: #0b702e;
 }
 
-/* ===== Responsive nhỏ hơn ===== */
+.profile-link.active {
+  background: #0b702e;
+  color: #ffffff;
+  border-color: #0b702e;
+  font-weight: 600;
+  box-shadow: 0 2px 10px rgba(11, 112, 46, 0.25);
+}
+
+/* ====== RESPONSIVE ====== */
 @media (max-width: 768px) {
   .profile-sidebar {
     width: 100%;
-    margin-bottom: 24px;
+    margin-bottom: 28px;
+    padding: 24px 16px;
+  }
+
+  .profile-avatar {
+    width: 90px;
+    height: 90px;
+  }
+
+  .profile-title {
+    font-size: 20px;
+  }
+
+  .profile-link {
+    font-size: 15px;
+    padding: 9px 16px;
   }
 }

@@ -78,6 +78,12 @@ export default function AccountMenu() {
   const [roleText, setRoleText] = React.useState(userRole || user?.role || "");
   const [avatarUrl, setAvatarUrl] = React.useState("");
 
+  // ngay sau các useState/useAuth:
+  const normRole = React.useMemo(() => {
+    return (roleText || userRole || user?.role || "").toString().toLowerCase();
+  }, [roleText, userRole, user]);
+
+
   React.useEffect(() => {
     if (userName && !displayName) setDisplayName(userName);
     if (userRole && !roleText) setRoleText(userRole);
@@ -258,10 +264,11 @@ export default function AccountMenu() {
 
         <Divider />
 
+        {/* ✅ Menu luôn hiển thị cho mọi role */}
         <MenuItem
           onClick={() => {
             handleClose();
-            navigate(manageAccountPath()); // ✅ dùng hàm chọn theo role
+            navigate(manageAccountPath());
           }}
           sx={{
             borderRadius: "10px",
@@ -273,50 +280,74 @@ export default function AccountMenu() {
           Quản lý tài khoản
         </MenuItem>
 
-        <MenuItem
-          onClick={() => {
-            handleClose();
-            navigate("/company/reports");
-          }}
-          sx={{
-            borderRadius: "10px",
-            mx: 0.5,
-            margin: "5px 0px",
-            "&:hover": { background: "#f5f7fa" },
-          }}
-        >
-          Thống kê theo tháng
-        </MenuItem>
+        {/* 🔒 Ẩn 3 mục dưới nếu là Staff */}
+        {!roleText?.toLowerCase().includes("staff") && (
+          <>
+            <MenuItem
+              onClick={() => {
+                handleClose();
+                navigate("/company/reports");
+              }}
+              sx={{
+                borderRadius: "10px",
+                mx: 0.5,
+                margin: "5px 0px",
+                "&:hover": { background: "#f5f7fa" },
+              }}
+            >
+              Thống kê theo tháng
+            </MenuItem>
 
-        <MenuItem
-          onClick={() => {
-            handleClose();
-            navigate("/charging");
-          }}
-          sx={{
-            borderRadius: "10px",
-            mx: 0.5,
-            margin: "5px 0px",
-            "&:hover": { background: "#f5f7fa" },
-          }}
-        >
-          Phiên đang sạc
-        </MenuItem>
+            <MenuItem
+              onClick={() => {
+                handleClose();
+                navigate("/charging");
+              }}
+              sx={{
+                borderRadius: "10px",
+                mx: 0.5,
+                margin: "5px 0px",
+                "&:hover": { background: "#f5f7fa" },
+              }}
+            >
+              Phiên đang sạc
+            </MenuItem>
 
-        <MenuItem
-          onClick={() => {
-            handleClose();
-            navigate("/manageSubcription");
-          }}
-          sx={{
-            borderRadius: "10px",
-            mx: 0.5,
-            margin: "5px 0px",
-            "&:hover": { background: "#f5f7fa" },
-          }}
-        >
-          Quản lý gói dịch vụ
-        </MenuItem>
+            <MenuItem
+              onClick={() => {
+                handleClose();
+                navigate("/manageSubcription");
+              }}
+              sx={{
+                borderRadius: "10px",
+                mx: 0.5,
+                margin: "5px 0px",
+                "&:hover": { background: "#f5f7fa" },
+              }}
+            >
+              Quản lý gói dịch vụ
+            </MenuItem>
+          </>
+        )}
+
+
+        {normRole === "customer" && (
+          <MenuItem
+            onClick={() => {
+              handleClose();
+              navigate("/my-feedback");
+            }}
+            sx={{
+              borderRadius: "10px",
+              mx: 0.5,
+              margin: "5px 0px",
+              "&:hover": { background: "#f5f7fa" },
+            }}
+          >
+            Đánh giá của tôi
+          </MenuItem>
+        )}
+
 
         <Divider sx={{ my: 0.5 }} />
 
@@ -339,6 +370,7 @@ export default function AccountMenu() {
           </ListItemIcon>
           Đăng xuất
         </MenuItem>
+
       </Menu>
     </Box>
   );

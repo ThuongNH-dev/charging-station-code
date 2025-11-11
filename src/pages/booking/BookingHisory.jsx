@@ -238,6 +238,14 @@ export default function HistoryPage() {
     navigate(`/payment/success?${qs.toString()}`);
   };
 
+  // 👉 NÊN đặt goInvoice ra ngoài cùng cấp với goDetail
+  const goInvoice = (row) => {
+    const qs = new URLSearchParams();
+    if (row.bookingId) qs.set("bookingId", String(row.bookingId));
+    // Bạn có thể đổi route này tuỳ hệ thống
+    navigate(`/invoiceSummary?${qs.toString()}`);
+  };
+
 
   const onPay = async (row) => {
     try {
@@ -386,10 +394,13 @@ export default function HistoryPage() {
               {filtered.map((row) => {
                 const showPayBtn = row.status === "Pending" && !row._paid;
                 const showCancelBtn = row.status === "Pending" && !row._paid;
-                const showDetailBtn =
-                  (row._paid || ["Confirmed", "Completed"].includes(row.status)) &&
-                  !["Cancelled", "Failed"].includes(row.status);
-                const noActions = ["Cancelled", "Failed"].includes(row.status);
+                const isCancelledOrFailed = ["Cancelled", "Failed"].includes(row.status);
+                const isCompleted = row.status === "Completed";
+                // ✅ “Xem chi tiết” chỉ cho Confirmed (hoặc đã _paid), KHÔNG áp dụng cho Completed
+                const showDetailBtn = !isCancelledOrFailed && !isCompleted && (row._paid || row.status === "Confirmed");
+                // ✅ “Xem hoá đơn” riêng cho Completed
+                const showInvoiceBtn = !isCancelledOrFailed && isCompleted;
+                const noActions = isCancelledOrFailed;
 
                 return (
                   <div key={row.bookingId} className="hist-card">
@@ -425,6 +436,9 @@ export default function HistoryPage() {
                       )}
                       {showDetailBtn && (
                         <button className="hist-btn ghost" onClick={() => goDetail(row)} title="Xem chi tiết">Xem chi tiết</button>
+                      )}
+                      {showInvoiceBtn && (
+                        <button className="hist-btn ghost" onClick={() => goInvoice(row)} title="Xem hoá đơn">Xem hoá đơn</button>
                       )}
                       {noActions && <span className="hist-note" style={{ color: '#9aa3b2' }}>—</span>}
                     </div>

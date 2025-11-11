@@ -39,7 +39,7 @@ async function pollInvoicePaid(invoiceId, { timeoutMs = 300000, stepMs = 2500 } 
     try {
       const inv = await fetchInvoiceById(invoiceId);
       if (isPaidOrConfirmed(inv)) return { ok: true, data: inv };
-    } catch { }
+    } catch {}
     await new Promise((r) => setTimeout(r, stepMs));
   }
   return { ok: false };
@@ -207,7 +207,7 @@ async function fetchSessionsForInvoice(invoiceId, context) {
       const hydrated = await hydrateSessionsDetails(base);
       return hydrated;
     }
-  } catch { }
+  } catch {}
 
   try {
     const baseUrl = `${API_ABS}/ChargingSessions/by-invoice/${invoiceId}`;
@@ -217,7 +217,7 @@ async function fetchSessionsForInvoice(invoiceId, context) {
       const hydrated = await hydrateSessionsDetails(base);
       return hydrated;
     }
-  } catch { }
+  } catch {}
 
   const { customerId, billingYear, billingMonth } = context || {};
   if (customerId && billingYear && billingMonth) {
@@ -235,7 +235,7 @@ async function fetchSessionsForInvoice(invoiceId, context) {
 
       const hydrated = await hydrateSessionsDetails(arr);
       return hydrated;
-    } catch { }
+    } catch {}
   }
 
   return [];
@@ -348,6 +348,154 @@ const computeSubscriptionDates = (sub, inv) => {
   return { endDate, nextBillingDate, isEndEstimated };
 };
 
+/* ======================= CSV helpers (NEW) ======================= */
+function csvEscape(v) {
+  if (v == null) return "";
+  const s = String(v);
+  if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function downloadCSV(filename, csvText) {
+  const BOM = "\uFEFF"; // để Excel hiển thị Unicode
+  const blob = new Blob([BOM + csvText], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function formatDateTime(v) {
+  return v ? new Date(v).toLocaleString("vi-VN") : "—";
+}
+
+function buildCSVForCharging(invoice, sessions) {
+  const lines = [];
+  // Thông tin chung
+  lines.push(["Thông tin hoá đơn"]);
+  lines.push(["Kỳ", `${invoice.billingMonth}/${invoice.billingYear}`]);
+  lines.push(["Khách hàng", invoice?.customer?.fullName || `#${invoice?.customerId || "—"}`]);
+  lines.push(["Trạng thái", invoice?.status || "—"]);
+  lines.push(["Tạo lúc", formatDateTime(invoice?.createdAt)]);
+  lines.push(["Cập nhật", formatDateTime(invoice?.updatedAt)]);
+  lines.push(["Tổng hoá đơn", (Number(invoice?.total) || 0).toLocaleString("vi-VN") + " đ"]);
+  lines.push([]);
+
+  // Header chi tiết
+  lines.push([
+    "Mã phiên",
+    "Xe",
+    "Cổng",
+    "Bắt đầu",
+    "Kết thúc",
+    "Thời lượng (phút)",
+    "Idle (phút)",
+    "SoC bắt đầu",
+    "SoC kết thúc",
+    "Năng lượng (kWh)",
+    "Phí trước thuế (đ)",
+    "Thuế (đ)",
+    "Tổng (đ)",
+    "Trạng thái",
+  ]);
+
+  let subtotal = 0,
+    tax = 0,
+    total = 0;
+
+  sessions.forEach((s) => {
+    const sub = Number(s.subtotal) || 0;
+    const t = Number(s.tax) || 0;
+    const tot = Number(s.total) || 0;
+    subtotal += sub;
+    tax += t;
+    total += tot;
+
+    lines.push([
+      s.chargingSessionId ?? "—",
+      s.vehicleId ?? "—",
+      s.portId ?? "—",
+      formatDateTime(s.startedAt),
+      formatDateTime(s.endedAt),
+      Number(s.durationMin) || 0,
+      Number(s.idleMin) || 0,
+      s.startSoc ?? "—",
+      s.endSoc ?? "—",
+      (Number(s.energyKwh) || 0).toLocaleString("vi-VN"),
+      (sub || 0).toLocaleString("vi-VN"),
+      (t || 0).toLocaleString("vi-VN"),
+      (tot || 0).toLocaleString("vi-VN"),
+      s.status || "—",
+    ]);
+  });
+
+  // Dòng tổng
+  lines.push([]);
+  lines.push([
+    "TỔNG",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    subtotal.toLocaleString("vi-VN"),
+    tax.toLocaleString("vi-VN"),
+    total.toLocaleString("vi-VN"),
+    "",
+  ]);
+
+  return lines.map((row) => row.map(csvEscape).join(",")).join("\n");
+}
+
+function buildCSVForSubscription(invoice, sub) {
+  const lines = [];
+  lines.push(["Thông tin hoá đơn Subscription"]);
+  lines.push(["Kỳ", `${invoice.billingMonth}/${invoice.billingYear}`]);
+  lines.push(["Khách hàng", invoice?.customer?.fullName || `#${invoice?.customerId || "—"}`]);
+  lines.push(["Trạng thái", invoice?.status || "—"]);
+  lines.push(["Tạo lúc", formatDateTime(invoice?.createdAt)]);
+  lines.push(["Cập nhật", formatDateTime(invoice?.updatedAt)]);
+  lines.push(["Tổng hoá đơn", (Number(invoice?.total) || 0).toLocaleString("vi-VN") + " đ"]);
+  lines.push([]);
+
+  lines.push([
+    "Gói",
+    "Chu kỳ",
+    "Tự gia hạn",
+    "Giá tháng (đ)",
+    "Ưu đãi (%)",
+    "Free idle (phút)",
+    "Bắt đầu",
+    "Hết hạn",
+    "Tổng (đ)",
+    "Trạng thái gói",
+  ]);
+
+  lines.push([
+    sub?.planName || "—",
+    sub?.billingCycle || "—",
+    sub?.autoRenew ? "Có" : "Không",
+    (Number(sub?.priceMonthly) || 0).toLocaleString("vi-VN"),
+    Number(sub?.discountPercent) || 0,
+    Number(sub?.freeIdleMinutes) || 0,
+    formatDateTime(sub?.startDate),
+    formatDateTime(sub?.endDate),
+    (Number(invoice?.total) || 0).toLocaleString("vi-VN"),
+    sub?.status || "—",
+  ]);
+
+  return lines.map((row) => row.map(csvEscape).join(",")).join("\n");
+}
+/* ===================== END CSV helpers ===================== */
+
 export default function InvoiceDetail() {
   const { state } = useLocation();
   const { invoiceId: invoiceIdParam } = useParams();
@@ -381,7 +529,7 @@ export default function InvoiceDetail() {
             }
           }
         }
-      } catch { }
+      } catch {}
       if (mounted) setLoading(false);
     })();
     return () => {
@@ -466,7 +614,6 @@ export default function InvoiceDetail() {
   const subtotalCharging = sessions.reduce((a, s) => a + (Number(s.subtotal) || 0), 0);
   const taxCharging = sessions.reduce((a, s) => a + (Number(s.tax) || 0), 0);
   const totalCharging = sessions.reduce((a, s) => a + (Number(s.total) || 0), 0);
-  // const mismatchCharging = Math.abs(totalCharging - (Number(invoice?.total) || 0)) > 1;
 
   const subtotalSub = Number(invoice?.subtotal) || 0;
   const taxSub = Number(invoice?.tax) || 0;
@@ -542,6 +689,23 @@ export default function InvoiceDetail() {
   const pageItems = filteredSessions.slice(start, start + pageSize);
   const pageList = buildPages(totalPages, page, 2);
 
+  /* ============== NEW: handler xuất CSV ============== */
+  const handleExportCSV = () => {
+    if (!invoice) return;
+    const idPart =
+      (invoice.invoiceId ?? invoice.id ?? `${invoice.billingYear}-${invoice.billingMonth}`).toString();
+    const fnameBase = `invoice_${idPart}_${invoice.billingMonth}-${invoice.billingYear}`.replace(/\s+/g, "_");
+
+    if (isSub) {
+      const csv = buildCSVForSubscription(invoice, invoice?.subscription || {});
+      downloadCSV(`${fnameBase}_subscription.csv`, csv);
+    } else {
+      const csv = buildCSVForCharging(invoice, filteredSessions);
+      downloadCSV(`${fnameBase}_charging.csv`, csv);
+    }
+  };
+  /* ============== END NEW ============== */
+
   if (!targetId && !loading) {
     return (
       <MainLayout>
@@ -615,8 +779,10 @@ export default function InvoiceDetail() {
                 Đã thanh toán
               </button>
             )}
-            <button onClick={() => window.print()} className="btn ghost">
-              In hóa đơn
+
+            {/* ✅ THAY nút In hóa đơn bằng Xuất CSV */}
+            <button onClick={handleExportCSV} className="btn ghost">
+              Xuất CSV
             </button>
           </div>
         </div>
