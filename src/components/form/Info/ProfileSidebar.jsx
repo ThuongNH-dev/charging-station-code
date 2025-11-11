@@ -2,18 +2,15 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import "./ProfileSidebar.css";
 import { useAuth } from "../../../context/AuthContext";
+import { getApiBase } from "../../../utils/api";
 
-/** Nếu dự án bạn có util getApiBase(): */
-// import { getApiBase } from "../../../utils/api";
-// const API_BASE = getApiBase();
-
-/** Chưa có thì dùng hằng này khi dev: */
-const API_BASE = "https://localhost:7268/api";
+/** API base từ utils */
+const API_BASE = getApiBase();
 
 const DEFAULT_AVATAR =
   "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
 
-/* ===== Helpers đọc storage/JWT để suy ra accountId ===== */
+/* ===== Helpers đọc storage/JWT ===== */
 function getStoredUser() {
   try {
     const s =
@@ -40,7 +37,8 @@ function decodeJwtPayload(token) {
   }
 }
 
-function resolveAccountId() {
+/** Lấy accountId đồng bộ từ storage/JWT; KHÔNG dùng fallback số cứng */
+function resolveAccountIdSync() {
   const s1 = sessionStorage.getItem("accountId");
   const s2 = localStorage.getItem("accountId");
   if (s1 && !isNaN(+s1)) return +s1;
@@ -50,14 +48,50 @@ function resolveAccountId() {
   const token = u?.token || localStorage.getItem("token") || "";
   const payload = token ? decodeJwtPayload(token) : null;
 
-  // Chỉnh key claim theo BE của bạn nếu khác
   const idFromClaim =
     payload?.nameid || payload?.nameId || payload?.sub || payload?.accountId;
 
   if (idFromClaim && !isNaN(+idFromClaim)) return +idFromClaim;
 
-  // Fallback khi dev/test (khớp mẫu bạn gửi)
-  return 4;
+  // Thiếu accountId ⇒ để effect async dò bằng customerId
+  return null;
+}
+
+function getStoredToken() {
+  const u = getStoredUser();
+  return u?.token || localStorage.getItem("token") || "";
+}
+
+function getStoredCustomerId() {
+  const s1 = sessionStorage.getItem("customerId");
+  const s2 = localStorage.getItem("customerId");
+  return (s1 && +s1) || (s2 && +s2) || null;
+}
+
+/** Nếu thiếu accountId mà có customerId → gọi GET /Auth (list) để match */
+async function findAccountIdByCustomerId(token, customerId) {
+  if (!customerId) return null;
+  try {
+    const base = (API_BASE || "").replace(/\/+$/, "");
+    const res = await fetch(`${base}/Auth`, {
+      headers: {
+        accept: "application/json",
+        authorization: token ? `Bearer ${token}` : undefined,
+      },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : [data];
+    const mine = list.find(
+      (acc) =>
+        Array.isArray(acc?.customers) &&
+        acc.customers.some((c) => Number(c?.customerId) === Number(customerId))
+    );
+    const accId = Number(mine?.accountId ?? mine?.id ?? mine?.userId);
+    return Number.isFinite(accId) ? accId : null;
+  } catch {
+    return null;
+  }
 }
 
 export default function ProfileSidebar() {
@@ -72,15 +106,45 @@ export default function ProfileSidebar() {
     avatarUrl: "",
   });
 
-  const accountId = useMemo(() => resolveAccountId(), []);
+  // accountId trong state; nếu thiếu sẽ được dò bằng customerId
+  const [accountId, setAccountId] = useState(() => resolveAccountIdSync());
+
+  // Nếu chưa có accountId nhưng có customerId → dò qua /Auth
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (accountId) return;
+      const token = getStoredToken();
+      const customerId = getStoredCustomerId();
+      if (!customerId) return;
+      const accId = await findAccountIdByCustomerId(token, customerId);
+      if (alive && Number.isFinite(accId)) {
+        setAccountId(accId);
+        try {
+          localStorage.setItem("accountId", String(accId));
+          sessionStorage.setItem("accountId", String(accId));
+        } catch {}
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [accountId]);
 
   useEffect(() => {
     let aborted = false;
 
     async function fetchProfile() {
       try {
-        const url = `${API_BASE}/Auth/${accountId}`;
-        const res = await fetch(url, { headers: { accept: "*/*" } });
+        const base = (API_BASE || "").replace(/\/+$/, "");
+        const url = `${base}/Auth/${accountId}`;
+        const token = getStoredToken();
+        const res = await fetch(url, {
+          headers: {
+            accept: "application/json",
+            authorization: token ? `Bearer ${token}` : undefined,
+          },
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (aborted) return;
@@ -125,7 +189,7 @@ export default function ProfileSidebar() {
   const isActive = (to) =>
     location.pathname === to || location.pathname.startsWith(to + "/");
 
-  // Menu theo role (giữ nguyên như bạn đang có)
+  // Menu theo role
   const items = useMemo(() => {
     if (roleNorm === "staff") {
       return [
