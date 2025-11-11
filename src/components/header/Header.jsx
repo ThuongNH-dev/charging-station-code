@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import AccountMenu from "../others/Menu";
 import {
   FileSearchOutlined,
+  ContainerOutlined,
   FileTextOutlined,
   NotificationOutlined,
   BellOutlined,
@@ -64,7 +65,7 @@ function getNotiTime(n) {
         if (!isNaN(d2.getTime())) return d2.getTime();
       }
     }
-  } catch { }
+  } catch {}
   if (typeof n?.id === "number") return n.id;
   return 0;
 }
@@ -80,7 +81,9 @@ export default function Head() {
     userName: ctxName,
   } = useAuth();
 
-  const rawRole = String(user?.role ?? "").trim().toLowerCase();
+  const rawRole = String(user?.role ?? "")
+    .trim()
+    .toLowerCase();
   const isAdmin = rawRole === "admin";
   const isStaff = rawRole === "staff";
   const isCustomer = rawRole === "customer";
@@ -158,20 +161,20 @@ export default function Head() {
   /* ===== NAV items ===== */
   const items = isStaff
     ? [
-      { key: "s1", label: "Quản lý trạm sạc", path: "/staff/stations" },
-      { key: "s2", label: "Quản lý trụ sạc", path: "/staff/chargers" },
-      { key: "s3", label: "Phiên sạc", path: "/staff/sessions" },
-      { key: "s4", label: "Thanh toán", path: "/staff/payments" },
-      { key: "s5", label: "Sự cố", path: "/staff/incidents" },
-      { key: "s6", label: "Báo cáo", path: "/staff/reports" },
-    ]
+        { key: "s1", label: "Quản lý trạm sạc", path: "/staff/stations" },
+        { key: "s2", label: "Quản lý trụ sạc", path: "/staff/chargers" },
+        { key: "s3", label: "Phiên sạc", path: "/staff/sessions" },
+        { key: "s4", label: "Thanh toán", path: "/staff/payments" },
+        { key: "s5", label: "Sự cố", path: "/staff/incidents" },
+        { key: "s6", label: "Báo cáo", path: "/staff/reports" },
+      ]
     : isCompany
-      ? [
+    ? [
         { key: "c1", label: "Quản lý nguồn lực", path: "/company" },
         { key: "3", label: "Dịch vụ", path: "/services" },
         { key: "4", label: "Liên hệ", path: "/contact" },
       ]
-      : [
+    : [
         { key: "1", label: "Trang chủ", path: "/" },
         { key: "2", label: "Danh mục", path: "/stations" },
         { key: "3", label: "Dịch vụ", path: "/services" },
@@ -317,7 +320,7 @@ export default function Head() {
                             String(latestMark || Date.now())
                           );
                       }
-                    } catch { }
+                    } catch {}
                     setHasNew(false);
                   }}
                 >
@@ -343,6 +346,18 @@ export default function Head() {
                 style={{ marginRight: 8 }}
               >
                 Quy tắc giá
+              </Button>
+            </Tooltip>
+
+            <Tooltip title="Quản lý Báo cáo Sự cố">
+              <Button
+                type="default"
+                size="middle"
+                icon={<ContainerOutlined />}
+                onClick={() => navigate("/admin/incident-reports")}
+                style={{ marginRight: 8 }}
+              >
+                Báo cáo Sự cố
               </Button>
             </Tooltip>
 
@@ -389,8 +404,9 @@ export default function Head() {
                         }}
                       >
                         <div
-                          className={`nav-item ${activeKey === item.key ? "active" : ""
-                            } nav-dropdown`}
+                          className={`nav-item ${
+                            activeKey === item.key ? "active" : ""
+                          } nav-dropdown`}
                           onClick={(e) => e.preventDefault()}
                         >
                           {item.label} <span className="caret">▾</span>
@@ -412,8 +428,9 @@ export default function Head() {
                         }}
                       >
                         <div
-                          className={`nav-item ${activeKey === item.key ? "active" : ""
-                            } nav-dropdown`}
+                          className={`nav-item ${
+                            activeKey === item.key ? "active" : ""
+                          } nav-dropdown`}
                           onClick={(e) => e.preventDefault()}
                         >
                           {item.label} <span className="caret">▾</span>
@@ -426,8 +443,9 @@ export default function Head() {
                 return (
                   <li key={item.key}>
                     <div
-                      className={`nav-item ${activeKey === item.key ? "active" : ""
-                        }`}
+                      className={`nav-item ${
+                        activeKey === item.key ? "active" : ""
+                      }`}
                       onClick={() => navigate(item.path)}
                     >
                       {item.label}

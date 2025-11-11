@@ -55,6 +55,7 @@ import ManageSubscriptions from "./components/subscription/ManageSubcription";
 import Dashboard from "./components/admin/pages/dashboard/Dashboard";
 import AdminNotificationsSendPage from "./components/admin/pages/AdminNotificationsSendPage";
 import PricingRulesPage from "./components/admin/pages/pricing/PricingRulesPage";
+import AdminIncidentReports from "./components/admin/pages/Reports/AdminIncidentReports";
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
@@ -343,7 +344,7 @@ export default function App() {
 
       {/* Admin */}
       <Route
-        path="admin"
+        path="/admin/*"
         element={
           <ProtectedRoute allowedRoles={["Admin"]}>
             <AdminLayout />
@@ -356,6 +357,7 @@ export default function App() {
         <Route path="stations/:stationId" element={<StationDetailPage />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="incident-reports" element={<AdminIncidentReports />} />
 
         <Route path="pricing-rules" element={<PricingRulesPage />} />
         <Route
