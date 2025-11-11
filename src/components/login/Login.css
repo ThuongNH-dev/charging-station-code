@@ -32,9 +32,9 @@
 /* Dark Mode Colors - Modern & Bright */
 @media (prefers-color-scheme: dark) {
   :root {
-    --login-bg-overlay: rgba(2, 6, 23, 0.5);
-    --login-card-bg: rgba(17, 24, 39, 0.6);
-    --login-card-border: rgba(236, 72, 153, 0.15);
+    --login-bg-overlay: rgba(0, 0, 0, 0.35);
+    --login-card-bg: rgba(30, 41, 59, 0.98);
+    --login-card-border: rgba(148, 163, 184, 0.4);
     --login-title-color: #f8fafc;
     --login-label-color: #f8fafc;
     --login-input-bg: rgba(30, 41, 59, 0.9);
@@ -184,6 +184,7 @@
 .login-text{
   background-color: var(--login-input-bg) !important;
 }
+
 .form-input::placeholder {
   color: var(--login-input-placeholder);
   font-weight: 400;
