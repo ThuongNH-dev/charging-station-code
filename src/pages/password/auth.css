@@ -1,0 +1,195 @@
+/* ========= AUTH: FORGOT + RESET (kế thừa theme login) ========= */
+
+:root {
+  --login-success-bg: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  --login-success-border: #34d399;
+  --login-success-text: #065f46;
+  --login-warning-bg: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  --login-warning-border: #f59e0b;
+  --login-warning-text: #7c2d12;
+  --login-info-bg: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  --login-info-border: #60a5fa;
+  --login-info-text: #1e3a8a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --login-success-bg: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+    --login-success-border: #34d399;
+    --login-success-text: #a7f3d0;
+    --login-warning-bg: linear-gradient(135deg, #7c2d12 0%, #92400e 100%);
+    --login-warning-border: #f59e0b;
+    --login-warning-text: #fde68a;
+    --login-info-bg: linear-gradient(135deg, #0c4a6e 0%, #1e40af 100%);
+    --login-info-border: #60a5fa;
+    --login-info-text: #bfdbfe;
+  }
+}
+
+/* Card dùng chung cho Forgot/Reset */
+.auth-card {
+  max-width: 520px;
+  padding: 40px 36px;
+}
+
+/* Subtitle dưới title */
+.auth-subtitle {
+  color: var(--login-text-secondary);
+  margin-bottom: 18px;
+  line-height: 1.6;
+  font-size: 14.5px;
+}
+
+/* AntD form elements */
+.auth-card .ant-form-item-label > label {
+  color: var(--login-label-color);
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.auth-card .ant-input,
+.auth-card .ant-input-password,
+.auth-card .ant-input-affix-wrapper {
+  background: var(--login-input-bg);
+  border: 2px solid var(--login-input-border);
+  border-radius: 10px !important;
+  padding: 10px 12px;
+  color: var(--login-input-text);
+  transition: all 0.25s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.auth-card .ant-input::placeholder {
+  color: var(--login-input-placeholder);
+}
+
+.auth-card .ant-input-affix-wrapper:hover,
+.auth-card .ant-input:hover {
+  border-color: var(--login-input-border-hover);
+}
+
+.auth-card .ant-input-affix-wrapper-focused,
+.auth-card .ant-input:focus {
+  border-color: var(--login-accent) !important;
+  box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.12),
+    0 4px 12px rgba(6, 182, 212, 0.15) !important;
+}
+
+/* Nút submit chính */
+.auth-submit {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  padding: 13px 22px;
+  font-weight: 700;
+  font-size: 15.5px;
+  letter-spacing: 0.2px;
+  background: linear-gradient(
+    135deg,
+    var(--login-accent) 0%,
+    var(--login-accent-hover) 100%
+  );
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(6, 182, 212, 0.35),
+    0 2px 8px rgba(6, 182, 212, 0.25);
+  transition: all 0.25s ease;
+}
+.auth-submit:hover {
+  transform: translateY(-1.5px);
+  background: linear-gradient(
+    135deg,
+    var(--login-accent-hover) 0%,
+    var(--login-accent) 100%
+  );
+}
+
+/* Link phụ */
+.auth-link-btn {
+  width: 100%;
+  margin-top: 4px;
+  color: var(--login-accent) !important;
+  font-weight: 600;
+}
+.auth-link-btn:hover {
+  color: var(--login-accent-hover) !important;
+}
+
+/* Alert warning tùy biến (thiếu token) */
+.alert-warning {
+  background: var(--login-warning-bg);
+  border: 2px solid var(--login-warning-border);
+  color: var(--login-warning-text);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+/* Panel token */
+.token-panel {
+  margin-top: 12px;
+  border-radius: 14px;
+  padding: 14px;
+  background: var(--login-input-bg);
+  border: 2px dashed var(--login-input-border-hover);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.02);
+}
+.token-panel .token-label {
+  display: block;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--login-text-secondary);
+  margin-bottom: 8px;
+}
+.token-badge {
+  display: block;
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+  white-space: normal;
+  word-break: break-all;
+  user-select: all;
+}
+@media (prefers-color-scheme: dark) {
+  .token-badge {
+    background: #0b1220;
+    color: #e2e8f0;
+  }
+}
+
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+.inline-actions .ant-btn {
+  border-radius: 10px;
+  height: 38px;
+  padding: 0 14px;
+  font-weight: 600;
+}
+
+/* Ghost button */
+.btn-ghost {
+  background: var(--login-input-bg);
+  border: 2px solid var(--login-input-border);
+  color: var(--login-text-primary);
+}
+.btn-ghost:hover {
+  border-color: var(--login-input-border-hover);
+}
+
+/* Responsive nhỏ hơn */
+@media (max-width: 640px) {
+  .auth-card {
+    padding: 32px 24px;
+  }
+  .token-badge {
+    font-size: 12px;
+  }
+}
