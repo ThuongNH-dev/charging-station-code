@@ -57,7 +57,8 @@ export default function SessionManager() {
   const currentAccountId = user?.accountId || localStorage.getItem("accountId");
 
   const [sessions, setSessions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [err, setErr] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -147,7 +148,7 @@ const myStationIds = [];
   }, [selectedStationId]);
 
   async function loadSessions() {
-    setLoading(true);
+    if (!isInitialLoad) setLoading(true);
     try {
       const res = await fetchAuthJSON(`${API_BASE}/ChargingSessions`);
       let sessionArr = res?.data ?? res?.$values ?? res?.items ?? res ?? [];
@@ -289,6 +290,7 @@ console.log(
         .sort((a, b) => (b.chargingSessionId || 0) - (a.chargingSessionId || 0));
 
       setSessions(merged);
+      setIsInitialLoad(false);
       // ==== Khởi tạo mô phỏng % pin nếu đang sạc ====
 merged.forEach((s) => {
   const id = s.chargingSessionId;
@@ -311,6 +313,7 @@ merged.forEach((s) => {
     } catch (e) {
       console.error(e);
       setErr("Không thể tải danh sách phiên hoặc dữ liệu kWh!");
+      setIsInitialLoad(false);
     } finally {
       setLoading(false);
     }

@@ -37,6 +37,7 @@ export default function StationManager() {
   const [ports, setPorts] = useState([]);
   const [staffs, setStaffs] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [stats, setStats] = useState({ open: 0, closed: 0 });
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -62,7 +63,7 @@ export default function StationManager() {
 
   // === Load danh sách trạm ===
   async function loadStations() {
-  setLoading(true);
+  if (!isInitialLoad) setLoading(true);
   try {
     const res = await fetchAuthJSON(`${API_BASE}/Stations`);
     let data = res?.data ?? res?.$values ?? res ?? [];
@@ -97,8 +98,10 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
       open: withOwnership.filter((s) => s.status === "Open").length,
       closed: withOwnership.filter((s) => s.status === "Closed").length,
     });
+    setIsInitialLoad(false);
   } catch {
     message.error("Không thể tải danh sách trạm!");
+    setIsInitialLoad(false);
   } finally {
     setLoading(false);
   }
@@ -499,34 +502,18 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
                 children: (
                   <>
                     <List
-                      dataSource={staffs}
-                      renderItem={(st) => (
-                        <List.Item
-                          actions={
-                            canEdit
-                              ? [
-                                  <Button
-                                    type="text"
-                                    danger
-                                    icon={<DeleteOutlined />}
-                                    onClick={() =>
-                                      handleRemoveStaff(st.staffId)
-                                    }
-                                  >
-                                    Xóa
-                                  </Button>,
-                                ]
-                              : []
-                          }
-                        >
-                          <strong>{st.staffName}</strong>{" "}
-                          <span style={{ color: "#888" }}>
-                            ({st.staffEmail || "Không có email"})
-                          </span>
-                        </List.Item>
-                      )}
-                    />
-                    {canEdit && (
+  dataSource={staffs}
+  renderItem={(st) => (
+    <List.Item>
+      <strong>{st.staffName}</strong>{" "}
+      <span style={{ color: "#888" }}>
+        ({st.staffEmail || "Không có email"})
+      </span>
+    </List.Item>
+  )}
+/>
+
+                    {/* {canEdit && (
                       <Form
                         layout="inline"
                         form={staffForm}
@@ -550,7 +537,7 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
                           </Button>
                         </Form.Item>
                       </Form>
-                    )}
+                    )} */}
                   </>
                 ),
               },

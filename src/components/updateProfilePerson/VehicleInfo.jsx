@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Form, Button, message } from "antd";
+import { Form, Button, message, Upload, Image } from "antd";
+import { UploadOutlined } from "@ant-design/icons";
 import CarField from "../form/Info/CarField";
 import ProfileSidebar from "../form/Info/ProfileSidebar";
 import "./VehicleInfo.css";
@@ -8,6 +9,7 @@ import { getApiBase } from "../../utils/api";
 
 const API_BASE = (getApiBase() || "").replace(/\/+$/, "");
 
+/* ================== AUTH/TOKEN HELPERS ================== */
 function getToken() {
   // ưu tiên object user như trang dưới
   try {
@@ -38,6 +40,7 @@ function getIdentityFromStorage() {
   };
 }
 
+/* ================== VEHICLE APIs ================== */
 async function apiListVehicles({
   page = 1,
   pageSize = 50,
@@ -85,7 +88,6 @@ async function apiCreateVehicle(payload) {
     const text = await res.text().catch(() => "");
     throw new Error(`POST /Vehicles ${res.status}: ${text}`);
   }
-  // BE của bạn trả JSON khi tạo – giữ nguyên
   return await res.json();
 }
 
@@ -104,7 +106,6 @@ async function apiUpdateVehicle(id, payload) {
     const text = await res.text().catch(() => "");
     throw new Error(`PUT /Vehicles ${res.status}: ${text}`);
   }
-  // Nhiều BE trả 204/No Content → fallback trả về object gộp payload+id
   if (res.status === 204) return { ...payload, vehicleId: Number(id) };
   const ct = res.headers.get("content-type") || "";
   if (!ct.includes("application/json"))
@@ -113,12 +114,41 @@ async function apiUpdateVehicle(id, payload) {
   return data ?? { ...payload, vehicleId: Number(id) };
 }
 
+/* Upload ảnh file → multipart */
+async function apiUploadVehicleImage(id, file) {
+  const token = getToken();
+  const fd = new FormData();
+  fd.append("VehicleId", String(id)); // key phải trùng [FromForm] id
+  fd.append("File", file); // key phải trùng [FromForm] file
+
+  const res = await fetch(`${API_BASE}/Vehicles/image/upload`, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      // KHÔNG set Content-Type để browser tự set boundary
+    },
+    body: fd,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`POST /Vehicles/image/upload ${res.status}: ${text}`);
+  }
+  return await res.json(); // VehicleReadDto có ImageUrl mới
+}
+
+/* ================== COMPONENT ================== */
 export default function VehicleInfo() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [initLoading, setInitLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [currentVehicle, setCurrentVehicle] = useState(null);
+
+  // upload state
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
 
   // Helper: đọc vehicleId đã lưu (ưu tiên localStorage)
   function getStoredVehicleId() {
@@ -134,8 +164,10 @@ export default function VehicleInfo() {
 
   // Helper: lấy vehicleId từ object BE (hỗ trợ nhiều casing)
   function pickVehicleId(obj) {
-    const n = Number(obj?.vehicleId ?? obj?.VehicleId ?? obj?.id ?? obj?.Id);
-    return Number.isFinite(n) ? n : null;
+    const raw = obj?.vehicleId ?? obj?.VehicleId ?? obj?.id ?? obj?.Id;
+    const n = Number(raw);
+    // chỉ chấp nhận số nguyên dương > 0
+    return Number.isFinite(n) && n > 0 ? n : null;
   }
 
   // Mirror BE: các trạng thái hợp lệ
@@ -145,11 +177,16 @@ export default function VehicleInfo() {
     return ALLOWED_STATUSES.includes(v) ? v : "Active";
   }
 
-  // CHUẨN HOÁ record BE -> giá trị nạp vào Form (đảm bảo đúng kiểu)
+  // Tiện ích: loại bỏ "string"
+  const stripStringLiteral = (val) => {
+    const v = String(val ?? "").trim();
+    return v.toLowerCase() === "string" ? "" : v;
+  };
+
+  // CHUẨN HOÁ record BE -> Form values (đảm bảo đúng kiểu)
   function normalizeVehicleForForm(r, fallbackCompanyId, fallbackCustomerId) {
     if (!r) {
       return {
-        // tối thiểu hiển thị 2 ID nếu có
         customerId: Number.isFinite(fallbackCustomerId)
           ? Number(fallbackCustomerId)
           : undefined,
@@ -158,6 +195,7 @@ export default function VehicleInfo() {
           : undefined,
         vehicleType: "Car",
         status: "Active",
+        imageUrl: "", // không nạp "string"
       };
     }
     return {
@@ -184,12 +222,11 @@ export default function VehicleInfo() {
       currentSoc: r?.currentSoc != null ? Number(r.currentSoc) : null,
       manufactureYear:
         r?.manufactureYear != null ? Number(r.manufactureYear) : null,
-      imageUrl: r?.imageUrl ?? "",
+      imageUrl: stripStringLiteral(r?.imageUrl ?? ""),
     };
   }
 
   const fillForm = (v) => {
-    console.debug("[VehicleInfo] fillForm with vehicle:", v);
     const norm = normalizeVehicleForForm(
       v,
       currentUser?.companyId != null
@@ -200,6 +237,10 @@ export default function VehicleInfo() {
         : undefined
     );
     form.setFieldsValue(norm);
+
+    const raw = v?.imageUrl || v?.ImageUrl || norm?.imageUrl || "";
+    const url = stripStringLiteral(raw);
+    setPreviewUrl(url ? `${url}?t=${Date.now()}` : "");
   };
 
   useEffect(() => {
@@ -218,7 +259,7 @@ export default function VehicleInfo() {
           accountId,
           hasToken: !!token,
         });
-        //
+
         // lấy từ storage (login đã lưu)
         const iden = getIdentityFromStorage();
         const u = {
@@ -239,32 +280,9 @@ export default function VehicleInfo() {
           companyId: u?.companyId ?? undefined,
         });
         console.timeEnd("[VehicleInfo] apiListVehicles");
-        console.debug(`[VehicleInfo] tổng số xe trả về: ${list.length}`);
-        if (list.length) {
-          console.table(
-            list.map((x) => ({
-              id: x.id ?? x.vehicleId,
-              vehicleId: x.vehicleId,
-              customerId: x.customerId,
-              companyId: x.companyId,
-              licensePlate: x.licensePlate,
-              carMaker: x.carMaker,
-              model: x.model,
-              vehicleType: x.vehicleType,
-            }))
-          );
-        }
 
         const uCustomerId = u?.customerId != null ? Number(u.customerId) : null;
         const uCompanyId = u?.companyId != null ? Number(u.companyId) : null;
-
-        if (uCustomerId != null)
-          console.debug("[VehicleInfo] filter by customerId:", uCustomerId);
-        if (uCompanyId != null)
-          console.debug(
-            "[VehicleInfo] fallback filter by companyId:",
-            uCompanyId
-          );
 
         // Lọc “xe của tôi”: ưu tiên customerId, nếu không có thì companyId
         let listForMe = list;
@@ -282,19 +300,6 @@ export default function VehicleInfo() {
             mine =
               listForMe.find((x) => pickVehicleId(x) === Number(storedVid)) ||
               null;
-            if (mine) {
-              console.debug(
-                "[VehicleInfo] matched by stored vehicleId =",
-                storedVid,
-                mine
-              );
-            } else {
-              console.warn(
-                "[VehicleInfo] stored vehicleId",
-                storedVid,
-                "không khớp danh sách BE."
-              );
-            }
           }
         }
 
@@ -306,39 +311,16 @@ export default function VehicleInfo() {
                 x?.customerId != null ? Number(x.customerId) : null;
               const xCompany =
                 x?.companyId != null ? Number(x.companyId) : null;
-
               const byCustomer =
                 uCustomerId != null && xCustomer === uCustomerId;
               const byCompany = uCompanyId != null && xCompany === uCompanyId;
-
-              if (byCustomer || byCompany) {
-                console.debug(
-                  "[VehicleInfo] matched vehicle (fallback filter):",
-                  {
-                    vid: pickVehicleId(x),
-                    xCustomer,
-                    xCompany,
-                    byCustomer,
-                    byCompany,
-                  }
-                );
-              }
               return byCustomer || byCompany;
             }) || null;
         }
 
-        if (!mine) {
-          console.warn(
-            "[VehicleInfo] Không tìm thấy xe thuộc user. Kiểm tra lại kiểu dữ liệu ID hoặc dữ liệu BE."
-          );
-          if (Array.isArray(listForMe) && listForMe[0]) {
-            console.debug("[VehicleInfo] Ví dụ phần tử đầu:", listForMe[0]);
-          }
-        }
-
         setCurrentVehicle(mine);
-        if (mine) fillForm(mine);
         if (mine) {
+          fillForm(mine);
           const vid = pickVehicleId(mine);
           if (vid) {
             try {
@@ -366,7 +348,44 @@ export default function VehicleInfo() {
         console.groupEnd();
       }
     })();
-  }, []);
+  }, []); // eslint-disable-line
+
+  /* ============ Upload ngay khi chọn file ============ */
+  const handleUploadFile = async (options) => {
+    const { file, onSuccess, onError } = options;
+    try {
+      const vid = pickVehicleId(currentVehicle);
+      if (!vid) {
+        message.warning("Bạn cần tạo/cập nhật xe trước rồi mới upload ảnh.");
+        onError?.(new Error("VehicleId not found"));
+        return;
+      }
+      setUploading(true);
+
+      const updated = await apiUploadVehicleImage(vid, file);
+
+      // cập nhật đầy đủ sau upload
+      const url = (updated?.imageUrl || updated?.ImageUrl || "").trim();
+      setCurrentVehicle(updated);
+      form.setFieldValue("imageUrl", url);
+      setPreviewUrl(url ? `${url}?t=${Date.now()}` : "");
+
+      const newVid = pickVehicleId(updated);
+      if (newVid) {
+        localStorage.setItem("vehicleId", String(newVid));
+        sessionStorage.setItem("vehicleId", String(newVid));
+      }
+
+      message.success("Tải ảnh thành công!");
+      onSuccess?.("ok");
+    } catch (e) {
+      console.error("[VehicleInfo] upload error:", e);
+      message.error(e?.message || "Upload ảnh thất bại!");
+      onError?.(e);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSubmit = async (values) => {
     console.groupCollapsed(
@@ -385,6 +404,10 @@ export default function VehicleInfo() {
     try {
       // Base là dữ liệu hiện có của xe (nếu có), sau đó override bởi Form values
       const base = currentVehicle || {};
+      const normalizedImage = stripStringLiteral(
+        (values.imageUrl ?? base.imageUrl ?? "").trim()
+      );
+
       const payload = {
         customerId: Number(
           values.customerId ??
@@ -412,11 +435,13 @@ export default function VehicleInfo() {
         manufactureYear: Number(
           values.manufactureYear ?? base.manufactureYear ?? 0
         ),
-        imageUrl: (values.imageUrl ?? base.imageUrl ?? "").trim(),
 
         vehicleType: (values.vehicleType ?? base.vehicleType ?? "Car").trim(),
         status: normalizeStatusFE(values.status ?? base.status ?? "Active"),
       };
+
+      // chỉ đính kèm imageUrl nếu có giá trị hợp lệ (không phải "string")
+      if (normalizedImage) payload.imageUrl = normalizedImage;
 
       console.debug("[VehicleInfo] payload gửi lên:", payload);
 
@@ -432,7 +457,6 @@ export default function VehicleInfo() {
           ...payload,
           vehicleId: currentVid,
         };
-        console.debug("[VehicleInfo] updated vehicle:", updated);
 
         message.success("Cập nhật thông số xe thành công!");
         setCurrentVehicle(safeUpdated);
@@ -448,7 +472,6 @@ export default function VehicleInfo() {
         console.time("[VehicleInfo] apiCreateVehicle");
         const created = await apiCreateVehicle(payload);
         console.timeEnd("[VehicleInfo] apiCreateVehicle");
-        console.debug("[VehicleInfo] created vehicle:", created);
 
         message.success("Tạo thông số xe thành công!");
         setCurrentVehicle(created);
@@ -493,10 +516,43 @@ export default function VehicleInfo() {
             >
               <CarField />
 
+              {/* ========== ẢNH XE (Upload từ máy) ========== */}
+              <Form.Item label="Ảnh xe (tải từ máy)">
+                <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                  <Upload
+                    accept="image/*"
+                    showUploadList={false}
+                    customRequest={handleUploadFile}
+                    disabled={uploading || initLoading}
+                  >
+                    <Button icon={<UploadOutlined />} loading={uploading}>
+                      Chọn ảnh &amp; tải lên
+                    </Button>
+                  </Upload>
+
+                  {previewUrl ? (
+                    <Image
+                      src={previewUrl}
+                      alt="vehicle"
+                      width={120}
+                      height={120}
+                      style={{ objectFit: "cover", borderRadius: 8 }}
+                      placeholder
+                    />
+                  ) : (
+                    <span style={{ opacity: 0.6 }}>Chưa có ảnh</span>
+                  )}
+                </div>
+                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.65 }}>
+                  Ảnh sẽ được tải lên ngay sau khi bạn chọn file (không dùng
+                  URL).
+                </div>
+              </Form.Item>
+
               {!currentVehicle && !initLoading && (
                 <p style={{ marginTop: 8, opacity: 0.7 }}>
                   Bạn chưa có xe nào. Hãy điền thông tin và bấm “Lưu” để tạo
-                  mới.
+                  mới, sau đó mới có thể tải ảnh.
                 </p>
               )}
 

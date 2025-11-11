@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getApiBase, fetchAuthJSON } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 import { message } from "antd";
 import "./ChargerManager.css";
 
@@ -41,11 +42,13 @@ const normCharger = (c = {}) => ({
 
 export default function ChargerManager() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const currentAccountId = user?.accountId || localStorage.getItem("accountId");
 
   const [rows, setRows] = useState([]);
   const [latestSessions, setLatestSessions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [err, setErr] = useState("");
 
   // Modal
@@ -109,7 +112,7 @@ export default function ChargerManager() {
     if (!selectedStationId) return;
     let alive = true;
     async function load() {
-      setLoading(true);
+      if (!isInitialLoad) setLoading(true);
       setErr("");
       try {
         const chargersRaw = await fetchAuthJSON(`${API_BASE}/Chargers`);
@@ -135,11 +138,13 @@ export default function ChargerManager() {
         if (alive) {
           setRows(chargers);
           setLatestSessions(Object.values(latestMap));
+          setIsInitialLoad(false);
           setLoading(false);
         }
       } catch (e) {
         if (alive) {
           setErr(e?.message || "Lỗi tải dữ liệu");
+          setIsInitialLoad(false);
           setLoading(false);
         }
       }
@@ -299,6 +304,10 @@ const sid =
 if (sid) sessionStorage.setItem("staffLiveSessionId", sid);
 console.log("🔌 Guest session started:", sid);
         message.success(res?.message || "✅ Phiên sạc (guest) đã được khởi động!");
+        // Tự động chuyển sang trang sessions sau 1.5 giây
+        setTimeout(() => {
+          navigate("/staff/sessions");
+        }, 1500);
       } else {
         const vehicle = companyVehicles.find(
           (v) => v.licensePlate === licensePlate
@@ -340,6 +349,10 @@ const sid = res?.chargingSessionId || res?.data?.chargingSessionId;
 if (sid) sessionStorage.setItem("staffLiveSessionId", sid);
 console.log("🏢 Company session started:", sid);
         message.success(res?.message || "✅ Phiên sạc (company) đã được khởi động!");
+        // Tự động chuyển sang trang sessions sau 1.5 giây
+        setTimeout(() => {
+          navigate("/staff/sessions");
+        }, 1500);
       }
 
       setShowModal(false);
