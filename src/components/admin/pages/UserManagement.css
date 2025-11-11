@@ -848,3 +848,27 @@ th {
 .vehicle-table .table-scroll-area thead {
   border-bottom: 2px solid #e5e7eb;
 }
+
+/* ===== Giữ cố định tiêu đề bảng gói dịch vụ (ServiceTable) ===== */
+
+/* 1) Cho phần thân bảng có vùng cuộn dọc riêng */
+.service-package-table .table-responsive-wrapper {
+  max-height: 420px; /* chỉnh theo nhu cầu */
+  overflow-y: auto; /* nội dung cuộn dọc */
+  overflow-x: auto; /* giữ cuộn ngang khi nhiều cột */
+  width: 100%;
+}
+
+/* 2) Header đứng yên khi cuộn nội dung */
+.service-package-table .table-responsive-wrapper thead th {
+  position: sticky;
+  top: 0;
+  background: #f8f9fb; /* đồng màu với th */
+  z-index: 2;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); /* viền nhẹ */
+}
+
+/* 3) Viền tách header cho dễ nhìn (tùy chọn) */
+.service-package-table .table-responsive-wrapper thead {
+  border-bottom: 2px solid #e5e7eb;
+}
