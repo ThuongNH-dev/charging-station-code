@@ -1,3 +1,4 @@
+// src/components/station/modals/AddEditPortModal.jsx
 import React, { useEffect, useState } from "react";
 import { Modal, Select, Input, message } from "antd";
 import { stationApi } from "../../../../../api/stationApi";
@@ -13,27 +14,14 @@ export default function AddEditPortModal({
   onSubmit,
   ids, // { stationId, chargerId }
 }) {
-  const [rules, setRules] = useState([]);
   const [connectorTypes, setConnectorTypes] = useState([]);
   const [showOther, setShowOther] = useState(false);
 
   const patch = (name, value) => onChange({ target: { name, value } });
 
-  // Load PricingRule và ConnectorType
+  // Chỉ load danh sách loại cổng
   useEffect(() => {
     if (!open) return;
-
-    (async () => {
-      try {
-        const list = stationApi.getPricingRules
-          ? await stationApi.getPricingRules()
-          : [];
-        setRules(Array.isArray(list) ? list : []);
-      } catch {
-        message.error("Không tải được danh sách PricingRule");
-      }
-    })();
-
     (async () => {
       try {
         const list = stationApi.getConnectorTypes
@@ -46,7 +34,7 @@ export default function AddEditPortModal({
     })();
   }, [open]);
 
-  // Bật input “Khác...” nếu loại cổng không nằm trong danh sách
+  // Bật input “Khác…” nếu không thuộc danh sách
   useEffect(() => {
     const cur = (data?.ConnectorType || "").trim();
     if (!cur) return setShowOther(false);
@@ -134,7 +122,7 @@ export default function AddEditPortModal({
         style={{ marginBottom: 8 }}
       />
 
-      {/* ✅ Đồng bộ trạng thái Port với BE */}
+      {/* Trạng thái Port */}
       <Select
         style={{ width: "100%", marginBottom: 8 }}
         name="Status"
@@ -147,26 +135,6 @@ export default function AddEditPortModal({
           { value: "Disabled", label: "⚫ Disabled (Không hoạt động)" },
         ]}
       />
-
-      {/* Pricing Rule */}
-      <div style={{ marginTop: 8 }}>
-        <label style={{ display: "block", marginBottom: 6, fontWeight: 600 }}>
-          PricingRule (tùy chọn)
-        </label>
-        <Select
-          allowClear
-          style={{ width: "100%" }}
-          placeholder="Chọn Quy tắc giá áp dụng cho cổng"
-          value={data?.PricingRuleId ?? null}
-          onChange={(val) => patch("PricingRuleId", val ?? null)}
-          options={(rules || []).map((r) => ({
-            value: r.PricingRuleId,
-            label: `${r.ChargerType || "?"} • ${r.PowerKw ?? 0}kW • ${
-              r.TimeRange || "—"
-            } • ${Number(r.PricePerKwh || 0).toLocaleString("vi-VN")}đ/kWh`,
-          }))}
-        />
-      </div>
 
       <div className="modal-actions" style={{ marginTop: 16 }}>
         <button onClick={onClose}>Hủy</button>
