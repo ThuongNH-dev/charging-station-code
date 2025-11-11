@@ -502,34 +502,18 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
                 children: (
                   <>
                     <List
-                      dataSource={staffs}
-                      renderItem={(st) => (
-                        <List.Item
-                          actions={
-                            canEdit
-                              ? [
-                                  <Button
-                                    type="text"
-                                    danger
-                                    icon={<DeleteOutlined />}
-                                    onClick={() =>
-                                      handleRemoveStaff(st.staffId)
-                                    }
-                                  >
-                                    Xóa
-                                  </Button>,
-                                ]
-                              : []
-                          }
-                        >
-                          <strong>{st.staffName}</strong>{" "}
-                          <span style={{ color: "#888" }}>
-                            ({st.staffEmail || "Không có email"})
-                          </span>
-                        </List.Item>
-                      )}
-                    />
-                    {canEdit && (
+  dataSource={staffs}
+  renderItem={(st) => (
+    <List.Item>
+      <strong>{st.staffName}</strong>{" "}
+      <span style={{ color: "#888" }}>
+        ({st.staffEmail || "Không có email"})
+      </span>
+    </List.Item>
+  )}
+/>
+
+                    {/* {canEdit && (
                       <Form
                         layout="inline"
                         form={staffForm}
@@ -553,7 +537,7 @@ setMyStations(assignedStations); // ✅ lưu danh sách nhiều trạm
                           </Button>
                         </Form.Item>
                       </Form>
-                    )}
+                    )} */}
                   </>
                 ),
               },
