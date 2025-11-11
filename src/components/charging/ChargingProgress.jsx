@@ -5,17 +5,36 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import { message } from "antd";
 import "./ChargingProgress.css";
 import MainLayout from "../../layouts/MainLayout";
-import { fetchJSON, fetchAuthJSON, getApiBase, getToken } from "../../utils/api";
+import {
+  fetchJSON,
+  fetchAuthJSON,
+  getApiBase,
+  getToken,
+} from "../../utils/api";
 import { resolveCustomerIdFromAuth } from "../../api/authHelpers";
 import { setChargeContext } from "../../utils/chargeSessionCtx";
-
 
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " VND";
 // --- DEMO SPEED SETTINGS ---
 // Bật/tắt tăng tốc (đặt DEMO_SPEED=1 là tốc độ thật)
-const DEMO_SPEED = 40;          // tăng ~8x
-const TICK_MS = 100;            // mỗi tick UI mượt (không ảnh hưởng logic)
-const PENALTY_TICK_MS = 200;    // không còn dùng (đồng hồ phạt dựa trên real-time)
+const DEMO_SPEED = 40; // tăng ~8x
+const TICK_MS = 100; // mỗi tick UI mượt (không ảnh hưởng logic)
+const PENALTY_TICK_MS = 200; // không còn dùng (đồng hồ phạt dựa trên real-time)
+
+// ======= Toast guard (chỉ hiện 1 lần) =======
+const START_TOAST_FLAG = "charging:start:toast:shown";
+const START_TOAST_KEY = "charging-start-toast";
+
+function showStartSessionToastOnce() {
+  if (sessionStorage.getItem(START_TOAST_FLAG) === "1") return; // đã hiện rồi
+  message.open({
+    type: "success",
+    key: START_TOAST_KEY, // có key để update / không stack
+    content: "✅ Bắt đầu phiên sạc theo Booking thành công!",
+    duration: 3,
+  });
+  sessionStorage.setItem(START_TOAST_FLAG, "1");
+}
 
 // ================== Helpers ==================
 function normalizeApiBase(s) {
@@ -25,14 +44,28 @@ function normalizeApiBase(s) {
 }
 const API_ABS = normalizeApiBase(getApiBase()) || "https://localhost:7268/api";
 
-function saveCtx({ orderId = null, stationId = null, chargerId = null, portId = null, stationCode = null, chargerCode = null, portCode = null, endedAt = null }) {
+function saveCtx({
+  orderId = null,
+  stationId = null,
+  chargerId = null,
+  portId = null,
+  stationCode = null,
+  chargerCode = null,
+  portCode = null,
+  endedAt = null,
+}) {
   try {
     setChargeContext({
-      orderId, stationId, chargerId, portId,
-      stationCode, chargerCode, portCode,
-      endedAt
+      orderId,
+      stationId,
+      chargerId,
+      portId,
+      stationCode,
+      chargerCode,
+      portCode,
+      endedAt,
     });
-  } catch { }
+  } catch {}
 }
 function toId(v) {
   const s = String(v ?? "").trim();
@@ -41,7 +74,6 @@ function toId(v) {
   const n = Number(m.join(""));
   return Number.isFinite(n) && n > 0 ? n : null;
 }
-
 
 // ============ Live persistence (localStorage) ============
 const LS_KEY = "charging:live:v1";
@@ -58,13 +90,13 @@ function loadLive() {
 function saveLive(obj) {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(obj));
-  } catch { }
+  } catch {}
 }
 
 function clearLive() {
   try {
     localStorage.removeItem(LS_KEY);
-  } catch { }
+  } catch {}
 }
 
 function decodeJwtPayload(token) {
@@ -96,7 +128,7 @@ function parseNumberLike(n) {
 function pctPerSecond(powerKw, capacityKwh) {
   const cap = Number(capacityKwh) > 0 ? Number(capacityKwh) : 60;
   const kw = Number(powerKw) > 0 ? Number(powerKw) : 7;
-  const pctPerSecReal = ((kw / 3600) / cap) * 100;
+  const pctPerSecReal = (kw / 3600 / cap) * 100;
   return pctPerSecReal * DEMO_SPEED;
 }
 
@@ -105,8 +137,14 @@ function computeBatteryNow(live) {
   if (!live) return null;
   const rate = pctPerSecond(live.powerKw, live.batteryCapacity);
   const now = Date.now();
-  const elapsedSec = Math.max(0, (now - (live.lastUpdateAt || live.startedAt || now)) / 1000);
-  const next = Math.min(100, (live.batteryAtLastUpdate || live.startSoc || 0) + rate * elapsedSec);
+  const elapsedSec = Math.max(
+    0,
+    (now - (live.lastUpdateAt || live.startedAt || now)) / 1000
+  );
+  const next = Math.min(
+    100,
+    (live.batteryAtLastUpdate || live.startSoc || 0) + rate * elapsedSec
+  );
   return Number(next.toFixed(2));
 }
 
@@ -122,7 +160,11 @@ function normalizeCharger(c = {}) {
   const powerKw = c.powerKw ?? c.PowerKW ?? c.power ?? c.Power;
   const priceText = c.price ?? c.Price ?? "";
   const pricePerKwh =
-    c.pricePerKwh ?? c.pricePerKWh ?? c.PricePerKwh ?? c.PricePerKWh ?? parseNumberLike(priceText);
+    c.pricePerKwh ??
+    c.pricePerKWh ??
+    c.PricePerKwh ??
+    c.PricePerKWh ??
+    parseNumberLike(priceText);
 
   const idleFeePerMin =
     c.idleFeePerMin ??
@@ -136,7 +178,9 @@ function normalizeCharger(c = {}) {
   const idleGraceSeconds =
     c.idleGraceSeconds ??
     c.IdleGraceSeconds ??
-    (c.idleGraceMinutes ?? c.IdleGraceMinutes ? Number(c.idleGraceMinutes ?? c.IdleGraceMinutes) * 60 : NaN);
+    (c.idleGraceMinutes ?? c.IdleGraceMinutes
+      ? Number(c.idleGraceMinutes ?? c.IdleGraceMinutes) * 60
+      : NaN);
 
   return {
     id: c.id ?? c.chargerId ?? c.ChargerId,
@@ -183,43 +227,10 @@ function fmtDateTimeISO(s) {
   }
 }
 
-function showStartSessionToast(data) {
-  const rows = [
-    ["chargingSessionId", data.chargingSessionId],
-    ["portId", data.portId],
-    ["vehicleId", data.vehicleId],
-    ["customerId", data.customerId],
-    ["status", data.status],
-    ["startSoc", data.startSoc],
-    ["startedAt", fmtDateTimeISO(data.startedAt)],
-    ["pricingRuleId", data.pricingRuleId],
-    ["vehicleType", data.vehicleType],
-    ["portStatus", data.portStatus ?? "—"],
-    ["chargerType", data.chargerType ?? "—"],
-    ["chargerPowerKw", data.chargerPowerKw ?? "—"],
-  ];
-
-  message.open({
-    type: "success",
-    duration: 6,
-    content: (
-      <div>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>✅ Bắt đầu phiên sạc theo Booking thành công!</div>
-        <div
-          style={{
-            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-            fontSize: 12,
-            lineHeight: 1.5,
-          }}
-        >
-          {rows.map(([k, v]) => (
-            <div key={k}>
-              <span style={{ color: "#888" }}>{k}:</span> <span>{String(v)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    ),
+function showStartSessionToast() {
+  message.success({
+    content: "✅ Bắt đầu phiên sạc theo Booking thành công!",
+    duration: 3, // tuỳ ý: 2–3s
   });
 }
 
@@ -292,11 +303,7 @@ const ChargingProgress = () => {
     return state?.charger?.power ?? "—";
   })();
   const priceLabel =
-    state?.charger?.price ??
-    chargerInfo?.price ??
-    chargerInfo?.Price ??
-    null;
-
+    state?.charger?.price ?? chargerInfo?.price ?? chargerInfo?.Price ?? null;
 
   // ==== Pricing dynamic ====
   const [dynPricePerKWh, setDynPricePerKWh] = useState(NaN);
@@ -306,25 +313,33 @@ const ChargingProgress = () => {
   const [pricingError, setPricingError] = useState("");
 
   // ==== Subscription đang active (để tính đúng như BE) ====
-  const [activeSub, setActiveSub] = useState({ discountPercent: 0, freeIdleMinutes: 0 });
+  const [activeSub, setActiveSub] = useState({
+    discountPercent: 0,
+    freeIdleMinutes: 0,
+  });
 
-
-  const parsedFromLabel = priceLabel ? Number((priceLabel.match(/\d+/g) || []).join("")) : NaN;
+  const parsedFromLabel = priceLabel
+    ? Number((priceLabel.match(/\d+/g) || []).join(""))
+    : NaN;
   // const fallbackPricePerKWh = Number.isFinite(state.pricePerKWh)
   //   ? state.pricePerKWh
   const fallbackPricePerKWh = Number.isFinite(state?.pricePerKWh)
     ? state?.pricePerKWh
     : Number.isFinite(parsedFromLabel)
-      ? parsedFromLabel
-      : 5500;
+    ? parsedFromLabel
+    : 5500;
 
   // const batteryCapacity = Number.isFinite(state.batteryCapacity) ? state.batteryCapacity : 75;
-  const batteryCapacity = Number.isFinite(state?.batteryCapacity) ? state?.batteryCapacity : 75;
+  const batteryCapacity = Number.isFinite(state?.batteryCapacity)
+    ? state?.batteryCapacity
+    : 75;
   const initialBattery = (() => {
     const fromSession = Number(session?.startSoc);
-    if (Number.isFinite(fromSession)) return Math.max(0, Math.min(100, fromSession));
+    if (Number.isFinite(fromSession))
+      return Math.max(0, Math.min(100, fromSession));
     const fromState = Number(state?.startSoc);
-    if (Number.isFinite(fromState)) return Math.max(0, Math.min(100, fromState));
+    if (Number.isFinite(fromState))
+      return Math.max(0, Math.min(100, fromState));
     return 0;
   })();
   const [battery, setBattery] = useState(initialBattery);
@@ -339,14 +354,16 @@ const ChargingProgress = () => {
   }, [session]);
 
   // const TOTAL_TIME_MINUTES = Number.isFinite(state.totalTimeMinutes) ? state.totalTimeMinutes : 120;
-  const TOTAL_TIME_MINUTES = Number.isFinite(state?.totalTimeMinutes) ? state?.totalTimeMinutes : 120;
+  const TOTAL_TIME_MINUTES = Number.isFinite(state?.totalTimeMinutes)
+    ? state?.totalTimeMinutes
+    : 120;
 
   const [timeLeft, setTimeLeft] = useState("");
   const [overTimeSecs, setOverTimeSecs] = useState(0);
   const [isCharging, setIsCharging] = useState(true);
 
-  const chargeInterval = useRef(null);     // không dùng nữa nhưng giữ để clear defensively
-  const penaltyInterval = useRef(null);    // không dùng nữa
+  const chargeInterval = useRef(null); // không dùng nữa nhưng giữ để clear defensively
+  const penaltyInterval = useRef(null); // không dùng nữa
   const startedAtRef = useRef(state?.startedAt || Date.now());
   const fullAtRef = useRef(null); // ⬅️ thời điểm lần đầu chạm 100%
 
@@ -355,31 +372,56 @@ const ChargingProgress = () => {
     let alive = true;
     async function startSessionIfNeeded() {
       setBooting(true);
-      const stateSessionId = state?.chargingSessionId ?? state?.sessionId ?? null; // ✅ fallback
+      const stateSessionId =
+        state?.chargingSessionId ?? state?.sessionId ?? null; // ✅ fallback
       if (stateSessionId) {
         let seed = state?.startSessionData || null;
         if (!seed) {
           try {
-            const s = await fetchAuthJSON(`${API_ABS}/ChargingSessions/${encodeURIComponent(stateSessionId)}`, { method: "GET" });
+            const s = await fetchAuthJSON(
+              `${API_ABS}/ChargingSessions/${encodeURIComponent(
+                stateSessionId
+              )}`,
+              { method: "GET" }
+            );
             seed = s?.data || s || null;
-          } catch { }
+          } catch {}
         }
         if (!seed) return;
 
         // Hydrate Port/Charger
-        let port = null, charger = null;
+        let port = null,
+          charger = null;
         try {
-          const pId = seed.portId ?? state?.portId ?? state?.gun?.id ?? state?.gun?.portId ?? state?.gun?.PortId;
-          if (pId != null) port = await fetchAuthJSON(`${API_ABS}/Ports/${encodeURIComponent(pId)}`, { method: "GET" });
-        } catch { }
+          const pId =
+            seed.portId ??
+            state?.portId ??
+            state?.gun?.id ??
+            state?.gun?.portId ??
+            state?.gun?.PortId;
+          if (pId != null)
+            port = await fetchAuthJSON(
+              `${API_ABS}/Ports/${encodeURIComponent(pId)}`,
+              { method: "GET" }
+            );
+        } catch {}
         try {
           const chId =
-            port?.chargerId ?? port?.ChargerId ??
-            seed?.chargerId ?? seed?.ChargerId ??
-            state?.charger?.id ?? state?.charger?.chargerId ?? state?.charger?.ChargerId ?? null;
-          if (chId != null) charger = await fetchAuthJSON(`${API_ABS}/Chargers/${encodeURIComponent(chId)}`, { method: "GET" });
+            port?.chargerId ??
+            port?.ChargerId ??
+            seed?.chargerId ??
+            seed?.ChargerId ??
+            state?.charger?.id ??
+            state?.charger?.chargerId ??
+            state?.charger?.ChargerId ??
+            null;
+          if (chId != null)
+            charger = await fetchAuthJSON(
+              `${API_ABS}/Chargers/${encodeURIComponent(chId)}`,
+              { method: "GET" }
+            );
           if (charger) setChargerInfo(charger);
-        } catch { }
+        } catch {}
 
         const merged = {
           ...seed,
@@ -388,44 +430,52 @@ const ChargingProgress = () => {
           chargerPowerKw: seed?.chargerPowerKw ?? null,
         };
         setSession(merged);
-        sessionStorage.setItem("charging:start:data", JSON.stringify({ message: "Bắt đầu phiên sạc", data: merged }));
-        showStartSessionToast(merged);
+        sessionStorage.setItem(
+          "charging:start:data",
+          JSON.stringify({ message: "Bắt đầu phiên sạc", data: merged })
+        );
+        showStartSessionToastOnce();
 
         // Lưu context (chưa có orderId) để Invoice merge được nếu reload
         saveCtx({
-          stationId: merged?.stationId
-            ?? port?.stationId
-            ?? state?.station?.id
-            ?? state?.station?.stationId
-            ?? null,
-          chargerId: merged?.chargerId
-            ?? port?.chargerId
-            ?? state?.charger?.id
-            ?? state?.charger?.chargerId
-            ?? null,
-          portId: merged?.portId
-            ?? state?.gun?.id
-            ?? state?.portId
-            ?? null,
+          stationId:
+            merged?.stationId ??
+            port?.stationId ??
+            state?.station?.id ??
+            state?.station?.stationId ??
+            null,
+          chargerId:
+            merged?.chargerId ??
+            port?.chargerId ??
+            state?.charger?.id ??
+            state?.charger?.chargerId ??
+            null,
+          portId: merged?.portId ?? state?.gun?.id ?? state?.portId ?? null,
           stationCode: state?.station?.code ?? null,
           chargerCode: state?.charger?.code ?? charger?.code ?? null,
           portCode: state?.gun?.name ?? state?.gun?.code ?? port?.code ?? null,
         });
 
-
         // NEW: init/update live persisted state
         const kwFromState = Number(state?.charger?.powerKw);
         const kwFromSession = Number(merged?.chargerPowerKw);
-        const powerKw = (Number.isFinite(kwFromSession) && kwFromSession > 0)
-          ? kwFromSession
-          : (Number.isFinite(kwFromState) && kwFromState > 0 ? kwFromState : 7);
+        const powerKw =
+          Number.isFinite(kwFromSession) && kwFromSession > 0
+            ? kwFromSession
+            : Number.isFinite(kwFromState) && kwFromState > 0
+            ? kwFromState
+            : 7;
 
-        const startSoc = Number.isFinite(merged?.startSoc) ? Math.max(0, Math.min(100, Number(merged.startSoc))) : 0;
+        const startSoc = Number.isFinite(merged?.startSoc)
+          ? Math.max(0, Math.min(100, Number(merged.startSoc)))
+          : 0;
 
         const now = Date.now();
         // ✅ Chỉ kế thừa live nếu cùng chargingSessionId (an toàn nhất)
         const prev = loadLive();
-        const sameSession = !!(prev && prev.chargingSessionId === merged?.chargingSessionId);
+        const sameSession = !!(
+          prev && prev.chargingSessionId === merged?.chargingSessionId
+        );
         const keepBattery = sameSession ? computeBatteryNow(prev) : NaN;
         if (!sameSession && prev) {
           // khác phiên => xoá live cũ để tránh mốc thời gian/pin sai
@@ -438,16 +488,24 @@ const ChargingProgress = () => {
           chargingSessionId: merged?.chargingSessionId ?? stateSessionId,
           portId: merged?.portId ?? state?.gun?.id ?? state?.portId ?? null,
           // ✅ KHÔNG dùng startedAt từ live cũ khi khác phiên
-          startedAt: (merged?.startedAt ? new Date(merged.startedAt).getTime() : now),
+          startedAt: merged?.startedAt
+            ? new Date(merged.startedAt).getTime()
+            : now,
           lastUpdateAt: now,
           startSoc,
           // ✅ chỉ giữ pin nếu đúng cùng phiên; ngược lại seed theo startSoc để không nhảy 100%
-          batteryAtLastUpdate: Number.isFinite(keepBattery) ? keepBattery : startSoc,
+          batteryAtLastUpdate: Number.isFinite(keepBattery)
+            ? keepBattery
+            : startSoc,
           powerKw,
-          batteryCapacity: Number.isFinite(state?.batteryCapacity) ? state.batteryCapacity : 75,
+          batteryCapacity: Number.isFinite(state?.batteryCapacity)
+            ? state.batteryCapacity
+            : 75,
           // ✅ không “kế thừa” fullAt từ phiên cũ
-          fullAt: sameSession ? (prev?.fullAt ?? null) : null,
-          graceSeconds: Number.isFinite(dynGraceSeconds) ? dynGraceSeconds : 5 * 60,
+          fullAt: sameSession ? prev?.fullAt ?? null : null,
+          graceSeconds: Number.isFinite(dynGraceSeconds)
+            ? dynGraceSeconds
+            : 5 * 60,
         };
         saveLive(live);
         setNoActiveSession(false);
@@ -459,16 +517,28 @@ const ChargingProgress = () => {
       // Ép về số an toàn
       const customerId = toId(
         state?.customerId ??
-        state?.customer?.customerId ??
-        (await resolveCustomerIdFromAuth(API_ABS))
+          state?.customer?.customerId ??
+          (await resolveCustomerIdFromAuth(API_ABS))
       );
-      const vehicleId = toId(state?.vehicleId ?? state?.vehicle?.id ?? state?.vehicle?.vehicleId);
-      const bookingId = toId(state?.bookingId ?? state?.booking?.id ?? state?.booking?.bookingId);
-      const portIdToUse = toId(state?.gun?.id ?? state?.gun?.portId ?? state?.gun?.PortId ?? state?.portId);
+      const vehicleId = toId(
+        state?.vehicleId ?? state?.vehicle?.id ?? state?.vehicle?.vehicleId
+      );
+      const bookingId = toId(
+        state?.bookingId ?? state?.booking?.id ?? state?.booking?.bookingId
+      );
+      const portIdToUse = toId(
+        state?.gun?.id ??
+          state?.gun?.portId ??
+          state?.gun?.PortId ??
+          state?.portId
+      );
 
       if (!customerId || !vehicleId || !portIdToUse) {
         console.warn("[ChargingProgress] Missing IDs for start", {
-          customerId, vehicleId, portIdToUse, bookingId
+          customerId,
+          vehicleId,
+          portIdToUse,
+          bookingId,
         });
         // Không đủ dữ liệu để start: nếu không có live thì coi như no active
         const live = loadLive();
@@ -478,10 +548,18 @@ const ChargingProgress = () => {
       }
 
       try {
-        const body = { customerId, vehicleId, portId: portIdToUse, bookingId: bookingId ?? null };
-        console.log("[ChargingProgress] POST /ChargingSessions/start payload =", body);
+        const body = {
+          customerId,
+          vehicleId,
+          portId: portIdToUse,
+          bookingId: bookingId ?? null,
+        };
+        console.log(
+          "[ChargingProgress] POST /ChargingSessions/start payload =",
+          body
+        );
 
-        const url = `${API_ABS}/ChargingSessions/start`;     // ✅ thêm dòng này
+        const url = `${API_ABS}/ChargingSessions/start`; // ✅ thêm dòng này
 
         const res = await fetchAuthJSON(url, {
           method: "POST",
@@ -489,68 +567,89 @@ const ChargingProgress = () => {
           body: JSON.stringify(body),
         });
 
-
         const msg = res?.message || "Bắt đầu phiên sạc";
         const raw = res?.data || res || null;
         if (!alive || !raw) return;
 
         // Hydrate thêm
-        let port = null, charger = null;
+        let port = null,
+          charger = null;
         try {
           if (raw.portId != null) {
-            port = await fetchAuthJSON(`${API_ABS}/Ports/${encodeURIComponent(raw.portId)}`, { method: "GET" });
+            port = await fetchAuthJSON(
+              `${API_ABS}/Ports/${encodeURIComponent(raw.portId)}`,
+              { method: "GET" }
+            );
           }
-        } catch { }
+        } catch {}
         try {
           const chargerId =
-            port?.chargerId ?? port?.ChargerId ??
-            raw?.chargerId ?? raw?.ChargerId ?? null;
+            port?.chargerId ??
+            port?.ChargerId ??
+            raw?.chargerId ??
+            raw?.ChargerId ??
+            null;
           if (chargerId != null) {
-            charger = await fetchAuthJSON(`${API_ABS}/Chargers/${encodeURIComponent(chargerId)}`, { method: "GET" });
+            charger = await fetchAuthJSON(
+              `${API_ABS}/Chargers/${encodeURIComponent(chargerId)}`,
+              { method: "GET" }
+            );
           }
           if (charger) setChargerInfo(charger);
-        } catch { }
+        } catch {}
 
         const merged = {
           ...raw,
-          chargerId: (port?.chargerId ?? port?.ChargerId ?? null) ?? (raw?.chargerId ?? raw?.ChargerId ?? null),
+          chargerId:
+            port?.chargerId ??
+            port?.ChargerId ??
+            null ??
+            raw?.chargerId ??
+            raw?.ChargerId ??
+            null,
         };
         setSession(merged);
-        sessionStorage.setItem("charging:start:data", JSON.stringify({ message: msg, data: merged }));
-        showStartSessionToast(merged);
+        sessionStorage.setItem(
+          "charging:start:data",
+          JSON.stringify({ message: msg, data: merged })
+        );
+        showStartSessionToastOnce();
 
         // Lưu context (chưa có orderId)
         saveCtx({
-          stationId: merged?.stationId
-            ?? port?.stationId
-            ?? state?.station?.id
-            ?? state?.station?.stationId
-            ?? null,
-          chargerId: merged?.chargerId
-            ?? port?.chargerId
-            ?? state?.charger?.id
-            ?? state?.charger?.chargerId
-            ?? null,
-          portId: merged?.portId
-            ?? state?.gun?.id
-            ?? state?.portId
-            ?? null,
+          stationId:
+            merged?.stationId ??
+            port?.stationId ??
+            state?.station?.id ??
+            state?.station?.stationId ??
+            null,
+          chargerId:
+            merged?.chargerId ??
+            port?.chargerId ??
+            state?.charger?.id ??
+            state?.charger?.chargerId ??
+            null,
+          portId: merged?.portId ?? state?.gun?.id ?? state?.portId ?? null,
           stationCode: state?.station?.code ?? null,
           chargerCode: state?.charger?.code ?? charger?.code ?? null,
           portCode: state?.gun?.name ?? state?.gun?.code ?? port?.code ?? null,
         });
 
-
         // NEW: init live persisted state for new session
         const kwFromState = Number(state?.charger?.powerKw);
         const kwFromSession = Number(merged?.chargerPowerKw);
-        const powerKw = (Number.isFinite(kwFromSession) && kwFromSession > 0)
-          ? kwFromSession
-          : (Number.isFinite(kwFromState) && kwFromState > 0 ? kwFromState : 7);
+        const powerKw =
+          Number.isFinite(kwFromSession) && kwFromSession > 0
+            ? kwFromSession
+            : Number.isFinite(kwFromState) && kwFromState > 0
+            ? kwFromState
+            : 7;
 
         const startSoc = Number.isFinite(merged?.startSoc)
           ? Math.max(0, Math.min(100, Number(merged.startSoc)))
-          : (Number.isFinite(state?.startSoc) ? state.startSoc : 0);
+          : Number.isFinite(state?.startSoc)
+          ? state.startSoc
+          : 0;
 
         const now = Date.now();
         const live = {
@@ -558,21 +657,29 @@ const ChargingProgress = () => {
           isCharging: true,
           chargingSessionId: merged?.chargingSessionId,
           portId: merged?.portId ?? state?.gun?.id ?? state?.portId ?? null,
-          startedAt: merged?.startedAt ? new Date(merged.startedAt).getTime() : now,
+          startedAt: merged?.startedAt
+            ? new Date(merged.startedAt).getTime()
+            : now,
           lastUpdateAt: now,
           startSoc,
           batteryAtLastUpdate: startSoc,
           powerKw,
-          batteryCapacity: Number.isFinite(state?.batteryCapacity) ? state.batteryCapacity : 75,
+          batteryCapacity: Number.isFinite(state?.batteryCapacity)
+            ? state.batteryCapacity
+            : 75,
           fullAt: null,
-          graceSeconds: Number.isFinite(dynGraceSeconds) ? dynGraceSeconds : 5 * 60,
+          graceSeconds: Number.isFinite(dynGraceSeconds)
+            ? dynGraceSeconds
+            : 5 * 60,
         };
         saveLive(live);
         setNoActiveSession(false);
         setBooting(false);
       } catch (e) {
         if (!alive) return;
-        message.error(`Không thể bắt đầu phiên sạc: ${e?.message || "Lỗi không xác định"}`);
+        message.error(
+          `Không thể bắt đầu phiên sạc: ${e?.message || "Lỗi không xác định"}`
+        );
         setNoActiveSession(true);
         setBooting(false);
       }
@@ -593,17 +700,6 @@ const ChargingProgress = () => {
     state?.portId,
   ]);
 
-  // Show lại toast nếu reload
-  useEffect(() => {
-    const cached = sessionStorage.getItem("charging:start:data");
-    if (cached) {
-      try {
-        const obj = JSON.parse(cached);
-        if (obj?.data) showStartSessionToast(obj.data);
-      } catch { }
-    }
-  }, []);
-
   // Resume khi vào từ Menu (không có state): đọc live và hydrate session/charger
   useEffect(() => {
     if (state) return; // có state thì không cần resume
@@ -619,7 +715,12 @@ const ChargingProgress = () => {
     (async () => {
       try {
         // 1) lấy session theo id
-        const s = await fetchAuthJSON(`${API_ABS}/ChargingSessions/${encodeURIComponent(live.chargingSessionId)}`, { method: "GET" });
+        const s = await fetchAuthJSON(
+          `${API_ABS}/ChargingSessions/${encodeURIComponent(
+            live.chargingSessionId
+          )}`,
+          { method: "GET" }
+        );
         const seed = s?.data || s || null;
         if (!seed || ignore) {
           setBooting(false);
@@ -636,24 +737,41 @@ const ChargingProgress = () => {
         }
 
         // 2) lấy Port và Charger để có chargerId và info
-        let port = null, charger = null;
+        let port = null,
+          charger = null;
         try {
           const pId = seed.portId ?? live.portId ?? null;
-          if (pId != null) port = await fetchAuthJSON(`${API_ABS}/Ports/${encodeURIComponent(pId)}`, { method: "GET" });
-        } catch { }
+          if (pId != null)
+            port = await fetchAuthJSON(
+              `${API_ABS}/Ports/${encodeURIComponent(pId)}`,
+              { method: "GET" }
+            );
+        } catch {}
 
         try {
           const chId =
-            port?.chargerId ?? port?.ChargerId ??
-            seed?.chargerId ?? seed?.ChargerId ?? null;
+            port?.chargerId ??
+            port?.ChargerId ??
+            seed?.chargerId ??
+            seed?.ChargerId ??
+            null;
           if (chId != null) {
-            charger = await fetchAuthJSON(`${API_ABS}/Chargers/${encodeURIComponent(chId)}`, { method: "GET" });
+            charger = await fetchAuthJSON(
+              `${API_ABS}/Chargers/${encodeURIComponent(chId)}`,
+              { method: "GET" }
+            );
           }
-        } catch { }
+        } catch {}
 
         const merged = {
           ...seed,
-          chargerId: (port?.chargerId ?? port?.ChargerId ?? null) ?? (seed?.chargerId ?? seed?.ChargerId ?? null),
+          chargerId:
+            port?.chargerId ??
+            port?.ChargerId ??
+            null ??
+            seed?.chargerId ??
+            seed?.ChargerId ??
+            null,
           portStatus: seed?.portStatus ?? null,
           chargerType: seed?.chargerType ?? null,
           chargerPowerKw: seed?.chargerPowerKw ?? null,
@@ -670,15 +788,16 @@ const ChargingProgress = () => {
         });
         setNoActiveSession(false);
         setBooting(false);
-      } catch {/* ignore */ }
+      } catch {
+        /* ignore */
+      }
     })();
 
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, API_ABS]);
-
-
-
 
   // ==== Pricing theo trụ/cổng ====
   useEffect(() => {
@@ -691,29 +810,45 @@ const ChargingProgress = () => {
         let chargerRaw = null;
         if (chargerId) {
           try {
-            chargerRaw = await fetchJSON(`${API_ABS}/Chargers/${encodeURIComponent(chargerId)}`);
-          } catch { }
+            chargerRaw = await fetchJSON(
+              `${API_ABS}/Chargers/${encodeURIComponent(chargerId)}`
+            );
+          } catch {}
         }
 
         const chNorm = normalizeCharger(chargerRaw || state?.charger || {});
         const currentTR = nowTimeRange(new Date());
-        const chargerType = (chargerRaw?.type ?? chargerRaw?.Type ?? state?.charger?.type ?? state?.charger?.Type ?? "").toString();
+        const chargerType = (
+          chargerRaw?.type ??
+          chargerRaw?.Type ??
+          state?.charger?.type ??
+          state?.charger?.Type ??
+          ""
+        ).toString();
 
         let rules = null;
         const tryEndpoints = [
-          `${API_ABS}/PricingRules?chargerId=${encodeURIComponent(chNorm.id || chargerId || "")}`,
-          `${API_ABS}/PricingRule?chargerId=${encodeURIComponent(chNorm.id || chargerId || "")}`,
+          `${API_ABS}/PricingRules?chargerId=${encodeURIComponent(
+            chNorm.id || chargerId || ""
+          )}`,
+          `${API_ABS}/PricingRule?chargerId=${encodeURIComponent(
+            chNorm.id || chargerId || ""
+          )}`,
           `${API_ABS}/PricingRules`,
         ];
         for (const url of tryEndpoints) {
           try {
             const r = await fetchJSON(url);
-            const arr = Array.isArray(r) ? r : Array.isArray(r?.items) ? r.items : null;
+            const arr = Array.isArray(r)
+              ? r
+              : Array.isArray(r?.items)
+              ? r.items
+              : null;
             if (arr && arr.length) {
               rules = arr;
               break;
             }
-          } catch { }
+          } catch {}
         }
 
         let pricePerKwh = chNorm.pricePerKwh;
@@ -721,28 +856,41 @@ const ChargingProgress = () => {
         let graceSeconds = chNorm.idleGraceSeconds;
 
         if (rules && rules.length) {
-          const typed = rules.filter(r => {
+          const typed = rules.filter((r) => {
             const rTR = (r.timeRange ?? r.TimeRange ?? "").toString();
             const rType = (r.chargerType ?? r.ChargerType ?? "").toString();
             return rTR === currentTR && (!chargerType || rType === chargerType);
           });
-          const best = pickRule(typed.length ? typed : rules, { powerKw: chNorm.powerKw, timeRange: currentTR });
+          const best = pickRule(typed.length ? typed : rules, {
+            powerKw: chNorm.powerKw,
+            timeRange: currentTR,
+          });
           if (best) {
-            const rPrice = Number(best.pricePerKwh ?? best.pricePerKWh ?? best.PricePerKwh ?? best.PricePerKWh);
+            const rPrice = Number(
+              best.pricePerKwh ??
+                best.pricePerKWh ??
+                best.PricePerKwh ??
+                best.PricePerKWh
+            );
             const rPenalty = Number(best.idleFeePerMin ?? best.IdleFeePerMin);
             const rGraceSec =
               Number(best.idleGraceSeconds ?? best.IdleGraceSeconds) ||
               Number(best.idleGraceMinutes ?? best.IdleGraceMinutes) * 60;
 
             if (Number.isFinite(rPrice) && rPrice > 0) pricePerKwh = rPrice;
-            if (Number.isFinite(rPenalty) && rPenalty > 0) idleFeePerMin = rPenalty;
-            if (Number.isFinite(rGraceSec) && rGraceSec > 0) graceSeconds = rGraceSec;
+            if (Number.isFinite(rPenalty) && rPenalty > 0)
+              idleFeePerMin = rPenalty;
+            if (Number.isFinite(rGraceSec) && rGraceSec > 0)
+              graceSeconds = rGraceSec;
           }
         }
 
-        if (!Number.isFinite(pricePerKwh) || pricePerKwh <= 0) pricePerKwh = fallbackPricePerKWh;
-        if (!Number.isFinite(idleFeePerMin) || idleFeePerMin <= 0) idleFeePerMin = 10000;
-        if (!Number.isFinite(graceSeconds) || graceSeconds <= 0) graceSeconds = 5 * 60;
+        if (!Number.isFinite(pricePerKwh) || pricePerKwh <= 0)
+          pricePerKwh = fallbackPricePerKWh;
+        if (!Number.isFinite(idleFeePerMin) || idleFeePerMin <= 0)
+          idleFeePerMin = 10000;
+        if (!Number.isFinite(graceSeconds) || graceSeconds <= 0)
+          graceSeconds = 5 * 60;
 
         if (!alive) return;
         setDynPricePerKWh(pricePerKwh);
@@ -776,23 +924,39 @@ const ChargingProgress = () => {
         try {
           const tk = getToken && getToken();
           const decoded = tk ? decodeJwtPayload(tk) : null;
-          customerId = customerId ?? decoded?.customerId ?? decoded?.nameid ?? decoded?.sub ?? null;
-          if (typeof customerId === "string" && /^\d+$/.test(customerId)) customerId = Number(customerId);
+          customerId =
+            customerId ??
+            decoded?.customerId ??
+            decoded?.nameid ??
+            decoded?.sub ??
+            null;
+          if (typeof customerId === "string" && /^\d+$/.test(customerId))
+            customerId = Number(customerId);
           companyId = companyId ?? decoded?.companyId ?? null;
-        } catch { }
+        } catch {}
 
         // Thử các endpoint khả dĩ của BE
         const candidates = [];
         if (customerId && companyId) {
-          candidates.push(`${API_ABS}/Subscriptions/active?customerId=${customerId}&companyId=${companyId}`);
+          candidates.push(
+            `${API_ABS}/Subscriptions/active?customerId=${customerId}&companyId=${companyId}`
+          );
         }
         if (customerId) {
-          candidates.push(`${API_ABS}/Subscriptions/active?customerId=${customerId}`);
-          candidates.push(`${API_ABS}/Subscriptions/by-customer/${customerId}?status=active`);
+          candidates.push(
+            `${API_ABS}/Subscriptions/active?customerId=${customerId}`
+          );
+          candidates.push(
+            `${API_ABS}/Subscriptions/by-customer/${customerId}?status=active`
+          );
         }
         if (companyId) {
-          candidates.push(`${API_ABS}/Subscriptions/active?companyId=${companyId}`);
-          candidates.push(`${API_ABS}/Subscriptions/by-company/${companyId}?status=active`);
+          candidates.push(
+            `${API_ABS}/Subscriptions/active?companyId=${companyId}`
+          );
+          candidates.push(
+            `${API_ABS}/Subscriptions/by-company/${companyId}?status=active`
+          );
         }
 
         let found = null;
@@ -827,7 +991,7 @@ const ChargingProgress = () => {
               freeIdleMinutes: Number(freeIdleMinutes) || 0,
             };
             break;
-          } catch { }
+          } catch {}
         }
 
         if (!alive) return;
@@ -845,9 +1009,20 @@ const ChargingProgress = () => {
   }, [API_ABS, state?.customerId, state?.companyId]);
 
   // ==== Ước tính theo BE ====
-  const needKWhToFull = useMemo(() => ((100 - initialBattery) / 100) * batteryCapacity, [initialBattery, batteryCapacity]);
+  const needKWhToFull = useMemo(
+    () => ((100 - initialBattery) / 100) * batteryCapacity,
+    [initialBattery, batteryCapacity]
+  );
   const estimatedCostToFull = useMemo(
-    () => vnd(Math.round(needKWhToFull * (Number.isFinite(dynPricePerKWh) ? dynPricePerKWh : fallbackPricePerKWh))),
+    () =>
+      vnd(
+        Math.round(
+          needKWhToFull *
+            (Number.isFinite(dynPricePerKWh)
+              ? dynPricePerKWh
+              : fallbackPricePerKWh)
+        )
+      ),
     [needKWhToFull, dynPricePerKWh, fallbackPricePerKWh]
   );
 
@@ -862,8 +1037,12 @@ const ChargingProgress = () => {
     return `${h}h${m.toString().padStart(2, "0")}p`;
   };
 
-  const GRACE_SECONDS = Number.isFinite(dynGraceSeconds) ? dynGraceSeconds : 5 * 60;
-  const PENALTY_PER_MIN = Number.isFinite(dynPenaltyPerMin) ? dynPenaltyPerMin : 10000;
+  const GRACE_SECONDS = Number.isFinite(dynGraceSeconds)
+    ? dynGraceSeconds
+    : 5 * 60;
+  const PENALTY_PER_MIN = Number.isFinite(dynPenaltyPerMin)
+    ? dynPenaltyPerMin
+    : 10000;
 
   // thời gian miễn phí còn lại sau khi đầy
   const chargeableSecs = Math.max(0, overTimeSecs - GRACE_SECONDS);
@@ -873,25 +1052,37 @@ const ChargingProgress = () => {
   const roundedBattery = Math.floor(battery);
   const roundedStartSoc = Math.floor(startSocRef.current);
   const chargedPercentSoFar = Math.max(0, roundedBattery - roundedStartSoc);
-  const energyKwhSoFar = Number(((chargedPercentSoFar / 100) * batteryCapacity).toFixed(2));
+  const energyKwhSoFar = Number(
+    ((chargedPercentSoFar / 100) * batteryCapacity).toFixed(2)
+  );
 
-  const pricePerKWhLive = Number.isFinite(dynPricePerKWh) ? dynPricePerKWh : fallbackPricePerKWh;
+  const pricePerKWhLive = Number.isFinite(dynPricePerKWh)
+    ? dynPricePerKWh
+    : fallbackPricePerKWh;
 
   // Idle live (chỉ tính khi đã đầy pin)
   const idleMinutesSoFar = roundedBattery < 100 ? 0 : chargeableMinutesRaw;
-  const chargeableIdleAfterSub = Math.max(idleMinutesSoFar - (activeSub.freeIdleMinutes || 0), 0);
+  const chargeableIdleAfterSub = Math.max(
+    idleMinutesSoFar - (activeSub.freeIdleMinutes || 0),
+    0
+  );
   const idleCostLive = chargeableIdleAfterSub * PENALTY_PER_MIN;
 
-  const subtotalBeforeDiscountLive = Math.round(energyKwhSoFar * pricePerKWhLive + idleCostLive);
-  const subtotalLive =
-    Math.round(subtotalBeforeDiscountLive * (1 - (activeSub.discountPercent || 0) / 100));
+  const subtotalBeforeDiscountLive = Math.round(
+    energyKwhSoFar * pricePerKWhLive + idleCostLive
+  );
+  const subtotalLive = Math.round(
+    subtotalBeforeDiscountLive * (1 - (activeSub.discountPercent || 0) / 100)
+  );
   const taxLive = Math.round(subtotalLive * 0.1);
   const totalLive = subtotalLive + taxLive;
 
   // đồng hồ thời gian sạc còn lại
   const [displayTimeLeft, setDisplayTimeLeft] = useState("");
   useEffect(() => {
-    const minutesLeft = Math.round((TOTAL_TIME_MINUTES * (100 - battery)) / 100);
+    const minutesLeft = Math.round(
+      (TOTAL_TIME_MINUTES * (100 - battery)) / 100
+    );
     const h = Math.floor(minutesLeft / 60);
     const m = minutesLeft % 60;
     setDisplayTimeLeft(`${h}h${m.toString().padStart(2, "0")}p`);
@@ -937,23 +1128,31 @@ const ChargingProgress = () => {
         const now = Date.now();
         const kwFromState = Number(state?.charger?.powerKw);
         const kwFromSession = Number(session?.chargerPowerKw);
-        const powerKw = (Number.isFinite(kwFromSession) && kwFromSession > 0)
-          ? kwFromSession
-          : (Number.isFinite(kwFromState) && kwFromState > 0 ? kwFromState : 7);
+        const powerKw =
+          Number.isFinite(kwFromSession) && kwFromSession > 0
+            ? kwFromSession
+            : Number.isFinite(kwFromState) && kwFromState > 0
+            ? kwFromState
+            : 7;
 
         live = {
           isActive: true,
           isCharging: true,
-          chargingSessionId: session?.chargingSessionId ?? state?.chargingSessionId ?? null,
+          chargingSessionId:
+            session?.chargingSessionId ?? state?.chargingSessionId ?? null,
           portId: session?.portId ?? state?.gun?.id ?? state?.portId ?? null,
           startedAt: startedAtRef.current || now,
           lastUpdateAt: now,
           startSoc: startSocRef.current || 0,
           batteryAtLastUpdate: startSocRef.current || 0,
           powerKw,
-          batteryCapacity: Number.isFinite(state?.batteryCapacity) ? state.batteryCapacity : 75,
+          batteryCapacity: Number.isFinite(state?.batteryCapacity)
+            ? state.batteryCapacity
+            : 75,
           fullAt: null,
-          graceSeconds: Number.isFinite(dynGraceSeconds) ? dynGraceSeconds : 5 * 60,
+          graceSeconds: Number.isFinite(dynGraceSeconds)
+            ? dynGraceSeconds
+            : 5 * 60,
         };
         saveLive(live);
         setNoActiveSession(false);
@@ -989,18 +1188,31 @@ const ChargingProgress = () => {
     tick();
     const id = setInterval(tick, TICK_MS);
     return () => clearInterval(id);
-  }, [isCharging, session?.chargerPowerKw, state?.charger?.powerKw, state?.batteryCapacity, dynGraceSeconds]);
+  }, [
+    isCharging,
+    session?.chargerPowerKw,
+    state?.charger?.powerKw,
+    state?.batteryCapacity,
+    dynGraceSeconds,
+  ]);
 
   // --- Không dùng nữa: interval phạt theo tick (đã thay bằng tính theo fullAt)
   // useEffect(() => { ... })  ← đã xoá
 
   function getChargingSessionIdSafe() {
-    let sid = session?.chargingSessionId ?? state?.chargingSessionId ?? state?.sessionId ?? null; // ✅ thêm fallback
+    let sid =
+      session?.chargingSessionId ??
+      state?.chargingSessionId ??
+      state?.sessionId ??
+      null; // ✅ thêm fallback
     if (!sid) {
       try {
-        const cached = JSON.parse(sessionStorage.getItem("charging:start:data") || "null");
-        sid = cached?.data?.chargingSessionId ?? cached?.chargingSessionId ?? null;
-      } catch { }
+        const cached = JSON.parse(
+          sessionStorage.getItem("charging:start:data") || "null"
+        );
+        sid =
+          cached?.data?.chargingSessionId ?? cached?.chargingSessionId ?? null;
+      } catch {}
     }
     if (!sid) {
       const live = loadLive();
@@ -1012,7 +1224,9 @@ const ChargingProgress = () => {
   function isEndedStatus(s) {
     if (!s) return false;
     const t = String(s).toLowerCase();
-    return /(end|ended|finish|finished|stop|stopped|complete|completed|cancel)/.test(t);
+    return /(end|ended|finish|finished|stop|stopped|complete|completed|cancel)/.test(
+      t
+    );
   }
 
   function markLiveInactive(extra = {}) {
@@ -1027,10 +1241,10 @@ const ChargingProgress = () => {
     });
   }
 
-
   // ==== END SESSION (chuẩn BE) ====
   async function endSessionOnServer({ endSoc, chargingSessionId }) {
-    if (!chargingSessionId || !Number.isFinite(Number(chargingSessionId))) return null;
+    if (!chargingSessionId || !Number.isFinite(Number(chargingSessionId)))
+      return null;
     try {
       const url = `${API_ABS}/ChargingSessions/end`;
 
@@ -1042,12 +1256,12 @@ const ChargingProgress = () => {
 
       // ✅ Tính overtime theo thời gian thực để không lệ thuộc interval
       const secondsSinceFull = Math.floor(
-        (fullAtRef.current ? (Date.now() - fullAtRef.current) : 0) / 1000
+        (fullAtRef.current ? Date.now() - fullAtRef.current : 0) / 1000
       );
 
       // ✅ Lấy giá trị lớn hơn giữa đồng hồ UI & thời gian thực
       const overtimeSecs = Math.max(
-        (Math.floor(battery) >= 100 ? overTimeSecs : 0),
+        Math.floor(battery) >= 100 ? overTimeSecs : 0,
         secondsSinceFull
       );
 
@@ -1062,7 +1276,11 @@ const ChargingProgress = () => {
         endSoc: Math.round(Number(endSoc) || 0),
         idleMin: idleMinToSend,
       };
-      console.debug("[Charging] END payload:", { ...body, overtimeSecs, GRACE_SECONDS });
+      console.debug("[Charging] END payload:", {
+        ...body,
+        overtimeSecs,
+        GRACE_SECONDS,
+      });
 
       const res = await fetchAuthJSON(url, {
         method: "POST",
@@ -1080,7 +1298,9 @@ const ChargingProgress = () => {
   const goToInvoicePage = async () => {
     const sid = getChargingSessionIdSafe();
     if (!sid) {
-      message.error("Chưa có mã phiên sạc (chargingSessionId). Hãy chờ vài giây rồi thử lại.");
+      message.error(
+        "Chưa có mã phiên sạc (chargingSessionId). Hãy chờ vài giây rồi thử lại."
+      );
       return;
     }
 
@@ -1090,7 +1310,9 @@ const ChargingProgress = () => {
       const curr = computeBatteryNow(liveBefore);
       saveLive({
         ...liveBefore,
-        batteryAtLastUpdate: Number.isFinite(curr) ? curr : (liveBefore.batteryAtLastUpdate || 0),
+        batteryAtLastUpdate: Number.isFinite(curr)
+          ? curr
+          : liveBefore.batteryAtLastUpdate || 0,
         lastUpdateAt: Date.now(),
       });
     }
@@ -1110,29 +1332,35 @@ const ChargingProgress = () => {
     setNoActiveSession(true);
     setBooting(false);
 
-    const orderId = `CHG${beData.chargingSessionId || Date.now()}`;// Ghi context theo orderId để Invoice.jsx đọc được charge:ctx:{orderId}
+    const orderId = `CHG${beData.chargingSessionId || Date.now()}`; // Ghi context theo orderId để Invoice.jsx đọc được charge:ctx:{orderId}
     saveCtx({
       orderId,
-      stationId: beData?.stationId
-        ?? session?.stationId
-        ?? state?.station?.id
-        ?? null,
-      chargerId: beData?.chargerId
-        ?? session?.chargerId
-        ?? chargerInfo?.chargerId
-        ?? chargerInfo?.id
-        ?? null,
-      portId: beData?.portId
-        ?? session?.portId
-        ?? state?.gun?.id
-        ?? state?.portId
-        ?? null,
+      stationId:
+        beData?.stationId ?? session?.stationId ?? state?.station?.id ?? null,
+      chargerId:
+        beData?.chargerId ??
+        session?.chargerId ??
+        chargerInfo?.chargerId ??
+        chargerInfo?.id ??
+        null,
+      portId:
+        beData?.portId ??
+        session?.portId ??
+        state?.gun?.id ??
+        state?.portId ??
+        null,
       endedAt: beData?.endedAt ?? new Date().toISOString(),
     });
 
     // Lưu theo 2 key mà Invoice.jsx có thể đọc
-    sessionStorage.setItem(`chargepay:${orderId}`, JSON.stringify({ orderId, ...beData }));
-    sessionStorage.setItem("charge:end:last", JSON.stringify({ orderId, data: beData }));
+    sessionStorage.setItem(
+      `chargepay:${orderId}`,
+      JSON.stringify({ orderId, ...beData })
+    );
+    sessionStorage.setItem(
+      "charge:end:last",
+      JSON.stringify({ orderId, data: beData })
+    );
 
     // Có thể clear live tại Invoice sau khi thanh toán xong
     navigate(`/invoice?order=${orderId}`, {
@@ -1154,7 +1382,9 @@ const ChargingProgress = () => {
         ...live,
         isCharging: false,
         isActive: true,
-        batteryAtLastUpdate: Number.isFinite(curr) ? curr : (live.batteryAtLastUpdate || 0),
+        batteryAtLastUpdate: Number.isFinite(curr)
+          ? curr
+          : live.batteryAtLastUpdate || 0,
         lastUpdateAt: Date.now(),
       });
     }
@@ -1174,7 +1404,9 @@ const ChargingProgress = () => {
         ...live,
         isCharging: false,
         isActive: false,
-        batteryAtLastUpdate: Number.isFinite(curr) ? curr : (live.batteryAtLastUpdate || 0),
+        batteryAtLastUpdate: Number.isFinite(curr)
+          ? curr
+          : live.batteryAtLastUpdate || 0,
         lastUpdateAt: Date.now(),
       });
     }
@@ -1183,19 +1415,22 @@ const ChargingProgress = () => {
   };
 
   const canEnd = Boolean(
-  session?.chargingSessionId ||
-  state?.chargingSessionId ||
-  state?.sessionId ||  
-    (() => {
-      try {
-        const cached = JSON.parse(sessionStorage.getItem("charging:start:data") || "null");
-        if (cached?.data?.chargingSessionId ?? cached?.chargingSessionId) return true;
-        const live = loadLive();
-        return !!live?.chargingSessionId;
-      } catch {
-        return null;
-      }
-    })()
+    session?.chargingSessionId ||
+      state?.chargingSessionId ||
+      state?.sessionId ||
+      (() => {
+        try {
+          const cached = JSON.parse(
+            sessionStorage.getItem("charging:start:data") || "null"
+          );
+          if (cached?.data?.chargingSessionId ?? cached?.chargingSessionId)
+            return true;
+          const live = loadLive();
+          return !!live?.chargingSessionId;
+        } catch {
+          return null;
+        }
+      })()
   );
 
   // Trước khi rời trang, chốt lại mốc live
@@ -1206,7 +1441,9 @@ const ChargingProgress = () => {
         const curr = computeBatteryNow(live);
         saveLive({
           ...live,
-          batteryAtLastUpdate: Number.isFinite(curr) ? curr : (live.batteryAtLastUpdate || 0),
+          batteryAtLastUpdate: Number.isFinite(curr)
+            ? curr
+            : live.batteryAtLastUpdate || 0,
           lastUpdateAt: Date.now(),
         });
       }
@@ -1216,14 +1453,20 @@ const ChargingProgress = () => {
   }, []);
 
   // ================== Render ==================
-  const graceLeftSecs = Math.max(0, (Number.isFinite(dynGraceSeconds) ? dynGraceSeconds : 5 * 60) - overTimeSecs);
+  const graceLeftSecs = Math.max(
+    0,
+    (Number.isFinite(dynGraceSeconds) ? dynGraceSeconds : 5 * 60) - overTimeSecs
+  );
   const graceLeftMMSS = useMemo(() => {
     const m = Math.floor(graceLeftSecs / 60);
     const s = Math.floor(graceLeftSecs % 60);
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   }, [graceLeftSecs]);
 
-  const penaltyElapsedSecs = Math.max(0, overTimeSecs - (Number.isFinite(dynGraceSeconds) ? dynGraceSeconds : 5 * 60));
+  const penaltyElapsedSecs = Math.max(
+    0,
+    overTimeSecs - (Number.isFinite(dynGraceSeconds) ? dynGraceSeconds : 5 * 60)
+  );
   const penaltyElapsedMMSS = useMemo(() => {
     const s = Math.floor(penaltyElapsedSecs);
     const m = Math.floor(s / 60);
@@ -1248,10 +1491,16 @@ const ChargingProgress = () => {
         <div className="cp-empty">
           <div className="cp-empty-card">
             <h2 className="cp-empty-title">Chưa có phiên sạc đang diễn ra</h2>
-            <p className="cp-empty-desc">Bạn có thể bắt đầu phiên sạc mới từ danh sách trạm.</p>
+            <p className="cp-empty-desc">
+              Bạn có thể bắt đầu phiên sạc mới từ danh sách trạm.
+            </p>
             <div className="cp-empty-actions">
-              <Link to="/stations" className="cp-link-btn">🔌 Về danh sách trạm</Link>
-              <Link to="/invoiceSummary" className="cp-link-secondary">🧾 Xem hoá đơn</Link>
+              <Link to="/stations" className="cp-link-btn">
+                🔌 Về danh sách trạm
+              </Link>
+              <Link to="/invoiceSummary" className="cp-link-secondary">
+                🧾 Xem hoá đơn
+              </Link>
             </div>
           </div>
         </div>
@@ -1283,7 +1532,11 @@ const ChargingProgress = () => {
 
             <div className="charging-status">
               <div className="status-box battery-box">
-                <div className="battery-ring" style={{ ["--pct"]: Math.round(battery) }} aria-label={`Mức pin hiện tại ${Math.round(battery)}%`}>
+                <div
+                  className="battery-ring"
+                  style={{ ["--pct"]: Math.round(battery) }}
+                  aria-label={`Mức pin hiện tại ${Math.round(battery)}%`}
+                >
                   <ThunderboltOutlined className="battery-icon" />
                 </div>
                 <div className="battery-info">
@@ -1296,7 +1549,11 @@ const ChargingProgress = () => {
                 <p>Thời gian sạc dự kiến</p>
                 <h3>{displayTimeLeft}</h3>
                 <div className="chip" style={{ marginTop: 6 }}>
-                  {(Number.isFinite(dynPricePerKWh) ? dynPricePerKWh : fallbackPricePerKWh).toLocaleString("vi-VN")} VND/kWh
+                  {(Number.isFinite(dynPricePerKWh)
+                    ? dynPricePerKWh
+                    : fallbackPricePerKWh
+                  ).toLocaleString("vi-VN")}{" "}
+                  VND/kWh
                 </div>
               </div>
             </div>
@@ -1325,7 +1582,11 @@ const ChargingProgress = () => {
                 <div>
                   <p>Giá điện</p>
                   <h4>
-                    {(Number.isFinite(dynPricePerKWh) ? dynPricePerKWh : fallbackPricePerKWh).toLocaleString("vi-VN")} VND/kWh
+                    {(Number.isFinite(dynPricePerKWh)
+                      ? dynPricePerKWh
+                      : fallbackPricePerKWh
+                    ).toLocaleString("vi-VN")}{" "}
+                    VND/kWh
                   </h4>
                 </div>
 
@@ -1334,9 +1595,17 @@ const ChargingProgress = () => {
                   <p>Tạm tính đến hiện tại</p>
                   <h4>{vnd(totalLive)}</h4>
                   <div className="sub">
-                    {energyKwhSoFar.toFixed(2)} kWh × {pricePerKWhLive.toLocaleString("vi-VN")} +{" "}
-                    {chargeableIdleAfterSub}’ × {(Number.isFinite(dynPenaltyPerMin) ? dynPenaltyPerMin : 10000).toLocaleString("vi-VN")}
-                    {activeSub.discountPercent ? ` → giảm ${activeSub.discountPercent}%` : ""} → VAT 10%
+                    {energyKwhSoFar.toFixed(2)} kWh ×{" "}
+                    {pricePerKWhLive.toLocaleString("vi-VN")} +{" "}
+                    {chargeableIdleAfterSub}’ ×{" "}
+                    {(Number.isFinite(dynPenaltyPerMin)
+                      ? dynPenaltyPerMin
+                      : 10000
+                    ).toLocaleString("vi-VN")}
+                    {activeSub.discountPercent
+                      ? ` → giảm ${activeSub.discountPercent}%`
+                      : ""}{" "}
+                    → VAT 10%
                   </div>
                 </div>
 
@@ -1348,7 +1617,9 @@ const ChargingProgress = () => {
                   ) : graceLeftSecs > 0 ? (
                     <div>
                       <h4>0 VND</h4>
-                      <div className="sub">Miễn phí còn lại: {graceLeftMMSS}</div>
+                      <div className="sub">
+                        Miễn phí còn lại: {graceLeftMMSS}
+                      </div>
                     </div>
                   ) : (
                     <div className="penalty-stripe">
@@ -1357,8 +1628,12 @@ const ChargingProgress = () => {
                         Đã chiếm trụ: <b>{penaltyElapsedMMSS}</b>
                       </div>
                       <div className="sub">
-                        Đang tính: ( {idleMinutesSoFar}’ − {activeSub.freeIdleMinutes || 0}’ ) ×{" "}
-                        {(Number.isFinite(dynPenaltyPerMin) ? dynPenaltyPerMin : 10000).toLocaleString("vi-VN")}
+                        Đang tính: ( {idleMinutesSoFar}’ −{" "}
+                        {activeSub.freeIdleMinutes || 0}’ ) ×{" "}
+                        {(Number.isFinite(dynPenaltyPerMin)
+                          ? dynPenaltyPerMin
+                          : 10000
+                        ).toLocaleString("vi-VN")}
                       </div>
                     </div>
                   )}
@@ -1369,7 +1644,11 @@ const ChargingProgress = () => {
             <div className="charging-buttons">
               {Math.floor(battery) < 100 && isCharging ? (
                 <>
-                  <button className="btn-stop" onClick={handleStopCharging} disabled={!canEnd}>
+                  <button
+                    className="btn-stop"
+                    onClick={handleStopCharging}
+                    disabled={!canEnd}
+                  >
                     Dừng sạc
                   </button>
                   <button className="btn-error">
@@ -1377,21 +1656,43 @@ const ChargingProgress = () => {
                   </button>
                 </>
               ) : battery < 100 && !isCharging ? (
-                <h3 style={{ color: "#f44336", fontSize: 16, gridColumn: "1 / -1" }}>🔴 Phiên sạc đã tạm dừng</h3>
+                <h3
+                  style={{
+                    color: "#f44336",
+                    fontSize: 16,
+                    gridColumn: "1 / -1",
+                  }}
+                >
+                  🔴 Phiên sạc đã tạm dừng
+                </h3>
               ) : (
                 <div>
                   <h2 style={{ fontSize: 16 }}>Phiên sạc đã hoàn tất</h2>
                   {graceLeftSecs > 0 ? (
                     <p style={{ fontSize: 12 }}>
-                      Vui lòng rút sạc trong vòng <b>{graceLeftMMSS}</b> để tránh phí phạt.
+                      Vui lòng rút sạc trong vòng <b>{graceLeftMMSS}</b> để
+                      tránh phí phạt.
                     </p>
                   ) : (
                     <p style={{ fontSize: 12 }}>
-                      Đang tính phí: {Math.max(0, idleMinutesSoFar - (activeSub.freeIdleMinutes || 0))} phút ×{" "}
-                      {(Number.isFinite(dynPenaltyPerMin) ? dynPenaltyPerMin : 10000).toLocaleString("vi-VN")} VND/phút
+                      Đang tính phí:{" "}
+                      {Math.max(
+                        0,
+                        idleMinutesSoFar - (activeSub.freeIdleMinutes || 0)
+                      )}{" "}
+                      phút ×{" "}
+                      {(Number.isFinite(dynPenaltyPerMin)
+                        ? dynPenaltyPerMin
+                        : 10000
+                      ).toLocaleString("vi-VN")}{" "}
+                      VND/phút
                     </p>
                   )}
-                  <button className="btn-finish" onClick={handleFinishCharging} disabled={!canEnd}>
+                  <button
+                    className="btn-finish"
+                    onClick={handleFinishCharging}
+                    disabled={!canEnd}
+                  >
                     Rút sạc
                   </button>
                 </div>
