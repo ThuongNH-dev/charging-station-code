@@ -13,7 +13,12 @@
   display: flex;
   flex-direction: column;
   background: #f9f9f9;
-  margin-left: 240px; /* để chừa khoảng sidebar */
+  margin-left: 260px; /* để chừa khoảng sidebar khi expanded (260px = sidebar width) */
+  transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.admin-main.sidebar-collapsed {
+  margin-left: 80px; /* điều chỉnh khi sidebar collapsed (80px = collapsed sidebar width) */
 }
 
 /* --- Header --- */
@@ -43,4 +48,19 @@
   font-weight: 600;
   margin-bottom: 24px;
   color: #333;
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .admin-main {
+    margin-left: 80px !important; /* Trên mobile, sidebar luôn collapsed */
+  }
+  
+  .admin-main.sidebar-collapsed {
+    margin-left: 80px !important;
+  }
+  
+  .admin-content {
+    padding: 20px 16px;
+  }
 }

@@ -11,6 +11,7 @@
     "dev:api": "json-server --watch db.json --port 4000"
   },
   "dependencies": {
+    "@ant-design/v5-patch-for-react-19": "^1.0.3",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@goongmaps/goong-js": "^1.0.9",
