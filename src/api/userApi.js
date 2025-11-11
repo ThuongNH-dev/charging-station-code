@@ -121,8 +121,33 @@ export const userApi = {
 
   // ===== VEHICLES =====
   fetchAllVehicles: async () => {
-    const res = await axios.get(`${BASE_URL}/Vehicles?page=1&pageSize=50`);
-    return res.data.items || [];
+    const pageSize = 100; // tuỳ bạn
+    let page = 1;
+    let out = [];
+
+    while (true) {
+      const res = await axios.get(
+        `${BASE_URL}/Vehicles?page=${page}&pageSize=${pageSize}`
+      );
+      const d = res.data;
+
+      // BE có 2 kiểu trả: mảng thuần hoặc PagedResult { totalItems, items }
+      if (Array.isArray(d)) {
+        // kiểu mảng => đã đủ luôn
+        out = d;
+        break;
+      }
+
+      const items = Array.isArray(d?.items) ? d.items : [];
+      out = out.concat(items);
+
+      const total = d?.totalItems ?? d?.total ?? out.length;
+      if (out.length >= total || items.length === 0) break;
+
+      page++;
+    }
+
+    return out;
   },
 
   updateVehicle: async (id, data) => {

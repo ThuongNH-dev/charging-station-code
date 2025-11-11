@@ -36,7 +36,7 @@ const renderCell = (vehicle, key, sttIndex) => {
     case "ownerType":
       if (hasId(vehicle.companyId)) return "Công ty";
       if (hasId(vehicle.customerId)) return "Cá nhân";
-      return "Không xác định";
+      return "Khách vãng lai";
     case "ownerId":
       if (hasId(vehicle.companyId)) return vehicle.companyId;
       if (hasId(vehicle.customerId)) return vehicle.customerId;

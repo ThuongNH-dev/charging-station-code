@@ -31,7 +31,8 @@ const useUserServicesHook = () => {
 
       // 1) Map id -> planName
       const serviceMap = (services || []).reduce((map, pkg) => {
-        map[pkg.id] = pkg.planName;
+        const key = pkg.id ?? pkg.subscriptionPlanId ?? pkg.packageId;
+        if (key != null) map[key] = pkg.planName;
         return map;
       }, {});
 
@@ -66,60 +67,59 @@ const useUserServicesHook = () => {
   }, [fetchData]);
 
   // ... bên trong useUserServicesHook
-const handleUpdate = async (apiFunc, id, data, successMsg, role) => {
-  if (typeof apiFunc !== "function") {
-    console.error("❌ apiFunc không phải function", apiFunc);
-    return false;
-  }
-  setIsLoading(true);
-  setError(null);
-  try {
-    if (id !== undefined && id !== null) {
-      await apiFunc(id, data, role);
-    } else {
-      await apiFunc(data);
+  const handleUpdate = async (apiFunc, id, data, successMsg, role) => {
+    if (typeof apiFunc !== "function") {
+      console.error("❌ apiFunc không phải function", apiFunc);
+      return false;
     }
-    alert(successMsg || "Cập nhật thành công!");
-    await fetchData();
-    return true;
-  } catch (err) {
-    const resp = err?.response;
-    const pd = resp?.data; // ProblemDetails từ ASP.NET
-    const sentBody = resp?.config?.data;
-
-    // 🔎 In ra toàn bộ để debug nhanh
-    console.error("❌ AxiosError detail:", {
-      status: resp?.status,
-      url: resp?.config?.url,
-      method: resp?.config?.method,
-      sentBody,                 // <= body FE đã gửi
-      problemDetails: pd,       // <= ProblemDetails từ BE
-    });
-
-    // 🔎 Gom lỗi ModelState cho người dùng
-    let msg =
-      pd?.title ||
-      pd?.message ||
-      err?.message ||
-      "One or more validation errors occurred.";
-
-    if (pd?.errors && typeof pd.errors === "object") {
-      const lines = [];
-      for (const [field, arr] of Object.entries(pd.errors)) {
-        const joined = Array.isArray(arr) ? arr.join(", ") : String(arr);
-        lines.push(`${field}: ${joined}`);
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (id !== undefined && id !== null) {
+        await apiFunc(id, data, role);
+      } else {
+        await apiFunc(data);
       }
-      if (lines.length) msg += `\n\n${lines.join("\n")}`;
+      alert(successMsg || "Cập nhật thành công!");
+      await fetchData();
+      return true;
+    } catch (err) {
+      const resp = err?.response;
+      const pd = resp?.data; // ProblemDetails từ ASP.NET
+      const sentBody = resp?.config?.data;
+
+      // 🔎 In ra toàn bộ để debug nhanh
+      console.error("❌ AxiosError detail:", {
+        status: resp?.status,
+        url: resp?.config?.url,
+        method: resp?.config?.method,
+        sentBody, // <= body FE đã gửi
+        problemDetails: pd, // <= ProblemDetails từ BE
+      });
+
+      // 🔎 Gom lỗi ModelState cho người dùng
+      let msg =
+        pd?.title ||
+        pd?.message ||
+        err?.message ||
+        "One or more validation errors occurred.";
+
+      if (pd?.errors && typeof pd.errors === "object") {
+        const lines = [];
+        for (const [field, arr] of Object.entries(pd.errors)) {
+          const joined = Array.isArray(arr) ? arr.join(", ") : String(arr);
+          lines.push(`${field}: ${joined}`);
+        }
+        if (lines.length) msg += `\n\n${lines.join("\n")}`;
+      }
+
+      setError(msg);
+      alert(`Lỗi: ${msg}`);
+      return false;
+    } finally {
+      setIsLoading(false);
     }
-
-    setError(msg);
-    alert(`Lỗi: ${msg}`);
-    return false;
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  };
 
   return {
     allAccounts,
@@ -547,14 +547,27 @@ const UserManagement = () => {
     }
 
     if (activeTab === "vehicle") {
-      const rows = (filteredVehicles || []).map((v) => ({
-        ID: v.id ?? "",
-        Hang: v.carMaker ?? "",
-        DongXe: v.model ?? "",
-        NamSX: v.year ?? "",
-        ChuSoHuuLoai: v.companyId ? "Công ty" : "Cá nhân",
-        ChuSoHuuID: v.companyId ?? v.customerId ?? "",
-      }));
+      const rows = (filteredVehicles || []).map((v) => {
+        let ownerType = "Khách vãng lai";
+        let ownerId = "";
+
+        if (v.customerId) {
+          ownerType = "Cá nhân";
+          ownerId = v.customerId;
+        } else if (v.companyId) {
+          ownerType = "Công ty";
+          ownerId = v.companyId;
+        }
+
+        return {
+          ID: v.vehicleId ?? "",
+          Hang: v.carMaker ?? "",
+          DongXe: v.model ?? "",
+          NamSX: v.manufactureYear ?? "",
+          ChuSoHuuLoai: ownerType,
+          ChuSoHuuID: ownerId,
+        };
+      });
       exportCsv(rows, "vehicles.csv");
       return;
     }
