@@ -2,7 +2,7 @@
 import { getApiBase, fetchAuthJSON } from "../utils/api";
 const API_BASE = getApiBase();
 
-// Ảnh mặc định nếu không nhập
+// Ảnh mặc định (chỉ dùng ở nhánh cần, KHÔNG tự ghi đè staff/admin nếu không chọn ảnh)
 const DEFAULT_IMAGE_URL =
   "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
 
@@ -26,6 +26,34 @@ function __logFetch(label, url, options) {
       : undefined,
   });
 }
+
+/* =========================================================
+   UPLOAD AVATAR (multipart) – đặt sớm để helper phía dưới dùng
+   ========================================================= */
+export const uploadAvatar = async ({ accountId, file }) => {
+  const url = `${API_BASE}/Auth/upload-avatar/${encodeURIComponent(accountId)}`;
+  console.debug("[profileApi.uploadAvatar] Request:", {
+    url,
+    hasFile: !!file,
+    accountId,
+  });
+
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
+    body: fd,
+  });
+  if (!res.ok)
+    throw new Error(
+      (await res.text().catch(() => "")) || "Upload avatar thất bại"
+    );
+
+  const data = await res.json().catch(() => ({}));
+  return normalizeUser(data);
+};
 
 /* =============== NORMALIZERS =============== */
 function normalizeUser(u = {}) {
@@ -111,6 +139,13 @@ function normalizeStaff(s = {}) {
       s.PhotoUrl ??
       "",
   };
+}
+
+/* =============== Helper upload trước khi update =============== */
+async function maybeUploadAvatarFirst({ accountId, file }) {
+  if (!file) return null;
+  const u = await uploadAvatar({ accountId, file });
+  return u?.avatarUrl || u?.AvatarUrl || null;
 }
 
 /* =============== STAFF =============== */
@@ -211,6 +246,8 @@ export const getStaffInfo = async () => {
 
 /**
  * Cập nhật Staff: yêu cầu CustomerId; Body theo BE /Auth/update-customer
+ * - Nếu payload.file có mặt: upload trước để lấy avatarUrl → gửi lên trong body.
+ * - Nếu không có file và không có avatarUrl string → KHÔNG gửi AvatarUrl (giữ nguyên ảnh cũ).
  */
 export const updateStaffInfo = async (payload = {}) => {
   if (!payload.customerId) {
@@ -219,16 +256,26 @@ export const updateStaffInfo = async (payload = {}) => {
     );
   }
 
-  const rawImg =
-    typeof payload.avatarUrl === "string" ? payload.avatarUrl.trim() : "";
-  const avatarUrl = rawImg || DEFAULT_IMAGE_URL;
+  // ✅ Nếu FE truyền file → upload trước để lấy url
+  let avatarUrl = null;
+  if (payload.file) {
+    const accountId = localStorage.getItem("accountId");
+    avatarUrl = await maybeUploadAvatarFirst({ accountId, file: payload.file });
+  } else if (
+    typeof payload.avatarUrl === "string" &&
+    payload.avatarUrl.trim()
+  ) {
+    // vẫn hỗ trợ trường hợp đã có URL sẵn
+    avatarUrl = payload.avatarUrl.trim();
+  }
 
   const body = {
     CustomerId: payload.customerId,
     FullName: payload.fullName ?? "",
     Phone: payload.phone ?? "",
     Address: payload.address ?? "",
-    AvatarUrl: avatarUrl,
+    // ✅ chỉ gửi AvatarUrl nếu có giá trị mới; tránh ghi đè bằng default URL
+    ...(avatarUrl ? { AvatarUrl: avatarUrl } : {}),
     Email: payload.email ?? "",
   };
 
@@ -493,31 +540,6 @@ export const changeAccountRole = async (accountId, newRole) => {
   });
 };
 
-export const uploadAvatar = async ({ accountId, file }) => {
-  const url = `${API_BASE}/Auth/upload-avatar/${encodeURIComponent(accountId)}`;
-  console.debug("[profileApi.uploadAvatar] Request:", {
-    url,
-    hasFile: !!file,
-    accountId,
-  });
-
-  const fd = new FormData();
-  fd.append("file", file);
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
-    body: fd,
-  });
-  if (!res.ok)
-    throw new Error(
-      (await res.text().catch(() => "")) || "Upload avatar thất bại"
-    );
-
-  const data = await res.json().catch(() => ({}));
-  return normalizeUser(data);
-};
-
 /* =============== ENTERPRISE (COMPANY) =============== */
 export const getEnterpriseInfo = async () => {
   const accountId = localStorage.getItem("accountId");
@@ -555,6 +577,7 @@ export const getEnterpriseInfo = async () => {
 
 /**
  * Cập nhật thông tin doanh nghiệp – chỉ gửi field company
+ * (Giữ cơ chế ImageUrl như cũ; nếu BE có endpoint upload riêng có thể áp dụng giống Staff/Admin)
  */
 export const updateEnterpriseInfo = async (payload = {}) => {
   if (!payload.companyId) {
@@ -657,6 +680,7 @@ export const getAdminInfo = async () => {
 };
 
 // Cập nhật thông tin Admin qua /Auth/update-customer (yêu cầu CustomerId)
+// - Hỗ trợ upload file trước để lấy avatarUrl (giống Staff)
 export const updateAdminInfo = async (payload = {}) => {
   // Ưu tiên lấy từ form: adminId (mã hiển thị) thực chất là CustomerId
   const customerId = payload.customerId ?? payload.adminId ?? null;
@@ -665,16 +689,23 @@ export const updateAdminInfo = async (payload = {}) => {
     throw new Error("Thiếu CustomerId – không thể cập nhật thông tin admin.");
   }
 
-  const rawImg =
-    typeof payload.avatarUrl === "string" ? payload.avatarUrl.trim() : "";
-  const avatarUrl = rawImg || DEFAULT_IMAGE_URL;
+  let avatarUrl = null;
+  if (payload.file) {
+    const accountId = localStorage.getItem("accountId");
+    avatarUrl = await maybeUploadAvatarFirst({ accountId, file: payload.file });
+  } else if (
+    typeof payload.avatarUrl === "string" &&
+    payload.avatarUrl.trim()
+  ) {
+    avatarUrl = payload.avatarUrl.trim();
+  }
 
   const body = {
     CustomerId: customerId, // ← đúng schema của /update-customer
     FullName: payload.fullName ?? "",
     Phone: payload.phone ?? "",
     Address: payload.address ?? "",
-    AvatarUrl: avatarUrl,
+    ...(avatarUrl ? { AvatarUrl: avatarUrl } : {}),
     Email: payload.email ?? "",
   };
 
