@@ -325,9 +325,42 @@ export default function PaymentSuccess() {
   const { state } = useLocation();
   const navigate = useNavigate();
   const [search] = useSearchParams();
-  
-  // ✅ THÊM: Lấy thông tin user để kiểm tra role
+
+  // ✅ Lấy thông tin user TRƯỚC khi dùng trong các effectu hướng tự động sau khi thanh toán (Invoice / Subscription / Combo)
   const { user, loading: authLoading } = useAuth();
+  useEffect(() => {
+    if (authLoading || user?.role === "Staff") return;
+
+    const type = (search.get("type") || "").toLowerCase();
+    const id = search.get("id");
+    const success = (search.get("success") || "").toLowerCase() === "true";
+
+    // Chỉ redirect khi success=true + có type
+    if (!success || !type) return;
+
+    // ⏳ Cho user thấy "Thanh toán thành công" 1.5s rồi mới redirect
+    const timer = setTimeout(() => {
+      switch (type) {
+        case "invoice":
+          if (id) navigate(`/invoiceDetail/${id}`, { replace: true });
+          break;
+        case "subscription":
+        case "combo":
+          navigate("/invoiceSummary", { replace: true });
+          break;
+        case "booking":
+          // booking giữ nguyên logic hiện tại (ở lại trang này)
+          break;
+        default:
+          // không biết type thì không redirect
+          break;
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [search, navigate, user?.role, authLoading]);
+
+
 
   const SPEED = Math.max(1, Number(search.get("speed") || 1));
   const [t0] = useState(() => Date.now());
@@ -346,13 +379,13 @@ export default function PaymentSuccess() {
   useEffect(() => {
     // Đợi AuthContext load xong
     if (authLoading) return;
-    
+
     // Nếu user là Staff, redirect sang /staff/payment-success với toàn bộ query params
     if (user?.role === "Staff") {
       console.log("🔄 Staff detected, redirecting to staff payment success page");
       console.log("🔍 Query params:", search.toString());
-      navigate(`/staff/payment-success?${search.toString()}`, { 
-        replace: true 
+      navigate(`/staff/payment-success?${search.toString()}`, {
+        replace: true
       });
     }
   }, [user, authLoading, navigate, search]);
@@ -706,7 +739,7 @@ export default function PaymentSuccess() {
               </div>
               <div className="ps-kv">
                 <span className="ps-k">Súng/Cổng đã đặt</span>
-                                <span className="ps-v">
+                <span className="ps-v">
                   {[data.gun?.name, data.gun?.id].filter(Boolean).join(" — ") || "—"}
                 </span>
               </div>
