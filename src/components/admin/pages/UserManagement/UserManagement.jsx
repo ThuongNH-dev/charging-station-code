@@ -31,22 +31,21 @@ const useUserServicesHook = () => {
           userApi.fetchAllInvoices(), // ✅ thêm dòng này
         ]);
 
-      // 1) Map id -> planName
-      // ✅ Map id -> tên gói dịch vụ
+      // ===== Map id -> tên gói dịch vụ
       const serviceMap = (services || []).reduce((map, p) => {
         const id = p.subscriptionPlanId ?? p.id ?? p.packageId;
         if (id != null) map[id] = p.planName;
         return map;
       }, {});
 
-      // ✅ Hàm lấy gói đang ACTIVE theo customerId
-      const pickActiveSub = (subs, customerId) => {
+      // ===== Lấy sub ACTIVE mới nhất theo customerId
+      const pickActiveSubByCustomer = (subs, customerId) => {
         if (!customerId) return null;
         const mine = (subs || []).filter(
           (s) => Number(s?.customerId) === Number(customerId)
         );
         const active = mine.filter((s) => String(s?.status) === "Active");
-        if (active.length === 0) return null;
+        if (!active.length) return null;
         active.sort(
           (a, b) =>
             new Date(b?.startDate || b?.updatedAt || 0) -
@@ -55,15 +54,39 @@ const useUserServicesHook = () => {
         return active[0];
       };
 
-      // ✅ Gắn gói dịch vụ chính xác cho user
+      // ===== Lấy sub ACTIVE mới nhất theo companyId
+      const pickActiveSubByCompany = (subs, companyId) => {
+        if (!companyId) return null;
+        const mine = (subs || []).filter(
+          (s) => Number(s?.companyId) === Number(companyId)
+        );
+        const active = mine.filter((s) => String(s?.status) === "Active");
+        if (!active.length) return null;
+        active.sort(
+          (a, b) =>
+            new Date(b?.startDate || b?.updatedAt || b?.createdAt || 0) -
+            new Date(a?.startDate || a?.updatedAt || a?.createdAt || 0)
+        );
+        return active[0];
+      };
+
+      // ===== Gắn servicePackageName cho MỌI user (cả cá nhân & DN)
       const accountsWithPackage = (accounts || []).map((u) => {
         const customerId = u?.customers?.[0]?.customerId;
-        const sub = pickActiveSub(subscriptionsData, customerId);
+        const companyId = u?.company?.companyId ?? u?.companyId;
+
+        let sub = null;
+        if (companyId)
+          sub = pickActiveSubByCompany(subscriptionsData, companyId);
+        if (!sub && customerId)
+          sub = pickActiveSubByCustomer(subscriptionsData, customerId);
+
         const planName =
           sub?.planName ??
           (sub?.subscriptionPlanId != null
             ? serviceMap[sub.subscriptionPlanId]
             : null);
+
         return {
           ...u,
           servicePackageName: planName || "Chưa đăng ký",
@@ -224,21 +247,37 @@ const useFilterLogicHook = ({
   });
 
   const filteredUsers = useMemo(() => {
+    const q = (userFilter.search || "").toLowerCase().trim();
+    const pkg = (userFilter.servicePackage || "all").toLowerCase();
+    const st = userFilter.status;
+
     return allAccounts.filter((user) => {
-      const matchSearch =
-        user.userName
-          ?.toLowerCase()
-          .includes(userFilter.search.toLowerCase()) ||
-        userFilter.search === "";
-      const matchStatus =
-        userFilter.status === "all" || user.status === userFilter.status;
+      const c = user?.customers?.[0] || {};
+      const comp = user?.company || {};
 
-      const userPackageNameLower = user.servicePackageName?.toLowerCase() || "";
-      const filterPackageNameLower = userFilter.servicePackage.toLowerCase();
+      // Ghép chuỗi để search trên nhiều trường:
+      const hay = [
+        user?.userName,
+        String(user?.accountId ?? user?.id ?? ""),
+        c?.fullName,
+        c?.email,
+        c?.phone,
+        comp?.name,
+        comp?.email,
+        comp?.taxCode,
+        comp?.address,
+        user?.servicePackageName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 
+      const matchSearch = !q || hay.includes(q);
+      const matchStatus = st === "all" || String(user?.status) === st;
       const matchServicePackage =
-        userFilter.servicePackage === "all" ||
-        userPackageNameLower === filterPackageNameLower;
+        pkg === "all" ||
+        (user?.servicePackageName &&
+          user.servicePackageName.toLowerCase() === pkg);
 
       const matchRole =
         userTypeFilter === "all" ||
@@ -346,9 +385,12 @@ const UserFilterBar = ({
   servicePackages,
 }) => {
   const packageOptions = useMemo(() => {
-    return (servicePackages || []).map((pkg) => (
-      <option key={pkg.planName} value={pkg.planName}>
-        {pkg.planName}
+    const names = new Set(
+      (servicePackages || []).map((pkg) => pkg?.planName).filter(Boolean)
+    );
+    return [...names].sort().map((name) => (
+      <option key={name} value={name}>
+        {name}
       </option>
     ));
   }, [servicePackages]);
