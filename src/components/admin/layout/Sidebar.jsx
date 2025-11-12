@@ -39,6 +39,12 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
       icon: <UserOutlined />,
     },
     {
+   key: "invoices",
+   label: "Quản lý Hóa đơn",
+   path: "/admin/invoices-admin",
+   icon: <BarChartOutlined />,
+ },
+    {
       key: "reports",
       label: "Báo cáo & Thống kê",
       path: "/admin/reports",

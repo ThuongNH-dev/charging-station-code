@@ -59,6 +59,8 @@ import AdminIncidentReports from "./components/admin/pages/Reports/AdminIncident
 import InfoDriver from "./pages/enterInfo/InfoDriver";
 import RegisterInfo from "./layouts/RegisterInfo";
 import MyFeedbacks from "./pages/feedback/MyFeedbacks";
+ import AdminInvoicesPage from "./components/admin/pages/AdminInvoicesPage";
+
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
@@ -369,6 +371,7 @@ export default function App() {
         <Route path="stations/:stationId" element={<StationDetailPage />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="invoices-admin" element={<AdminInvoicesPage />} />
         <Route path="incident-reports" element={<AdminIncidentReports />} />
 
         <Route path="pricing-rules" element={<PricingRulesPage />} />
