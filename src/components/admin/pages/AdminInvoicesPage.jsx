@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Button, message } from "antd";
 import { notificationApi } from "../../../api/notificationApi";
 import { invoiceApi } from "../../../api/invoiceApi";
+import "./AdminInvoicesPage.css";
 
 const PAGE_SIZE = 10;
 
@@ -14,9 +15,9 @@ export default function AdminInvoicesPage() {
   const [month, setMonth] = useState("");
   const [year, setYear] = useState("");
   const [daysBefore, setDaysBefore] = useState(3);
-  const [dueOnly, setDueOnly] = useState(false); // chỉ hiện sắp đến hạn
+  const [dueOnly, setDueOnly] = useState(false);
 
-  // helper
+  // ===== Helpers =====
   const isOverdue = (inv) => {
     if (!inv?.dueDate) return false;
     return new Date(inv.dueDate) < new Date() && inv.status !== "Paid";
@@ -31,13 +32,18 @@ export default function AdminInvoicesPage() {
     return due <= soon; // gồm cả quá hạn
   };
 
-  // Lấy danh sách hoá đơn
+  const viMoney = (v) => (v ?? 0).toLocaleString("vi-VN");
+
+  // ===== Fetch =====
   const fetchInvoices = async () => {
     setLoading(true);
     try {
+      // lấy tất cả, không filter ở server (lọc client)
       const data = await invoiceApi.getAll();
       setInvoices(Array.isArray(data) ? data : []);
-    } catch {
+      setPage(1); // reset về trang 1 sau khi tải
+    } catch (e) {
+      console.error(e);
       message.error("Không tải được danh sách hoá đơn");
     } finally {
       setLoading(false);
@@ -48,7 +54,7 @@ export default function AdminInvoicesPage() {
     fetchInvoices();
   }, []);
 
-  // Bộ lọc
+  // ===== Filter / Paging =====
   const filtered = useMemo(() => {
     return invoices.filter((i) => {
       const okStatus = status === "All" || i.status === status;
@@ -62,9 +68,7 @@ export default function AdminInvoicesPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageData = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // ======= GỬI THÔNG BÁO =======
-  const viMoney = (v) => (v ?? 0).toLocaleString("vi-VN");
-
+  // ===== Tạo nội dung thông báo =====
   const buildTemplate = (inv) => {
     const due = inv?.dueDate ? new Date(inv.dueDate) : null;
     const overdue = isOverdue(inv);
@@ -79,6 +83,7 @@ export default function AdminInvoicesPage() {
     return { title, message: messageText, priority };
   };
 
+  // ===== Gửi 1 =====
   const remindOne = async (inv) => {
     const { title, message: msg, priority } = buildTemplate(inv);
     const payload = {
@@ -107,15 +112,14 @@ export default function AdminInvoicesPage() {
     }
   };
 
+  // ===== Gửi lô =====
   const remindBulk = async () => {
-    // gửi theo bộ lọc hiện tại (đã gồm dueOnly + daysBefore)
     const targets = filtered.filter((i) => i.status !== "Paid");
     if (!targets.length) return message.info("Không có hóa đơn phù hợp");
     if (!window.confirm(`Gửi nhắc cho ${targets.length} hóa đơn?`)) return;
 
     setSending(true);
     try {
-      // giới hạn song song = 5
       const chunk = async (arr, size) => {
         for (let i = 0; i < arr.length; i += size) {
           const part = arr.slice(i, i + size);
@@ -129,14 +133,15 @@ export default function AdminInvoicesPage() {
     }
   };
 
+  // ===== Render =====
   return (
-    <div className="p-4">
-      <h1 className="text-xl font-semibold mb-3">📜 Quản lý Hóa đơn</h1>
+    <div className="invoice-wrap">
+      <h1 className="invoice-title">📜 Quản lý Hóa đơn</h1>
 
-      {/* Bộ lọc */}
-      <div className="flex flex-wrap gap-3 mb-4">
+      {/* Toolbar */}
+      <div className="invoice-toolbar">
         <select
-          className="border px-2 py-1 rounded"
+          className="toolbar-select"
           value={status}
           onChange={(e) => {
             setStatus(e.target.value);
@@ -150,7 +155,8 @@ export default function AdminInvoicesPage() {
 
         <input
           type="number"
-          className="border px-2 py-1 rounded w-24"
+          className="toolbar-input"
+          style={{ width: 96 }}
           placeholder="Tháng"
           value={month}
           onChange={(e) => {
@@ -160,7 +166,8 @@ export default function AdminInvoicesPage() {
         />
         <input
           type="number"
-          className="border px-2 py-1 rounded w-24"
+          className="toolbar-input"
+          style={{ width: 96 }}
           placeholder="Năm"
           value={year}
           onChange={(e) => {
@@ -170,8 +177,7 @@ export default function AdminInvoicesPage() {
         />
         <Button onClick={fetchInvoices}>🔄 Tải lại</Button>
 
-        {/* Lọc sắp đến hạn + gửi hàng loạt */}
-        <label className="flex items-center gap-2">
+        <label className="toolbar-checkbox">
           <input
             type="checkbox"
             checked={dueOnly}
@@ -184,28 +190,31 @@ export default function AdminInvoicesPage() {
         </label>
         <input
           type="number"
-          className="border px-2 py-1 rounded w-20"
+          className="toolbar-input"
+          style={{ width: 80 }}
           value={daysBefore}
           min={0}
           onChange={(e) => setDaysBefore(Number(e.target.value))}
           disabled={!dueOnly}
           title="Số ngày tới hạn"
         />
+
+        <span className="toolbar-spacer" />
         <Button type="primary" onClick={remindBulk} disabled={sending}>
           {sending ? "Đang gửi..." : "📣 Nhắc hàng loạt"}
         </Button>
       </div>
 
-      {/* Bảng hóa đơn */}
-      <div className="border rounded-lg overflow-hidden">
-        <div className="grid grid-cols-10 bg-gray-100 font-semibold px-3 py-2 sticky top-0">
-          <div className="col-span-1">ID</div>
-          <div className="col-span-2">Người dùng</div>
-          <div className="col-span-1">Tháng/Năm</div>
-          <div className="col-span-1">Tổng (đ)</div>
-          <div className="col-span-1">Trạng thái</div>
-          <div className="col-span-2">Hạn thanh toán</div>
-          <div className="col-span-2 text-right">Hành động</div>
+      {/* Table */}
+      <div className="invoice-table">
+        <div className="table-header">
+          <div>ID</div>
+          <div>Người dùng</div>
+          <div>Tháng/Năm</div>
+          <div>Tổng (đ)</div>
+          <div>Trạng thái</div>
+          <div>Hạn thanh toán</div>
+          <div className="text-right">Hành động</div>
         </div>
 
         {loading ? (
@@ -216,7 +225,6 @@ export default function AdminInvoicesPage() {
           pageData.map((i) => {
             const overdue = isOverdue(i);
             const soon = isDueSoon(i, daysBefore);
-            const rowCls = overdue ? "bg-red-50" : soon ? "bg-yellow-50" : "";
             const dueStr = i.dueDate
               ? new Date(i.dueDate).toLocaleString("vi-VN")
               : "-";
@@ -224,24 +232,32 @@ export default function AdminInvoicesPage() {
             return (
               <div
                 key={i.invoiceId}
-                className={`grid grid-cols-10 px-3 py-2 border-t ${rowCls}`}
+                className={`table-row ${
+                  overdue ? "row-overdue" : soon ? "row-soon" : ""
+                }`}
               >
-                <div className="col-span-1">#{i.invoiceId}</div>
-                <div className="col-span-2">
-                  {i.customerId ? `KH ${i.customerId}` : `Cty ${i.companyId}`}
-                </div>
-                <div className="col-span-1">
+                <div>#{i.invoiceId}</div>
+                <div>{i.customerId ? `KH ${i.customerId}` : `Cty ${i.companyId}`}</div>
+                <div>
                   {i.billingMonth}/{i.billingYear}
                 </div>
-                <div className="col-span-1">{viMoney(i.total)}</div>
-                <div className="col-span-1">{i.status}</div>
-                <div className="col-span-2">{dueStr}</div>
-                <div className="col-span-2 flex justify-end">
-                  <Button
-                    size="small"
-                    onClick={() => remindOne(i)}
-                    disabled={sending}
+                <div>{viMoney(i.total)}</div>
+                <div>
+                  <span
+                    className={`badge ${
+                      overdue
+                        ? "badge-overdue"
+                        : i.status === "Paid"
+                        ? "badge-paid"
+                        : "badge-unpaid"
+                    }`}
                   >
+                    {overdue ? "Overdue" : i.status}
+                  </span>
+                </div>
+                <div>{dueStr}</div>
+                <div className="row-actions">
+                  <Button size="small" onClick={() => remindOne(i)} disabled={sending}>
                     Nhắc thanh toán
                   </Button>
                 </div>
@@ -251,23 +267,23 @@ export default function AdminInvoicesPage() {
         )}
       </div>
 
-      {/* Phân trang */}
-      <div className="flex justify-between items-center mt-3">
-        <div>
+      {/* Pagination */}
+      <div className="invoice-pagination">
+        <div className="info-dim">
           Tổng: {filtered.length} • Trang {page}/{totalPages}
         </div>
         <div className="flex gap-2">
           <Button
+            size="small"
             disabled={page <= 1}
             onClick={() => setPage((p) => p - 1)}
-            size="small"
           >
             ← Trước
           </Button>
           <Button
+            size="small"
             disabled={page >= totalPages}
             onClick={() => setPage((p) => p + 1)}
-            size="small"
           >
             Sau →
           </Button>
