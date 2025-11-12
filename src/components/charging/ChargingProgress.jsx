@@ -34,6 +34,13 @@ function saveCtx({ orderId = null, stationId = null, chargerId = null, portId = 
     });
   } catch { }
 }
+function toId(v) {
+  const s = String(v ?? "").trim();
+  const m = s.match(/\d+/g);
+  if (!m) return null;
+  const n = Number(m.join(""));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 
 // ============ Live persistence (localStorage) ============
@@ -348,11 +355,12 @@ const ChargingProgress = () => {
     let alive = true;
     async function startSessionIfNeeded() {
       setBooting(true);
-      if (state?.chargingSessionId) {
+      const stateSessionId = state?.chargingSessionId ?? state?.sessionId ?? null; // ✅ fallback
+      if (stateSessionId) {
         let seed = state?.startSessionData || null;
         if (!seed) {
           try {
-            const s = await fetchAuthJSON(`${API_ABS}/ChargingSessions/${encodeURIComponent(state.chargingSessionId)}`, { method: "GET" });
+            const s = await fetchAuthJSON(`${API_ABS}/ChargingSessions/${encodeURIComponent(stateSessionId)}`, { method: "GET" });
             seed = s?.data || s || null;
           } catch { }
         }
@@ -427,7 +435,7 @@ const ChargingProgress = () => {
         const live = {
           isActive: true,
           isCharging: true,
-          chargingSessionId: merged?.chargingSessionId,
+          chargingSessionId: merged?.chargingSessionId ?? stateSessionId,
           portId: merged?.portId ?? state?.gun?.id ?? state?.portId ?? null,
           // ✅ KHÔNG dùng startedAt từ live cũ khi khác phiên
           startedAt: (merged?.startedAt ? new Date(merged.startedAt).getTime() : now),
@@ -448,16 +456,20 @@ const ChargingProgress = () => {
       }
 
       // Bắt đầu mới nếu chưa có id
-      const customerId =
+      // Ép về số an toàn
+      const customerId = toId(
         state?.customerId ??
         state?.customer?.customerId ??
-        (await resolveCustomerIdFromAuth(API_ABS));
-
-      const vehicleId = state?.vehicleId ?? state?.vehicle?.id ?? state?.vehicle?.vehicleId;
-      const bookingId = state?.bookingId ?? state?.booking?.id ?? state?.booking?.bookingId;
-      const portIdToUse = state?.gun?.id ?? state?.gun?.portId ?? state?.gun?.PortId ?? state?.portId;
+        (await resolveCustomerIdFromAuth(API_ABS))
+      );
+      const vehicleId = toId(state?.vehicleId ?? state?.vehicle?.id ?? state?.vehicle?.vehicleId);
+      const bookingId = toId(state?.bookingId ?? state?.booking?.id ?? state?.booking?.bookingId);
+      const portIdToUse = toId(state?.gun?.id ?? state?.gun?.portId ?? state?.gun?.PortId ?? state?.portId);
 
       if (!customerId || !vehicleId || !portIdToUse) {
+        console.warn("[ChargingProgress] Missing IDs for start", {
+          customerId, vehicleId, portIdToUse, bookingId
+        });
         // Không đủ dữ liệu để start: nếu không có live thì coi như no active
         const live = loadLive();
         if (!live?.isActive) setNoActiveSession(true);
@@ -466,18 +478,17 @@ const ChargingProgress = () => {
       }
 
       try {
-        const url = `${API_ABS}/ChargingSessions/start`;
-        const body = {
-          customerId: Number(customerId),
-          vehicleId: Number(vehicleId),
-          bookingId: bookingId == null ? null : Number(bookingId),
-          portId: Number(portIdToUse),
-        };
+        const body = { customerId, vehicleId, portId: portIdToUse, bookingId: bookingId ?? null };
+        console.log("[ChargingProgress] POST /ChargingSessions/start payload =", body);
+
+        const url = `${API_ABS}/ChargingSessions/start`;     // ✅ thêm dòng này
+
         const res = await fetchAuthJSON(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
+
 
         const msg = res?.message || "Bắt đầu phiên sạc";
         const raw = res?.data || res || null;
@@ -984,7 +995,7 @@ const ChargingProgress = () => {
   // useEffect(() => { ... })  ← đã xoá
 
   function getChargingSessionIdSafe() {
-    let sid = session?.chargingSessionId ?? state?.chargingSessionId ?? null;
+    let sid = session?.chargingSessionId ?? state?.chargingSessionId ?? state?.sessionId ?? null; // ✅ thêm fallback
     if (!sid) {
       try {
         const cached = JSON.parse(sessionStorage.getItem("charging:start:data") || "null");
@@ -1172,8 +1183,9 @@ const ChargingProgress = () => {
   };
 
   const canEnd = Boolean(
-    session?.chargingSessionId ||
-    state?.chargingSessionId ||
+  session?.chargingSessionId ||
+  state?.chargingSessionId ||
+  state?.sessionId ||  
     (() => {
       try {
         const cached = JSON.parse(sessionStorage.getItem("charging:start:data") || "null");

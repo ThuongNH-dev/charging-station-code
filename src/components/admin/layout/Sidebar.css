@@ -238,3 +238,86 @@
     display: none;
   }
 }
+
+.admin-sidebar {
+  width: 260px;
+  min-height: 100vh;
+  background: #0f172a; /* slate-900 */
+  color: #e5e7eb;      /* gray-200 */
+  padding: 16px 12px;
+  box-sizing: border-box;
+}
+
+/* Khối avatar + tên */
+.sidebar-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 14px 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 10px;
+}
+
+.sidebar-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #0b1220;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.sidebar-user {
+  min-width: 0;
+}
+
+.sidebar-user-name {
+  display: block;
+  max-width: 170px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-user-role {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* Tiêu đề */
+.sidebar-title {
+  font-size: 14px;
+  letter-spacing: 1.2px;
+  opacity: 0.7;
+  margin: 12px 6px;
+}
+
+/* Menu */
+.sidebar-menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin: 6px 4px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.menu-item:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.menu-item.active {
+  background: rgba(96,165,250,0.18); /* blue-400/20 */
+  color: #ffffff;
+  border: 1px solid rgba(96,165,250,0.35);
+}

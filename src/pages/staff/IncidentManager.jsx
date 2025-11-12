@@ -31,6 +31,7 @@ export default function IncidentManager() {
   const [selectedStation, setSelectedStation] = useState(null);
   const [selectedReport, setSelectedReport] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [detailOpen, setDetailOpen] = useState(false);
   const [severityFilter, setSeverityFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -56,7 +57,7 @@ const [ports, setPorts] = useState([]);
   // === Lấy danh sách trạm mà nhân viên phụ trách ===
   async function loadStaffStations() {
     try {
-      setLoading(true);
+      if (!isInitialLoad) setLoading(true);
       const allStations = await fetchAuthJSON(`${API_BASE}/Stations`);
       let stationsArr =
         allStations?.data ?? allStations?.$values ?? allStations ?? [];
@@ -80,9 +81,11 @@ const [ports, setPorts] = useState([]);
       );
       setStations(myStations);
       if (myStations.length > 0) setSelectedStation(myStations[0]);
+      setIsInitialLoad(false);
     } catch (err) {
       console.error(err);
       message.error("Không thể tải danh sách trạm!");
+      setIsInitialLoad(false);
     } finally {
       setLoading(false);
     }

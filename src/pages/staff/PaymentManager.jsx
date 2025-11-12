@@ -35,7 +35,8 @@ export default function PaymentManager() {
 
   const [guestSessions, setGuestSessions] = useState([]);
   const [paidSessions, setPaidSessions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [payingId, setPayingId] = useState(null);
   const [method, setMethod] = useState("VNPAY");
 
@@ -81,7 +82,7 @@ export default function PaymentManager() {
   }, [selectedStationId]);
 
   async function loadData() {
-    setLoading(true);
+    if (!isInitialLoad) setLoading(true);
     try {
       const resSess = await fetchAuthJSON(`${API_BASE}/ChargingSessions`);
       let sessions =
@@ -215,11 +216,12 @@ const sortedPaid = [...paidSessionsArr].sort(
 );
 
 setPaidSessions(sortedPaid);
-
+      setIsInitialLoad(false);
 
     } catch (e) {
       console.error(e);
       message.error("Không thể tải dữ liệu!");
+      setIsInitialLoad(false);
     } finally {
       setLoading(false);
     }

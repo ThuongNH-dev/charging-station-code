@@ -50,10 +50,53 @@ async function fetchOne(paths) {
       const url = p.startsWith("http") ? p : `${API_ABS}${p.startsWith("/") ? "" : "/"}${p}`;
       const res = await fetchAuthJSON(url, { method: "GET" });
       if (res) return res;
-    } catch {}
+    } catch { }
   }
   throw new Error("Not found");
 }
+
+// PATCH A: helpers chọn vehicleId & lấy chi tiết từ API (không gán cứng)
+async function pickVehicleIdFromApi({ apiBase, customerId, companyId }) {
+  // Ưu tiên: liệt kê xe theo customerId
+  const urls = [];
+  if (Number.isFinite(customerId)) {
+    urls.push(`${apiBase}/Vehicles?page=1&pageSize=50&customerId=${encodeURIComponent(customerId)}`);
+  }
+  // Fallback: theo companyId
+  if (Number.isFinite(companyId)) {
+    urls.push(`${apiBase}/Vehicles?page=1&pageSize=50&companyId=${encodeURIComponent(companyId)}`);
+  }
+  // Fallback cuối: không filter
+  urls.push(`${apiBase}/Vehicles?page=1&pageSize=50`);
+
+  for (const url of urls) {
+    try {
+      const r = await fetchAuthJSON(url, { method: "GET" });
+      const items = Array.isArray(r?.items) ? r.items : Array.isArray(r) ? r : [];
+      if (!items.length) continue;
+
+      // Ưu tiên chiếc thực sự thuộc customer hiện tại
+      const mine = Number.isFinite(customerId)
+        ? items.find(v => Number(v?.customerId ?? v?.CustomerId) === Number(customerId)) || items[0]
+        : items[0];
+
+      const vid = Number(mine?.vehicleId ?? mine?.VehicleId ?? mine?.id ?? mine?.Id);
+      if (Number.isFinite(vid) && vid > 0) return vid;
+    } catch { }
+  }
+  return null;
+}
+
+async function fetchVehicleById(apiBase, vehicleId) {
+  if (!Number.isFinite(vehicleId)) return null;
+  try {
+    const v = await fetchAuthJSON(`${apiBase}/Vehicles/${vehicleId}`, { method: "GET" });
+    return v?.data || v || null;
+  } catch {
+    return null;
+  }
+}
+
 
 const pickCompanyId = (st, ch, g) => {
   const fromState = st?.companyId ?? st?.CompanyId ?? ch?.companyId ?? ch?.CompanyId ?? g?.companyId ?? g?.CompanyId;
@@ -61,6 +104,41 @@ const pickCompanyId = (st, ch, g) => {
   const n = toNumId(fromState ?? fromStorage);
   return Number.isFinite(n) ? n : null;
 };
+
+// ====== GỢI Ý CỔNG TƯƠNG THÍCH ======
+function normalizeConnectorString(raw = "") {
+  return String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[-_]/g, "");
+}
+
+// Lấy danh sách ports của 1 charger và tìm port có connector trùng với xe
+async function findCompatiblePort(apiBase, chargerId, wantedConnector) {
+  try {
+    if (!chargerId || !wantedConnector) return null;
+    const res = await fetchAuthJSON(`${apiBase}/Ports?chargerId=${encodeURIComponent(chargerId)}&page=1&pageSize=100`, { method: "GET" });
+    const items = Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []);
+    if (!items.length) return null;
+
+    const normWant = normalizeConnectorString(wantedConnector);
+    // Ưu tiên port available
+    const sameAndAvail = items.find(p =>
+      normalizeConnectorString(p?.connectorType ?? p?.ConnectorType) === normWant &&
+      normalizePortStatus(p?.status ?? p?.Status) === "available"
+    );
+    if (sameAndAvail) return sameAndAvail;
+
+    // fallback: port trùng connector (bất kể trạng thái)
+    return items.find(p =>
+      normalizeConnectorString(p?.connectorType ?? p?.ConnectorType) === normWant
+    ) || null;
+  } catch {
+    return null;
+  }
+}
+
 
 /* ===== Pricing helpers ===== */
 const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " đ";
@@ -91,6 +169,7 @@ function normalizePortStatus(raw = "") {
     case "occupied":
     case "busy":
     case "charging":
+      case "inuse":
       return "busy";
     case "disabled":
     case "inactive":
@@ -157,6 +236,7 @@ export default function ChargingSessionStart() {
   const [station, setStation] = useState(state?.station || {});
   const [charger, setCharger] = useState(state?.charger || {});
   const [gun, setGun] = useState(state?.gun || state?.port || {});
+  const [suggestedPort, setSuggestedPort] = useState(null);
   const [infoReady, setInfoReady] = useState(!!normId(gun) || !!normId(charger));
   const [showInfo, setShowInfo] = useState(false);
 
@@ -273,30 +353,47 @@ export default function ChargingSessionStart() {
 
     setLoadingLookup(true);
     try {
+      // 1) Port
       const port = await fetchOne([`/Ports/${portId}`, `/ChargingPorts/${portId}`]);
       const resolvedPortId = port?.portId ?? port?.PortId ?? portId;
       const portStatus = normalizePortStatus(
-        port?.status ??
-          port?.Status ??
-          port?.state ??
-          port?.State ??
-          port?.currentStatus ??
-          port?.CurrentStatus ??
-          port?.availability ??
-          port?.Availability ??
-          ""
+        port?.status ?? port?.Status ?? port?.state ?? port?.State ?? port?.currentStatus ?? port?.CurrentStatus ?? port?.availability ?? port?.Availability ?? ""
       );
       setGun({ ...(port || {}), portId: resolvedPortId, id: resolvedPortId, status: portStatus });
 
+      // 2) Charger
       const chId = port?.chargerId ?? port?.ChargerId ?? gun?.chargerId ?? gun?.ChargerId ?? normId(charger);
       if (!Number.isFinite(toNumId(chId))) throw new Error("Không tìm thấy trụ sạc từ port.");
       const chg = await fetchOne([`/Chargers/${chId}`, `/api/Chargers/${chId}`]);
       setCharger(chg || {});
 
+      // 3) Station
       const stId = chg?.stationId ?? chg?.StationId ?? normId(station);
       if (!Number.isFinite(toNumId(stId))) throw new Error("Không tìm thấy trạm từ trụ sạc.");
       const st = await fetchOne([`/Stations/${stId}`, `/api/Stations/${stId}`]);
       setStation(st || {});
+
+      // 4) Lấy vehicle mới nhất (để biết đúng connector)
+      const cid = await resolveCustomerIdFromAuth(API_ABS);
+      let veh = null;
+      try {
+        const vres = await fetchAuthJSON(`/Vehicles?page=1&pageSize=50&customerId=${cid}`, { method: "GET" });
+        const items = Array.isArray(vres?.items) ? vres.items : Array.isArray(vres) ? vres : [];
+        veh = items.find(v => String(v?.customerId ?? v?.CustomerId) === String(cid)) || items[0] || null;
+      } catch { }
+      if (veh) setVehicle(veh);
+
+      // 5) Nếu connector xe ≠ connector port ⇒ gợi ý port cùng trụ phù hợp
+      setSuggestedPort(null);
+      if (veh) {
+        const vConn = veh?.connectorType ?? veh?.ConnectorType ?? "";
+        const pConn = port?.connectorType ?? port?.ConnectorType ?? port?.portConnectorType ?? "";
+        if (normalizeConnectorString(vConn) && normalizeConnectorString(pConn) &&
+          normalizeConnectorString(vConn) !== normalizeConnectorString(pConn)) {
+          const hint = await findCompatiblePort(API_ABS, chId, vConn);
+          if (hint) setSuggestedPort(hint);
+        }
+      }
 
       setInfoReady(true);
       setShowInfo(true);
@@ -308,11 +405,13 @@ export default function ChargingSessionStart() {
       setStation({});
       setCharger({});
       setGun({});
+      setSuggestedPort(null);
       message.error(e?.message || "Không tra cứu được thông tin từ máy chủ.");
     } finally {
       setLoadingLookup(false);
     }
   }
+
 
   // === BẮT ĐẦU SẠC ===
   async function resolveFirstVehicleIdForCustomer(customerId) {
@@ -329,53 +428,116 @@ export default function ChargingSessionStart() {
         const vid = Number(mine?.vehicleId ?? mine?.VehicleId ?? mine?.id ?? mine?.Id);
         if (Number.isFinite(vid) && vid > 0) return vid;
       }
-    } catch {}
+    } catch { }
     return null;
   }
+
+  function readVehicleIdFromStorage(customerId) {
+    try {
+      // key global (tiện cho code cũ)
+      const g = Number(localStorage.getItem("vehicleId") || sessionStorage.getItem("vehicleId"));
+      // key scoped theo customer (Login.jsx đã set nếu có customerId)
+      const scopedKey = Number.isFinite(customerId) ? `vehicleId__${customerId}` : null;
+      const s = scopedKey
+        ? Number(localStorage.getItem(scopedKey) || sessionStorage.getItem(scopedKey))
+        : NaN;
+      if (Number.isFinite(s) && s > 0) return s;
+      if (Number.isFinite(g) && g > 0) return g;
+    } catch { }
+    return null;
+  }
+
 
   async function handleStart() {
     if (!infoReady) return message.error("Vui lòng xác nhận ID trước khi bắt đầu sạc.");
     if (gun?.status && gun.status !== "available") return message.warning("Cổng này hiện không khả dụng để sạc.");
-    if (vehicleError) return message.error(vehicleError);
     if (!vehicle) return message.error("Không tìm thấy xe của bạn.");
 
-    const comp = checkCompatibility(vehicle, charger, gun);
-    if (!comp.ok) return message.error(comp.reason || "Xe và cổng sạc không tương thích.");
-
     const portId = toNumId(normId(gun));
-    let vehicleId = toNumId(state?.vehicleId ?? state?.vehicle?.id ?? state?.vehicle?.vehicleId);
+    if (!Number.isFinite(portId)) return message.error("Thiếu portId hợp lệ.");
+
+    // Lấy id chuẩn
     let customerId = toNumId(state?.customerId ?? state?.customer?.id ?? (await resolveCustomerIdFromAuth(API_ABS)));
+    // 1) ƯU TIÊN: vehicleId đã lưu khi Login
+    let vehicleId =
+      toNumId(readVehicleIdFromStorage(customerId)) ??
+      NaN;
+    // 2) Fallback: state (nếu màn trước có truyền)
+    if (!Number.isFinite(vehicleId)) {
+      vehicleId = toNumId(state?.vehicleId ?? state?.vehicle?.id ?? state?.vehicle?.vehicleId);
+    }
+    // 3) Fallback cuối: tra qua API
+    if (!Number.isFinite(vehicleId)) {
+      vehicleId = await resolveFirstVehicleIdForCustomer(customerId);
+    }
+    if (!Number.isFinite(vehicleId)) {
+      return message.error("Không tìm được vehicleId (hãy thêm xe hoặc đăng nhập lại).");
+    }
+
+    // 🔄 lấy vehicle fresh từ API để chắc connector đúng nhất
+    const vehicleFresh = await fetchVehicleById(API_ABS, vehicleId);
+    if (!vehicleFresh) return message.error("Không đọc được thông tin xe từ máy chủ.");
+
+    const comp = checkCompatibility(vehicleFresh, charger, gun);
+    if (!comp.ok) {
+      // Nếu đã có suggestedPort thì đề nghị chuyển
+      if (suggestedPort) {
+        return message.warning(
+          `Xe dùng ${vehicleFresh.connectorType}, cổng hiện tại là ${gun?.connectorType}. Hãy bấm "Chuyển sang cổng gợi ý" bên dưới.`
+        );
+      }
+      return message.error(comp.reason || "Xe và cổng sạc không tương thích.");
+    }
+
     const bookingRaw = state?.bookingId ?? state?.booking?.id ?? state?.booking?.bookingId ?? null;
     const nBooking = toNumId(bookingRaw);
     const bookingId = Number.isFinite(nBooking) ? nBooking : null;
     const companyId = pickCompanyId(state, charger, gun);
 
-    if (!Number.isFinite(portId)) return message.error("Thiếu portId hợp lệ.");
-    if (!Number.isFinite(customerId)) return message.error("Thiếu customerId hợp lệ.");
-
-    if (!Number.isFinite(vehicleId)) {
-      vehicleId = await resolveFirstVehicleIdForCustomer(customerId);
-    }
-    if (!Number.isFinite(vehicleId)) return message.error("Không tìm được vehicleId cho khách hàng này.");
-
     setStarting(true);
-    navigate("/charging", {
-      replace: true,
-      state: {
-        station,
-        charger,
-        gun,
+    try {
+      const payload = {
         customerId,
-        companyId: Number.isFinite(companyId) ? companyId : undefined,
+        companyId: Number.isFinite(companyId) ? companyId : null,
         vehicleId,
         bookingId,
-        portId,
-        carModel: state?.carModel ?? undefined,
-        plate: state?.plate ?? undefined,
-        startedAt: Date.now(),
-      },
-    });
+        portId
+      };
+      const url = `${API_ABS}/ChargingSessions/start`;
+      const res = await fetchAuthJSON(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = res?.data || res;
+      if (!data?.chargingSessionId) throw new Error(res?.message || "Không nhận được sessionId.");
+      message.success(res?.message || "Đã bắt đầu phiên sạc!");
+
+      navigate("/charging", {
+        replace: true,
+        state: {
+          station, charger, gun,
+          customerId,
+          companyId: Number.isFinite(companyId) ? companyId : undefined,
+          vehicleId,
+          bookingId,
+          portId,
+          startedAt: data.startedAt || Date.now(),
+          chargingSessionId: data.chargingSessionId,
+          startSessionData: data,
+          carModel: state?.carModel ?? undefined,
+          plate: state?.plate ?? undefined,
+        },
+      });
+    } catch (e) {
+      console.error("[startSession]", e);
+      message.error(e?.message || "Không bắt đầu được phiên sạc.");
+    } finally {
+      setStarting(false);
+    }
   }
+
 
   // ======= UI helpers =======
   const statusTag = (st) => {
@@ -406,6 +568,20 @@ export default function ChargingSessionStart() {
       />
     </Tooltip>
   );
+
+  // ======= WHY BUTTON DISABLED (for tooltip only) =======
+  function getDisableReason() {
+    if (!infoReady) return "Chưa xác nhận trụ/cổng.";
+    const s = (gun?.status || "").toLowerCase();
+    if (s === "busy") return "Cổng đang bận.";
+    if (s === "maintenance" || s === "inactive") return "Cổng đang bảo trì/không hoạt động.";
+    if (s === "reserved") return "Cổng đã được đặt trước.";
+    if (vehicleError) return vehicleError;
+
+    // KHÔNG disable vì không tương thích nữa — chỉ hiển thị cảnh báo ở trên và chặn trong handleStart()
+    return "";
+  }
+
 
   return (
     <MainLayout>
@@ -511,7 +687,7 @@ export default function ChargingSessionStart() {
 
               {/* CHARGER */}
               <Col xs={24} md={12}>
-                <Card title="Trụ & Cổng" className="cs-elevate glass" extra={<PriceBadge />}> 
+                <Card title="Trụ & Cổng" className="cs-elevate glass" extra={<PriceBadge />}>
                   <Space direction="vertical" size={8} style={{ width: "100%" }}>
                     <div className="cs-row">
                       <div className="cs-label">Mã trụ</div>
@@ -554,8 +730,8 @@ export default function ChargingSessionStart() {
                   gun.status === "busy"
                     ? "Cổng này đang bận (Occupied). Vui lòng chờ."
                     : gun.status === "reserved"
-                    ? "Cổng này đã được đặt trước. Vui lòng chọn cổng khác."
-                    : "Cổng này đang bảo trì hoặc bị vô hiệu hóa."
+                      ? "Cổng này đã được đặt trước. Vui lòng chọn cổng khác."
+                      : "Cổng này đang bảo trì hoặc bị vô hiệu hóa."
                 }
               />
             )}
@@ -572,32 +748,47 @@ export default function ChargingSessionStart() {
             })()}
 
             {/* ACTIONS */}
-            <div className="cs-actions">
-              <Button
-                className="cs-btn-green big pulse"
-                type="primary"
-                size="large"
-                icon={<ThunderboltOutlined />}
-                disabled={
-                  !infoReady || ["busy", "maintenance", "reserved"].includes(gun?.status) || !!vehicleError ||
-                  (vehicle && !checkCompatibility(vehicle, charger, gun).ok)
-                }
-                loading={starting}
-                onClick={handleStart}
-              >
-                {gun?.status === "busy"
-                  ? "Cổng đang bận"
-                  : gun?.status === "maintenance"
-                  ? "Đang bảo trì"
-                  : gun?.status === "inactive"
-                  ? "Không hoạt động"
-                  : vehicleError
-                  ? "Chưa có xe"
-                  : vehicle && !checkCompatibility(vehicle, charger, gun).ok
-                  ? "Không tương thích"
-                  : "Bắt đầu sạc"}
-              </Button>
+            <div className="cs-actions" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {suggestedPort ? (
+                <Button
+                  icon={<InfoCircleOutlined />}
+                  onClick={() => {
+                    const p = suggestedPort;
+                    const pid = p?.portId ?? p?.PortId ?? p?.id ?? p?.Id;
+                    const st = normalizePortStatus(p?.status ?? p?.Status);
+                    setGun({ ...(p || {}), portId: pid, id: pid, status: st });
+                    setSuggestedPort(null);
+                    message.success(`Đã chuyển sang cổng gợi ý: P-${pid}`);
+                  }}
+                >
+                  Chuyển sang cổng gợi ý ({suggestedPort?.code || suggestedPort?.name || `P-${suggestedPort?.portId || suggestedPort?.Id}`})
+                </Button>
+              ) : null}
+
+              {/* Antd Tooltip không hoạt động với button disabled => bọc thêm <span> */}
+              <Tooltip title={getDisableReason()} mouseEnterDelay={0.3}>
+                <span>
+                  <Button
+                    className="cs-btn-green big pulse"
+                    type="primary"
+                    size="large"
+                    icon={<ThunderboltOutlined />}
+                    disabled={
+                      !infoReady ||
+                      ["busy", "maintenance", "reserved"].includes((gun?.status || "").toLowerCase()) ||
+                      starting
+                      // KHÔNG check "không tương thích" ở đây nữa
+                    }
+                    loading={starting}
+                    onClick={handleStart}
+                  >
+                    Bắt đầu sạc
+                  </Button>
+                </span>
+              </Tooltip>
             </div>
+
+
           </div>
         ) : (
           loadingLookup && (

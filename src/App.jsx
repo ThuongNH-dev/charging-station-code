@@ -56,13 +56,15 @@ import ManageSubscriptions from "./components/subscription/ManageSubcription";
 import Dashboard from "./components/admin/pages/dashboard/Dashboard";
 import AdminNotificationsSendPage from "./components/admin/pages/AdminNotificationsSendPage";
 import PricingRulesPage from "./components/admin/pages/pricing/PricingRulesPage";
+import AdminIncidentReports from "./components/admin/pages/Reports/AdminIncidentReports";
 import InfoDriver from "./pages/enterInfo/InfoDriver";
 import RegisterInfo from "./layouts/RegisterInfo";
+import MyFeedbacks from "./pages/feedback/MyFeedbacks";
 
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
     case "customer":
-      return "/homepage";
+      return "/stations";
     case "admin":
       return "/admin/dashboard";
     case "staff":
@@ -99,8 +101,6 @@ export default function App() {
       <Route path="/register/business" element={<BusinessRegister />} />
       <Route path="/register/payment" element={<BusinessPayment />} />
       <Route path="/register/success" element={<BusinessSuccess />} />
-      <Route path="/register/vehicle" element={<InfoDriver mode="register"/>}/> 
-      <Route path="/register-info" element={<RegisterInfo/>}/>
       {/* các route khác của bạn */}
       <Route
         path="/login"
@@ -152,7 +152,7 @@ export default function App() {
         }
       />
       <Route
-        path="/payment/failluer"
+        path="/payment/failure"
         element={
           <ProtectedRoute allowedRoles={["Customer"]}>
             <PaymentFailure />
@@ -242,6 +242,15 @@ export default function App() {
         }
       />
 
+      <Route
+        path="/my-feedback"
+        element={
+          <ProtectedRoute allowedRoles={["Customer"]}>
+            <MyFeedbacks/>
+          </ProtectedRoute>
+        }
+      />
+
       {/* ✅ Profile (Admin) */}
       <Route
         path="/profile/admin-info"
@@ -284,7 +293,7 @@ export default function App() {
       <Route
         path="/profile/vehicle-info"
         element={
-          <ProtectedRoute allowedRoles={["Customer"]}>
+          <ProtectedRoute allowedRoles={["Customer", "Company"]}>
             <VehicleInfo />
           </ProtectedRoute>
         }
@@ -349,7 +358,7 @@ export default function App() {
 
       {/* Admin */}
       <Route
-        path="admin"
+        path="/admin/*"
         element={
           <ProtectedRoute allowedRoles={["Admin"]}>
             <AdminLayout />
@@ -362,6 +371,7 @@ export default function App() {
         <Route path="stations/:stationId" element={<StationDetailPage />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="reports" element={<Reports />} />
+        <Route path="incident-reports" element={<AdminIncidentReports />} />
 
         <Route path="pricing-rules" element={<PricingRulesPage />} />
         <Route
