@@ -4,8 +4,16 @@ import axios from "axios";
 const BASE_URL = import.meta.env.DEV ? "/api" : "https://localhost:7268/api";
 
 // Loại bỏ undefined khỏi payload trước khi gửi
+// Loại bỏ undefined / null / "" và trim chuỗi trước khi gửi lên BE
 const clean = (obj = {}) =>
-  Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+  Object.fromEntries(
+    Object.entries(obj)
+      .map(([k, v]) => [k, typeof v === "string" ? v.trim() : v])
+      .filter(
+        ([, v]) =>
+          v !== undefined && v !== null && !(typeof v === "string" && v === "")
+      )
+  );
 
 /* ===== Helpers rút ID an toàn từ object (phòng dữ liệu lồng) ===== */
 const extractCustomerId = (data) =>
@@ -51,10 +59,14 @@ export const userApi = {
         email: data?.email ?? data?.companyEmail,
         phone: data?.phone ?? data?.companyPhone,
         address: data?.address,
-        imageUrl: data?.imageUrl,
+        imageUrl: data?.imageUrl, // có thể rỗng ở UI
       });
 
-      // console.debug("PUT /Auth/update-company payload:", payload);
+      // 🔒 Bảo hiểm cho BE nếu ImageUrl là [Required]
+      if (!payload.imageUrl) {
+        payload.imageUrl = "https://via.placeholder.com/1.png";
+      }
+
       const res = await axios.put(`${BASE_URL}/Auth/update-company`, payload, {
         headers: { "Content-Type": "application/json" },
       });
@@ -251,16 +263,15 @@ export const userApi = {
   },
 
   // ===== Invoices =====
-fetchAllInvoices: async () => {
-  const res = await axios.get(`${BASE_URL}/Invoices`);
-  const d = res.data;
-  // Hỗ trợ cả: [], { items: [...] }, { data: [...] }
-  if (Array.isArray(d)) return d;
-  if (Array.isArray(d?.items)) return d.items;
-  if (Array.isArray(d?.data)) return d.data;
-  return [];
-},
-
+  fetchAllInvoices: async () => {
+    const res = await axios.get(`${BASE_URL}/Invoices`);
+    const d = res.data;
+    // Hỗ trợ cả: [], { items: [...] }, { data: [...] }
+    if (Array.isArray(d)) return d;
+    if (Array.isArray(d?.items)) return d.items;
+    if (Array.isArray(d?.data)) return d.data;
+    return [];
+  },
 
   fetchInvoicesByCompany: async (companyId) => {
     const res = await axios.get(`${BASE_URL}/Invoices/by-company/${companyId}`);
