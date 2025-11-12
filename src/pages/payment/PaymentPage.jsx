@@ -9,9 +9,15 @@ import { getApiBase, fetchAuthJSON } from "../../utils/api";
 
 // ===== DEBUG LOGGER =====
 const DEBUG_PAY = true;
-function dlog(...args) { if (DEBUG_PAY) console.log("[PAY]", ...args); }
-function dwarn(...args) { if (DEBUG_PAY) console.warn("[PAY]", ...args); }
-function derr(...args) { if (DEBUG_PAY) console.error("[PAY]", ...args); }
+function dlog(...args) {
+  if (DEBUG_PAY) console.log("[PAY]", ...args);
+}
+function dwarn(...args) {
+  if (DEBUG_PAY) console.warn("[PAY]", ...args);
+}
+function derr(...args) {
+  if (DEBUG_PAY) console.error("[PAY]", ...args);
+}
 
 const API_BASE = getApiBase();
 const vnd = (n) => {
@@ -41,18 +47,29 @@ function getClaimsFromToken() {
   const t = localStorage.getItem("token") || "";
   const p = decodeJwtPayload(t) || {};
 
-  const NAME_ID = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier";
-  const EMAIL_CLAIM = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress";
-  const NAME_CLAIM = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
+  const NAME_ID =
+    "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier";
+  const EMAIL_CLAIM =
+    "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress";
+  const NAME_CLAIM =
+    "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name";
 
   const accountId =
-    p[NAME_ID] != null ? Number(p[NAME_ID])
-      : p.sub != null ? Number(p.sub)
-        : p.userid != null ? Number(p.userid)
-          : null;
+    p[NAME_ID] != null
+      ? Number(p[NAME_ID])
+      : p.sub != null
+      ? Number(p.sub)
+      : p.userid != null
+      ? Number(p.userid)
+      : null;
 
   const username =
-    p.unique_name ?? p.preferred_username ?? p.username ?? p.userName ?? p[NAME_CLAIM] ?? null;
+    p.unique_name ??
+    p.preferred_username ??
+    p.username ??
+    p.userName ??
+    p[NAME_CLAIM] ??
+    null;
 
   const email = p.email ?? p[EMAIL_CLAIM] ?? null;
   const customerId = p.customerId ?? p.CustomerId ?? null;
@@ -66,7 +83,9 @@ function normalizeAccount(raw) {
     return { fullName: "", email: "", phone: "" };
   }
   const userName = raw.userName ?? raw.username ?? raw.email ?? "";
-  const emailGuess = /\S+@\S+\.\S+/.test(String(userName)) ? String(userName) : "";
+  const emailGuess = /\S+@\S+\.\S+/.test(String(userName))
+    ? String(userName)
+    : "";
 
   const c =
     Array.isArray(raw.customers) && raw.customers.length
@@ -76,7 +95,10 @@ function normalizeAccount(raw) {
   const phone = c?.phone ?? raw.phone ?? "";
 
   const fullNameGuess =
-    c?.fullName ?? raw.fullName ?? raw.name ?? (emailGuess ? emailGuess.split("@")[0] : (userName || ""));
+    c?.fullName ??
+    raw.fullName ??
+    raw.name ??
+    (emailGuess ? emailGuess.split("@")[0] : userName || "");
 
   return {
     fullName: String(fullNameGuess ?? "").trim(),
@@ -93,7 +115,10 @@ function pickCurrentUserRecord(data, claims) {
   const { accountId, username, email } = claims;
 
   let found =
-    data.find((x) => Number(x.accountId ?? x.id ?? x.AccountId ?? x.Id) === Number(accountId)) || null;
+    data.find(
+      (x) =>
+        Number(x.accountId ?? x.id ?? x.AccountId ?? x.Id) === Number(accountId)
+    ) || null;
 
   if (!found && username) {
     found =
@@ -106,7 +131,9 @@ function pickCurrentUserRecord(data, claims) {
   if (!found && email) {
     found =
       data.find((x) => {
-        const e = String(x.email ?? x.userName ?? x.username ?? "").toLowerCase();
+        const e = String(
+          x.email ?? x.userName ?? x.username ?? ""
+        ).toLowerCase();
         return e === String(email).toLowerCase();
       }) || null;
   }
@@ -126,29 +153,49 @@ function extractVehicleItems(res) {
 /** ===== Dual-write helpers (session + local) ===== */
 function saveOrderBlob(orderId, obj) {
   const key = `pay:${orderId}`;
-  try { sessionStorage.setItem(key, JSON.stringify(obj)); } catch { }
-  try { localStorage.setItem(key, JSON.stringify(obj)); } catch { }
-  try { sessionStorage.setItem("pay:lastOrderId", orderId); } catch { }
-  try { localStorage.setItem("pay:lastOrderId", orderId); } catch { }
+  try {
+    sessionStorage.setItem(key, JSON.stringify(obj));
+  } catch {}
+  try {
+    localStorage.setItem(key, JSON.stringify(obj));
+  } catch {}
+  try {
+    sessionStorage.setItem("pay:lastOrderId", orderId);
+  } catch {}
+  try {
+    localStorage.setItem("pay:lastOrderId", orderId);
+  } catch {}
 }
 function readOrderBlob(orderId) {
   const key = `pay:${orderId}`;
   let s = null;
-  try { s = sessionStorage.getItem(key); } catch { }
+  try {
+    s = sessionStorage.getItem(key);
+  } catch {}
   if (!s) {
-    try { s = localStorage.getItem(key); } catch { }
+    try {
+      s = localStorage.getItem(key);
+    } catch {}
   }
   if (!s) return null;
-  try { return JSON.parse(s); } catch { return null; }
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
 }
 
 /** ===== Invoice/Booking utils ===== */
 async function fetchInvoiceById(apiBase, invoiceId) {
-  const res = await fetchAuthJSON(`${apiBase}/Invoices/${invoiceId}`, { method: "GET" });
+  const res = await fetchAuthJSON(`${apiBase}/Invoices/${invoiceId}`, {
+    method: "GET",
+  });
   return res?.data ?? res ?? null;
 }
 async function fetchBookingById(apiBase, bookingId) {
-  const b = await fetchAuthJSON(`${apiBase}/Booking/${bookingId}`, { method: "GET" });
+  const b = await fetchAuthJSON(`${apiBase}/Booking/${bookingId}`, {
+    method: "GET",
+  });
   if (!b) return null;
   if (Array.isArray(b?.items) && b.items.length) return b.items[0];
   return b;
@@ -158,8 +205,11 @@ function isPaidOrConfirmed(raw) {
   const paid = raw.isPaid ?? raw.paid ?? raw.IsPaid ?? false;
   if (paid === true || paid === "true" || paid === 1) return true;
   const st = String(raw.status ?? raw.Status ?? "").toLowerCase();
-  if (["paid", "completed", "confirmed", "success", "active"].includes(st)) return true;
-  const paymentStatus = String(raw.paymentStatus ?? raw.PaymentStatus ?? "").toLowerCase();
+  if (["paid", "completed", "confirmed", "success", "active"].includes(st))
+    return true;
+  const paymentStatus = String(
+    raw.paymentStatus ?? raw.PaymentStatus ?? ""
+  ).toLowerCase();
   if (["paid", "success", "completed"].includes(paymentStatus)) return true;
   const inv = raw.invoice ?? raw.Invoice;
   if (inv) {
@@ -170,7 +220,14 @@ function isPaidOrConfirmed(raw) {
   }
   return false;
 }
-async function pollUntilPaid({ apiBase, bookingId, invoiceId, timeoutMs = 300000, stepMs = 2000, onTick }) {
+async function pollUntilPaid({
+  apiBase,
+  bookingId,
+  invoiceId,
+  timeoutMs = 300000,
+  stepMs = 2000,
+  onTick,
+}) {
   const t0 = Date.now();
   while (Date.now() - t0 < timeoutMs) {
     try {
@@ -179,7 +236,7 @@ async function pollUntilPaid({ apiBase, bookingId, invoiceId, timeoutMs = 300000
       else if (invoiceId) data = await fetchInvoiceById(apiBase, invoiceId);
       if (onTick) onTick(data);
       if (data && isPaidOrConfirmed(data)) return { ok: true, data };
-    } catch { }
+    } catch {}
     await new Promise((r) => setTimeout(r, stepMs));
   }
   return { ok: false, data: null };
@@ -199,10 +256,20 @@ async function activateSubscription(apiBase, subscriptionId) {
 function extractSubscriptionAmount(subRes) {
   if (!subRes || typeof subRes !== "object") return null;
   const cands = [
-    subRes.amountDue, subRes.totalDue, subRes.grandTotal, subRes.total,
-    subRes.amount, subRes.paymentAmount, subRes.price, subRes.monthlyFee,
-    subRes.subscriptionFee, subRes.dueAmount, subRes.outstandingBalance,
-    subRes?.plan?.price, subRes?.plan?.monthlyPrice, subRes?.plan?.planPrice,
+    subRes.amountDue,
+    subRes.totalDue,
+    subRes.grandTotal,
+    subRes.total,
+    subRes.amount,
+    subRes.paymentAmount,
+    subRes.price,
+    subRes.monthlyFee,
+    subRes.subscriptionFee,
+    subRes.dueAmount,
+    subRes.outstandingBalance,
+    subRes?.plan?.price,
+    subRes?.plan?.monthlyPrice,
+    subRes?.plan?.planPrice,
   ];
   for (const v of cands) {
     const n = Number(v);
@@ -212,7 +279,10 @@ function extractSubscriptionAmount(subRes) {
 }
 async function fetchSubscriptionAmount(apiBase, subscriptionId) {
   try {
-    const res = await fetchAuthJSON(`${apiBase}/Subscriptions/${subscriptionId}`, { method: "GET" });
+    const res = await fetchAuthJSON(
+      `${apiBase}/Subscriptions/${subscriptionId}`,
+      { method: "GET" }
+    );
     const obj = res?.data ?? res;
     return extractSubscriptionAmount(obj);
   } catch {
@@ -229,16 +299,26 @@ function findSubAmountFromCachedInvoices(subscriptionId) {
     if (!Array.isArray(list)) return null;
     // tìm hóa đơn có invoiceType=subscription & subscriptionId trùng, ưu tiên chưa thanh toán
     const candidates = list
-      .filter((it) =>
-        String(it?.invoiceType || "").toLowerCase() === "subscription" &&
-        Number(it?.subscriptionId) === Number(subscriptionId)
+      .filter(
+        (it) =>
+          String(it?.invoiceType || "").toLowerCase() === "subscription" &&
+          Number(it?.subscriptionId) === Number(subscriptionId)
       )
-      .sort((a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0));
+      .sort(
+        (a, b) => new Date(b?.createdAt || 0) - new Date(a?.createdAt || 0)
+      );
 
     if (!candidates.length) return null;
 
-    const unpaidFirst = candidates.find((x) => String(x?.status || "").toLowerCase().includes("unpaid")) || candidates[0];
-    const total = Number(unpaidFirst?.total ?? unpaidFirst?.amount ?? unpaidFirst?.grandTotal ?? 0);
+    const unpaidFirst =
+      candidates.find((x) =>
+        String(x?.status || "")
+          .toLowerCase()
+          .includes("unpaid")
+      ) || candidates[0];
+    const total = Number(
+      unpaidFirst?.total ?? unpaidFirst?.amount ?? unpaidFirst?.grandTotal ?? 0
+    );
     return Number.isFinite(total) && total > 0 ? total : null;
   } catch {
     return null;
@@ -255,7 +335,11 @@ async function fetchSubscriptionInvoiceAmount(apiBase, subscriptionId) {
   for (const p of paths) {
     try {
       const res = await fetchAuthJSON(`${apiBase}${p}`, { method: "GET" });
-      const items = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : (res?.items ?? []);
+      const items = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res)
+        ? res
+        : res?.items ?? [];
       if (!items || !items.length) continue;
 
       // ưu tiên hóa đơn gần nhất/chưa thanh toán
@@ -266,11 +350,17 @@ async function fetchSubscriptionInvoiceAmount(apiBase, subscriptionId) {
           status: String(it?.status ?? "").toLowerCase(),
           createdAt: it?.createdAt ?? it?.CreatedAt ?? null,
         }))
-        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        .sort(
+          (a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+        );
 
-      const pick = normalized.find((x) => x.status.includes("unpaid")) || normalized[0];
-      if (pick && Number.isFinite(pick.total) && pick.total > 0) return pick.total;
-    } catch { /* try next path */ }
+      const pick =
+        normalized.find((x) => x.status.includes("unpaid")) || normalized[0];
+      if (pick && Number.isFinite(pick.total) && pick.total > 0)
+        return pick.total;
+    } catch {
+      /* try next path */
+    }
   }
   return null;
 }
@@ -282,14 +372,17 @@ export default function PaymentPage() {
 
   const [invoiceId, setInvoiceId] = useState(state?.invoiceId ?? null);
   const [companyId, setCompanyId] = useState(state?.companyId ?? null);
-  const [subscriptionId, setSubscriptionId] = useState(state?.subscriptionId ?? null);
+  const [subscriptionId, setSubscriptionId] = useState(
+    state?.subscriptionId ?? null
+  );
 
   // ép kiểu an toàn
   useEffect(() => {
     const toNumOrNull = (v) => (v == null || v === "" ? null : Number(v));
     dlog("location.state in:", state);
     if (state?.invoiceId != null) setInvoiceId(toNumOrNull(state.invoiceId));
-    if (state?.subscriptionId != null) setSubscriptionId(toNumOrNull(state.subscriptionId));
+    if (state?.subscriptionId != null)
+      setSubscriptionId(toNumOrNull(state.subscriptionId));
     if (state?.companyId != null) setCompanyId(toNumOrNull(state.companyId));
   }, [state]);
 
@@ -297,7 +390,7 @@ export default function PaymentPage() {
 
   // số tiền từng phần
   const [invoiceAmount, setInvoiceAmount] = useState(null); // Charging
-  const [subAmount, setSubAmount] = useState(null);         // Subscription
+  const [subAmount, setSubAmount] = useState(null); // Subscription
   const [subLoading, setSubLoading] = useState(false);
 
   // số tiền CHÍNH THỨC từ /Payment/create (tổng)
@@ -310,7 +403,11 @@ export default function PaymentPage() {
   const [paymentRef, setPaymentRef] = useState("");
   const [payError, setPayError] = useState("");
 
-  const [contact, setContact] = useState({ fullName: "", email: "", phone: "" });
+  const [contact, setContact] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+  });
   const [contactLoad, setContactLoad] = useState(true);
   const [contactErr, setContactErr] = useState("");
 
@@ -322,7 +419,10 @@ export default function PaymentPage() {
   const [bookingPrice, setBookingPrice] = useState(null);
 
   // Early guard
-  if (!state || (!state.bookingId && !state.invoiceId && !state.subscriptionId)) {
+  if (
+    !state ||
+    (!state.bookingId && !state.invoiceId && !state.subscriptionId)
+  ) {
     return (
       <div className="page-fallback">
         <h2>Thiếu thông tin thanh toán</h2>
@@ -334,8 +434,12 @@ export default function PaymentPage() {
     );
   }
 
-  const { station, charger, gun, totalMinutes, startTime, baseline } = state || {};
-  const orderId = useMemo(() => state?.orderId || "ORD" + Date.now(), [state?.orderId]);
+  const { station, charger, gun, totalMinutes, startTime, baseline } =
+    state || {};
+  const orderId = useMemo(
+    () => state?.orderId || "ORD" + Date.now(),
+    [state?.orderId]
+  );
 
   // Lấy hồ sơ user + customerId
   const [currentCustomerId, setCurrentCustomerId] = useState(null);
@@ -356,18 +460,33 @@ export default function PaymentPage() {
 
       try {
         let authRes = null;
-        try { authRes = await fetchAuthJSON(`/Auth`, { method: "GET" }); }
-        catch { try { authRes = await fetchAuthJSON(`${API_BASE}/Auth`, { method: "GET" }); } catch { } }
+        try {
+          authRes = await fetchAuthJSON(`/Auth`, { method: "GET" });
+        } catch {
+          try {
+            authRes = await fetchAuthJSON(`${API_BASE}/Auth`, {
+              method: "GET",
+            });
+          } catch {}
+        }
 
         let record = pickCurrentUserRecord(authRes, claims);
 
         if (!record && claims?.accountId != null) {
-          try { record = await fetchAuthJSON(`${API_BASE}/Account/${claims.accountId}`, { method: "GET" }); }
-          catch { }
+          try {
+            record = await fetchAuthJSON(
+              `${API_BASE}/Account/${claims.accountId}`,
+              { method: "GET" }
+            );
+          } catch {}
         }
 
         if (!record) {
-          record = { userName: claims?.username || "", email: claims?.email || "", customers: [] };
+          record = {
+            userName: claims?.username || "",
+            email: claims?.email || "",
+            customers: [],
+          };
         }
 
         const normalized = normalizeAccount(record);
@@ -381,9 +500,11 @@ export default function PaymentPage() {
 
         if (!cid) {
           try {
-            const meCus = await fetchAuthJSON(`${API_BASE}/Customers/me`, { method: "GET" });
+            const meCus = await fetchAuthJSON(`${API_BASE}/Customers/me`, {
+              method: "GET",
+            });
             cid = meCus?.customerId ?? meCus?.CustomerId ?? null;
-          } catch { }
+          } catch {}
         }
 
         if (mounted) {
@@ -391,12 +512,15 @@ export default function PaymentPage() {
           setCurrentCustomerId(cid || null);
         }
       } catch (e) {
-        if (mounted) setContactErr(e?.message || "Không tải được thông tin liên hệ.");
+        if (mounted)
+          setContactErr(e?.message || "Không tải được thông tin liên hệ.");
       } finally {
         if (mounted) setContactLoad(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Sau khi trở lại từ VNPAY, poll & kích hoạt subscription (nếu có)
@@ -410,7 +534,7 @@ export default function PaymentPage() {
           const ctx = JSON.parse(sessionStorage.getItem("__pay_ctx") || "{}");
           invId = invId || ctx?.invoiceId || null;
           subId = subId || ctx?.subscriptionId || null;
-        } catch { }
+        } catch {}
       }
       if (!invId || !subId) return;
 
@@ -425,7 +549,53 @@ export default function PaymentPage() {
         try {
           await activateSubscription(API_BASE, subId);
           sessionStorage.setItem("__refresh_subs_after_pay", "1");
-        } catch { }
+
+          // ✅ Gọi lại API Notification để lấy thông báo mới nhất
+          const role = (user?.role || "").toLowerCase();
+          const customerId =
+            user?.customerId || localStorage.getItem("customerId");
+          const companyId =
+            user?.companyId || localStorage.getItem("companyId");
+
+          let notiUrl = null;
+          if (role === "customer" && customerId)
+            notiUrl = `${API_BASE}/Notification/customer/${customerId}?includeArchived=false`;
+          else if (role === "company" && companyId)
+            notiUrl = `${API_BASE}/Notification/company/${companyId}?includeArchived=false`;
+
+          if (notiUrl) {
+            const r = await fetch(notiUrl, {
+              headers: {
+                accept: "application/json",
+                authorization: `Bearer ${user.token}`,
+              },
+            });
+            const notis = await r.json();
+            if (Array.isArray(notis) && notis.length > 0) {
+              const latest = notis.sort(
+                (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+              )[0];
+              const url = latest?.actionUrl;
+              if (url) {
+                // ✅ Điều hướng theo link BE gửi về
+                if (url.startsWith("/")) navigate(url, { replace: true });
+                else window.location.href = url;
+                return;
+              }
+            }
+          }
+
+          // 🔄 Nếu không có actionUrl, fallback về mặc định
+          navigate("/payment-success", {
+            state: { invoiceId: invId, subscriptionId: subId },
+            replace: true,
+          });
+        } catch (err) {
+          console.error("Lỗi khi kích hoạt subscription:", err);
+        }
+      } else {
+        // ❌ Nếu hết thời gian mà chưa thanh toán, quay về trang thất bại
+        navigate("/payment-failed", { replace: true });
       }
     })();
   }, []); // eslint-disable-line
@@ -437,10 +607,16 @@ export default function PaymentPage() {
       try {
         const inv = await fetchInvoiceById(API_BASE, invoiceId);
         const total = Number(
-          inv?.total ?? inv?.Total ?? inv?.amount ?? inv?.Amount ?? inv?.grandTotal ?? inv?.GrandTotal ?? 0
+          inv?.total ??
+            inv?.Total ??
+            inv?.amount ??
+            inv?.Amount ??
+            inv?.grandTotal ??
+            inv?.GrandTotal ??
+            0
         );
         if (total > 0) setInvoiceAmount(total);
-      } catch { }
+      } catch {}
     })();
   }, [invoiceId]);
 
@@ -460,7 +636,10 @@ export default function PaymentPage() {
       }
 
       // 2) Thử tìm hóa đơn Subscription qua các endpoint khả dĩ
-      const fromInvoices = await fetchSubscriptionInvoiceAmount(API_BASE, subscriptionId);
+      const fromInvoices = await fetchSubscriptionInvoiceAmount(
+        API_BASE,
+        subscriptionId
+      );
       if (alive && fromInvoices != null) {
         setSubAmount(fromInvoices);
         setSubLoading(false);
@@ -474,7 +653,9 @@ export default function PaymentPage() {
         setSubLoading(false);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [subscriptionId]);
 
   // ===== Vehicle theo customerId
@@ -495,20 +676,35 @@ export default function PaymentPage() {
         let items = [];
         for (const p of paths) {
           try {
-            const res = await fetchAuthJSON(`${API_BASE}${p}`, { method: "GET" });
+            const res = await fetchAuthJSON(`${API_BASE}${p}`, {
+              method: "GET",
+            });
             const list = extractVehicleItems(res);
-            if (list.length) { items = list; break; }
-          } catch { }
+            if (list.length) {
+              items = list;
+              break;
+            }
+          } catch {}
         }
 
-        if (!items.length) throw new Error("Không tìm thấy phương tiện của bạn.");
+        if (!items.length)
+          throw new Error("Không tìm thấy phương tiện của bạn.");
 
-        let mine = items.filter((v) => Number(v.customerId ?? v.CustomerId) === Number(currentCustomerId));
+        let mine = items.filter(
+          (v) =>
+            Number(v.customerId ?? v.CustomerId) === Number(currentCustomerId)
+        );
         if (!mine.length) mine = items;
 
         mine.sort((a, b) => {
-          const sa = String(a.status ?? a.Status ?? "").toLowerCase() === "active" ? 1 : 0;
-          const sb = String(b.status ?? b.Status ?? "").toLowerCase() === "active" ? 1 : 0;
+          const sa =
+            String(a.status ?? a.Status ?? "").toLowerCase() === "active"
+              ? 1
+              : 0;
+          const sb =
+            String(b.status ?? b.Status ?? "").toLowerCase() === "active"
+              ? 1
+              : 0;
           return sb - sa;
         });
 
@@ -523,7 +719,9 @@ export default function PaymentPage() {
         if (mounted) setVehicleLoad(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [currentCustomerId]);
 
   // ===== Booking price
@@ -531,10 +729,12 @@ export default function PaymentPage() {
     if (!bookingId) return;
     (async () => {
       try {
-        const b = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
+        const b = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, {
+          method: "GET",
+        });
         const price = Number(b?.price ?? b?.Price ?? 0);
         if (price > 0) setBookingPrice(price);
-      } catch { }
+      } catch {}
     })();
   }, [bookingId]);
 
@@ -545,14 +745,21 @@ export default function PaymentPage() {
     (async function loop() {
       while (alive && Date.now() - started < 10000) {
         try {
-          const b = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
+          const b = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, {
+            method: "GET",
+          });
           const price = Number(b?.price ?? b?.Price ?? 0);
-          if (price > 0) { setBookingPrice(price); break; }
-        } catch { }
+          if (price > 0) {
+            setBookingPrice(price);
+            break;
+          }
+        } catch {}
         await new Promise((r) => setTimeout(r, 800));
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [bookingId, bookingPrice]);
 
   // ===== Parse vnp_Amount (vnd*100) từ URL
@@ -566,7 +773,9 @@ export default function PaymentPage() {
       const scaled = Number(raw);
       if (!Number.isFinite(scaled)) return null;
       return Math.round(scaled / 100);
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }, [vnpayUrl]);
 
   // ===== Tổng hiển thị:
@@ -574,19 +783,21 @@ export default function PaymentPage() {
   const derivedComboTotal =
     serverAmount != null
       ? serverAmount
-      : (isCombo && invoiceAmount != null && subAmount != null)
-        ? invoiceAmount + subAmount
-        : null;
+      : isCombo && invoiceAmount != null && subAmount != null
+      ? invoiceAmount + subAmount
+      : null;
 
   // Số tiền cho trường hợp đơn lẻ (booking / invoice lẻ)
   const singleAmount =
     serverAmount != null
       ? serverAmount
-      : (bookingId && bookingPrice > 0)
-        ? bookingPrice
-        : (invoiceId && invoiceAmount > 0 && !isCombo)
-          ? invoiceAmount
-          : (amountFromVnpUrl != null ? amountFromVnpUrl : null);
+      : bookingId && bookingPrice > 0
+      ? bookingPrice
+      : invoiceId && invoiceAmount > 0 && !isCombo
+      ? invoiceAmount
+      : amountFromVnpUrl != null
+      ? amountFromVnpUrl
+      : null;
 
   // ===== UI payment
   const [walletBalance, setWalletBalance] = useState(0);
@@ -600,7 +811,12 @@ export default function PaymentPage() {
   }, []);
 
   const [selectedPayment, setSelectedPayment] = useState(""); // 'visa' | 'mastercard' | 'qr' | 'wallet'
-  const [formData, setFormData] = useState({ cardNumber: "", cardHolder: "", expiryDate: "", cvv: "" });
+  const [formData, setFormData] = useState({
+    cardNumber: "",
+    cardHolder: "",
+    expiryDate: "",
+    cvv: "",
+  });
 
   const onInputChange = (e) => {
     const { name, value } = e.target;
@@ -617,10 +833,15 @@ export default function PaymentPage() {
 
   function toUrlString(val) {
     if (!val) return "";
-    const s = typeof val === "string" ? val : (val.result ?? val.url ?? val.href ?? "");
+    const s =
+      typeof val === "string" ? val : val.result ?? val.url ?? val.href ?? "";
     if (!s) return "";
     if (/^https?:\/\//i.test(s)) return s;
-    try { return new URL(s, window.location.origin).toString(); } catch { return ""; }
+    try {
+      return new URL(s, window.location.origin).toString();
+    } catch {
+      return "";
+    }
   }
 
   // Nếu đã có vnpayUrl từ BookingPorts, auto chọn QR
@@ -651,16 +872,26 @@ export default function PaymentPage() {
 
       // Kiểm tra số tiền trước khi tạo phiên (optional)
       if (bookingId) {
-        const check = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, { method: "GET" });
+        const check = await fetchAuthJSON(`${API_BASE}/Booking/${bookingId}`, {
+          method: "GET",
+        });
         const bePrice = Number(check?.price ?? check?.Price ?? 0);
-        if (!(bePrice > 0)) throw new Error("Booking chưa có giá, không thể thanh toán.");
+        if (!(bePrice > 0))
+          throw new Error("Booking chưa có giá, không thể thanh toán.");
         setBookingPrice(bePrice);
       } else if (invoiceId && !isCombo) {
         const inv = await fetchInvoiceById(API_BASE, invoiceId);
         const total = Number(
-          inv?.total ?? inv?.Total ?? inv?.amount ?? inv?.Amount ?? inv?.grandTotal ?? inv?.GrandTotal ?? 0
+          inv?.total ??
+            inv?.Total ??
+            inv?.amount ??
+            inv?.Amount ??
+            inv?.grandTotal ??
+            inv?.GrandTotal ??
+            0
         );
-        if (!(total > 0)) throw new Error("Invoice chưa có tổng tiền, không thể thanh toán.");
+        if (!(total > 0))
+          throw new Error("Invoice chưa có tổng tiền, không thể thanh toán.");
         setInvoiceAmount(total);
       } else if (isCombo) {
         // nếu combo mà chưa có subAmount -> cố gắng lấy trước để UI hiển thị chuẩn
@@ -669,10 +900,16 @@ export default function PaymentPage() {
           const fromCache = findSubAmountFromCachedInvoices(subscriptionId);
           if (fromCache != null) setSubAmount(fromCache);
           else {
-            const fromInvoices = await fetchSubscriptionInvoiceAmount(API_BASE, subscriptionId);
+            const fromInvoices = await fetchSubscriptionInvoiceAmount(
+              API_BASE,
+              subscriptionId
+            );
             if (fromInvoices != null) setSubAmount(fromInvoices);
             else {
-              const amt = await fetchSubscriptionAmount(API_BASE, subscriptionId);
+              const amt = await fetchSubscriptionAmount(
+                API_BASE,
+                subscriptionId
+              );
               if (amt != null) setSubAmount(amt);
             }
           }
@@ -686,16 +923,29 @@ export default function PaymentPage() {
       if (invoiceId != null) payload.invoiceId = Number(invoiceId);
       // Chỉ loại subscriptionId khi tới từ InvoiceDetail
       if (!fromDetail && (subscriptionId ?? state?.subscriptionId) != null) {
-        payload.subscriptionId = Number(subscriptionId ?? state?.subscriptionId);
+        payload.subscriptionId = Number(
+          subscriptionId ?? state?.subscriptionId
+        );
       }
       if (companyId != null) payload.companyId = Number(companyId);
       payload.description = bookingId
         ? `Thanh toán booking #${bookingId}`
-        : (isCombo
-          ? `Thanh toán combo: invoice #${invoiceId} + subscription #${subscriptionId}`
-          : `Thanh toán hóa đơn #${invoiceId}`);
+        : isCombo
+        ? `Thanh toán combo: invoice #${invoiceId} + subscription #${subscriptionId}`
+        : `Thanh toán hóa đơn #${invoiceId}`;
+      const detailUrl = invoiceId
+        ? `${window.location.origin}/invoiceDetail/${encodeURIComponent(
+            invoiceId
+          )}`
+        : `${window.location.origin}/invoiceSummary`;
       payload.returnUrl = bookingId
-        ? `${window.location.origin}/payment/success?bookingId=${encodeURIComponent(bookingId)}&order=${encodeURIComponent(orderId)}`
+        ? `${
+            window.location.origin
+          }/payment/success?bookingId=${encodeURIComponent(
+            bookingId
+          )}&order=${encodeURIComponent(orderId)}`
+        : fromDetail
+        ? detailUrl
         : `${window.location.origin}/invoiceSummary`;
       dlog("create payload →", JSON.stringify(payload));
 
@@ -714,7 +964,11 @@ export default function PaymentPage() {
 
       // ---- LẤY SỐ TIỀN CHÍNH THỨC TỪ BE ----
       const rawVnp = res?.vnp_Amount ?? res?.vnpAmount ?? res?.VnpAmount;
-      const rawAmt = res?.amount ?? res?.total ?? res?.paymentAmount ?? (rawVnp != null ? Number(rawVnp) / 100 : null);
+      const rawAmt =
+        res?.amount ??
+        res?.total ??
+        res?.paymentAmount ??
+        (rawVnp != null ? Number(rawVnp) / 100 : null);
       if (Number.isFinite(rawAmt) && rawAmt > 0) {
         const totalAmt = Math.round(Number(rawAmt));
         setServerAmount(totalAmt);
@@ -724,7 +978,8 @@ export default function PaymentPage() {
       let url = null;
       if (typeof res?.paymentUrl === "string") url = res.paymentUrl;
       else if (res?.paymentUrl?.result) url = res.paymentUrl.result;
-      else if (res?.paymentUrl?.url || res?.paymentUrl?.href) url = res.paymentUrl.url || res.paymentUrl.href;
+      else if (res?.paymentUrl?.url || res?.paymentUrl?.href)
+        url = res.paymentUrl.url || res.paymentUrl.href;
       else url = res?.paymentUrl;
 
       url = toUrlString(url);
@@ -735,14 +990,17 @@ export default function PaymentPage() {
       try {
         const u = new URL(url);
         ref = u.searchParams.get("vnp_TxnRef") || "";
-      } catch { }
+      } catch {}
 
       setVnpayUrl(url);
       const fallbackRef = String(bookingId || invoiceId || orderId);
       setPaymentRef(ref || fallbackRef);
       return { url, ref: ref || fallbackRef };
     } catch (err) {
-      setPayError(err?.message || "Không tạo được phiên thanh toán VNPAY. Vui lòng thử lại.");
+      setPayError(
+        err?.message ||
+          "Không tạo được phiên thanh toán VNPAY. Vui lòng thử lại."
+      );
       setVnpayUrl("");
       setPaymentRef("");
       return null;
@@ -753,40 +1011,67 @@ export default function PaymentPage() {
 
   // Auto-create VNPAY URL khi chọn QR
   useEffect(() => {
-    if (selectedPayment === "qr" && (bookingId || invoiceId || subscriptionId) && !vnpayUrl) {
+    if (
+      selectedPayment === "qr" &&
+      (bookingId || invoiceId || subscriptionId) &&
+      !vnpayUrl
+    ) {
       createVnpayPayment();
     }
-  }, [selectedPayment, bookingId, invoiceId, subscriptionId, orderId, vnpayUrl]); // eslint-disable-line
+  }, [
+    selectedPayment,
+    bookingId,
+    invoiceId,
+    subscriptionId,
+    orderId,
+    vnpayUrl,
+  ]); // eslint-disable-line
 
   const payingTotal = isCombo ? derivedComboTotal : singleAmount;
-  const canPayByWallet = selectedPayment === "wallet" ? walletBalance >= (payingTotal || 0) : true;
+  const canPayByWallet =
+    selectedPayment === "wallet" ? walletBalance >= (payingTotal || 0) : true;
   const payDisabled =
     loading ||
     !selectedPayment ||
     (selectedPayment === "wallet" && !canPayByWallet) ||
-    (selectedPayment === "qr" && (!(bookingId || invoiceId || subscriptionId) || creatingVnpay || !vnpayUrl)) ||
+    (selectedPayment === "qr" &&
+      (!(bookingId || invoiceId || subscriptionId) ||
+        creatingVnpay ||
+        !vnpayUrl)) ||
     (isCombo ? derivedComboTotal == null : singleAmount == null);
 
   const handlePay = async () => {
     if (selectedPayment !== "qr") {
       const payload = {
         orderId,
-        station, charger, gun, startTime: startTime || "", baseline: baseline || "",
+        station,
+        charger,
+        gun,
+        startTime: startTime || "",
+        baseline: baseline || "",
         totalMinutes: totalMinutes || 0,
         bookingFee: payingTotal,
         roundedHours: Math.max(1, Math.ceil((totalMinutes || 0) / 60)),
         pricePerHour: 0,
-        bookingId, invoiceId, companyId,
+        bookingId,
+        invoiceId,
+        companyId,
         paidAt: Date.now(),
         paymentMethod: selectedPayment,
-        contact, vehiclePlate,
+        contact,
+        vehiclePlate,
       };
       saveOrderBlob(orderId, payload);
       if (bookingId) {
         navigate("/payment/success", { replace: true, state: payload });
       } else if (invoiceId || subscriptionId) {
-        // invoice đơn lẻ hoặc combo invoice+subscription → về trang tổng hợp hóa đơn
-        navigate("/invoiceSummary");
+        if (state?.from === "invoice-detail" && invoiceId) {
+          navigate(`/invoiceDetail/${encodeURIComponent(invoiceId)}`, {
+            replace: true,
+          });
+        } else {
+          navigate("/invoiceSummary");
+        }
       }
       return;
     }
@@ -811,15 +1096,23 @@ export default function PaymentPage() {
         payUrl = toUrlString(created.url);
       }
 
-      try { sessionStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }
-      try { localStorage.setItem(`pay:${orderId}:pending`, "1"); } catch { }
+      try {
+        sessionStorage.setItem(`pay:${orderId}:pending`, "1");
+      } catch {}
+      try {
+        localStorage.setItem(`pay:${orderId}:pending`, "1");
+      } catch {}
       window.location.href = payUrl;
 
       try {
-        const ctx = { invoiceId, subscriptionId: subscriptionId ?? state?.subscriptionId ?? null };
+        const ctx = {
+          invoiceId,
+          subscriptionId: subscriptionId ?? state?.subscriptionId ?? null,
+          backToDetail: state?.from === "invoice-detail",
+        };
         sessionStorage.setItem("__pay_ctx", JSON.stringify(ctx));
         sessionStorage.setItem("__refresh_subs_after_pay", "1");
-      } catch { }
+      } catch {}
       return;
     } finally {
       setLoading(false);
@@ -849,8 +1142,12 @@ export default function PaymentPage() {
                 vehiclePlate={vehiclePlate}
               />
 
-              {contactLoad && <p className="os-warning">Đang tải thông tin liên hệ...</p>}
-              {!contactLoad && contactErr && <p className="os-error">{contactErr}</p>}
+              {contactLoad && (
+                <p className="os-warning">Đang tải thông tin liên hệ...</p>
+              )}
+              {!contactLoad && contactErr && (
+                <p className="os-error">{contactErr}</p>
+              )}
               {!!vehicleErr && <p className="os-error">{vehicleErr}</p>}
 
               {selectedPayment === "qr" && (
@@ -861,19 +1158,27 @@ export default function PaymentPage() {
 
                   {vnpayUrl ? (
                     <>
-                      <QRCodeCanvas value={toUrlString(vnpayUrl)} size={180} includeMargin />
+                      <QRCodeCanvas
+                        value={toUrlString(vnpayUrl)}
+                        size={180}
+                        includeMargin
+                      />
                       <p className="os-qr-hint">
-                        Quét mã QR để thanh toán {isCombo ? "combo (Charging + Subscription)" : "qua VNPAY"}
+                        Quét mã QR để thanh toán{" "}
+                        {isCombo
+                          ? "combo (Charging + Subscription)"
+                          : "qua VNPAY"}
                       </p>
                       <p className="os-qr-mini">
-                        Mã giao dịch: <b>{paymentRef || bookingId || invoiceId || orderId}</b>
+                        Mã giao dịch:{" "}
+                        <b>{paymentRef || bookingId || invoiceId || orderId}</b>
                       </p>
                     </>
                   ) : (
                     <>
                       <div className="os-qr-skeleton" />
                       <p className="os-qr-hint">
-                        {(bookingId || invoiceId || subscriptionId)
+                        {bookingId || invoiceId || subscriptionId
                           ? "Đang khởi tạo phiên thanh toán VNPAY..."
                           : "Thiếu mã tham chiếu thanh toán"}
                       </p>
@@ -892,7 +1197,9 @@ export default function PaymentPage() {
                   disabled={payDisabled}
                 >
                   {selectedPayment === "qr"
-                    ? (creatingVnpay ? "Đang khởi tạo..." : "Chuyển đến VNPAY")
+                    ? creatingVnpay
+                      ? "Đang khởi tạo..."
+                      : "Chuyển đến VNPAY"
                     : "Thanh Toán"}
                 </button>
 
@@ -908,15 +1215,25 @@ export default function PaymentPage() {
             <h2 className="os-title">
               {bookingId
                 ? "Xác nhận đơn đặt trước"
-                : (isCombo ? "Xác nhận thanh toán combo" : "Xác nhận thanh toán hóa đơn")}
+                : isCombo
+                ? "Xác nhận thanh toán combo"
+                : "Xác nhận thanh toán hóa đơn"}
             </h2>
 
             <div className="os-block">
-              <h3>1. {bookingId ? "Thông tin trụ sạc" : (isCombo ? "Thông tin hóa đơn (combo)" : "Thông tin hóa đơn")}</h3>
+              <h3>
+                1.{" "}
+                {bookingId
+                  ? "Thông tin trụ sạc"
+                  : isCombo
+                  ? "Thông tin hóa đơn (combo)"
+                  : "Thông tin hóa đơn"}
+              </h3>
               {bookingId ? (
                 <>
                   <p className="os-station-line">
-                    <b>{station?.name}</b> — {charger?.title} — Cổng <b>{gun?.name}</b>
+                    <b>{station?.name}</b> — {charger?.title} — Cổng{" "}
+                    <b>{gun?.name}</b>
                   </p>
                   <ul className="os-station-list">
                     <li>Công suất: {charger?.power || "—"}</li>
@@ -929,24 +1246,35 @@ export default function PaymentPage() {
                     </ul>
                   </ul>
                 </>
+              ) : isCombo ? (
+                <ul className="os-station-list">
+                  <li>
+                    Charging InvoiceId: <b>{invoiceId}</b>
+                  </li>
+                  <li>
+                    SubscriptionId: <b>{subscriptionId}</b>
+                  </li>
+                  <li>Công ty: {companyId ?? "—"}</li>
+                </ul>
               ) : (
-                isCombo ? (
-                  <ul className="os-station-list">
-                    <li>Charging InvoiceId: <b>{invoiceId}</b></li>
-                    <li>SubscriptionId: <b>{subscriptionId}</b></li>
-                    <li>Công ty: {companyId ?? "—"}</li>
-                  </ul>
-                ) : (
-                  <ul className="os-station-list">
-                    <li>Mã hóa đơn: <b>{invoiceId}</b></li>
-                    <li>Công ty: {companyId ?? "—"}</li>
-                  </ul>
-                )
+                <ul className="os-station-list">
+                  <li>
+                    Mã hóa đơn: <b>{invoiceId}</b>
+                  </li>
+                  <li>Công ty: {companyId ?? "—"}</li>
+                </ul>
               )}
             </div>
 
             <div className="os-block">
-              <h3>2. {bookingId ? "Chi phí (phí đặt chỗ)" : (isCombo ? "Tổng tiền combo" : "Tổng tiền hóa đơn")}</h3>
+              <h3>
+                2.{" "}
+                {bookingId
+                  ? "Chi phí (phí đặt chỗ)"
+                  : isCombo
+                  ? "Tổng tiền combo"
+                  : "Tổng tiền hóa đơn"}
+              </h3>
 
               {bookingId ? (
                 singleAmount == null ? (
@@ -959,17 +1287,27 @@ export default function PaymentPage() {
                         <td className="os-right">{vnd(singleAmount)}</td>
                       </tr>
                       <tr className="os-total">
-                        <td><b>Tổng</b></td>
-                        <td className="os-right"><b>{vnd(singleAmount)}</b></td>
+                        <td>
+                          <b>Tổng</b>
+                        </td>
+                        <td className="os-right">
+                          <b>{vnd(singleAmount)}</b>
+                        </td>
                       </tr>
                     </tbody>
                   </table>
                 )
               ) : isCombo ? (
                 <>
-                  {(invoiceAmount == null) && <p className="os-warning">Đang lấy tiền Charging...</p>}
-                  {subLoading && <p className="os-warning">Đang lấy tiền Subscription...</p>}
-                  {(invoiceAmount != null || subAmount != null || serverAmount != null) && (
+                  {invoiceAmount == null && (
+                    <p className="os-warning">Đang lấy tiền Charging...</p>
+                  )}
+                  {subLoading && (
+                    <p className="os-warning">Đang lấy tiền Subscription...</p>
+                  )}
+                  {(invoiceAmount != null ||
+                    subAmount != null ||
+                    serverAmount != null) && (
                     <table className="os-table">
                       <tbody>
                         <tr>
@@ -979,18 +1317,28 @@ export default function PaymentPage() {
                           </td>
                         </tr>
                         <tr>
-                          <td>Subscription (SubscriptionId: {subscriptionId})</td>
+                          <td>
+                            Subscription (SubscriptionId: {subscriptionId})
+                          </td>
                           <td className="os-right">
                             {serverAmount != null && invoiceAmount != null
                               ? vnd(Math.max(0, serverAmount - invoiceAmount))
-                              : (subAmount != null ? vnd(subAmount) : (subLoading ? "…" : "—"))}
+                              : subAmount != null
+                              ? vnd(subAmount)
+                              : subLoading
+                              ? "…"
+                              : "—"}
                           </td>
                         </tr>
                         <tr className="os-total">
-                          <td><b>Tổng combo</b></td>
+                          <td>
+                            <b>Tổng combo</b>
+                          </td>
                           <td className="os-right">
                             <b>
-                              {derivedComboTotal != null ? vnd(derivedComboTotal) : "—"}
+                              {derivedComboTotal != null
+                                ? vnd(derivedComboTotal)
+                                : "—"}
                             </b>
                           </td>
                         </tr>
@@ -998,33 +1346,40 @@ export default function PaymentPage() {
                     </table>
                   )}
                 </>
+              ) : singleAmount == null ? (
+                <p className="os-warning">Đang chờ hệ thống tính phí...</p>
               ) : (
-                singleAmount == null ? (
-                  <p className="os-warning">Đang chờ hệ thống tính phí...</p>
-                ) : (
-                  <table className="os-table">
-                    <tbody>
-                      <tr>
-                        <td>Số tiền phải thanh toán</td>
-                        <td className="os-right">{vnd(singleAmount)}</td>
-                      </tr>
-                      <tr className="os-total">
-                        <td><b>Tổng</b></td>
-                        <td className="os-right"><b>{vnd(singleAmount)}</b></td>
-                      </tr>
-                    </tbody>
-                  </table>
-                )
+                <table className="os-table">
+                  <tbody>
+                    <tr>
+                      <td>Số tiền phải thanh toán</td>
+                      <td className="os-right">{vnd(singleAmount)}</td>
+                    </tr>
+                    <tr className="os-total">
+                      <td>
+                        <b>Tổng</b>
+                      </td>
+                      <td className="os-right">
+                        <b>{vnd(singleAmount)}</b>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               )}
 
               {bookingId ? (
-                <p className="os-note">Lưu ý: Đây là <b>phí đặt chỗ</b>, không phải tiền điện sạc.</p>
+                <p className="os-note">
+                  Lưu ý: Đây là <b>phí đặt chỗ</b>, không phải tiền điện sạc.
+                </p>
               ) : isCombo ? (
                 <p className="os-note">
-                  Bạn đang thanh toán <b>combo</b> gồm 1 hóa đơn Charging và 1 hóa đơn Subscription trong cùng một giao dịch.
+                  Bạn đang thanh toán <b>combo</b> gồm 1 hóa đơn Charging và 1
+                  hóa đơn Subscription trong cùng một giao dịch.
                 </p>
               ) : (
-                <p className="os-note">Bạn đang thanh toán cho <b>hóa đơn</b> đã phát sinh.</p>
+                <p className="os-note">
+                  Bạn đang thanh toán cho <b>hóa đơn</b> đã phát sinh.
+                </p>
               )}
             </div>
           </div>
