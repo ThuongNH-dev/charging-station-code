@@ -38,6 +38,26 @@ function getIdentityFromStorage() {
   };
 }
 
+// helpers cho payload
+function toNumberOrNull(v) {
+  if (v === undefined || v === null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+function trimOrNull(v) {
+  const s = (v ?? "").trim();
+  return s === "" ? null : s;
+}
+function statusOrDefault(v) {
+  const s = (v ?? "").trim();
+  return s ? s : "Active";
+}
+function vehicleTypeOrDefault(v) {
+  const s = (v ?? "").trim();
+  return s ? s : "Car";
+}
+
+
 async function apiListVehicles({
   page = 1,
   pageSize = 50,
@@ -119,6 +139,8 @@ export default function VehicleInfo() {
   const [initLoading, setInitLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [currentVehicle, setCurrentVehicle] = useState(null);
+  const pageTitle = currentVehicle ? "Cập nhật thông số xe" : "Thêm xe mới";
+  
 
   // Helper: đọc vehicleId đã lưu (ưu tiên localStorage)
   function getStoredVehicleId() {
@@ -201,6 +223,24 @@ export default function VehicleInfo() {
     );
     form.setFieldsValue(norm);
   };
+
+  useEffect(() => {
+  document.title = currentVehicle ? "Cập nhật xe" : "Thêm xe";
+}, [currentVehicle]);
+
+  useEffect(() => {
+    // luôn khóa status trên form:
+    if (currentVehicle) {
+      // edit mode: dùng status từ DB
+      form.setFieldsValue({
+        status: normalizeStatusFE(currentVehicle?.status || "Active"),
+      });
+    } else {
+      // create mode: ép Active
+      form.setFieldsValue({ status: "Active" });
+    }
+  }, [currentVehicle, initLoading]);
+
 
   useEffect(() => {
     (async () => {
@@ -386,37 +426,31 @@ export default function VehicleInfo() {
       // Base là dữ liệu hiện có của xe (nếu có), sau đó override bởi Form values
       const base = currentVehicle || {};
       const payload = {
-        customerId: Number(
-          values.customerId ??
-          currentUser?.customerId ??
-          base.customerId ??
-          null
+        // ID: null nếu không có
+        customerId: toNumberOrNull(
+          values.customerId ?? currentUser?.customerId ?? base.customerId
         ),
-        companyId: Number(
-          values.companyId ?? currentUser?.companyId ?? base.companyId ?? null
+        companyId: toNumberOrNull(
+          values.companyId ?? currentUser?.companyId ?? base.companyId
         ),
 
-        carMaker: (values.carMaker ?? base.carMaker ?? "").trim(),
-        model: (values.model ?? base.model ?? "").trim(),
-        licensePlate: (values.licensePlate ?? base.licensePlate ?? "").trim(),
+        // Text: null nếu trống
+        carMaker: trimOrNull(values.carMaker ?? base.carMaker),
+        model: trimOrNull(values.model ?? base.model),
+        licensePlate: trimOrNull(values.licensePlate ?? base.licensePlate),
+        connectorType: trimOrNull(values.connectorType ?? base.connectorType),
+        imageUrl: trimOrNull(values.imageUrl ?? base.imageUrl),
 
-        batteryCapacity: Number(
-          values.batteryCapacity ?? base.batteryCapacity ?? 0
-        ),
-        currentSoc: Number(values.currentSoc ?? base.currentSoc ?? 0),
-        connectorType: (
-          values.connectorType ??
-          base.connectorType ??
-          ""
-        ).trim(),
-        manufactureYear: Number(
-          values.manufactureYear ?? base.manufactureYear ?? 0
-        ),
-        imageUrl: (values.imageUrl ?? base.imageUrl ?? "").trim(),
+        // Number optional: null nếu không nhập
+        batteryCapacity: toNumberOrNull(values.batteryCapacity ?? base.batteryCapacity),
+        currentSoc: toNumberOrNull(values.currentSoc ?? base.currentSoc),
+        manufactureYear: toNumberOrNull(values.manufactureYear ?? base.manufactureYear),
 
-        vehicleType: (values.vehicleType ?? base.vehicleType ?? "Car").trim(),
+        // Enum: giữ default nhưng vẫn là string hợp lệ
+        vehicleType: vehicleTypeOrDefault(values.vehicleType ?? base.vehicleType),
         status: normalizeStatusFE(values.status ?? base.status ?? "Active"),
       };
+
 
       console.debug("[VehicleInfo] payload gửi lên:", payload);
 
@@ -478,7 +512,7 @@ export default function VehicleInfo() {
           </div>
 
           <div className="vehicle-form-section">
-            <h2 className="vehicle-title">Cập nhật thông số xe</h2>
+            <h2 className="vehicle-title">{pageTitle}</h2>
 
             <Form
               layout="vertical"
@@ -491,7 +525,7 @@ export default function VehicleInfo() {
                 status: "Active",
               }}
             >
-              <CarField />
+              <CarField lockStatus />
 
               {!currentVehicle && !initLoading && (
                 <p style={{ marginTop: 8, opacity: 0.7 }}>

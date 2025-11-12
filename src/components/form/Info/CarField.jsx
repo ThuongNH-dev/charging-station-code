@@ -77,7 +77,6 @@ export default function CarField({
             name="licensePlate" // ✅
             rules={[
               { required: true, message: "Vui lòng nhập biển số" },
-              // Nếu regex cũ quá chặt, dùng regex nhẹ hơn:
               {
                 pattern: /^[A-Z0-9.\-\s]{4,20}$/i,
                 message: "Biển số không hợp lệ",
@@ -85,6 +84,17 @@ export default function CarField({
             ]}
           >
             <Input placeholder="VD: 51H-123.45" />
+          </Form.Item>
+
+          {/* ➕ Mã công ty (không bắt buộc) */}
+          <Form.Item
+            label={<strong>Mã công ty</strong>}
+            name="companyCode" // <— key lưu vào form
+            rules={[
+              { max: 50, message: "Tối đa 50 ký tự" }, // không required
+            ]}
+          >
+            <Input placeholder="VD: C001, ABC-123..." allowClear />
           </Form.Item>
 
           <Form.Item
@@ -112,12 +122,12 @@ export default function CarField({
             />
           </Form.Item>
 
-          <Form.Item
+          {/* <Form.Item
             label={<strong>Ảnh (URL)</strong>}
             name="imageUrl" // ✅ optional
           >
             <Input placeholder="https://..." allowClear />
-          </Form.Item>
+          </Form.Item> */}
 
           {!hideStatus && (
             <Form.Item
@@ -125,23 +135,21 @@ export default function CarField({
               name="status"
               rules={[{ required: true, message: "Chọn trạng thái" }]}
             >
-              {/* Khi cập nhật: disabled như cũ bằng lockStatus */}
               <Select
                 placeholder="Chọn trạng thái"
-                disabled={lockStatus}
+                disabled={true /* luôn khóa ở UI */}
                 style={{
-                  backgroundColor: lockStatus ? "rgba(255, 255, 255, 0.85)" : "transparent",
+                  backgroundColor: "rgba(255, 255, 255, 0.85)",
                   color: "#000",
                   borderRadius: 6,
                 }}
                 dropdownStyle={{ backgroundColor: "#fff" }}
               >
-
-                {/* (Khuyến nghị) dùng value lowercase cho thống nhất API */}
-                <Select.Option value="active">Hoạt động</Select.Option>
-                <Select.Option value="inactive">Vô hiệu hóa</Select.Option>
-                <Select.Option value="blacklisted">Cấm</Select.Option>
-                <Select.Option value="retired">Ngừng sử dụng</Select.Option>
+                {/* Giá trị khớp với BE & ALLOWED_STATUSES */}
+                <Select.Option value="Active">Hoạt động</Select.Option>
+                <Select.Option value="Inactive">Vô hiệu hóa</Select.Option>
+                <Select.Option value="Blacklisted">Cấm</Select.Option>
+                <Select.Option value="Retired">Ngừng sử dụng</Select.Option>
               </Select>
             </Form.Item>
           )}
