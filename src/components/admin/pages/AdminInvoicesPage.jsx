@@ -14,7 +14,7 @@ export default function AdminInvoicesPage() {
   const [status, setStatus] = useState("All");
   const [month, setMonth] = useState("");
   const [year, setYear] = useState("");
-  const [daysBefore, setDaysBefore] = useState(3);
+  const [daysBefore, setDaysBefore] = useState(2);
   const [dueOnly, setDueOnly] = useState(false);
 
   // ===== Helpers =====
@@ -23,7 +23,7 @@ export default function AdminInvoicesPage() {
     return new Date(inv.dueDate) < new Date() && inv.status !== "Paid";
   };
 
-  const isDueSoon = (inv, days = 3) => {
+  const isDueSoon = (inv, days = 2) => {
     if (!inv?.dueDate) return false;
     if (inv.status === "Paid") return false;
     const now = new Date();
@@ -77,7 +77,10 @@ export default function AdminInvoicesPage() {
       ? "Hóa đơn đã quá hạn thanh toán"
       : "Sắp đến hạn thanh toán hóa đơn";
     const messageText =
-      `Hóa đơn #${inv.invoiceId} kỳ ${String(inv.billingMonth).padStart(2, "0")}/${inv.billingYear} ` +
+      `Hóa đơn #${inv.invoiceId} kỳ ${String(inv.billingMonth).padStart(
+        2,
+        "0"
+      )}/${inv.billingYear} ` +
       `tổng ${viMoney(inv.total)}đ. Hạn: ${dueStr}. Vui lòng thanh toán.`;
     const priority = overdue ? "High" : "Normal";
     return { title, message: messageText, priority };
@@ -123,7 +126,9 @@ export default function AdminInvoicesPage() {
       const chunk = async (arr, size) => {
         for (let i = 0; i < arr.length; i += size) {
           const part = arr.slice(i, i + size);
-          await Promise.all(part.map((inv) => remindOne(inv).catch(() => null)));
+          await Promise.all(
+            part.map((inv) => remindOne(inv).catch(() => null))
+          );
         }
       };
       await chunk(targets, 5);
@@ -152,7 +157,6 @@ export default function AdminInvoicesPage() {
           <option>Unpaid</option>
           <option>Paid</option>
         </select>
-
         <input
           type="number"
           className="toolbar-input"
@@ -177,6 +181,18 @@ export default function AdminInvoicesPage() {
         />
         <Button onClick={fetchInvoices}>🔄 Tải lại</Button>
 
+        <Button
+          onClick={() => {
+            setStatus("All");
+            setMonth("");
+            setYear("");
+            setDueOnly(false);
+            setDaysBefore(2);
+            setPage(1);
+          }}
+        >
+          Xoá lọc
+        </Button>
         <label className="toolbar-checkbox">
           <input
             type="checkbox"
@@ -198,7 +214,6 @@ export default function AdminInvoicesPage() {
           disabled={!dueOnly}
           title="Số ngày tới hạn"
         />
-
         <span className="toolbar-spacer" />
         <Button type="primary" onClick={remindBulk} disabled={sending}>
           {sending ? "Đang gửi..." : "📣 Nhắc hàng loạt"}
@@ -237,7 +252,9 @@ export default function AdminInvoicesPage() {
                 }`}
               >
                 <div>#{i.invoiceId}</div>
-                <div>{i.customerId ? `KH ${i.customerId}` : `Cty ${i.companyId}`}</div>
+                <div>
+                  {i.customerId ? `KH ${i.customerId}` : `Cty ${i.companyId}`}
+                </div>
                 <div>
                   {i.billingMonth}/{i.billingYear}
                 </div>
@@ -257,7 +274,11 @@ export default function AdminInvoicesPage() {
                 </div>
                 <div>{dueStr}</div>
                 <div className="row-actions">
-                  <Button size="small" onClick={() => remindOne(i)} disabled={sending}>
+                  <Button
+                    size="small"
+                    onClick={() => remindOne(i)}
+                    disabled={sending}
+                  >
                     Nhắc thanh toán
                   </Button>
                 </div>
