@@ -51,26 +51,28 @@ const getColumns = (userType) => {
 /* =========================================================
    🔹 HELPERS
    ========================================================= */
+// ✅ Chỉ chọn gói đang ACTIVE cho người dùng cá nhân
 const pickUserSubscription = (subs, customerId) => {
   if (!customerId || !Array.isArray(subs)) return null;
   const cid = Number(customerId);
-  const candidates = subs.filter(
+
+  const mine = subs.filter(
     (s) =>
       Number(s?.customerId) === cid &&
       (s?.companyId == null || Number(s.companyId) === 0)
   );
-  if (candidates.length === 0) return null;
 
-  const rank = (st) => (st === "Active" ? 2 : st === "Pending" ? 1 : 0);
+  if (mine.length === 0) return null;
+
+  // 👉 Lọc chỉ gói đang ACTIVE
+  const active = mine.filter((s) => String(s?.status) === "Active");
+  if (active.length === 0) return null;
+
+  // Lấy gói mới nhất
   const when = (s) => new Date(s?.startDate || s?.updatedAt || 0).getTime();
+  active.sort((a, b) => when(b) - when(a));
 
-  candidates.sort((a, b) => {
-    const r = rank(b?.status) - rank(a?.status);
-    if (r !== 0) return r;
-    return when(b) - when(a);
-  });
-
-  return candidates[0];
+  return active[0];
 };
 
 const buildPlanMap = (servicePackages = []) =>

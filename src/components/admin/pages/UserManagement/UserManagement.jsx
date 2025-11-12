@@ -32,25 +32,43 @@ const useUserServicesHook = () => {
         ]);
 
       // 1) Map id -> planName
-      const serviceMap = (services || []).reduce((map, pkg) => {
-        const key = pkg.id ?? pkg.subscriptionPlanId ?? pkg.packageId;
-        if (key != null) map[key] = pkg.planName;
+      // ✅ Map id -> tên gói dịch vụ
+      const serviceMap = (services || []).reduce((map, p) => {
+        const id = p.subscriptionPlanId ?? p.id ?? p.packageId;
+        if (id != null) map[id] = p.planName;
         return map;
       }, {});
 
-      // 2) Map userId -> gói hiện tại
-      const userPackageMap = (subscriptionsData || []).reduce((map, sub) => {
-        const packageName =
-          serviceMap[sub.servicePackageId] || sub.GoiDichVu || null;
-        if (packageName) map[sub.userId] = packageName;
-        return map;
-      }, {});
+      // ✅ Hàm lấy gói đang ACTIVE theo customerId
+      const pickActiveSub = (subs, customerId) => {
+        if (!customerId) return null;
+        const mine = (subs || []).filter(
+          (s) => Number(s?.customerId) === Number(customerId)
+        );
+        const active = mine.filter((s) => String(s?.status) === "Active");
+        if (active.length === 0) return null;
+        active.sort(
+          (a, b) =>
+            new Date(b?.startDate || b?.updatedAt || 0) -
+            new Date(a?.startDate || a?.updatedAt || 0)
+        );
+        return active[0];
+      };
 
-      // 3) Gắn tên gói cho user
-      const accountsWithPackage = (accounts || []).map((user) => ({
-        ...user,
-        servicePackageName: userPackageMap[user.id] || "Chưa đăng ký",
-      }));
+      // ✅ Gắn gói dịch vụ chính xác cho user
+      const accountsWithPackage = (accounts || []).map((u) => {
+        const customerId = u?.customers?.[0]?.customerId;
+        const sub = pickActiveSub(subscriptionsData, customerId);
+        const planName =
+          sub?.planName ??
+          (sub?.subscriptionPlanId != null
+            ? serviceMap[sub.subscriptionPlanId]
+            : null);
+        return {
+          ...u,
+          servicePackageName: planName || "Chưa đăng ký",
+        };
+      });
 
       setAllAccounts(accountsWithPackage);
       setAllVehicles(vehicles || []);
