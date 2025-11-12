@@ -58,6 +58,59 @@ function statusColor(s) {
   }
 }
 
+/** === NEW UTILS FOR RENEW WINDOW & ANCHORED PERIOD === */
+function daysUntil(dt) {
+  if (!dt) return Infinity;
+  const now = new Date();
+  const end = new Date(dt);
+  const ms = end.getTime() - now.getTime();
+  return Math.floor(ms / (24 * 60 * 60 * 1000));
+}
+
+/** Cho phép gia hạn nếu Active và còn trong vòng 10 ngày trước endDate */
+function canRenew(sub) {
+  const status = String(sub?.status || "").toLowerCase();
+  if (status !== "active") return false;
+  const d = daysUntil(sub?.endDate);
+  return d >= 0 && d <= 10;
+}
+
+/** Cộng tháng neo theo endDate để ngày chốt kỳ sau giữ nguyên (vd 20 -> 20) */
+function addMonthsAnchor(dateISO, months = 1) {
+  if (!dateISO) return null;
+  const d = new Date(dateISO);
+  const target = new Date(d);
+  target.setMonth(d.getMonth() + months);
+  return target.toISOString(); // giữ nguyên hh:mm:ss theo endDate gốc
+}
+
+/** Tính kỳ kế tiếp khi gia hạn neo theo endDate */
+function getNextPeriodAnchored(sub) {
+  const end = sub?.endDate;
+  if (!end) return { nextStart: null, nextEnd: null };
+
+  const cycle = String(sub?.billingCycle || "Monthly").toLowerCase();
+  const nextStart = new Date(end).toISOString();
+  let nextEnd = null;
+
+  switch (cycle) {
+    case "monthly":
+      nextEnd = addMonthsAnchor(end, 1);
+      break;
+    case "quarterly":
+      nextEnd = addMonthsAnchor(end, 3);
+      break;
+    case "yearly":
+    case "annually":
+      nextEnd = addMonthsAnchor(end, 12);
+      break;
+    default:
+      nextEnd = addMonthsAnchor(end, 1);
+      break;
+  }
+  return { nextStart, nextEnd };
+}
+
 export default function ManageSubscriptions() {
   const { user } = useAuth();
 
@@ -275,27 +328,43 @@ export default function ManageSubscriptions() {
       render: (_, r) => {
         const status = String(r.status || "").toLowerCase();
         const isActive = status === "active";
+        const withinWindow = canRenew(r); // <= 10 ngày trước endDate
 
-        // ẨN TOÀN BỘ HÀNH ĐỘNG KHI INACTIVE (hoặc khác Active)
         if (!isActive) {
           return <Text type="secondary">Không khả dụng</Text>;
         }
+
+        // Neo kỳ sau theo endDate hiện tại
+        const { nextStart, nextEnd } = getNextPeriodAnchored(r);
 
         return (
           <Space
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
           >
-            {/* Gia hạn (chỉ hiện khi Active) */}
-            <Tooltip title="Gia hạn gói này">
+            <Tooltip
+              title={
+                withinWindow
+                  ? "Gia hạn gói này (kỳ sau tính từ ngày kết thúc hiện tại)"
+                  : `Chỉ có thể gia hạn trong vòng 10 ngày trước khi hết hạn (còn ${daysUntil(r.endDate)} ngày)`
+              }
+            >
               <Button
                 type="primary"
+                disabled={!withinWindow}
                 onClick={() =>
                   navigate("/payment", {
                     state: {
                       mode: "renew",
                       subscriptionId: Number(r.subscriptionId),
                       companyId: r.companyId ?? null,
+
+                      // Thông tin để trang thanh toán hiển thị/tính phí đúng “neo theo endDate”
+                      anchor: "endDate",
+                      currentEndDate: r.endDate,
+                      nextPeriodStart: nextStart,
+                      nextPeriodEnd: nextEnd,
+                      billingCycle: r.billingCycle || "Monthly",
                     },
                   })
                 }
@@ -304,7 +373,6 @@ export default function ManageSubscriptions() {
               </Button>
             </Tooltip>
 
-            {/* Hủy gói (chỉ hiện khi Active) */}
             <Popconfirm
               title="Xác nhận hủy gói?"
               description="Hủy là kết thúc luôn và không thể tiếp tục gia hạn."

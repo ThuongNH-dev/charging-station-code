@@ -108,3 +108,19 @@
   font-weight: 600;
   color: var(--text);
 }
+
+.due-banner {
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  line-height: 1.5;
+  border: 1px solid transparent;
+}
+.due-banner.warn {
+  background: #fff7e6;
+  border-color: #ffe0b2;
+}
+.due-banner.danger {
+  background: #ffebee;
+  border-color: #ffcdd2;
+}
