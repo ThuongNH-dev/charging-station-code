@@ -251,6 +251,17 @@ export const userApi = {
   },
 
   // ===== Invoices =====
+fetchAllInvoices: async () => {
+  const res = await axios.get(`${BASE_URL}/Invoices`);
+  const d = res.data;
+  // Hỗ trợ cả: [], { items: [...] }, { data: [...] }
+  if (Array.isArray(d)) return d;
+  if (Array.isArray(d?.items)) return d.items;
+  if (Array.isArray(d?.data)) return d.data;
+  return [];
+},
+
+
   fetchInvoicesByCompany: async (companyId) => {
     const res = await axios.get(`${BASE_URL}/Invoices/by-company/${companyId}`);
     return Array.isArray(res.data) ? res.data : res.data?.items || [];
@@ -260,7 +271,12 @@ export const userApi = {
     const res = await axios.get(
       `${BASE_URL}/Invoices/by-customer/${customerId}`
     );
-    return Array.isArray(res.data) ? res.data : res.data?.items || [];
+    const raw = Array.isArray(res.data) ? res.data : res.data?.items || [];
+    return raw.map((i) => ({
+      ...i,
+      companyId: i.companyId ?? i.CompanyId ?? null,
+      customerId: i.customerId ?? i.CustomerId ?? null,
+    }));
   },
 
   // ===== GET USER BY ID (debug/helper) =====

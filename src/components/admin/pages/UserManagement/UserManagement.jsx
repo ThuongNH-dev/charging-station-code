@@ -16,17 +16,19 @@ const useUserServicesHook = () => {
   const [subscriptions, setSubscriptions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [invoices, setInvoices] = useState([]);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [accounts, vehicles, services, subscriptionsData] =
+      const [accounts, vehicles, services, subscriptionsData, invoicesData] =
         await Promise.all([
           userApi.fetchAllUsers(),
           userApi.fetchAllVehicles(),
           userApi.fetchAllServicePackages(),
           userApi.fetchAllSubscriptions(),
+          userApi.fetchAllInvoices(), // ✅ thêm dòng này
         ]);
 
       // 1) Map id -> planName
@@ -54,6 +56,7 @@ const useUserServicesHook = () => {
       setAllVehicles(vehicles || []);
       setServicePackages(services || []);
       setSubscriptions(subscriptionsData || []);
+      setInvoices(invoicesData || []);
     } catch (err) {
       console.error("❌ Lỗi khi load dữ liệu:", err);
       setError(err.message || "Không thể tải dữ liệu");
@@ -126,6 +129,7 @@ const useUserServicesHook = () => {
     allVehicles,
     servicePackages,
     subscriptions,
+    invoices,
     isLoading,
     error,
     fetchData,
@@ -424,6 +428,7 @@ const UserManagement = () => {
     allVehicles,
     servicePackages,
     subscriptions,
+    invoices,
     isLoading,
     error,
     updateUser,
@@ -680,6 +685,7 @@ const UserManagement = () => {
                 setActiveModal={setActiveModal}
                 servicePackages={servicePackages}
                 subscriptions={subscriptions}
+                invoices={invoices}
               />
             )}
 
@@ -690,6 +696,7 @@ const UserManagement = () => {
                 setActiveModal={setActiveModal}
                 servicePackages={servicePackages}
                 subscriptions={subscriptions}
+                invoices={invoices}
               />
             )}
           </div>

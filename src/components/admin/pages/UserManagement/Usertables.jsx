@@ -83,10 +83,23 @@ const buildPlanMap = (servicePackages = []) =>
 const pickCompanyLatestInvoice = (invoices, companyId) => {
   if (!companyId || !Array.isArray(invoices)) return null;
   const cid = Number(companyId);
-  const list = invoices.filter((i) => Number(i?.companyId) === cid);
+
+  const list = invoices.filter(
+    (i) => Number(i?.companyId ?? i?.CompanyId) === cid
+  );
   if (list.length === 0) return null;
+
   const when = (x) =>
-    new Date(x?.createdAt || x?.updatedAt || x?.dueDate || 0).getTime();
+    new Date(
+      x?.createdAt ??
+        x?.CreatedAt ??
+        x?.updatedAt ??
+        x?.UpdatedAt ??
+        x?.dueDate ??
+        x?.DueDate ??
+        0
+    ).getTime();
+
   return list.slice().sort((a, b) => when(b) - when(a))[0];
 };
 
@@ -134,8 +147,15 @@ const renderCell = (
 
     case "paymentStatus": {
       const compId =
-        companyData?.companyId ?? user?.companyId ?? customerInfo?.companyId;
+        companyData?.companyId ??
+        companyData?.CompanyId ??
+        user?.companyId ??
+        user?.CompanyId ??
+        customerInfo?.companyId ??
+        customerInfo?.CompanyId;
+
       const inv = pickCompanyLatestInvoice(invoices, compId);
+      // console.log('PAYMENT DEBUG', { compId, invoicesLen: invoices?.length, inv });
       return paymentStatusFromInvoice(inv);
     }
 
