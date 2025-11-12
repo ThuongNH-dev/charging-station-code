@@ -131,6 +131,7 @@ async function hydrateInvoiceTypes(list) {
         chargingSessions: [],
         isMonthlyInvoice: false,
         subscriptionId: null,
+        dueDate: it.dueDate ?? null,
       };
     }
     const invoiceType = pickInvoiceType(d); // dùng đúng logic Detail
@@ -146,6 +147,7 @@ async function hydrateInvoiceTypes(list) {
         it.subscription?.subscriptionId ??
         it.subscriptionId ??
         null,
+      dueDate: d.dueDate ?? d.DueDate ?? it.dueDate ?? null,
     };
   });
 
@@ -164,6 +166,7 @@ async function hydrateInvoiceTypes(list) {
       chargingSessions: it.chargingSessions?.length ? it.chargingSessions : (patch.chargingSessions ?? []),
       isMonthlyInvoice: it.isMonthlyInvoice ?? patch.isMonthlyInvoice ?? false,
       subscriptionId: it.subscriptionId ?? patch.subscriptionId ?? null,
+      dueDate: it.dueDate ?? patch.dueDate ?? null,
     };
   });
 }
@@ -370,6 +373,7 @@ export default function InvoiceSummary() {
           status: it.status,
           createdAt: it.createdAt,
           updatedAt: it.updatedAt,
+          dueDate: it.dueDate ?? null,
 
           // đồng bộ với Detail:
           invoiceType: it.invoiceType,
@@ -550,6 +554,7 @@ export default function InvoiceSummary() {
               >
                 <option value="createdAt">Tạo lúc</option>
                 <option value="updatedAt">Cập nhật</option>
+                <option value="dueDate">Hết hạn</option>
               </select>
               <input
                 className="df-date"
@@ -641,11 +646,13 @@ export default function InvoiceSummary() {
                   setSelectedInvoiceId((cur) => (cur === inv.invoiceId ? null : inv.invoiceId));
                 }
               };
+              const isPastDue = inv.dueDate ? new Date(inv.dueDate) < new Date() : false;
+              const isOverdueVisual = isPastDue && isUnpaidLike(inv);
 
               return (
                 <div
                   key={id}
-                  className={`sum-card ${isSelected ? "is-selected" : ""} ${comboMode && isUnpaidLike(inv) ? "is-pickable" : ""}`}
+                  className={`sum-card ${isSelected ? "is-selected" : ""} ${comboMode && isUnpaidLike(inv) ? "is-pickable" : ""} ${isOverdueVisual ? "is-overdue" : ""}`}
                 >
                   <button
                     className="sum-card-body"
@@ -697,6 +704,10 @@ export default function InvoiceSummary() {
                         <div className="kv">
                           <span className="k">Cập nhật:</span>
                           <span className="v light">{fmt(inv.updatedAt)}</span>
+                        </div>
+                        <div className="kv">
+                          <span className="k">Hạn thanh toán:</span>
+                          <span className="v light">{fmt(inv.dueDate)}</span>
                         </div>
                       </div>
                       <div className="sum-total">

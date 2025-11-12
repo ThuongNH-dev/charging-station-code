@@ -1,45 +1,66 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import MainLayout from "../../layouts/MainLayout";
-import { fetchAuthJSON } from "../../utils/api";
+import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
 import "./BookingHistory.css";
 
-const API_ABS = "https://localhost:7268/api";
+// ===== API base: KHÔNG hard-code localhost =====
+function normalizeApiBase(s) {
+  const raw = (s || "").trim();
+  if (!raw) return "/api"; // fallback relative
+  return raw.replace(/\/+$/, "");
+}
+const API_ABS = normalizeApiBase(getApiBase());
 const PAYMENT_CREATE_URL = `${API_ABS}/Payment/create`;
 
 const HOLD_MINUTES_DEFAULT = 15;
 const vndNumber = (n) => (Number(n) || 0).toLocaleString("vi-VN");
 
-
 // === URL normalizer: string | {result|url|href|paymentUrl} | relative -> absolute string
 function toUrlString(val) {
   if (!val) return "";
-  // nếu là object, lấy các key thường gặp
   if (typeof val === "object") {
     const cand =
       val.result ?? val.url ?? val.href ?? val.paymentUrl ?? val.paymentURL ??
       (val.data && (val.data.result ?? val.data.url ?? val.data.href)) ?? "";
-    return toUrlString(cand); // đệ quy 1 bước
+    return toUrlString(cand);
   }
-  // nếu là string
   const s = String(val).trim();
   if (!s) return "";
-  // tuyệt đối sẵn
   if (/^https?:\/\//i.test(s)) return s;
-  // relative -> tuyệt đối theo origin hiện tại
-  try { return new URL(s, window.location.origin).toString(); } catch { return ""; }
+  try {
+    return new URL(s, window.location.origin).toString();
+  } catch {
+    return "";
+  }
 }
 
-
 // === Storage helpers ===
-function dualRead(key) { let s = null; try { s = sessionStorage.getItem(key); } catch { } if (!s) try { s = localStorage.getItem(key); } catch { } return s; }
-function dualWrite(key, val) { try { sessionStorage.setItem(key, val); } catch { } try { localStorage.setItem(key, val); } catch { } }
+function dualRead(key) {
+  let s = null;
+  try { s = sessionStorage.getItem(key); } catch {}
+  if (!s) try { s = localStorage.getItem(key); } catch {}
+  return s;
+}
+function dualWrite(key, val) {
+  try { sessionStorage.setItem(key, val); } catch {}
+  try { localStorage.setItem(key, val); } catch {}
+}
 
 // === Payment storage helpers ===
 function wasFinalized(orderId) { return dualRead(`pay:${orderId}:finalized`) === "1"; }
 function findPaymentStubByBookingId(bookingId) {
-  const collect = (store) => { const keys = []; try { for (let i = 0; i < store.length; i++) { const k = store.key(i); if (k && k.startsWith("pay:") && !k.endsWith(":pending") && !k.endsWith(":finalized")) keys.push(k); } } catch { }; return keys; };
+  const collect = (store) => {
+    const keys = [];
+    try {
+      for (let i = 0; i < store.length; i++) {
+        const k = store.key(i);
+        if (k && k.startsWith("pay:") && !k.endsWith(":pending") && !k.endsWith(":finalized")) keys.push(k);
+      }
+    } catch {}
+    return keys;
+  };
   const keys = Array.from(new Set([...collect(localStorage), ...collect(sessionStorage)]));
   for (const k of keys) {
     try {
@@ -47,18 +68,22 @@ function findPaymentStubByBookingId(bookingId) {
       if (String(obj?.bookingId) === String(bookingId)) {
         const orderId = obj?.orderId || obj?.paymentRef || k.replace(/^pay:/, "");
         return {
-          orderId, paidAt: obj?.paidAt ? new Date(obj.paidAt).getTime() : Date.now(),
+          orderId,
+          paidAt: obj?.paidAt ? new Date(obj.paidAt).getTime() : Date.now(),
           totalMinutes: obj?.totalMinutes > 0 ? obj.totalMinutes : HOLD_MINUTES_DEFAULT
         };
       }
-    } catch { }
+    } catch {}
   }
   return null;
 }
 
 function useTick(ms = 1000) {
   const [, setN] = useState(0); const ref = useRef(null);
-  useEffect(() => { ref.current = setInterval(() => setN(n => (n + 1) % 1_000_000), ms); return () => clearInterval(ref.current); }, [ms]);
+  useEffect(() => {
+    ref.current = setInterval(() => setN(n => (n + 1) % 1_000_000), ms);
+    return () => clearInterval(ref.current);
+  }, [ms]);
 }
 
 function StatusPill({ status }) {
@@ -78,28 +103,60 @@ async function updateBookingStatus(bookingId, status) {
 }
 
 // === Date helpers ===
-function parseDateSafe(v) { // YYYY-MM-DD -> Date at local midnight
+function parseDateSafe(v) {
   if (!v) return null;
   const [y, m, d] = v.split("-").map(Number);
   if (!y || !m || !d) return null;
   return new Date(y, m - 1, d, 0, 0, 0, 0);
 }
-function endOfDay(date) {
-  const d = new Date(date); d.setHours(23, 59, 59, 999); return d;
-}
+function endOfDay(date) { const d = new Date(date); d.setHours(23, 59, 59, 999); return d; }
 function pickDateField(row, fieldKey) {
-  const map = {
-    createdAt: row.createdAt,
-    startTime: row.startTime,
-    endTime: row.endTime,
-  };
+  const map = { createdAt: row.createdAt, startTime: row.startTime, endTime: row.endTime };
   const v = map[fieldKey];
   return v ? new Date(v) : null;
+}
+
+// ===== Toast & Confirm (không dùng alert/confirm) =====
+function useToast() {
+  const [toast, setToast] = useState({ open: false, type: "info", text: "" });
+  const show = (text, type = "info", timeout = 3500) => {
+    setToast({ open: true, type, text });
+    if (timeout > 0) {
+      setTimeout(() => setToast(t => ({ ...t, open: false })), timeout);
+    }
+  };
+  const hide = () => setToast(t => ({ ...t, open: false }));
+  return { toast, show, hide };
+}
+
+function ConfirmModal({ open, title, message, onOk, onCancel }) {
+  if (!open) return null;
+  return (
+    <div className="bh-modal-backdrop">
+      <div className="bh-modal">
+        <div className="bh-modal-title">{title || "Xác nhận"}</div>
+        <div className="bh-modal-body">{message}</div>
+        <div className="bh-modal-actions">
+          <button className="hist-btn danger" onClick={onOk}>Đồng ý</button>
+          <button className="hist-btn ghost" onClick={onCancel}>Huỷ</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function HistoryPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast, show, hide } = useToast();
+  const [confirmState, setConfirmState] = useState({ open: false, resolver: null, title: "", message: "" });
+
+  const confirmAsync = (title, message) => new Promise((resolve) => {
+    setConfirmState({ open: true, resolver: resolve, title, message });
+  });
+  const onConfirmOk = () => { confirmState.resolver?.(true); setConfirmState(s => ({ ...s, open: false })); };
+  const onConfirmCancel = () => { confirmState.resolver?.(false); setConfirmState(s => ({ ...s, open: false })); };
+
   const myCustomerId = React.useMemo(() => {
     const cid =
       user?.customerId ??
@@ -116,17 +173,15 @@ export default function HistoryPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
-  // Lọc trạng thái (có sẵn)
   const [filter, setFilter] = useState("all"); // all | active | past
 
   // 🔎 Lọc theo ngày
   const [dateField, setDateField] = useState("createdAt"); // createdAt | startTime | endTime
-  const [dateFrom, setDateFrom] = useState("");            // input type="date": "YYYY-MM-DD"
+  const [dateFrom, setDateFrom] = useState("");            // "YYYY-MM-DD"
   const [dateTo, setDateTo] = useState("");
 
   useTick(1000);
 
-  // Reset trang khi thay đổi bộ lọc ngày/trường để tránh “trôi trang”
   useEffect(() => { setPage(1); }, [dateField, dateFrom, dateTo, filter]);
 
   useEffect(() => {
@@ -140,16 +195,13 @@ export default function HistoryPage() {
           setLoading(false);
           return;
         }
-        // Gọi BE: cố gắng truyền tham số từ–đến nếu BE có hỗ trợ (optional, không bắt buộc)
-        const url = new URL(`${API_ABS}/Booking`);
+        const url = new URL(`${API_ABS}/Booking`, window.location.origin);
         url.searchParams.set("page", page);
         url.searchParams.set("pageSize", pageSize);
         url.searchParams.set("customerId", myCustomerId);
-
-        // Truyền kèm field + range nếu có chọn
-        if (dateFrom) url.searchParams.set("from", dateFrom); // ví dụ BE chấp nhận YYYY-MM-DD
+        if (dateFrom) url.searchParams.set("from", dateFrom);
         if (dateTo) url.searchParams.set("to", dateTo);
-        if (dateField) url.searchParams.set("dateField", dateField); // phòng khi BE hỗ trợ
+        if (dateField) url.searchParams.set("dateField", dateField);
 
         const res = await fetchAuthJSON(url.toString(), { method: "GET" });
         if (!res) throw new Error("Không nhận được dữ liệu.");
@@ -188,22 +240,21 @@ export default function HistoryPage() {
           };
         });
 
-        // Fallback: lọc đúng chủ sở hữu ở FE nếu BE chưa filter
         const mineOnly = normalized.filter(x => String(x.customerId) === myCustomerId);
         setItems(mineOnly);
       } catch (e) {
-        setErr(e.message || "Lỗi tải lịch sử.");
+        const msg = e?.message || "Lỗi tải lịch sử.";
+        setErr(msg);
+        // show toast thay vì alert
+        show(msg, "error");
       } finally {
         setLoading(false);
       }
     })();
-  }, [page, pageSize, dateField, dateFrom, dateTo]);
+  }, [page, pageSize, dateField, dateFrom, dateTo]); // filter được xử lý phía client
 
-  // Lọc phía client (fallback) trong trường hợp BE không hỗ trợ from/to
   const filtered = useMemo(() => {
     let arr = items;
-
-    // 1) Lọc trạng thái
     switch (filter) {
       case "active":
         arr = arr.filter((x) => x.status === "Pending" || x.status === "Confirmed");
@@ -213,21 +264,18 @@ export default function HistoryPage() {
         break;
       default: break;
     }
-
-    // 2) Lọc theo ngày (inclusive)
     const fromDate = parseDateSafe(dateFrom);
     const toDate = parseDateSafe(dateTo) ? endOfDay(parseDateSafe(dateTo)) : null;
 
     if (fromDate || toDate) {
       arr = arr.filter((row) => {
         const d = pickDateField(row, dateField);
-        if (!d) return false; // nếu không có dữ liệu ngày thì loại
+        if (!d) return false;
         if (fromDate && d < fromDate) return false;
         if (toDate && d > toDate) return false;
         return true;
       });
     }
-
     return arr;
   }, [items, filter, dateField, dateFrom, dateTo]);
 
@@ -238,14 +286,11 @@ export default function HistoryPage() {
     navigate(`/payment/success?${qs.toString()}`);
   };
 
-  // 👉 NÊN đặt goInvoice ra ngoài cùng cấp với goDetail
   const goInvoice = (row) => {
     const qs = new URLSearchParams();
     if (row.bookingId) qs.set("bookingId", String(row.bookingId));
-    // Bạn có thể đổi route này tuỳ hệ thống
     navigate(`/invoiceSummary?${qs.toString()}`);
   };
-
 
   const onPay = async (row) => {
     try {
@@ -270,17 +315,15 @@ export default function HistoryPage() {
           paymentUrl ||
           data.paymentUrl || data.paymentURL || data.url || data.redirectUrl ||
           data.data?.paymentUrl || data.data?.url || data.data?.redirectUrl || "";
-        paymentUrl = toUrlString(cand); // <— QUAN TRỌNG
-
+        paymentUrl = toUrlString(cand);
         orderId = data.orderId || data.id || data.txnRef || data.data?.orderId || data.data?.id || "";
       } else {
         const text = await res.text().catch(() => "");
-        if (!paymentUrl && text) paymentUrl = toUrlString(text.trim()); // <— QUAN TRỌNG
+        if (!paymentUrl && text) paymentUrl = toUrlString(text.trim());
       }
 
-      if (!res.ok) throw new Error(`Create payment failed ${res.status} ${res.statusText}`);
+      if (!res.ok) throw new Error(`Tạo thanh toán thất bại: ${res.status} ${res.statusText}`);
       if (!paymentUrl) throw new Error("BE không trả paymentUrl / Location header hợp lệ.");
-
 
       if (!orderId) {
         try {
@@ -289,7 +332,7 @@ export default function HistoryPage() {
             || u.searchParams.get("txnRef")
             || u.searchParams.get("vnp_TxnRef")
             || "";
-        } catch { }
+        } catch {}
       }
 
       if (orderId) {
@@ -298,20 +341,23 @@ export default function HistoryPage() {
         dualWrite("pay:lastOrderId", String(orderId));
         dualWrite(`pay:${orderId}:pending`, "1");
       }
+
       window.location.href = toUrlString(paymentUrl);
     } catch (e) {
-      alert(e.message || "Không thể khởi tạo thanh toán.");
+      show(e.message || "Không thể khởi tạo thanh toán.", "error");
     }
   };
 
   const onCancel = async (row) => {
-    if (!confirm(`Huỷ booking #${row.bookingId}?`)) return;
+    const ok = await confirmAsync("Xác nhận huỷ booking", `Bạn có chắc muốn huỷ booking #${row.bookingId}?`);
+    if (!ok) return;
     try {
       const res = await updateBookingStatus(row.bookingId, "Cancelled");
       if (res?.status && res.status !== "Cancelled") throw new Error("Đổi trạng thái không thành 'Cancelled'.");
       setItems((arr) => arr.map((x) => (x.bookingId === row.bookingId ? { ...x, status: "Cancelled" } : x)));
+      show(`Đã huỷ booking #${row.bookingId}`, "success");
     } catch (e) {
-      alert(e.message || "Không thể huỷ booking.");
+      show(e.message || "Không thể huỷ booking.", "error");
     }
   };
 
@@ -322,6 +368,25 @@ export default function HistoryPage() {
 
   return (
     <MainLayout>
+      {/* Toast gọn nhẹ */}
+      <div
+        className={`bh-toast ${toast.open ? "open" : ""} ${toast.type}`}
+        onClick={hide}
+        role="status"
+        aria-live="polite"
+      >
+        {toast.text}
+      </div>
+
+      {/* Modal confirm custom */}
+      <ConfirmModal
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        onOk={onConfirmOk}
+        onCancel={onConfirmCancel}
+      />
+
       <div className="hist-root">
         <div className="hist-topbar">
           <h2>Lịch sử giao dịch / hoạt động</h2>
@@ -396,9 +461,7 @@ export default function HistoryPage() {
                 const showCancelBtn = row.status === "Pending" && !row._paid;
                 const isCancelledOrFailed = ["Cancelled", "Failed"].includes(row.status);
                 const isCompleted = row.status === "Completed";
-                // ✅ “Xem chi tiết” chỉ cho Confirmed (hoặc đã _paid), KHÔNG áp dụng cho Completed
                 const showDetailBtn = !isCancelledOrFailed && !isCompleted && (row._paid || row.status === "Confirmed");
-                // ✅ “Xem hoá đơn” riêng cho Completed
                 const showInvoiceBtn = !isCancelledOrFailed && isCompleted;
                 const noActions = isCancelledOrFailed;
 

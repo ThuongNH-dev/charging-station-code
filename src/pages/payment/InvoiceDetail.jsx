@@ -28,6 +28,11 @@ function isPaidOrConfirmed(raw) {
   return false;
 }
 
+function isUnpaidLikeInvoice(inv) {
+  const s = String(inv?.status || "").toLowerCase();
+  return s.includes("unpaid") || s.includes("overdue") || s.includes("pending") || s.includes("due");
+}
+
 async function fetchInvoiceById(id) {
   const res = await fetchAuthJSON(`${API_ABS}/Invoices/${id}`, { method: "GET" });
   return res?.data ?? res ?? null;
@@ -39,7 +44,7 @@ async function pollInvoicePaid(invoiceId, { timeoutMs = 300000, stepMs = 2500 } 
     try {
       const inv = await fetchInvoiceById(invoiceId);
       if (isPaidOrConfirmed(inv)) return { ok: true, data: inv };
-    } catch {}
+    } catch { }
     await new Promise((r) => setTimeout(r, stepMs));
   }
   return { ok: false };
@@ -207,7 +212,7 @@ async function fetchSessionsForInvoice(invoiceId, context) {
       const hydrated = await hydrateSessionsDetails(base);
       return hydrated;
     }
-  } catch {}
+  } catch { }
 
   try {
     const baseUrl = `${API_ABS}/ChargingSessions/by-invoice/${invoiceId}`;
@@ -217,7 +222,7 @@ async function fetchSessionsForInvoice(invoiceId, context) {
       const hydrated = await hydrateSessionsDetails(base);
       return hydrated;
     }
-  } catch {}
+  } catch { }
 
   const { customerId, billingYear, billingMonth } = context || {};
   if (customerId && billingYear && billingMonth) {
@@ -235,7 +240,7 @@ async function fetchSessionsForInvoice(invoiceId, context) {
 
       const hydrated = await hydrateSessionsDetails(arr);
       return hydrated;
-    } catch {}
+    } catch { }
   }
 
   return [];
@@ -529,7 +534,7 @@ export default function InvoiceDetail() {
             }
           }
         }
-      } catch {}
+      } catch { }
       if (mounted) setLoading(false);
     })();
     return () => {
@@ -592,8 +597,10 @@ export default function InvoiceDetail() {
             subscription: subscriptionNormalized,
             subscriptionDates: {
               endDateEstimated: subDateHints?.isEndEstimated || false,
+
             },
             chargingSessions: sessions,
+            dueDate: latest?.dueDate ?? latest?.DueDate ?? prev?.dueDate ?? null,
           }));
         }
       } catch (e) {
@@ -621,6 +628,10 @@ export default function InvoiceDetail() {
   const totalSub = Number(invoice?.total) || (subtotalSub + taxSub + adjustSub);
 
   const customer = invoice?.customer || null;
+
+  const now = new Date();
+  const dueDateObj = invoice?.dueDate ? new Date(invoice.dueDate) : null;
+  const isOverdue = !!(dueDateObj && dueDateObj < now && !isPaidOrConfirmed(invoice));
 
   const [sessStatus, setSessStatus] = useState("all");
   const [timeField, setTimeField] = useState("endedAt");
@@ -812,11 +823,35 @@ export default function InvoiceDetail() {
               Cập nhật:{" "}
               <b>{invoice.updatedAt ? new Date(invoice.updatedAt).toLocaleString("vi-VN") : "—"}</b>
             </div>
+            <div>
+              Hết hạn:{" "}
+              <b>{invoice.dueDate ? new Date(invoice.dueDate).toLocaleString("vi-VN") : "—"}</b>
+            </div>
           </div>
           <div className="invoice-sum">
             Tổng hóa đơn: <b>{VND(invoice.total)}</b>
           </div>
         </div>
+
+        {/* ====== DUE banner: luôn nhắc khi trạng thái unpaid-like ====== */}
+        {!isPaidOrConfirmed(invoice) && isUnpaidLikeInvoice(invoice) && (
+          <div className={`due-banner ${isOverdue ? "danger" : "warn"}`} role="status" aria-live="polite">
+            {isOverdue ? (
+              <>
+                <b>Hóa đơn đã quá hạn.</b>{" "}
+                {invoice.dueDate ? `Ngày hết hạn: ${new Date(invoice.dueDate).toLocaleString("vi-VN")}. ` : ""}
+                Vui lòng thanh toán ngay để tránh ảnh hưởng dịch vụ.
+              </>
+            ) : (
+              <>
+                <b>Cần thanh toán hóa đơn</b>{" "}
+                {invoice.dueDate
+                  ? <>trước ngày <b>{new Date(invoice.dueDate).toLocaleString("vi-VN")}</b>.</>
+                  : <>trong thời gian sớm nhất.</>}
+              </>
+            )}
+          </div>
+        )}
 
         {isSub && (
           <div className="ivp-card ivp-subscription">

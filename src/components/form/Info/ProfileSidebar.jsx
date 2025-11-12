@@ -1,19 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import "./ProfileSidebar.css";
 import { useAuth } from "../../../context/AuthContext";
+import { getApiBase } from "../../../utils/api";
 
-/** Nếu dự án bạn có util getApiBase(): */
-// import { getApiBase } from "../../../utils/api";
-// const API_BASE = getApiBase();
-
-/** Chưa có thì dùng hằng này khi dev: */
-const API_BASE = "https://localhost:7268/api";
-
+const API_BASE = getApiBase();
 const DEFAULT_AVATAR =
   "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg";
 
-/* ===== Helpers đọc storage/JWT để suy ra accountId ===== */
+/* ===== Helpers storage/JWT (giữ nguyên như bạn có) ===== */
 function getStoredUser() {
   try {
     const s =
@@ -23,7 +18,6 @@ function getStoredUser() {
     return null;
   }
 }
-
 function decodeJwtPayload(token) {
   try {
     const base64Url = token.split(".")[1];
@@ -39,8 +33,7 @@ function decodeJwtPayload(token) {
     return null;
   }
 }
-
-function resolveAccountId() {
+function resolveAccountIdSync() {
   const s1 = sessionStorage.getItem("accountId");
   const s2 = localStorage.getItem("accountId");
   if (s1 && !isNaN(+s1)) return +s1;
@@ -49,22 +42,51 @@ function resolveAccountId() {
   const u = getStoredUser();
   const token = u?.token || localStorage.getItem("token") || "";
   const payload = token ? decodeJwtPayload(token) : null;
-
-  // Chỉnh key claim theo BE của bạn nếu khác
   const idFromClaim =
     payload?.nameid || payload?.nameId || payload?.sub || payload?.accountId;
-
   if (idFromClaim && !isNaN(+idFromClaim)) return +idFromClaim;
 
-  // Fallback khi dev/test (khớp mẫu bạn gửi)
-  return 4;
+  return null;
+}
+function getStoredToken() {
+  const u = getStoredUser();
+  return u?.token || localStorage.getItem("token") || "";
+}
+function getStoredCustomerId() {
+  const s1 = sessionStorage.getItem("customerId");
+  const s2 = localStorage.getItem("customerId");
+  return (s1 && +s1) || (s2 && +s2) || null;
+}
+async function findAccountIdByCustomerId(token, customerId) {
+  if (!customerId) return null;
+  try {
+    const base = (API_BASE || "").replace(/\/+$/, "");
+    const res = await fetch(`${base}/Auth`, {
+      headers: {
+        accept: "application/json",
+        authorization: token ? `Bearer ${token}` : undefined,
+      },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : [data];
+    const mine = list.find(
+      (acc) =>
+        Array.isArray(acc?.customers) &&
+        acc.customers.some((c) => Number(c?.customerId) === Number(customerId))
+    );
+    const accId = Number(mine?.accountId ?? mine?.id ?? mine?.userId);
+    return Number.isFinite(accId) ? accId : null;
+  } catch {
+    return null;
+  }
 }
 
+/* ============= COMPONENT ============= */
 export default function ProfileSidebar() {
   const location = useLocation();
   const { user } = useAuth();
 
-  // ---- Lấy role từ AuthContext trước, sau đó có thể ghi đè từ API (nếu cần) ----
   const baseRole = String(user?.role || "");
   const [profile, setProfile] = useState({
     name: user?.name || "",
@@ -72,15 +94,49 @@ export default function ProfileSidebar() {
     avatarUrl: "",
   });
 
-  const accountId = useMemo(() => resolveAccountId(), []);
+  const [accountId, setAccountId] = useState(() => resolveAccountIdSync());
 
+  // 🔽 NEW: states & refs cho upload
+  const [uploading, setUploading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const fileInputRef = useRef(null);
+
+  // Nếu chưa có accountId nhưng có customerId → dò qua /Auth
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (accountId) return;
+      const token = getStoredToken();
+      const customerId = getStoredCustomerId();
+      if (!customerId) return;
+      const accId = await findAccountIdByCustomerId(token, customerId);
+      if (alive && Number.isFinite(accId)) {
+        setAccountId(accId);
+        try {
+          localStorage.setItem("accountId", String(accId));
+          sessionStorage.setItem("accountId", String(accId));
+        } catch {}
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [accountId]);
+
+  // fetch profile theo accountId
   useEffect(() => {
     let aborted = false;
-
     async function fetchProfile() {
       try {
-        const url = `${API_BASE}/Auth/${accountId}`;
-        const res = await fetch(url, { headers: { accept: "*/*" } });
+        const base = (API_BASE || "").replace(/\/+$/, "");
+        const url = `${base}/Auth/${accountId}`;
+        const token = getStoredToken();
+        const res = await fetch(url, {
+          headers: {
+            accept: "application/json",
+            authorization: token ? `Bearer ${token}` : undefined,
+          },
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (aborted) return;
@@ -112,7 +168,6 @@ export default function ProfileSidebar() {
         }
       }
     }
-
     if (accountId) fetchProfile();
     return () => {
       aborted = true;
@@ -121,11 +176,9 @@ export default function ProfileSidebar() {
   }, [accountId]);
 
   const roleNorm = String(profile.role || "").toLowerCase();
-
   const isActive = (to) =>
     location.pathname === to || location.pathname.startsWith(to + "/");
 
-  // Menu theo role (giữ nguyên như bạn đang có)
   const items = useMemo(() => {
     if (roleNorm === "staff") {
       return [
@@ -145,7 +198,6 @@ export default function ProfileSidebar() {
         { to: "/profile/change-password", label: "Đổi mật khẩu" },
       ];
     }
-    // default: customer
     return [
       { to: "/profile/update-info", label: "Cập nhật thông tin" },
       { to: "/profile/vehicle-info", label: "Thông số xe" },
@@ -166,6 +218,97 @@ export default function ProfileSidebar() {
 
   const avatarSrc = profile.avatarUrl || DEFAULT_AVATAR;
 
+  /* ============ Upload handlers ============ */
+  function openFilePicker() {
+    setErrorMsg("");
+    fileInputRef.current?.click();
+  }
+
+  function validateImage(file) {
+    const okTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+    const maxSizeMB = 5;
+    if (!okTypes.includes(file.type)) {
+      return "Vui lòng chọn ảnh PNG/JPG/WebP.";
+    }
+    if (file.size > maxSizeMB * 1024 * 1024) {
+      return `Ảnh vượt quá ${maxSizeMB}MB.`;
+    }
+    return "";
+  }
+
+  async function onFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file || !accountId) return;
+
+    const v = validateImage(file);
+    if (v) {
+      setErrorMsg(v);
+      e.target.value = "";
+      return;
+    }
+
+    // Preview tạm thời
+    const objectUrl = URL.createObjectURL(file);
+    setProfile((p) => ({ ...p, avatarUrl: objectUrl }));
+
+    try {
+      setUploading(true);
+      setErrorMsg("");
+
+      const fd = new FormData();
+      fd.append("file", file, file.name); // field name phải là "file"
+
+      const base = (API_BASE || "").replace(/\/+$/, "");
+      const token = getStoredToken();
+
+      const res = await fetch(`${base}/Auth/upload-avatar/${accountId}`, {
+        method: "POST",
+        headers: {
+          // KHÔNG set 'Content-Type' ở đây
+          accept: "*/*",
+          authorization: token ? `Bearer ${token}` : undefined,
+        },
+        body: fd,
+      });
+
+      if (!res.ok) {
+        throw new Error(`Upload failed (HTTP ${res.status})`);
+      }
+
+      // Server có thể trả về JSON chứa url mới, hoặc 204 No Content.
+      let newUrl = "";
+      try {
+        const data = await res.json();
+        newUrl =
+          data?.avatarUrl || data?.url || data?.avatar || ""; /* tuỳ backend */
+      } catch {
+        /* không phải json */
+      }
+
+      // Nếu server không trả URL, refetch hoặc thêm cache-busting
+      if (newUrl) {
+        setProfile((p) => ({ ...p, avatarUrl: String(newUrl) }));
+      } else {
+        // ép reload ảnh cũ bằng query ?t=
+        setProfile((p) => ({
+          ...p,
+          avatarUrl:
+            (p.avatarUrl || DEFAULT_AVATAR).split("?t=")[0] +
+            `?t=${Date.now()}`,
+        }));
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("Tải ảnh lên không thành công. Vui lòng thử lại.");
+      // Nếu lỗi, trả preview về ảnh cũ nếu có
+      setProfile((p) => ({ ...p, avatarUrl: p.avatarUrl || DEFAULT_AVATAR }));
+    } finally {
+      setUploading(false);
+      // reset input để có thể chọn cùng file lần nữa
+      e.target.value = "";
+    }
+  }
+
   return (
     <div className="profile-sidebar">
       <div className="profile-card">
@@ -177,9 +320,28 @@ export default function ProfileSidebar() {
               e.currentTarget.src = DEFAULT_AVATAR;
             }}
           />
+          {/* Nút overlay để chọn ảnh */}
+          <button
+            type="button"
+            className="avatar-upload-btn"
+            onClick={openFilePicker}
+            disabled={!accountId || uploading}
+            title={accountId ? "Đổi ảnh đại diện" : "Chưa xác định accountId"}
+          >
+            {uploading ? "Đang tải..." : "Đổi ảnh"}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/jpg,image/webp"
+            style={{ display: "none" }}
+            onChange={onFileChange}
+          />
         </div>
+
         <div className="profile-title">{profile.name || "Tài khoản"}</div>
         <div className="profile-role">{roleLabel}</div>
+        {errorMsg && <div className="profile-error">{errorMsg}</div>}
       </div>
 
       <nav className="profile-nav">
