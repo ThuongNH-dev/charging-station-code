@@ -922,7 +922,7 @@ th {
 } /* Địa chỉ */
 .user-table--users .minimal-table th:nth-child(7),
 .user-table--users .minimal-table td:nth-child(7) {
-  min-width: 200px;
+  min-width: 160px;
 } /* Trạng thái thanh toán */
 
 /* 3 cột cuối (Vai trò, Trạng thái, Thao tác) căn giữa */

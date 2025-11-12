@@ -33,6 +33,7 @@ const getColumns = (userType) => {
     cols.push({ key: "email", header: "Email" });
     cols.push({ key: "accountType", header: "Loại tài khoản" });
     cols.push({ key: "planName", header: "Gói dịch vụ" });
+    cols.push({ key: "paymentStatus", header: "Trạng thái thanh toán" }); // <-- thêm
   } else if (userType === "company") {
     cols.push({ key: "companyName", header: "Công ty" });
     cols.push({ key: "email", header: "Email" });
@@ -124,6 +125,29 @@ const pickCompanyLatestInvoice = (invoices, companyId) => {
   return list.slice().sort((a, b) => when(b) - when(a))[0];
 };
 
+const pickCustomerLatestInvoice = (invoices, customerId) => {
+  if (!customerId || !Array.isArray(invoices)) return null;
+  const cid = Number(customerId);
+
+  const list = invoices.filter(
+    (i) => Number(i?.customerId ?? i?.CustomerId) === cid
+  );
+  if (list.length === 0) return null;
+
+  const when = (x) =>
+    new Date(
+      x?.createdAt ??
+        x?.CreatedAt ??
+        x?.updatedAt ??
+        x?.UpdatedAt ??
+        x?.dueDate ??
+        x?.DueDate ??
+        0
+    ).getTime();
+
+  return list.slice().sort((a, b) => when(b) - when(a))[0];
+};
+
 const paymentStatusFromInvoice = (inv) => {
   if (!inv) return "—";
   const st = String(inv?.status || "").trim();
@@ -185,16 +209,30 @@ const renderCell = (
       return nameFromSub || nameFromPlanMap || "—";
     }
     case "paymentStatus": {
-      const compId =
-        companyData?.companyId ??
-        companyData?.CompanyId ??
-        user?.companyId ??
-        user?.CompanyId ??
-        customerInfo?.companyId ??
-        customerInfo?.CompanyId;
+      // Nếu là công ty: dùng companyId
+      if (userType === "company") {
+        const compId =
+          companyData?.companyId ??
+          companyData?.CompanyId ??
+          user?.companyId ??
+          user?.CompanyId ??
+          customerInfo?.companyId ??
+          customerInfo?.CompanyId;
 
-      const inv = pickCompanyLatestInvoice(invoices, compId);
-      // console.log('PAYMENT DEBUG', { compId, invoicesLen: invoices?.length, inv });
+        const inv = pickCompanyLatestInvoice(invoices, compId);
+        // console.log('PAYMENT DEBUG COMPANY', { compId, inv, invoicesLen: invoices?.length });
+        return paymentStatusFromInvoice(inv);
+      }
+
+      // Nếu là cá nhân: dùng customerId
+      const custId =
+        customerInfo?.customerId ??
+        customerInfo?.CustomerId ??
+        user?.customers?.[0]?.customerId ??
+        user?.Customers?.[0]?.CustomerId;
+
+      const inv = pickCustomerLatestInvoice(invoices, custId);
+      // console.log('PAYMENT DEBUG CUSTOMER', { custId, inv, invoicesLen: invoices?.length });
       return paymentStatusFromInvoice(inv);
     }
 
