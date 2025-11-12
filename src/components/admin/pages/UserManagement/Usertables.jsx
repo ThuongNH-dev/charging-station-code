@@ -287,7 +287,7 @@ export const UserTables = ({
   );
 
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const pageSize = 15;
 
   const total = filteredData.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -318,11 +318,14 @@ export const UserTables = ({
 
   return (
     <div className="user-table-section user-table--users">
-      <h3>
-        Thông tin {getTableTitle(userType)} ({total} mục)
-      </h3>
+      {/* Header sticky */}
+      <div className="table-header">
+        <h3>
+          Thông tin {getTableTitle(userType)} ({total} mục)
+        </h3>
+      </div>
 
-      {/* ✅ Vùng CUỘN của nội dung bảng */}
+      {/* Vùng CUỘN của nội dung bảng */}
       <div className="table-responsive-wrapper" ref={wrapRef}>
         <table className="minimal-table">
           <thead>

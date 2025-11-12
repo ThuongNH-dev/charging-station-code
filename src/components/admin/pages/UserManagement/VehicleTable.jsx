@@ -67,7 +67,7 @@ const renderCell = (vehicle, key, sttIndex) => {
    ========================================================= */
 const VehicleTable = ({ filteredData = [], setActiveModal }) => {
   const columns = getColumns();
-  const pageSize = 10;
+  const pageSize = 15;
   const [page, setPage] = useState(1);
 
   const total = filteredData.length;
