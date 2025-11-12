@@ -872,3 +872,66 @@ th {
 .service-package-table .table-responsive-wrapper thead {
   border-bottom: 2px solid #e5e7eb;
 }
+/* ========== APPEND-ONLY: Nới rộng bảng Users, không ảnh hưởng trang khác ========== */
+
+/* Bảng tự giãn theo nội dung nhưng vẫn có min-width để bật scroll ngang khi thiếu chỗ */
+.user-table--users .minimal-table {
+  table-layout: auto !important; /* cho cột tự co giãn theo nội dung */
+  width: 100%;
+  min-width: 1100px; /* đảm bảo có không gian/scroll ngang */
+}
+
+/* Ô rộng rãi, hiển thị 1 dòng, KHÔNG ellipsis */
+.user-table--users .minimal-table th,
+.user-table--users .minimal-table td {
+  padding: 12px 16px;
+  vertical-align: middle;
+  white-space: nowrap !important; /* 1 dòng */
+  overflow: visible !important; /* không ẩn nội dung */
+  text-overflow: clip !important; /* bỏ dấu … */
+}
+
+/* STT + ID: cố định nhỏ gọn và căn giữa */
+.user-table--users .minimal-table th:nth-child(1),
+.user-table--users .minimal-table td:nth-child(1) {
+  width: 60px; /* STT */
+  text-align: center;
+}
+.user-table--users .minimal-table th:nth-child(2),
+.user-table--users .minimal-table td:nth-child(2) {
+  width: 70px; /* ID */
+  text-align: center;
+}
+
+/* Các cột nội dung cần nhiều chỗ (Công ty, Email, MST, Địa chỉ, Trạng thái thanh toán) */
+.user-table--users .minimal-table th:nth-child(3),
+.user-table--users .minimal-table td:nth-child(3) {
+  min-width: 180px;
+} /* Công ty */
+.user-table--users .minimal-table th:nth-child(4),
+.user-table--users .minimal-table td:nth-child(4) {
+  min-width: 220px;
+} /* Email */
+.user-table--users .minimal-table th:nth-child(5),
+.user-table--users .minimal-table td:nth-child(5) {
+  min-width: 160px;
+} /* Mã số thuế */
+.user-table--users .minimal-table th:nth-child(6),
+.user-table--users .minimal-table td:nth-child(6) {
+  min-width: 240px;
+} /* Địa chỉ */
+.user-table--users .minimal-table th:nth-child(7),
+.user-table--users .minimal-table td:nth-child(7) {
+  min-width: 200px;
+} /* Trạng thái thanh toán */
+
+/* 3 cột cuối (Vai trò, Trạng thái, Thao tác) căn giữa */
+.user-table--users .minimal-table th:nth-last-child(-n + 3),
+.user-table--users .minimal-table td:nth-last-child(-n + 3) {
+  text-align: center;
+}
+
+/* Hover nhẹ cho hàng */
+.user-table--users .minimal-table tr:hover td {
+  background: #f6faff;
+}

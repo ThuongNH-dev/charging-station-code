@@ -6,6 +6,7 @@ import { Pagination } from "antd";
 /* =========================================================
    🔹 TIÊU ĐỀ
    ========================================================= */
+
 const getTableTitle = (userType) => {
   switch (userType) {
     case "individual":
@@ -120,31 +121,10 @@ const renderCell = (
 
     // ======== DOANH NGHIỆP ========
     case "companyName":
-      return (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {companyData?.imageUrl ? (
-            <img
-              src={companyData.imageUrl}
-              alt="logo"
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                objectFit: "cover",
-              }}
-            />
-          ) : null}
-          <span>{companyData?.companyName || user?.userName || "—"}</span>
-        </div>
-      );
+      return <span>{companyData?.name || user?.userName || "—"}</span>;
 
     case "email":
-      return (
-        customerInfo?.email ||
-        companyData?.companyEmail ||
-        user?.userName ||
-        "—"
-      );
+      return customerInfo?.email || companyData?.email || user?.userName || "—";
 
     case "taxCode":
       return companyData?.taxCode || "—";
