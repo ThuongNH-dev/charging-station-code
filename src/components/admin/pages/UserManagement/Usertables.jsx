@@ -38,6 +38,7 @@ const getColumns = (userType) => {
     cols.push({ key: "email", header: "Email" });
     cols.push({ key: "taxCode", header: "Mã số thuế" });
     cols.push({ key: "address", header: "Địa chỉ" });
+    cols.push({ key: "companyPlan", header: "Gói dịch vụ" });
     cols.push({ key: "paymentStatus", header: "Trạng thái thanh toán" });
   }
 
@@ -70,6 +71,24 @@ const pickUserSubscription = (subs, customerId) => {
 
   // Lấy gói mới nhất
   const when = (s) => new Date(s?.startDate || s?.updatedAt || 0).getTime();
+  active.sort((a, b) => when(b) - when(a));
+
+  return active[0];
+};
+
+// ✅ Lấy gói dịch vụ đang ACTIVE cho company, ưu tiên bản mới nhất
+const pickCompanySubscription = (subs, companyId) => {
+  if (!companyId || !Array.isArray(subs)) return null;
+  const cid = Number(companyId);
+
+  const mine = subs.filter((s) => Number(s?.companyId) === cid);
+  if (mine.length === 0) return null;
+
+  const active = mine.filter((s) => String(s?.status) === "Active");
+  if (active.length === 0) return null;
+
+  const when = (s) =>
+    new Date(s?.startDate || s?.updatedAt || s?.createdAt || 0).getTime();
   active.sort((a, b) => when(b) - when(a));
 
   return active[0];
@@ -147,6 +166,24 @@ const renderCell = (
     case "address":
       return companyData?.address || "—";
 
+    // ✅ Gói dịch vụ của doanh nghiệp (chỉ hiển thị khi có subscription ACTIVE)
+    case "companyPlan": {
+      const compId =
+        companyData?.companyId ??
+        companyData?.CompanyId ??
+        user?.companyId ??
+        user?.CompanyId ??
+        null;
+
+      const sub = pickCompanySubscription(subscriptions, compId);
+      if (!sub) return "—";
+      const nameFromSub = sub?.planName;
+      const nameFromPlanMap =
+        sub?.subscriptionPlanId != null
+          ? planMap?.[Number(sub.subscriptionPlanId)]
+          : undefined;
+      return nameFromSub || nameFromPlanMap || "—";
+    }
     case "paymentStatus": {
       const compId =
         companyData?.companyId ??
