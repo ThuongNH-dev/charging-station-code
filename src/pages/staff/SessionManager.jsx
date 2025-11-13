@@ -3,6 +3,7 @@ import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Pagination } from "antd";
+import { message as antdMessage } from "antd";
 import MessageBox from "../../components/staff/MessageBox";
 import ConfirmDialog from "../../components/staff/ConfirmDialog";
 import "./SessionManager.css";
@@ -397,6 +398,54 @@ console.log("🛑 Gửi yêu cầu dừng phiên:", endpoint, payload);
         setTimeout(() => setMessage({ type: "", text: "" }), 5000);
         return;
       }
+
+      // 🧾 Nếu là xe công ty → tự lấy companyId và tạo hóa đơn
+try {
+  // 🔍 Lấy companyId (ưu tiên từ beData hoặc session, fallback bằng Vehicles)
+  let companyIdFinal = beData.companyId || s.companyId;
+
+  if (!companyIdFinal && s.vehicleId) {
+    try {
+      const vInfo = await fetchAuthJSON(`${API_BASE}/Vehicles/${s.vehicleId}`);
+      companyIdFinal =
+        vInfo?.companyId || vInfo?.CompanyId || vInfo?.data?.companyId || null;
+      console.log("🚗 CompanyId lấy từ xe:", companyIdFinal);
+    } catch (err) {
+      console.warn("Không lấy được thông tin xe:", err);
+    }
+  }
+
+  if (companyIdFinal && Number(companyIdFinal) > 0) {
+    const amount = beData.total || s.total || 0;
+    const payloadInvoice = {
+      companyId: companyIdFinal,
+      billingMonth: new Date().getMonth() + 1,
+      billingYear: new Date().getFullYear(),
+      subtotal: amount,
+      tax: Math.round(amount * 0.1),
+      total: amount + Math.round(amount * 0.1),
+      notes: `Tự động tạo từ phiên sạc #${s.chargingSessionId}`,
+    };
+
+    console.log("🧾 Gửi hóa đơn công ty:", payloadInvoice);
+
+    const invRes = await fetchAuthJSON(`${API_BASE}/Invoices`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payloadInvoice),
+    });
+
+    if (invRes?.invoiceId || invRes?.id || invRes?.success) {
+      antdMessage.success(`✅ Đã tạo hóa đơn cho công ty ID ${companyIdFinal}`);
+    } else {
+      antdMessage.warning("⚠️ Đã gửi yêu cầu nhưng server không trả mã hóa đơn!");
+    }
+  }
+} catch (err) {
+  console.error("❌ Lỗi khi tạo hóa đơn công ty:", err);
+  antdMessage.error("Không thể gửi hóa đơn cho công ty!");
+}
+
 
       const orderId = `CHG${beData.chargingSessionId || Date.now()}`;
       const finalPayload = {
