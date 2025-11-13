@@ -65,8 +65,20 @@ export default function AdminInvoicesPage() {
     });
   }, [invoices, status, month, year, dueOnly, daysBefore]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageData = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const getTs = (i) =>
+    new Date(i?.updatedAt || i?.createdAt || i?.dueDate || 0).getTime();
+  const ordered = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      const dt = getTs(b) - getTs(a); // hóa đơn mới nhất lên đầu
+      if (dt !== 0) return dt;
+      return (b.invoiceId ?? 0) - (a.invoiceId ?? 0); // nếu trùng thời gian thì so ID
+    });
+    return arr;
+  }, [filtered]);
+
+  const totalPages = Math.max(1, Math.ceil(ordered.length / PAGE_SIZE));
+  const pageData = ordered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // ===== Tạo nội dung thông báo =====
   const buildTemplate = (inv) => {
