@@ -325,7 +325,7 @@ console.log("🔌 Guest session started:", sid);
           fullVehicleRes;
 
         const body = {
-          customerId: fullVehicle?.customerId ?? null,
+          customerId: null,
           companyId:
             fullVehicle?.companyId != null
               ? Number(fullVehicle.companyId)

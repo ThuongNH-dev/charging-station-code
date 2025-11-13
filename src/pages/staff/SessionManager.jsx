@@ -266,8 +266,9 @@ console.log(
 
           const custId = s.customerId ?? s.CustomerId;
           let customerType = "Khách bình thường";
-          if (!custId || custId === 0) customerType = "Khách vãng lai";
-          else if (companyId) customerType = "Xe công ty";
+
+if (companyId) customerType = "Xe công ty";
+else if (!custId || custId === 0) customerType = "Khách vãng lai";
 
           if (customerType === "Xe công ty" && (!licensePlate || licensePlate === "—")) {
             const fallback = vehicleMap[vId];
@@ -357,7 +358,8 @@ async function startTrackingSession(id) {
     setConfirmDialog({ open: false, session: null });
 
     try {
-      const isGuest = !s.customerId || s.customerId === 0;
+      const isCompany = s.companyId && s.companyId !== 0;
+const isGuest = !s.customerId && !isCompany;
       const endpoint = isGuest
         ? `${API_BASE}/ChargingSessions/guest/end`
         : `${API_BASE}/ChargingSessions/end`;
@@ -398,54 +400,6 @@ console.log("🛑 Gửi yêu cầu dừng phiên:", endpoint, payload);
         setTimeout(() => setMessage({ type: "", text: "" }), 5000);
         return;
       }
-
-      // 🧾 Nếu là xe công ty → tự lấy companyId và tạo hóa đơn
-try {
-  // 🔍 Lấy companyId (ưu tiên từ beData hoặc session, fallback bằng Vehicles)
-  let companyIdFinal = beData.companyId || s.companyId;
-
-  if (!companyIdFinal && s.vehicleId) {
-    try {
-      const vInfo = await fetchAuthJSON(`${API_BASE}/Vehicles/${s.vehicleId}`);
-      companyIdFinal =
-        vInfo?.companyId || vInfo?.CompanyId || vInfo?.data?.companyId || null;
-      console.log("🚗 CompanyId lấy từ xe:", companyIdFinal);
-    } catch (err) {
-      console.warn("Không lấy được thông tin xe:", err);
-    }
-  }
-
-  if (companyIdFinal && Number(companyIdFinal) > 0) {
-    const amount = beData.total || s.total || 0;
-    const payloadInvoice = {
-      companyId: companyIdFinal,
-      billingMonth: new Date().getMonth() + 1,
-      billingYear: new Date().getFullYear(),
-      subtotal: amount,
-      tax: Math.round(amount * 0.1),
-      total: amount + Math.round(amount * 0.1),
-      notes: `Tự động tạo từ phiên sạc #${s.chargingSessionId}`,
-    };
-
-    console.log("🧾 Gửi hóa đơn công ty:", payloadInvoice);
-
-    const invRes = await fetchAuthJSON(`${API_BASE}/Invoices`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payloadInvoice),
-    });
-
-    if (invRes?.invoiceId || invRes?.id || invRes?.success) {
-      antdMessage.success(`✅ Đã tạo hóa đơn cho công ty ID ${companyIdFinal}`);
-    } else {
-      antdMessage.warning("⚠️ Đã gửi yêu cầu nhưng server không trả mã hóa đơn!");
-    }
-  }
-} catch (err) {
-  console.error("❌ Lỗi khi tạo hóa đơn công ty:", err);
-  antdMessage.error("Không thể gửi hóa đơn cho công ty!");
-}
-
 
       const orderId = `CHG${beData.chargingSessionId || Date.now()}`;
       const finalPayload = {
