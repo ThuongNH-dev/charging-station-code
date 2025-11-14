@@ -3,6 +3,7 @@ import { getApiBase, fetchAuthJSON } from "../../utils/api";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { message } from "antd";
+import { getFriendlyErrorMessage } from "../../utils/friendlyError";
 import "./ChargerManager.css";
 
 const API_BASE = getApiBase();
@@ -250,8 +251,9 @@ export default function ChargerManager() {
         .filter((c) => String(c.stationId) === String(selectedStationId));
       setRows(chargers);
     } catch (err) {
-      message.error(`❌ ${err.message}`);
-
+      message.error(
+        getFriendlyErrorMessage(err, "Không thể cập nhật trạng thái trụ sạc.")
+      );
     }
   }
 
@@ -362,7 +364,9 @@ console.log("🏢 Company session started:", sid);
       setVehicleType("");
       setType("guest");
     } catch (e) {
-      message.error(`❌ Lỗi: ${e.message || "Không thể khởi động phiên sạc"}`);
+      message.error(
+        getFriendlyErrorMessage(e, "Không thể khởi động phiên sạc.")
+      );
     } finally {
       setSubmitting(false);
     }

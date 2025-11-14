@@ -7,6 +7,7 @@ import {
   CarOutlined,
 } from "@ant-design/icons";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
+import { getFriendlyErrorMessage } from "../../utils/friendlyError";
 import { useAuth } from "../../context/AuthContext";
 import "./PaymentManager.css";
 
@@ -253,7 +254,9 @@ setPaidSessions(sortedPaid);
       // Chỉ khi trang /staff/payment-success xác nhận thành công mới ghi vào localStorage.
     } catch (err) {
       console.error(err);
-      message.error(`❌ Lỗi khi tạo thanh toán: ${err.message}`);
+      message.error(
+        getFriendlyErrorMessage(err, "Không thể tạo yêu cầu thanh toán.")
+      );
     } finally {
       setPayingId(null);
     }
