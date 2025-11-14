@@ -341,6 +341,14 @@ export default function StationDetailPage() {
       return;
     }
 
+    // Validate ID
+    const idStr = String(targetId).trim();
+    if (!idStr || idStr === "0" || idStr === "null" || idStr === "undefined") {
+      message.error("ID không hợp lệ. Vui lòng thử lại.");
+      setActiveModal(null);
+      return;
+    }
+
     try {
       let res;
       if (targetType === "station") {
@@ -348,6 +356,7 @@ export default function StationDetailPage() {
         message.success("Đã xóa trạm thành công!");
         navigate("/admin/stations");
       } else if (targetType === "charger") {
+        console.log("🔄 Đang xóa bộ sạc với ID:", targetId);
         res = await stationApi.deleteCharger(targetId);
         setStation((prev) => ({
           ...prev,
@@ -376,7 +385,29 @@ export default function StationDetailPage() {
       console.log("✅ Delete result:", res);
     } catch (err) {
       console.error("❌ Lỗi xóa:", err);
-      message.error("Xóa thất bại: " + (err?.message || "Không xác định"));
+      
+      // Hiển thị thông báo lỗi chi tiết hơn
+      const errorMsg = err?.message || "Không xác định";
+      
+      // Nếu lỗi đã có thông báo rõ ràng từ API, dùng trực tiếp
+      if (errorMsg.includes("Không tìm thấy") || 
+          errorMsg.includes("không tồn tại") ||
+          errorMsg.includes("404")) {
+        message.error(errorMsg);
+      } else {
+        // Parse error message nếu là JSON string
+        let displayMsg = errorMsg;
+        try {
+          if (errorMsg.startsWith("{") || errorMsg.startsWith("[")) {
+            const parsed = JSON.parse(errorMsg);
+            displayMsg = parsed.title || parsed.message || parsed.detail || errorMsg;
+          }
+        } catch (parseErr) {
+          // Giữ nguyên errorMsg nếu không parse được
+        }
+        
+        message.error(`Xóa thất bại: ${displayMsg}`);
+      }
     } finally {
       setActiveModal(null);
     }
@@ -852,6 +883,7 @@ export default function StationDetailPage() {
           onDeleteStation={(id) => openDeleteModal(id, "station")}
           onEditCharger={openEditChargerModal}
           onDeleteCharger={(id, t) => openDeleteModal(id, t || "charger")}
+          onDeletePort={(id, t) => openDeleteModal(id, t || "port")}
           onAddCharger={openAddChargerModal}
           onAddPort={openAddPortModal}
           onEditPort={openEditPortModal}

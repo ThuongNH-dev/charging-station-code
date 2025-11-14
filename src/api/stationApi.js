@@ -258,12 +258,52 @@ export const stationApi = {
   },
 
   async deleteCharger(chargerId) {
+    // Validate ID
+    if (!chargerId || chargerId === null || chargerId === undefined) {
+      throw new Error("ID bộ sạc không hợp lệ");
+    }
+    
+    const idStr = String(chargerId).trim();
+    if (!idStr || idStr === "0" || idStr === "null" || idStr === "undefined") {
+      throw new Error("ID bộ sạc không hợp lệ");
+    }
+
     try {
-      await fetchAuthJSON(resolveUrl(`/Chargers/${chargerId}`), { method: "DELETE" });
+      // Thử endpoint chính
+      await fetchAuthJSON(resolveUrl(`/Chargers/${idStr}`), { method: "DELETE" });
       return true;
     } catch (error) {
       console.error("API Error: deleteCharger", error);
-      throw new Error(`Xóa bộ sạc thất bại: ${error.message || "Lỗi không xác định"}`);
+      
+      // Xử lý lỗi chi tiết hơn
+      if (error.status === 404) {
+        throw new Error(`Không tìm thấy bộ sạc với ID: ${idStr}. Có thể bộ sạc đã bị xóa hoặc không tồn tại.`);
+      } else if (error.status === 403) {
+        throw new Error("Bạn không có quyền xóa bộ sạc này.");
+      } else if (error.status === 400) {
+        throw new Error(`Yêu cầu không hợp lệ: ${error.message || "Vui lòng kiểm tra lại thông tin."}`);
+      } else if (error.status >= 500) {
+        throw new Error("Lỗi máy chủ. Vui lòng thử lại sau.");
+      }
+      
+      // Parse error message từ response
+      let errorMessage = "Lỗi không xác định";
+      try {
+        if (error.message) {
+          const errorText = error.message;
+          // Thử parse JSON nếu có
+          if (errorText.startsWith("{") || errorText.startsWith("[")) {
+            const parsed = JSON.parse(errorText);
+            errorMessage = parsed.title || parsed.message || parsed.detail || errorText;
+          } else {
+            errorMessage = errorText;
+          }
+        }
+      } catch (parseErr) {
+        errorMessage = error.message || "Lỗi không xác định";
+      }
+      
+      throw new Error(`Xóa bộ sạc thất bại: ${errorMessage}`);
     }
   },
 
