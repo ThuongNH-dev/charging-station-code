@@ -828,3 +828,173 @@ th {
   align-items: center;
   gap: 8px;
 }
+
+/* ===== Giữ cố định tiêu đề bảng xe (VehicleTable) ===== */
+.vehicle-table .table-scroll-area table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+/* Header đứng yên khi cuộn nội dung */
+.vehicle-table .table-scroll-area thead th {
+  position: sticky;
+  top: 0;
+  background: #f8f9fb; /* Màu nền cùng màu với th hiện tại */
+  z-index: 2; /* Giữ nằm trên nội dung khi cuộn */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* Tùy chọn: thêm viền cho header nhìn tách biệt */
+.vehicle-table .table-scroll-area thead {
+  border-bottom: 2px solid #e5e7eb;
+}
+
+/* ===== Giữ cố định tiêu đề bảng gói dịch vụ (ServiceTable) ===== */
+
+/* 1) Cho phần thân bảng có vùng cuộn dọc riêng */
+.service-package-table .table-responsive-wrapper {
+  max-height: 420px; /* chỉnh theo nhu cầu */
+  overflow-y: auto; /* nội dung cuộn dọc */
+  overflow-x: auto; /* giữ cuộn ngang khi nhiều cột */
+  width: 100%;
+}
+
+/* 2) Header đứng yên khi cuộn nội dung */
+.service-package-table .table-responsive-wrapper thead th {
+  position: sticky;
+  top: 0;
+  background: #f8f9fb; /* đồng màu với th */
+  z-index: 2;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); /* viền nhẹ */
+}
+
+/* 3) Viền tách header cho dễ nhìn (tùy chọn) */
+.service-package-table .table-responsive-wrapper thead {
+  border-bottom: 2px solid #e5e7eb;
+}
+/* ========== APPEND-ONLY: Nới rộng bảng Users, không ảnh hưởng trang khác ========== */
+
+/* Bảng tự giãn theo nội dung nhưng vẫn có min-width để bật scroll ngang khi thiếu chỗ */
+.user-table--users .minimal-table {
+  table-layout: auto !important; /* cho cột tự co giãn theo nội dung */
+  width: 100%;
+  min-width: 1100px; /* đảm bảo có không gian/scroll ngang */
+}
+
+/* Ô rộng rãi, hiển thị 1 dòng, KHÔNG ellipsis */
+.user-table--users .minimal-table th,
+.user-table--users .minimal-table td {
+  padding: 12px 16px;
+  vertical-align: middle;
+  white-space: nowrap !important; /* 1 dòng */
+  overflow: visible !important; /* không ẩn nội dung */
+  text-overflow: clip !important; /* bỏ dấu … */
+}
+
+/* STT + ID: cố định nhỏ gọn và căn giữa */
+.user-table--users .minimal-table th:nth-child(1),
+.user-table--users .minimal-table td:nth-child(1) {
+  width: 60px; /* STT */
+  text-align: center;
+}
+.user-table--users .minimal-table th:nth-child(2),
+.user-table--users .minimal-table td:nth-child(2) {
+  width: 70px; /* ID */
+  text-align: center;
+}
+
+/* Các cột nội dung cần nhiều chỗ (Công ty, Email, MST, Địa chỉ, Trạng thái thanh toán) */
+.user-table--users .minimal-table th:nth-child(3),
+.user-table--users .minimal-table td:nth-child(3) {
+  min-width: 180px;
+} /* Công ty */
+.user-table--users .minimal-table th:nth-child(4),
+.user-table--users .minimal-table td:nth-child(4) {
+  min-width: 220px;
+} /* Email */
+.user-table--users .minimal-table th:nth-child(5),
+.user-table--users .minimal-table td:nth-child(5) {
+  min-width: 160px;
+} /* Mã số thuế */
+.user-table--users .minimal-table th:nth-child(6),
+.user-table--users .minimal-table td:nth-child(6) {
+  min-width: 240px;
+} /* Địa chỉ */
+.user-table--users .minimal-table th:nth-child(7),
+.user-table--users .minimal-table td:nth-child(7) {
+  min-width: 160px;
+} /* Trạng thái thanh toán */
+
+/* 3 cột cuối (Vai trò, Trạng thái, Thao tác) căn giữa */
+.user-table--users .minimal-table th:nth-last-child(-n + 3),
+.user-table--users .minimal-table td:nth-last-child(-n + 3) {
+  text-align: center;
+}
+
+/* Hover nhẹ cho hàng */
+.user-table--users .minimal-table tr:hover td {
+  background: #f6faff;
+}
+
+/* ===== Bố cục vùng bảng: phần giữa cuộn, header + pagination cố định ===== */
+.user-table-section {
+  /* Chiều cao “khung” của mỗi bảng; chỉnh lại cho vừa mắt giao diện của bạn */
+  height: 520px; /* có thể 540-600 tuỳ layout */
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 12px;
+}
+
+/* Header (tiêu đề) sticky ở trên cùng của khung bảng */
+.user-table-section .table-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  padding: 12px 8px 8px;
+  border-bottom: 1px solid #eee;
+}
+
+/* Vùng nội dung cuộn giữa header và pagination */
+.user-table-section .table-responsive-wrapper {
+  flex: 1 1 auto;
+  overflow: auto; /* chỉ phần này cuộn */
+  padding: 0 8px;
+}
+
+/* Thanh phân trang sticky ở đáy khung bảng */
+.user-table-section .table-pagination--outside {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  background: #fff;
+  padding: 10px 8px 14px;
+  border-top: 1px solid #eee;
+}
+
+/* ===== Header cột của bảng cũng sticky trong vùng cuộn ===== */
+.minimal-table thead th {
+  position: sticky;
+  top: 0; /* dính vào mép trên của vùng cuộn */
+  z-index: 2;
+  background: #f7f8fa;
+  box-shadow: inset 0 -1px 0 #eee;
+}
+
+/* (Tuỳ chọn) làm pill pagination giống ảnh */
+.table-pagination .ant-pagination {
+  gap: 6px;
+}
+.table-pagination .ant-pagination-item,
+.table-pagination .ant-pagination-prev,
+.table-pagination .ant-pagination-next {
+  border-radius: 999px;
+  border: 1px solid #e6e6e6;
+  min-width: 36px;
+  height: 36px;
+  line-height: 34px;
+}
+.table-pagination .ant-pagination-item-active {
+  border-color: #1677ff;
+}

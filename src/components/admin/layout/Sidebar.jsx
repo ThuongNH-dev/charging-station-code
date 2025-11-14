@@ -7,13 +7,14 @@ import {
   BarChartOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 import "./Sidebar.css";
 
 export default function Sidebar({ collapsed, onCollapseChange }) {
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   // Use prop if provided, otherwise use internal state (backward compatibility)
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const isCollapsed = collapsed !== undefined ? collapsed : internalCollapsed;
@@ -37,6 +38,12 @@ export default function Sidebar({ collapsed, onCollapseChange }) {
       label: "Người dùng",
       path: "/admin/users",
       icon: <UserOutlined />,
+    },
+    {
+      key: "invoices",
+      label: "Quản lý Hóa đơn",
+      path: "/admin/invoices-admin",
+      icon: <FileTextOutlined />,
     },
     {
       key: "reports",

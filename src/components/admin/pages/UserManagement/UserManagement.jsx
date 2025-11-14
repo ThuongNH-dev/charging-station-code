@@ -16,43 +16,88 @@ const useUserServicesHook = () => {
   const [subscriptions, setSubscriptions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [invoices, setInvoices] = useState([]);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [accounts, vehicles, services, subscriptionsData] =
+      const [accounts, vehicles, services, subscriptionsData, invoicesData] =
         await Promise.all([
           userApi.fetchAllUsers(),
           userApi.fetchAllVehicles(),
           userApi.fetchAllServicePackages(),
           userApi.fetchAllSubscriptions(),
+          userApi.fetchAllInvoices(), // ✅ thêm dòng này
         ]);
 
-      // 1) Map id -> planName
-      const serviceMap = (services || []).reduce((map, pkg) => {
-        map[pkg.id] = pkg.planName;
+      // ===== Map id -> tên gói dịch vụ
+      const serviceMap = (services || []).reduce((map, p) => {
+        const id = p.subscriptionPlanId ?? p.id ?? p.packageId;
+        if (id != null) map[id] = p.planName;
         return map;
       }, {});
 
-      // 2) Map userId -> gói hiện tại
-      const userPackageMap = (subscriptionsData || []).reduce((map, sub) => {
-        const packageName =
-          serviceMap[sub.servicePackageId] || sub.GoiDichVu || null;
-        if (packageName) map[sub.userId] = packageName;
-        return map;
-      }, {});
+      // ===== Lấy sub ACTIVE mới nhất theo customerId
+      const pickActiveSubByCustomer = (subs, customerId) => {
+        if (!customerId) return null;
+        const mine = (subs || []).filter(
+          (s) => Number(s?.customerId) === Number(customerId)
+        );
+        const active = mine.filter((s) => String(s?.status) === "Active");
+        if (!active.length) return null;
+        active.sort(
+          (a, b) =>
+            new Date(b?.startDate || b?.updatedAt || 0) -
+            new Date(a?.startDate || a?.updatedAt || 0)
+        );
+        return active[0];
+      };
 
-      // 3) Gắn tên gói cho user
-      const accountsWithPackage = (accounts || []).map((user) => ({
-        ...user,
-        servicePackageName: userPackageMap[user.id] || "Chưa đăng ký",
-      }));
+      // ===== Lấy sub ACTIVE mới nhất theo companyId
+      const pickActiveSubByCompany = (subs, companyId) => {
+        if (!companyId) return null;
+        const mine = (subs || []).filter(
+          (s) => Number(s?.companyId) === Number(companyId)
+        );
+        const active = mine.filter((s) => String(s?.status) === "Active");
+        if (!active.length) return null;
+        active.sort(
+          (a, b) =>
+            new Date(b?.startDate || b?.updatedAt || b?.createdAt || 0) -
+            new Date(a?.startDate || a?.updatedAt || a?.createdAt || 0)
+        );
+        return active[0];
+      };
+
+      // ===== Gắn servicePackageName cho MỌI user (cả cá nhân & DN)
+      const accountsWithPackage = (accounts || []).map((u) => {
+        const customerId = u?.customers?.[0]?.customerId;
+        const companyId = u?.company?.companyId ?? u?.companyId;
+
+        let sub = null;
+        if (companyId)
+          sub = pickActiveSubByCompany(subscriptionsData, companyId);
+        if (!sub && customerId)
+          sub = pickActiveSubByCustomer(subscriptionsData, customerId);
+
+        const planName =
+          sub?.planName ??
+          (sub?.subscriptionPlanId != null
+            ? serviceMap[sub.subscriptionPlanId]
+            : null);
+
+        return {
+          ...u,
+          servicePackageName: planName || "Chưa đăng ký",
+        };
+      });
 
       setAllAccounts(accountsWithPackage);
       setAllVehicles(vehicles || []);
       setServicePackages(services || []);
       setSubscriptions(subscriptionsData || []);
+      setInvoices(invoicesData || []);
     } catch (err) {
       console.error("❌ Lỗi khi load dữ liệu:", err);
       setError(err.message || "Không thể tải dữ liệu");
@@ -66,66 +111,66 @@ const useUserServicesHook = () => {
   }, [fetchData]);
 
   // ... bên trong useUserServicesHook
-const handleUpdate = async (apiFunc, id, data, successMsg, role) => {
-  if (typeof apiFunc !== "function") {
-    console.error("❌ apiFunc không phải function", apiFunc);
-    return false;
-  }
-  setIsLoading(true);
-  setError(null);
-  try {
-    if (id !== undefined && id !== null) {
-      await apiFunc(id, data, role);
-    } else {
-      await apiFunc(data);
+  const handleUpdate = async (apiFunc, id, data, successMsg, role) => {
+    if (typeof apiFunc !== "function") {
+      console.error("❌ apiFunc không phải function", apiFunc);
+      return false;
     }
-    alert(successMsg || "Cập nhật thành công!");
-    await fetchData();
-    return true;
-  } catch (err) {
-    const resp = err?.response;
-    const pd = resp?.data; // ProblemDetails từ ASP.NET
-    const sentBody = resp?.config?.data;
-
-    // 🔎 In ra toàn bộ để debug nhanh
-    console.error("❌ AxiosError detail:", {
-      status: resp?.status,
-      url: resp?.config?.url,
-      method: resp?.config?.method,
-      sentBody,                 // <= body FE đã gửi
-      problemDetails: pd,       // <= ProblemDetails từ BE
-    });
-
-    // 🔎 Gom lỗi ModelState cho người dùng
-    let msg =
-      pd?.title ||
-      pd?.message ||
-      err?.message ||
-      "One or more validation errors occurred.";
-
-    if (pd?.errors && typeof pd.errors === "object") {
-      const lines = [];
-      for (const [field, arr] of Object.entries(pd.errors)) {
-        const joined = Array.isArray(arr) ? arr.join(", ") : String(arr);
-        lines.push(`${field}: ${joined}`);
+    setIsLoading(true);
+    setError(null);
+    try {
+      if (id !== undefined && id !== null) {
+        await apiFunc(id, data, role);
+      } else {
+        await apiFunc(data);
       }
-      if (lines.length) msg += `\n\n${lines.join("\n")}`;
+      alert(successMsg || "Cập nhật thành công!");
+      await fetchData();
+      return true;
+    } catch (err) {
+      const resp = err?.response;
+      const pd = resp?.data; // ProblemDetails từ ASP.NET
+      const sentBody = resp?.config?.data;
+
+      // 🔎 In ra toàn bộ để debug nhanh
+      console.error("❌ AxiosError detail:", {
+        status: resp?.status,
+        url: resp?.config?.url,
+        method: resp?.config?.method,
+        sentBody, // <= body FE đã gửi
+        problemDetails: pd, // <= ProblemDetails từ BE
+      });
+
+      // 🔎 Gom lỗi ModelState cho người dùng
+      let msg =
+        pd?.title ||
+        pd?.message ||
+        err?.message ||
+        "One or more validation errors occurred.";
+
+      if (pd?.errors && typeof pd.errors === "object") {
+        const lines = [];
+        for (const [field, arr] of Object.entries(pd.errors)) {
+          const joined = Array.isArray(arr) ? arr.join(", ") : String(arr);
+          lines.push(`${field}: ${joined}`);
+        }
+        if (lines.length) msg += `\n\n${lines.join("\n")}`;
+      }
+
+      setError(msg);
+      alert(`Lỗi: ${msg}`);
+      return false;
+    } finally {
+      setIsLoading(false);
     }
-
-    setError(msg);
-    alert(`Lỗi: ${msg}`);
-    return false;
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  };
 
   return {
     allAccounts,
     allVehicles,
     servicePackages,
     subscriptions,
+    invoices,
     isLoading,
     error,
     fetchData,
@@ -202,21 +247,37 @@ const useFilterLogicHook = ({
   });
 
   const filteredUsers = useMemo(() => {
+    const q = (userFilter.search || "").toLowerCase().trim();
+    const pkg = (userFilter.servicePackage || "all").toLowerCase();
+    const st = userFilter.status;
+
     return allAccounts.filter((user) => {
-      const matchSearch =
-        user.userName
-          ?.toLowerCase()
-          .includes(userFilter.search.toLowerCase()) ||
-        userFilter.search === "";
-      const matchStatus =
-        userFilter.status === "all" || user.status === userFilter.status;
+      const c = user?.customers?.[0] || {};
+      const comp = user?.company || {};
 
-      const userPackageNameLower = user.servicePackageName?.toLowerCase() || "";
-      const filterPackageNameLower = userFilter.servicePackage.toLowerCase();
+      // Ghép chuỗi để search trên nhiều trường:
+      const hay = [
+        user?.userName,
+        String(user?.accountId ?? user?.id ?? ""),
+        c?.fullName,
+        c?.email,
+        c?.phone,
+        comp?.name,
+        comp?.email,
+        comp?.taxCode,
+        comp?.address,
+        user?.servicePackageName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 
+      const matchSearch = !q || hay.includes(q);
+      const matchStatus = st === "all" || String(user?.status) === st;
       const matchServicePackage =
-        userFilter.servicePackage === "all" ||
-        userPackageNameLower === filterPackageNameLower;
+        pkg === "all" ||
+        (user?.servicePackageName &&
+          user.servicePackageName.toLowerCase() === pkg);
 
       const matchRole =
         userTypeFilter === "all" ||
@@ -324,9 +385,12 @@ const UserFilterBar = ({
   servicePackages,
 }) => {
   const packageOptions = useMemo(() => {
-    return (servicePackages || []).map((pkg) => (
-      <option key={pkg.planName} value={pkg.planName}>
-        {pkg.planName}
+    const names = new Set(
+      (servicePackages || []).map((pkg) => pkg?.planName).filter(Boolean)
+    );
+    return [...names].sort().map((name) => (
+      <option key={name} value={name}>
+        {name}
       </option>
     ));
   }, [servicePackages]);
@@ -424,6 +488,7 @@ const UserManagement = () => {
     allVehicles,
     servicePackages,
     subscriptions,
+    invoices,
     isLoading,
     error,
     updateUser,
@@ -547,14 +612,27 @@ const UserManagement = () => {
     }
 
     if (activeTab === "vehicle") {
-      const rows = (filteredVehicles || []).map((v) => ({
-        ID: v.id ?? "",
-        Hang: v.carMaker ?? "",
-        DongXe: v.model ?? "",
-        NamSX: v.year ?? "",
-        ChuSoHuuLoai: v.companyId ? "Công ty" : "Cá nhân",
-        ChuSoHuuID: v.companyId ?? v.customerId ?? "",
-      }));
+      const rows = (filteredVehicles || []).map((v) => {
+        let ownerType = "Khách vãng lai";
+        let ownerId = "";
+
+        if (v.customerId) {
+          ownerType = "Cá nhân";
+          ownerId = v.customerId;
+        } else if (v.companyId) {
+          ownerType = "Công ty";
+          ownerId = v.companyId;
+        }
+
+        return {
+          ID: v.vehicleId ?? "",
+          Hang: v.carMaker ?? "",
+          DongXe: v.model ?? "",
+          NamSX: v.manufactureYear ?? "",
+          ChuSoHuuLoai: ownerType,
+          ChuSoHuuID: ownerId,
+        };
+      });
       exportCsv(rows, "vehicles.csv");
       return;
     }
@@ -667,6 +745,7 @@ const UserManagement = () => {
                 setActiveModal={setActiveModal}
                 servicePackages={servicePackages}
                 subscriptions={subscriptions}
+                invoices={invoices}
               />
             )}
 
@@ -677,6 +756,7 @@ const UserManagement = () => {
                 setActiveModal={setActiveModal}
                 servicePackages={servicePackages}
                 subscriptions={subscriptions}
+                invoices={invoices}
               />
             )}
           </div>

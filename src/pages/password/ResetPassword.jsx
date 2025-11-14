@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Form, Input, Button, message, Card, Typography, Alert } from "antd";
+import { Form, Input, Button, message, Card } from "antd";
 import { LockOutlined, SafetyOutlined } from "@ant-design/icons";
 import { resetPassword } from "../../api/passwordRecoveryApi";
-
-const { Title, Paragraph, Text } = Typography;
+import "./auth.css";
+// <- nhớ import file CSS ở mục (3)
 
 export default function ResetPassword() {
   const [params] = useSearchParams();
@@ -12,19 +12,16 @@ export default function ResetPassword() {
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
-  // Lấy token từ URL (?token=...)
   const tokenFromUrl = useMemo(() => params.get("token") || "", [params]);
 
   const onFinish = async (values) => {
     setSubmitting(true);
     try {
-      // ĐÚNG PAYLOAD: { resetToken, newPassword, confirmPassword }
       await resetPassword({
         resetToken: values.resetToken,
         newPassword: values.newPassword,
         confirmPassword: values.confirmPassword,
       });
-
       message.success("Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.");
       navigate("/login", { replace: true });
     } catch (err) {
@@ -36,32 +33,26 @@ export default function ResetPassword() {
 
   const validateConfirm = ({ getFieldValue }) => ({
     validator(_, value) {
-      if (!value || getFieldValue("newPassword") === value) {
+      if (!value || getFieldValue("newPassword") === value)
         return Promise.resolve();
-      }
       return Promise.reject(new Error("Xác nhận mật khẩu không khớp"));
     },
   });
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
-      <Card style={{ width: 520 }}>
-        <Title level={3} style={{ marginBottom: 8 }}>
-          Đặt lại mật khẩu
-        </Title>
-        <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+    <div className="login-wrapper">
+      <Card className="login-card auth-card">
+        <h3 className="login-title">Đặt lại mật khẩu</h3>
+        <p className="auth-subtitle">
           Nhập mật khẩu mới cho tài khoản của bạn. Liên kết đặt lại có thể hết
           hạn sau một thời gian.
-        </Paragraph>
+        </p>
 
         {!tokenFromUrl && (
-          <Alert
-            type="warning"
-            showIcon
-            message="Thiếu token"
-            description="Không tìm thấy token trong đường dẫn. Vui lòng mở lại liên kết từ email."
-            style={{ marginBottom: 16 }}
-          />
+          <div className="alert-warning" style={{ marginBottom: 16 }}>
+            Không tìm thấy token trong đường dẫn. Vui lòng quay lại trang Quên
+            mật khẩu để tạo token.
+          </div>
         )}
 
         <Form
@@ -83,7 +74,7 @@ export default function ResetPassword() {
           >
             <Input
               size="large"
-              placeholder="Token từ đường link email"
+              placeholder="Token từ email hoặc từ màn hình Quên mật khẩu"
               prefix={<SafetyOutlined />}
               readOnly={!!tokenFromUrl}
             />
@@ -126,17 +117,22 @@ export default function ResetPassword() {
 
           <Form.Item style={{ marginTop: 8 }}>
             <Button
-              type="primary"
               htmlType="submit"
               size="large"
               loading={submitting}
+              className="auth-submit"
               block
             >
               Đặt lại mật khẩu
             </Button>
           </Form.Item>
 
-          <Button type="link" block onClick={() => navigate("/login")}>
+          <Button
+            type="link"
+            className="auth-link-btn"
+            block
+            onClick={() => navigate("/login")}
+          >
             Quay lại đăng nhập
           </Button>
         </Form>

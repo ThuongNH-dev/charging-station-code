@@ -6,6 +6,7 @@ import { Pagination } from "antd";
 /* =========================================================
    🔹 TIÊU ĐỀ
    ========================================================= */
+
 const getTableTitle = (userType) => {
   switch (userType) {
     case "individual":
@@ -32,11 +33,13 @@ const getColumns = (userType) => {
     cols.push({ key: "email", header: "Email" });
     cols.push({ key: "accountType", header: "Loại tài khoản" });
     cols.push({ key: "planName", header: "Gói dịch vụ" });
+    cols.push({ key: "paymentStatus", header: "Trạng thái thanh toán" }); // <-- thêm
   } else if (userType === "company") {
     cols.push({ key: "companyName", header: "Công ty" });
     cols.push({ key: "email", header: "Email" });
     cols.push({ key: "taxCode", header: "Mã số thuế" });
     cols.push({ key: "address", header: "Địa chỉ" });
+    cols.push({ key: "companyPlan", header: "Gói dịch vụ" });
     cols.push({ key: "paymentStatus", header: "Trạng thái thanh toán" });
   }
 
@@ -50,26 +53,46 @@ const getColumns = (userType) => {
 /* =========================================================
    🔹 HELPERS
    ========================================================= */
+// ✅ Chỉ chọn gói đang ACTIVE cho người dùng cá nhân
 const pickUserSubscription = (subs, customerId) => {
   if (!customerId || !Array.isArray(subs)) return null;
   const cid = Number(customerId);
-  const candidates = subs.filter(
+
+  const mine = subs.filter(
     (s) =>
       Number(s?.customerId) === cid &&
       (s?.companyId == null || Number(s.companyId) === 0)
   );
-  if (candidates.length === 0) return null;
 
-  const rank = (st) => (st === "Active" ? 2 : st === "Pending" ? 1 : 0);
+  if (mine.length === 0) return null;
+
+  // 👉 Lọc chỉ gói đang ACTIVE
+  const active = mine.filter((s) => String(s?.status) === "Active");
+  if (active.length === 0) return null;
+
+  // Lấy gói mới nhất
   const when = (s) => new Date(s?.startDate || s?.updatedAt || 0).getTime();
+  active.sort((a, b) => when(b) - when(a));
 
-  candidates.sort((a, b) => {
-    const r = rank(b?.status) - rank(a?.status);
-    if (r !== 0) return r;
-    return when(b) - when(a);
-  });
+  return active[0];
+};
 
-  return candidates[0];
+// ✅ Lấy gói dịch vụ đang ACTIVE cho company, ưu tiên bản mới nhất
+const pickCompanySubscription = (subs, companyId) => {
+  if (!companyId || !Array.isArray(subs)) return null;
+  const cid = Number(companyId);
+
+  const mine = subs.filter((s) => Number(s?.companyId) === cid);
+  if (mine.length === 0) return null;
+
+  const active = mine.filter((s) => String(s?.status) === "Active");
+  if (active.length === 0) return null;
+
+  const when = (s) =>
+    new Date(s?.startDate || s?.updatedAt || s?.createdAt || 0).getTime();
+  active.sort((a, b) => when(b) - when(a));
+
+  return active[0];
 };
 
 const buildPlanMap = (servicePackages = []) =>
@@ -82,10 +105,46 @@ const buildPlanMap = (servicePackages = []) =>
 const pickCompanyLatestInvoice = (invoices, companyId) => {
   if (!companyId || !Array.isArray(invoices)) return null;
   const cid = Number(companyId);
-  const list = invoices.filter((i) => Number(i?.companyId) === cid);
+
+  const list = invoices.filter(
+    (i) => Number(i?.companyId ?? i?.CompanyId) === cid
+  );
   if (list.length === 0) return null;
+
   const when = (x) =>
-    new Date(x?.createdAt || x?.updatedAt || x?.dueDate || 0).getTime();
+    new Date(
+      x?.createdAt ??
+        x?.CreatedAt ??
+        x?.updatedAt ??
+        x?.UpdatedAt ??
+        x?.dueDate ??
+        x?.DueDate ??
+        0
+    ).getTime();
+
+  return list.slice().sort((a, b) => when(b) - when(a))[0];
+};
+
+const pickCustomerLatestInvoice = (invoices, customerId) => {
+  if (!customerId || !Array.isArray(invoices)) return null;
+  const cid = Number(customerId);
+
+  const list = invoices.filter(
+    (i) => Number(i?.customerId ?? i?.CustomerId) === cid
+  );
+  if (list.length === 0) return null;
+
+  const when = (x) =>
+    new Date(
+      x?.createdAt ??
+        x?.CreatedAt ??
+        x?.updatedAt ??
+        x?.UpdatedAt ??
+        x?.dueDate ??
+        x?.DueDate ??
+        0
+    ).getTime();
+
   return list.slice().sort((a, b) => when(b) - when(a))[0];
 };
 
@@ -120,31 +179,10 @@ const renderCell = (
 
     // ======== DOANH NGHIỆP ========
     case "companyName":
-      return (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {companyData?.imageUrl ? (
-            <img
-              src={companyData.imageUrl}
-              alt="logo"
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                objectFit: "cover",
-              }}
-            />
-          ) : null}
-          <span>{companyData?.companyName || user?.userName || "—"}</span>
-        </div>
-      );
+      return <span>{companyData?.name || user?.userName || "—"}</span>;
 
     case "email":
-      return (
-        customerInfo?.email ||
-        companyData?.companyEmail ||
-        user?.userName ||
-        "—"
-      );
+      return customerInfo?.email || companyData?.email || user?.userName || "—";
 
     case "taxCode":
       return companyData?.taxCode || "—";
@@ -152,10 +190,49 @@ const renderCell = (
     case "address":
       return companyData?.address || "—";
 
-    case "paymentStatus": {
+    // ✅ Gói dịch vụ của doanh nghiệp (chỉ hiển thị khi có subscription ACTIVE)
+    case "companyPlan": {
       const compId =
-        companyData?.companyId ?? user?.companyId ?? customerInfo?.companyId;
-      const inv = pickCompanyLatestInvoice(invoices, compId);
+        companyData?.companyId ??
+        companyData?.CompanyId ??
+        user?.companyId ??
+        user?.CompanyId ??
+        null;
+
+      const sub = pickCompanySubscription(subscriptions, compId);
+      if (!sub) return "—";
+      const nameFromSub = sub?.planName;
+      const nameFromPlanMap =
+        sub?.subscriptionPlanId != null
+          ? planMap?.[Number(sub.subscriptionPlanId)]
+          : undefined;
+      return nameFromSub || nameFromPlanMap || "—";
+    }
+    case "paymentStatus": {
+      // Nếu là công ty: dùng companyId
+      if (userType === "company") {
+        const compId =
+          companyData?.companyId ??
+          companyData?.CompanyId ??
+          user?.companyId ??
+          user?.CompanyId ??
+          customerInfo?.companyId ??
+          customerInfo?.CompanyId;
+
+        const inv = pickCompanyLatestInvoice(invoices, compId);
+        // console.log('PAYMENT DEBUG COMPANY', { compId, inv, invoicesLen: invoices?.length });
+        return paymentStatusFromInvoice(inv);
+      }
+
+      // Nếu là cá nhân: dùng customerId
+      const custId =
+        customerInfo?.customerId ??
+        customerInfo?.CustomerId ??
+        user?.customers?.[0]?.customerId ??
+        user?.Customers?.[0]?.CustomerId;
+
+      const inv = pickCustomerLatestInvoice(invoices, custId);
+      // console.log('PAYMENT DEBUG CUSTOMER', { custId, inv, invoicesLen: invoices?.length });
       return paymentStatusFromInvoice(inv);
     }
 
@@ -210,7 +287,7 @@ export const UserTables = ({
   );
 
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const pageSize = 15;
 
   const total = filteredData.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -241,11 +318,14 @@ export const UserTables = ({
 
   return (
     <div className="user-table-section user-table--users">
-      <h3>
-        Thông tin {getTableTitle(userType)} ({total} mục)
-      </h3>
+      {/* Header sticky */}
+      <div className="table-header">
+        <h3>
+          Thông tin {getTableTitle(userType)} ({total} mục)
+        </h3>
+      </div>
 
-      {/* ✅ Vùng CUỘN của nội dung bảng */}
+      {/* Vùng CUỘN của nội dung bảng */}
       <div className="table-responsive-wrapper" ref={wrapRef}>
         <table className="minimal-table">
           <thead>
