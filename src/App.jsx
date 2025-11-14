@@ -22,7 +22,6 @@ import StaffPaymentSuccess from "./pages/staff/StaffPaymentSuccess";
 import AdminLayout from "./components/admin/layout/AdminLayout";
 import StationPage from "./components/admin/pages/station/StationPage";
 import StationDetailPage from "./components/admin/pages/station/StationDetailPage";
-import ContactPage from "./pages/contact/ContactPage";
 
 import UserManagement from "./components/admin/pages/UserManagement/UserManagement";
 import RegisterSelect from "./pages/Register/RegisterSelect";
@@ -94,7 +93,6 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/homepage" replace />} />
       {/* PUBLIC */}
-      <Route path="/contact" element={<ContactPage />} />
       <Route path="/homepage" element={<Homepage />} />
       <Route path="/register/select" element={<RegisterSelect />} />
       <Route path="/register/personal" element={<PersonalRegister />} />

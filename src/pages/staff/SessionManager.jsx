@@ -3,7 +3,6 @@ import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Pagination } from "antd";
-import { message as antdMessage } from "antd";
 import MessageBox from "../../components/staff/MessageBox";
 import ConfirmDialog from "../../components/staff/ConfirmDialog";
 import "./SessionManager.css";
@@ -75,7 +74,6 @@ const [liveProgress, setLiveProgress] = useState({});
   // ✅ Trạm staff phụ trách
   const [stations, setStations] = useState([]);
   const [users, setUsers] = useState([]);
-  const [userMap, setUserMap] = useState({});
 
   const [myStations, setMyStations] = useState([]);
   const [selectedStationId, setSelectedStationId] = useState(null);
@@ -117,11 +115,6 @@ const mappedUsers = authList
   }));
 
 setUsers(mappedUsers);
-const map = {};
-mappedUsers.forEach(u => {
-  map[String(u.accountId)] = u.fullName;
-});
-setUserMap(map);
 
 const myStationIds = [];
 
@@ -272,9 +265,8 @@ console.log(
 
           const custId = s.customerId ?? s.CustomerId;
           let customerType = "Khách bình thường";
-
-if (companyId) customerType = "Xe công ty";
-else if (!custId || custId === 0) customerType = "Khách vãng lai";
+          if (!custId || custId === 0) customerType = "Khách vãng lai";
+          else if (companyId) customerType = "Xe công ty";
 
           if (customerType === "Xe công ty" && (!licensePlate || licensePlate === "—")) {
             const fallback = vehicleMap[vId];
@@ -364,8 +356,7 @@ async function startTrackingSession(id) {
     setConfirmDialog({ open: false, session: null });
 
     try {
-      const isCompany = s.companyId && s.companyId !== 0;
-const isGuest = !s.customerId && !isCompany;
+      const isGuest = !s.customerId || s.customerId === 0;
       const endpoint = isGuest
         ? `${API_BASE}/ChargingSessions/guest/end`
         : `${API_BASE}/ChargingSessions/end`;
@@ -569,7 +560,7 @@ sessionStorage.removeItem("staffLiveSessionId");
               <tr>
                 <th>Mã phiên</th>
                 <th>Trụ</th>
-                <th>Người bắt đầu</th>
+                <th>Khách hàng</th>
                 <th>Biển số</th>
                 <th>Loại</th>
                 <th>Bắt đầu</th>
@@ -604,23 +595,18 @@ sessionStorage.removeItem("staffLiveSessionId");
                   <tr key={s.chargingSessionId}>
                     <td className="strong">S-{s.chargingSessionId}</td>
                     <td>{s.portId ?? "—"}</td>
-<td>
+                    <td>
   {(() => {
-    // 🔹 Ưu tiên xe công ty
-    if (s.companyId) {
-      return userMap[String(s.companyId)] || `Cty #${s.companyId}`;
-    }
-
-    // 🔹 Nếu là khách cá nhân
-    if (s.customerId) {
-      return userMap[String(s.customerId)] || `#${s.customerId}`;
-    }
-
-    // 🔹 Nếu không có gì hết → khách vãng lai
-    return "Khách vãng lai";
+    const matched = users.find(
+      (u) => String(u.accountId) === String(s.customerId)
+    );
+    return matched
+      ? matched.fullName
+      : s.customerId
+      ? `#${s.customerId}`
+      : "—";
   })()}
 </td>
-
 
 
                     <td>{s.licensePlate}</td>
