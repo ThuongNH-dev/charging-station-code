@@ -1,3 +1,4 @@
+/* ======================= LAYOUT CHUNG ======================= */
 .pay-wrap {
   display: flex;
   justify-content: center;
@@ -7,14 +8,33 @@
   font-family: "Inter", system-ui, sans-serif;
 }
 
-.pay-top {
+/* 2 CỘT: bảng trái & bảng phải */
+.two-column {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  grid-template-columns: 1fr 1fr;   /* chia đều 50%-50% */
+  gap: 30px;                        /* tăng khoảng cách */
   width: 100%;
-  max-width: 1100px;
+  max-width: 1300px;                /* rộng thoáng */
 }
 
+/* Header chọn trạm */
+.station-header {
+  grid-column: 1 / -1;              /* ăn full 2 cột */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+/* Cột trái & phải */
+.pay-left,
+.pay-right {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ======================= CARD ======================= */
 .pay-card {
   background: white;
   border-radius: 14px;
@@ -23,6 +43,7 @@
   padding: 20px 25px;
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 .pay-card h3 {
@@ -32,6 +53,7 @@
   margin-bottom: 16px;
 }
 
+/* ======================= FORM ======================= */
 .pay-form {
   display: flex;
   flex-direction: column;
@@ -82,7 +104,7 @@
   margin-top: 6px;
 }
 
-/* Bảng */
+/* ======================= BẢNG ======================= */
 .table-wrap table {
   width: 100%;
   border-collapse: collapse;
@@ -119,7 +141,7 @@
   font-weight: 600;
 }
 
-/* Xuất CSV */
+/* ======================= EXPORT / BUTTON ======================= */
 .export {
   margin-top: 12px;
   padding: 8px 14px;
@@ -137,28 +159,15 @@
   background-color: #e5e7eb;
 }
 
-@media (max-width: 900px) {
-  .pay-top {
-    grid-template-columns: 1fr;
-  }
-}
-.center {
-  text-align: center;
-}
 .center h3 {
   margin-top: 10px;
   font-weight: 600;
 }
-.two-column {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  width: 100%;
-  max-width: 1200px;
-}
 
+/* ======================= RESPONSIVE ======================= */
 @media (max-width: 900px) {
   .two-column {
     grid-template-columns: 1fr;
+    gap: 20px;
   }
 }
