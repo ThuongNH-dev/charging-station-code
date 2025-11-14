@@ -187,20 +187,40 @@ setUsers(userMap);
               )
             );
           return {
-            session: `S-${s.chargingSessionId}`,
-            charger: s.portId,
-            customer:
-  users.find((u) => String(u.accountId) === String(s.customerId))
-    ?.fullName || "Vãng lai",
+  session: `S-${s.chargingSessionId}`,
+  charger: s.portId,
 
+  // === Xác định người bắt đầu phiên ===
+  customer: (() => {
+    let starter = "Vãng lai";
 
-            duration: formatDuration(s.startedAt, s.endedAt),
-            kWh: s.energyKwh || 0,
-            cost: s.total || 0,
-            invoice: inv
-              ? inv.invoiceCode || `INV-${inv.invoiceId}`
-              : s.invoiceId || "—",
-          };
+    // Xe của công ty → lấy tên công ty
+    if (s.companyId) {
+      const comp = users.find(
+        (u) => String(u.accountId) === String(s.companyId)
+      );
+      if (comp?.fullName) return comp.fullName;
+    }
+
+    // Khách hàng cá nhân → lấy fullName
+    if (s.customerId) {
+      const cust = users.find(
+        (u) => String(u.accountId) === String(s.customerId)
+      );
+      if (cust?.fullName) return cust.fullName;
+    }
+
+    return starter;
+  })(),
+
+  duration: formatDuration(s.startedAt, s.endedAt),
+  kWh: s.energyKwh || 0,
+  cost: s.total || 0,
+  invoice: inv
+    ? inv.invoiceCode || `INV-${inv.invoiceId}`
+    : s.invoiceId || "—",
+};
+
         });
 
         // === Biểu đồ doanh thu ===
