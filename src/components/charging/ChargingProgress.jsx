@@ -1,3 +1,4 @@
+
 // ✅ src/components/Charging/ChargingProgress.jsx
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { ThunderboltOutlined, WarningOutlined } from "@ant-design/icons";
