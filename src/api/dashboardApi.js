@@ -1,31 +1,26 @@
 // ✅ src/api/dashboardApi.js
 import axios from "axios";
 
-// Tự đổi theo môi trường dev/prod như các file trước
 const BASE_URL = import.meta.env.DEV ? "/api" : "https://localhost:7268/api";
 
 /**
- * Lấy dữ liệu Dashboard trong ngày (sessions, invoices, stations)
+ * Lấy dữ liệu Dashboard theo khoảng ngày (mặc định: hôm nay)
+ * @param {{startDate?: string, endDate?: string, stationId?: string|number}} params
  * @returns {Promise<{sessions:any[], stations:any[]}>}
  */
-export const fetchDashboardToday = async () => {
-  // Lấy mốc ngày hôm nay [00:00, 23:59:59]
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
+export const fetchDashboard = async (params = {}) => {
+  const { startDate, endDate, stationId } = params;
 
-  const startDate = start.toISOString();
-  const endDate = end.toISOString();
+  const qs = new URLSearchParams();
+  if (startDate) qs.set("startDate", startDate);
+  if (endDate) qs.set("endDate", endDate);
+  if (stationId && stationId !== "all") qs.set("stationId", stationId);
 
-  // API sessions của bạn đã có filter startDate/endDate & stationId
   const sessionsReq = axios.get(
-    `${BASE_URL}/ChargingSessions?startDate=${encodeURIComponent(
-      startDate
-    )}&endDate=${encodeURIComponent(endDate)}`
+    `${BASE_URL}/ChargingSessions${qs.toString() ? `?${qs}` : ""}`
   );
 
-  // Stations để tính % sử dụng và số trạm online
+  // Lấy list trạm để đổ dropdown + tính % sử dụng
   const stationsReq = axios.get(
     `${BASE_URL}/Stations/paged?page=1&pageSize=200`
   );
@@ -35,14 +30,6 @@ export const fetchDashboardToday = async () => {
     stationsReq,
   ]);
 
-  if (sessionsRes.status === "rejected") {
-    console.error("❌ Dashboard sessions API failed:", sessionsRes.reason);
-  }
-  if (stationsRes.status === "rejected") {
-    console.error("❌ Dashboard stations API failed:", stationsRes.reason);
-  }
-
-  // Chuẩn hoá mảng
   const toArr = (d) =>
     Array.isArray(d)
       ? d

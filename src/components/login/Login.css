@@ -1,26 +1,31 @@
 /* ====== CSS VARIABLES - THEME SUPPORT ====== */
 :root {
-  /* Light Mode Colors - Modern & Bright */
-  --login-bg-overlay: rgba(0, 0, 0, 0.2);
-  --login-card-bg: rgba(255, 255, 255, 1);
-  --login-card-border: rgba(203, 213, 225, 0.8);
+  /* Noel theme (Light) */
+  --login-bg-overlay: rgba(16, 24, 40, 0.25);
+  --login-card-bg: rgba(255, 255, 255, 0.98);
+  --login-card-border: rgba(220, 38, 38, 0.25);
   --login-title-color: #0f172a;
-  --login-label-color: #475569;
+  --login-label-color: #0f172a; 
   --login-input-bg: #ffffff;
-  --login-input-border: #cbd5e1;
-  --login-input-border-hover: #94a3b8;
+  --login-input-border: #94a3b8;
+  --login-input-border-hover: #16a34a;
   --login-input-text: #0f172a;
-  --login-input-placeholder: #94a3b8;
-  --login-text-primary: #1e293b;
-  --login-text-secondary: #64748b;
+  --login-input-placeholder: #6b7280;
+  --login-text-primary: #111827;
+  --login-text-secondary: #475569;
   --login-text-muted: #64748b;
-  --login-divider-bg: #cbd5e1;
+  --login-divider-bg: rgba(203, 213, 225, 0.8);
   --login-divider-text-bg: rgba(255, 255, 255, 1);
   --login-error-bg: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-  --login-error-border: #f87171;
-  --login-error-text: #991b1b;
-  --login-accent: #06b6d4;
-  --login-accent-hover: #0891b2;
+  --login-error-border: #ef4444;
+  --login-error-text: #7f1d1d;
+  /* Noel accent: xanh lá chủ đạo, nhấn đỏ */
+  --holiday-green: #16a34a;
+  --holiday-green-dark: #15803d;
+  --holiday-red: #dc2626;
+  --holiday-red-dark: #b91c1c;
+  --login-accent: var(--holiday-green);
+  --login-accent-hover: var(--holiday-green-dark);
   --login-social-border: #cbd5e1;
 }
 
@@ -28,13 +33,13 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --login-bg-overlay: rgba(0, 0, 0, 0.35);
-    --login-card-bg: rgba(255, 255, 255, 0.162);
+    --login-card-bg: rgba(30, 41, 59, 0.98);
     --login-card-border: rgba(148, 163, 184, 0.4);
     --login-title-color: #f8fafc;
-    --login-label-color: #e2e8f0;
+    --login-label-color: #f8fafc;
     --login-input-bg: rgba(30, 41, 59, 0.9);
     --login-input-border: rgba(148, 163, 184, 0.5);
-    --login-input-border-hover: rgba(148, 163, 184, 0.7);
+    --login-input-border-hover: var(--holiday-green);
     --login-input-text: #f8fafc;
     --login-input-placeholder: #94a3b8;
     --login-text-primary: #f8fafc;
@@ -45,8 +50,8 @@
     --login-error-bg: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
     --login-error-border: #ef4444;
     --login-error-text: #fecaca;
-    --login-accent: #22d3ee;
-    --login-accent-hover: #06b6d4;
+    --login-accent: var(--holiday-green);
+    --login-accent-hover: var(--holiday-green-dark);
     --login-social-border: rgba(148, 163, 184, 0.5);
   }
 }
@@ -68,11 +73,32 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: 
+  background:
+    /* Noel gradient nền đỏ-xanh nhạt */
+    linear-gradient(120deg, rgba(220, 38, 38, 0.10), rgba(22, 163, 74, 0.10)),
     linear-gradient(var(--login-bg-overlay), var(--login-bg-overlay)),
     url("/Parking_lotV4.png") center / cover no-repeat;
   filter: brightness(1.1) saturate(1.15);
   transform: scale(1.05);
+}
+
+/* Hiệu ứng tuyết rơi nhẹ */
+.login-wrapper::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(white 1px, transparent 1px),
+    radial-gradient(white 1px, transparent 1px);
+  background-size: 40px 40px, 60px 60px;
+  background-position: 0 0, 20px 20px;
+  opacity: 0.25;
+  animation: snow 30s linear infinite;
+}
+@keyframes snow {
+  from { background-position: 0 0, 20px 20px; }
+  to   { background-position: 0 800px, 20px 820px; }
 }
 
 /* ====== FORM CARD ====== */
@@ -156,8 +182,9 @@
   margin-bottom: 10px;
 }
 .login-text{
-  background-color: rgba(255, 255, 255, 0) !important;
+  background-color: var(--login-input-bg) !important;
 }
+
 .form-input::placeholder {
   color: var(--login-input-placeholder);
   font-weight: 400;
@@ -214,7 +241,7 @@
 /* ====== BUTTON LOGIN ====== */
 .submit-btn {
   width: 100%;
-  background: linear-gradient(135deg, var(--login-accent) 0%, var(--login-accent-hover) 100%);
+  background: linear-gradient(135deg, var(--holiday-red) 0%, var(--holiday-green) 100%);
   color: white;
   font-weight: 600;
   font-size: 16px;
@@ -225,8 +252,8 @@
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 
-    0 4px 16px rgba(6, 182, 212, 0.35),
-    0 2px 8px rgba(6, 182, 212, 0.25);
+    0 8px 20px rgba(220, 38, 38, 0.20),
+    0 8px 20px rgba(22, 163, 74, 0.20);
   position: relative;
   overflow: hidden;
 }
@@ -250,11 +277,11 @@
 }
 
 .submit-btn:hover {
-  background: linear-gradient(135deg, var(--login-accent-hover) 0%, var(--login-accent) 100%);
+  background: linear-gradient(135deg, var(--holiday-green) 0%, var(--holiday-red) 100%);
   transform: translateY(-2px);
   box-shadow: 
-    0 6px 24px rgba(6, 182, 212, 0.45),
-    0 4px 12px rgba(6, 182, 212, 0.35);
+    0 10px 28px rgba(22, 163, 74, 0.35),
+    0 8px 20px rgba(220, 38, 38, 0.30);
 }
 
 .submit-btn:active {
@@ -300,7 +327,7 @@
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  color: var(--login-text-muted);
+  color: var(--login-text-primary);
   user-select: none;
   transition: color 0.2s ease;
 }
@@ -317,14 +344,14 @@
 }
 
 .forgot-link {
-  color: var(--login-accent);
+  color: var(--holiday-red);
   text-decoration: none;
   font-weight: 500;
   transition: all 0.2s ease;
 }
 
 .forgot-link:hover {
-  color: var(--login-accent-hover);
+  color: var(--holiday-red-dark);
   text-decoration: underline;
 }
 
@@ -442,7 +469,8 @@
 }
 
 .google-btn {
-  color: #4285f4;
+  color: inherit;
+
 }
 
 
@@ -468,12 +496,12 @@
   text-align: center;
   margin-top: 20px;
   font-size: 14px;
-  color: var(--login-text-secondary);
+  color: var(--login-text-primary);
   transition: color 0.3s ease;
 }
 
 .signup-link a {
-  color: var(--login-accent);
+  color: var(--holiday-green);
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
@@ -488,7 +516,7 @@
   left: 0;
   width: 0;
   height: 2px;
-  background: var(--login-accent);
+  background: var(--holiday-green);
   transition: width 0.3s ease;
 }
 
@@ -497,7 +525,7 @@
 }
 
 .signup-link a:hover {
-  color: var(--login-accent-hover);
+  color: var(--holiday-green-dark);
 }
 
 /* ====== RESPONSIVE ====== */
@@ -620,3 +648,156 @@
   }
 }
 
+/* ===== READABILITY PATCH — tăng tương phản tổng ===== */
+.form-label{ color: var(--login-label-color) !important; }
+.signup-link{ color: var(--login-text-primary) !important; }
+.info-note strong{ color: var(--login-text-primary) !important; }
+.social-btn{ color: var(--login-text-primary) !important; }
+.divider{ color: var(--login-text-secondary) !important; }
+
+.forgot-link{
+  color: var(--holiday-red-dark) !important;
+  font-weight: 600;
+}
+
+/* Input nền xám rất nhạt ở light mode */
+@media (prefers-color-scheme: light){
+  :root{
+    --login-input-bg: #eef2f7;
+ /* slate-100 */
+  }
+  .form-input{
+    background-color: var(--login-input-bg) !important;
+  }
+  .form-input:hover,
+  .form-input:focus{
+    background-color: var(--login-input-bg) !important;
+  }
+}
+
+/* ==== PATCH: Label đậm & rõ hơn ==== */
+:root{
+  --login-label-color: #0b1220; /* đậm hơn #0f172a một chút */
+}
+
+.form-label{
+  color: var(--login-label-color) !important;
+  font-weight: 700 !important;   /* tăng từ 600 -> 700 */
+  font-size: 15px !important;    /* nhỉnh hơn 14px */
+  letter-spacing: .1px;
+  opacity: 1 !important;
+  text-shadow: none !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+}
+
+/* Dark mode – trắng hẳn để tương phản tối đa */
+@media (prefers-color-scheme: dark){
+  :root{ --login-label-color: #ffffff; }
+}
+/* Label & input rõ hơn khi focus vào ô */
+.form-group:focus-within .form-label{
+  color: var(--login-accent) !important;  /* xanh lá chủ đạo */
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+
+/* Chữ trong ô và con trỏ hiển thị đậm khi gõ */
+.form-input{
+  color: var(--login-input-text) !important;   /* #0f172a ở light */
+  caret-color: var(--login-label-color) !important; /* con trỏ dễ thấy */
+}
+
+/* Nếu muốn label luôn đậm kể cả không focus */
+.form-label{
+  color: var(--login-label-color) !important;
+  font-weight: 700 !important;
+  font-size: 15px; /* tùy chọn: nhỉnh hơn 1px */
+}
+/* ===== UI POLISH PATCH ===== */
+
+/* Card & Title */
+.login-card{
+  max-width: 440px;
+  border-radius: 20px;
+  padding: 40px 36px 32px;
+}
+.login-title{
+  font-size: 32px;
+  letter-spacing: -0.4px;
+  margin-bottom: 22px;
+}
+
+/* Label & group spacing */
+.form-group{ margin-bottom: 16px; }
+.form-label{
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--login-label-color);
+}
+
+/* Input “pill nhẹ” + placeholder rõ hơn */
+.form-input{
+  height: 46px;                /* đồng bộ chiều cao */
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(0,0,0,.035);
+}
+.form-input::placeholder{ opacity: .95; }
+
+/* State khi focus – rõ ràng nhưng không chói */
+.form-input:focus{
+  transform: none;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--login-accent) 18%, transparent),
+    0 1px 2px rgba(0,0,0,.06);
+}
+.form-group:focus-within .form-label{
+  color: var(--login-label-color);
+  font-weight: 700;
+}
+
+/* Remember / Forgot — canh hàng gọn */
+.form-options{
+  align-items: center;
+  gap: 12px;
+}
+.forgot-link{
+  margin-left: auto;           /* đẩy sang phải */
+  font-weight: 700;
+}
+
+/* CTA button – nổi bật nhưng tinh tế */
+.submit-btn{
+  height: 48px;
+  border-radius: 14px;
+  padding: 0 22px;
+  box-shadow:
+    0 10px 24px rgba(22,163,74,.25),
+    0 10px 24px rgba(220,38,38,.18);
+}
+.submit-btn:focus-visible{
+  outline: 3px solid color-mix(in srgb, var(--login-accent) 45%, transparent);
+  outline-offset: 2px;
+}
+
+/* Divider dạng “chip” */
+.divider{ margin: 20px 0; }
+.divider span{
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  box-shadow: 0 1px 0 rgba(0,0,0,.05);
+}
+
+/* Social button tròn đều, cân icon */
+.social-login{ margin-bottom: 10px; }
+.social-btn{
+  height: 46px;
+  border-radius: 999px;
+}
+.social-icon{ width: 18px; height: 18px; }
+
+/* Footer note & link */
+.signup-link{ margin-top: 16px; }

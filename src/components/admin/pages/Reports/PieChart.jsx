@@ -194,7 +194,7 @@ export default function PieChart({ data = [] }) {
         Cơ cấu gói dịch vụ
       </h4>
 
-      <ResponsiveContainer width="100%" height={360}>
+      <ResponsiveContainer width="100%" height={360} minWidth={0}>
         <RePieChart>
           <Pie
             data={normalized}

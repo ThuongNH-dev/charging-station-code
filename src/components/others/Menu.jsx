@@ -401,6 +401,7 @@ export default function AccountMenu() {
 
         <Divider />
 
+        {/* ✅ Menu luôn hiển thị cho mọi role */}
         <MenuItem
           onClick={() => {
             handleClose();
@@ -416,50 +417,56 @@ export default function AccountMenu() {
           Quản lý tài khoản
         </MenuItem>
 
-        <MenuItem
-          onClick={() => {
-            handleClose();
-            navigate("/company/reports");
-          }}
-          sx={{
-            borderRadius: "10px",
-            mx: 0.5,
-            margin: "5px 0px",
-            "&:hover": { background: "#f5f7fa" },
-          }}
-        >
-          Thống kê theo tháng
-        </MenuItem>
+        {/* 🔒 Ẩn 3 mục dưới nếu là Staff */}
+        {!roleText?.toLowerCase().includes("staff") && (
+          <>
+            <MenuItem
+              onClick={() => {
+                handleClose();
+                navigate("/company/reports");
+              }}
+              sx={{
+                borderRadius: "10px",
+                mx: 0.5,
+                margin: "5px 0px",
+                "&:hover": { background: "#f5f7fa" },
+              }}
+            >
+              Thống kê theo tháng
+            </MenuItem>
 
-        <MenuItem
-          onClick={() => {
-            handleClose();
-            navigate("/charging");
-          }}
-          sx={{
-            borderRadius: "10px",
-            mx: 0.5,
-            margin: "5px 0px",
-            "&:hover": { background: "#f5f7fa" },
-          }}
-        >
-          Phiên đang sạc
-        </MenuItem>
+            <MenuItem
+              onClick={() => {
+                handleClose();
+                navigate("/charging");
+              }}
+              sx={{
+                borderRadius: "10px",
+                mx: 0.5,
+                margin: "5px 0px",
+                "&:hover": { background: "#f5f7fa" },
+              }}
+            >
+              Phiên đang sạc
+            </MenuItem>
 
-        <MenuItem
-          onClick={() => {
-            handleClose();
-            navigate("/manageSubcription");
-          }}
-          sx={{
-            borderRadius: "10px",
-            mx: 0.5,
-            margin: "5px 0px",
-            "&:hover": { background: "#f5f7fa" },
-          }}
-        >
-          Quản lý gói dịch vụ
-        </MenuItem>
+            <MenuItem
+              onClick={() => {
+                handleClose();
+                navigate("/manageSubcription");
+              }}
+              sx={{
+                borderRadius: "10px",
+                mx: 0.5,
+                margin: "5px 0px",
+                "&:hover": { background: "#f5f7fa" },
+              }}
+            >
+              Quản lý gói dịch vụ
+            </MenuItem>
+          </>
+        )}
+
 
         {normRole === "customer" && (
           <MenuItem
