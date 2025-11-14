@@ -294,14 +294,21 @@ th {
   justify-content: center;
   align-items: center;
   z-index: 999;
+  margin: 0;
+  padding: 0;
 }
 
 .modal-box {
-  background: #1e293b; /* Nền tối */
-  color: #f1f5f9; /* Chữ sáng */
-  padding: 24px;
-  border-radius: 12px;
-  width: 340px;
+  background: transparent !important;
+  color: inherit;
+  padding: 0 !important;
+  border-radius: 0;
+  width: auto;
+  max-width: 100%;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   animation: fadeIn 0.25s ease;
 }
 
@@ -714,13 +721,46 @@ th {
   z-index: 9999; /* cao hơn mọi thứ */
 }
 .modal-container {
-  background: #fff;
-  color: #111;
-  padding: 24px;
-  border-radius: 12px;
-  width: 420px;
-  max-width: calc(100% - 32px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  background: #ffffff !important;
+  color: #0f172a !important;
+  padding: 36px 48px !important;
+  border-radius: 18px !important;
+  width: 1200px !important;
+  min-width: 1200px !important;
+  max-width: 90vw !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.2) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif !important;
+  border: none !important;
+  box-sizing: border-box !important;
+  margin: 0 auto !important;
+  position: relative !important;
+}
+
+.modal-container h3 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a !important;
+  margin: 0 0 30px 0;
+  padding-bottom: 18px;
+  border-bottom: 2px solid #e5eaf2;
+  letter-spacing: -0.01em;
+}
+
+.modal-container .modal-content {
+  padding: 0;
+}
+
+.modal-container .modal-error {
+  padding: 16px 20px;
+  color: #dc2626;
+  background-color: #fef2f2;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  font-size: 14px;
+  line-height: 1.5;
 }
 /* ===== Users table ONLY (scoped) ===== */
 .user-table--users .table-responsive-wrapper {
@@ -1032,4 +1072,331 @@ th {
 }
 .table-pagination .ant-pagination-item-active {
   border-color: #1677ff;
+}
+
+/* ================== SERVICE PACKAGE FORM STYLES ================== */
+
+/* Main form container */
+.service-form {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  color: #0f172a !important;
+  box-sizing: border-box;
+}
+
+.service-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+  gap: 24px 56px;
+}
+
+.service-form .form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+/* Form group spacing */
+.service-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+/* Labels */
+.service-form .form-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #000000 !important;
+  margin: 0;
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.service-form .form-label .required-asterisk {
+  color: #ef4444;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+/* Form hint text */
+.service-form .form-hint {
+  font-size: 13px;
+  color: #475569;
+  margin: 0 0 4px 0;
+  line-height: 1.6;
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* Input fields - Text, Number */
+.service-form .form-input {
+  width: 100%;
+  max-width: 100%;
+  padding: 14px 18px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #0f172a;
+  background-color: #fcfdff;
+  border: 1.6px solid #d9e2f1;
+  border-radius: 10px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.service-form .form-input:focus {
+  outline: none;
+  border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.1);
+}
+
+.service-form .form-input:hover:not(:disabled) {
+  border-color: #cbd5e1;
+}
+
+.service-form .form-input::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+.service-form .form-input:disabled {
+  background-color: #f1f5f9;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Select dropdown */
+.service-form .form-select {
+  width: 100%;
+  max-width: 100%;
+  padding: 14px 44px 14px 18px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #0f172a;
+  background-color: #fcfdff;
+  border: 1.6px solid #d9e2f1;
+  border-radius: 10px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+  box-sizing: border-box;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14' fill='none'%3E%3Cpath d='M3.5 5.25L7 8.75L10.5 5.25' stroke='%23334155' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.service-form .form-select:focus {
+  outline: none;
+  border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.1);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14' fill='none'%3E%3Cpath d='M3.5 5.25L7 8.75L10.5 5.25' stroke='%231677ff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.service-form .form-select:hover:not(:disabled) {
+  border-color: #cbd5e1;
+}
+
+.service-form .form-select:disabled {
+  background-color: #f1f5f9;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Textarea */
+.service-form .form-textarea {
+  width: 100%;
+  max-width: 100%;
+  padding: 14px 18px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: #0f172a;
+  background-color: #fcfdff;
+  border: 1.6px solid #d9e2f1;
+  border-radius: 10px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 90px;
+}
+
+.service-form .form-textarea:focus {
+  outline: none;
+  border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.1);
+}
+
+.service-form .form-textarea:hover:not(:disabled) {
+  border-color: #cbd5e1;
+}
+
+.service-form .form-textarea::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+.service-form .form-textarea:disabled {
+  background-color: #f1f5f9;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Checkbox group */
+.service-form .checkbox-group {
+  padding: 8px 0;
+}
+
+.service-form .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #1e293b;
+  font-weight: 500;
+  user-select: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.service-form .form-checkbox {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: #1677ff;
+  margin: 0;
+  flex-shrink: 0;
+  border-radius: 4px;
+  border: 1.5px solid #cbd5e1;
+  transition: all 0.2s ease;
+}
+
+.service-form .checkbox-label:hover .form-checkbox {
+  border-color: #1677ff;
+}
+
+.service-form .checkbox-label:hover {
+  color: #0f172a;
+}
+
+/* Form actions (buttons) */
+.service-form .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 4px;
+  padding-top: 26px;
+  border-top: 1px solid #dde4f1;
+}
+
+.service-form .btn {
+  padding: 12px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+  min-width: 110px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+.service-form .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Submit button */
+.service-form .btn-submit {
+  background-color: #1667ff;
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(22, 119, 255, 0.2);
+}
+
+.service-form .btn-submit:hover:not(:disabled) {
+  background-color: #125ed6;
+  box-shadow: 0 4px 8px rgba(22, 119, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.service-form .btn-submit:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(22, 119, 255, 0.2);
+}
+
+/* Cancel button */
+.service-form .btn-cancel {
+  background-color: #f6f8fb;
+  color: #334155;
+  border: 1.5px solid #d8e1f0;
+}
+
+.service-form .btn-cancel:hover:not(:disabled) {
+  background-color: #f1f5f9;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+.service-form .btn-cancel:active:not(:disabled) {
+  background-color: #e2e8f0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .modal-container {
+    width: calc(100vw - 40px) !important;
+    min-width: unset !important;
+    padding: 32px 40px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .modal-container {
+    width: calc(100% - 20px) !important;
+    min-width: unset;
+    padding: 28px 24px;
+  }
+
+  .service-form {
+    gap: 22px;
+  }
+
+  .service-form .form-group {
+    gap: 8px;
+  }
+
+  .service-form .form-input,
+  .service-form .form-select,
+  .service-form .form-textarea {
+    padding: 12px 16px;
+    font-size: 15px;
+  }
+
+  .service-form .form-actions {
+    flex-direction: column-reverse;
+    gap: 12px;
+  }
+
+  .service-form .btn {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .service-form .form-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
 }
