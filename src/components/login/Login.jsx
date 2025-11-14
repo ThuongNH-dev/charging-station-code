@@ -507,7 +507,7 @@ export default function Login() {
             </button>
 
             <div className="divider">
-              <span>Hoặc đăng nhập bằng</span>
+              <span className="login-text">Hoặc đăng nhập bằng</span>
             </div>
 
             <div className="social-login">
