@@ -21,7 +21,6 @@ import {
 } from "recharts";
 import AreaBox from "./AreaBox";
 import DetailedStationTable from "./DetailedStationTable";
-import StackedBarChart from "./StackedBarChart";
 
 const COLORS = [
   "#4285F4",
@@ -187,30 +186,37 @@ function DailyCharts({ dailySessions = [], dailyRevenue = [] }) {
 function RevenueByPlan({ data = [] }) {
   if (!data.length) {
     return (
-      <div
-        style={{
-          textAlign: "center",
-          padding: 40,
-          color: "#777",
-          fontStyle: "italic",
-        }}
-      >
+      <div className="chart-empty">
         Không có dữ liệu doanh thu theo gói
       </div>
     );
   }
 
   return (
-    <div style={{ marginTop: 20 }}>
-      <h4>Doanh thu theo gói dịch vụ (₫)</h4>
-      <div className="chart-box-350">
+    <div className="plan-revenue-card">
+      <div className="plan-revenue-top">
+        <div>
+          <p className="eyebrow">Cơ cấu dịch vụ</p>
+          <h4>Doanh thu theo gói dịch vụ</h4>
+          <span className="subtitle">Đơn vị: đồng (₫)</span>
+        </div>
+        <div className="mini-legend">
+          {OFFICIAL_PLANS.map((plan, i) => (
+            <span key={plan}>
+              <i style={{ background: COLORS[i % COLORS.length] }} />
+              {plan}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="plan-revenue-chart">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" />
             <YAxis />
             <Tooltip formatter={(v) => `${v.toLocaleString()} ₫`} />
-            <Legend />
             {OFFICIAL_PLANS.map((plan, i) => (
               <Bar
                 key={plan}
@@ -222,7 +228,7 @@ function RevenueByPlan({ data = [] }) {
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <p style={{ marginTop: 8, color: "#666", fontSize: 12 }}>
+      <p className="chart-footnote">
         Chú thích: Mỗi cột là một tháng; màu sắc thể hiện doanh thu từng gói.
       </p>
     </div>
@@ -249,35 +255,76 @@ function ServiceStructurePie({ data = [] }) {
   }
 
   const total = data.reduce((s, d) => s + Number(d.value || 0), 0);
+  const dominant = data.reduce(
+    (best, item) =>
+      Number(item.value || 0) > Number(best.value || 0) ? item : best,
+    data[0] || { value: 0 }
+  );
+
+  const renderLabel = ({ name, percent }) => {
+    if (percent < 0.06) return "";
+    return `${name} ${(percent * 100).toFixed(1)}%`;
+  };
 
   return (
-    <div style={{ marginTop: 30 }}>
+    <div className="service-structure-card">
       <h4>Cơ cấu dịch vụ (theo doanh thu)</h4>
-      <div className="chart-box-350">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              nameKey="name"
-              outerRadius={100}
-              label={({ name, percent }) =>
-                `${name} ${(percent * 100).toFixed(1)}%`
-              }
-            >
-              {data.map((entry, index) => (
-                <Cell key={index} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip
-              formatter={(v) => `${v.toLocaleString()} ₫`}
-              labelFormatter={() => `Tổng: ${total.toLocaleString()} ₫`}
-            />
-            <Legend />
-          </PieChart>
-        </ResponsiveContainer>
+      <div className="service-structure-pie">
+        <div className="pie-chart-box">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart margin={{ top: 8 }}>
+              <Pie
+                data={data}
+                dataKey="value"
+                nameKey="name"
+                innerRadius={70}
+                outerRadius={120}
+                paddingAngle={2}
+                labelLine={false}
+                label={renderLabel}
+              >
+                {data.map((entry, index) => (
+                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(v) => `${v.toLocaleString()} ₫`}
+                labelFormatter={() => `Tổng: ${total.toLocaleString()} ₫`}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="pie-summary">
+          <p className="pie-summary-label">Gói nổi bật</p>
+          <h5>{dominant?.name || "—"}</h5>
+          <span className="pie-summary-percent">
+            {total > 0
+              ? `${((dominant?.value || 0) / total * 100).toFixed(1)}%`
+              : "0%"}
+          </span>
+          <p className="pie-summary-total">
+            Tổng doanh thu: <strong>{total.toLocaleString()} ₫</strong>
+          </p>
+        </div>
       </div>
-      <p style={{ marginTop: 8, color: "#666", fontSize: 12 }}>
+
+      <div className="pie-legend">
+        {data.map((item, index) => (
+          <div className="pie-legend-item" key={item.name || index}>
+            <span
+              className="dot"
+              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+            />
+            <span className="name">{item.name}</span>
+            <span className="value">
+              {item.value?.toLocaleString() || 0} ₫
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <p className="pie-footnote">
         Chú thích: Tỷ trọng doanh thu giữa 6 gói dịch vụ hợp lệ.
       </p>
     </div>
@@ -376,7 +423,7 @@ export default function ReportContent({ data, reportFilter }) {
       return (
         <div className="report-content-area">
           <h3 className="comparison-title">Cơ cấu dịch vụ</h3>
-          <StackedBarChart data={serviceStructure?.monthlyRevenue || []} />
+          <RevenueByPlan data={serviceStructure?.monthlyRevenue || []} />
           <ServiceStructurePie data={serviceStructure?.pieData || []} />
         </div>
       );
