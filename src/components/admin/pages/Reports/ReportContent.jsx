@@ -1,8 +1,8 @@
 // =========================================================
 // ReportContent.jsx — HOÀN CHỈNH (Recharts + dữ liệu từ API)
 // =========================================================
+import React, { useState, useEffect, useMemo } from "react";
 
-import React from "react";
 import {
   BarChart,
   Bar,
@@ -186,9 +186,7 @@ function DailyCharts({ dailySessions = [], dailyRevenue = [] }) {
 function RevenueByPlan({ data = [] }) {
   if (!data.length) {
     return (
-      <div className="chart-empty">
-        Không có dữ liệu doanh thu theo gói
-      </div>
+      <div className="chart-empty">Không có dữ liệu doanh thu theo gói</div>
     );
   }
 
@@ -300,7 +298,7 @@ function ServiceStructurePie({ data = [] }) {
           <h5>{dominant?.name || "—"}</h5>
           <span className="pie-summary-percent">
             {total > 0
-              ? `${((dominant?.value || 0) / total * 100).toFixed(1)}%`
+              ? `${(((dominant?.value || 0) / total) * 100).toFixed(1)}%`
               : "0%"}
           </span>
           <p className="pie-summary-total">
@@ -317,9 +315,7 @@ function ServiceStructurePie({ data = [] }) {
               style={{ backgroundColor: COLORS[index % COLORS.length] }}
             />
             <span className="name">{item.name}</span>
-            <span className="value">
-              {item.value?.toLocaleString() || 0} ₫
-            </span>
+            <span className="value">{item.value?.toLocaleString() || 0} ₫</span>
           </div>
         ))}
       </div>
@@ -332,7 +328,7 @@ function ServiceStructurePie({ data = [] }) {
 }
 
 // =========================================================
-// 🔹 5. So sánh khu vực (Bar) — nếu còn dùng
+// 🔹 5. So sánh khu vực (Bar)
 // =========================================================
 function AreaComparison({ areaData = {} }) {
   const data = Object.entries(areaData).map(([key, value]) => ({
@@ -383,6 +379,46 @@ export default function ReportContent({ data, reportFilter }) {
 
   const { areaComparison, stationTable, timeChart, serviceStructure } = data;
 
+  // ====== CHỌN THÁNG + PIE DATA THEO THÁNG ======
+  const monthlyRevenue = serviceStructure?.monthlyRevenue || [];
+
+  // state: tháng đang chọn (VD "11/2025")
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    if (!monthlyRevenue.length) return "";
+    // mặc định: tháng mới nhất
+    return monthlyRevenue[monthlyRevenue.length - 1].month;
+  });
+
+  // Khi monthlyRevenue thay đổi (do filter ngày / trạm),
+  // nếu tháng đang chọn không còn trong danh sách thì nhảy về tháng mới nhất
+  useEffect(() => {
+    if (!monthlyRevenue.length) {
+      setSelectedMonth("");
+      return;
+    }
+    const exists = monthlyRevenue.some((row) => row.month === selectedMonth);
+    if (!selectedMonth || !exists) {
+      setSelectedMonth(monthlyRevenue[monthlyRevenue.length - 1].month);
+    }
+  }, [monthlyRevenue, selectedMonth]);
+
+  // Tính pieData theo THÁNG đang chọn
+  const pieDataForSelectedMonth = useMemo(() => {
+    if (!monthlyRevenue.length) return [];
+
+    const row =
+      monthlyRevenue.find((r) => r.month === selectedMonth) ||
+      monthlyRevenue[monthlyRevenue.length - 1];
+
+    if (!row) return [];
+
+    return OFFICIAL_PLANS.map((name) => ({
+      name,
+      value: Number(row[name] || 0),
+    }));
+  }, [monthlyRevenue, selectedMonth]);
+  // ====== HẾT PHẦN THÊM MỚI ======
+
   switch (reportFilter.viewType) {
     case "area-comparison":
       return (
@@ -423,8 +459,46 @@ export default function ReportContent({ data, reportFilter }) {
       return (
         <div className="report-content-area">
           <h3 className="comparison-title">Cơ cấu dịch vụ</h3>
-          <RevenueByPlan data={serviceStructure?.monthlyRevenue || []} />
-          <ServiceStructurePie data={serviceStructure?.pieData || []} />
+
+          {/* Bộ lọc tháng cho view Cơ cấu dịch vụ */}
+          {monthlyRevenue.length > 0 && (
+            <div
+              style={{
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <span style={{ fontWeight: 500 }}>Tháng:</span>
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  border: "1px solid #ccc",
+                  minWidth: 120,
+                }}
+              >
+                {monthlyRevenue.map((row) => (
+                  <option key={row.month} value={row.month}>
+                    {row.month}
+                  </option>
+                ))}
+              </select>
+              <span style={{ fontSize: 12, color: "#666" }}>
+                (Bar hiển thị toàn bộ các tháng trong khoảng lọc. Pie hiển thị
+                riêng tháng đang chọn.)
+              </span>
+            </div>
+          )}
+
+          {/* Bar: tất cả tháng trong range */}
+          <RevenueByPlan data={monthlyRevenue} />
+
+          {/* Pie: riêng tháng đang chọn */}
+          <ServiceStructurePie data={pieDataForSelectedMonth} />
         </div>
       );
 
