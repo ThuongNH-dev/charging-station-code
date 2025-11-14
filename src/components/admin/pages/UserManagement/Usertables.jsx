@@ -1,10 +1,10 @@
-import React, { useState } from "react";
-
+// src/components/admin/pages/UserManagement/Usertables.jsx
+import React, { useState, useMemo, useRef } from "react";
 import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { Pagination } from "antd";
 
 /* =========================================================
-   🔹 HÀM TIÊU ĐỀ BẢNG
+   🔹 TIÊU ĐỀ
    ========================================================= */
 const getTableTitle = (userType) => {
   switch (userType) {
@@ -18,7 +18,7 @@ const getTableTitle = (userType) => {
 };
 
 /* =========================================================
-   🔹 HÀM XÁC ĐỊNH CỘT BẢNG THEO LOẠI USER
+   🔹 CỘT BẢNG THEO LOẠI USER
    ========================================================= */
 const getColumns = (userType) => {
   const cols = [
@@ -27,16 +27,13 @@ const getColumns = (userType) => {
   ];
 
   if (userType === "individual") {
-    // === CỘT CỦA NGƯỜI DÙNG CÁ NHÂN ===
     cols.push({ key: "fullName", header: "Tên" });
     cols.push({ key: "phone", header: "SĐT" });
     cols.push({ key: "email", header: "Email" });
     cols.push({ key: "accountType", header: "Loại tài khoản" });
-    cols.push({ key: "servicePackageName", header: "Gói dịch vụ" });
+    cols.push({ key: "planName", header: "Gói dịch vụ" });
   } else if (userType === "company") {
-    // === CỘT CỦA DOANH NGHIỆP ===
     cols.push({ key: "companyName", header: "Công ty" });
-    // ❌ Đã bỏ Người đại diện, SĐT đại diện và Quy mô
     cols.push({ key: "email", header: "Email" });
     cols.push({ key: "taxCode", header: "Mã số thuế" });
     cols.push({ key: "address", header: "Địa chỉ" });
@@ -51,24 +48,81 @@ const getColumns = (userType) => {
 };
 
 /* =========================================================
-   🔹 HÀM RENDER GIÁ TRỊ Ô (CELL)
+   🔹 HELPERS
    ========================================================= */
-const renderCell = (user, key, index, servicePackages, subscriptions) => {
+const pickUserSubscription = (subs, customerId) => {
+  if (!customerId || !Array.isArray(subs)) return null;
+  const cid = Number(customerId);
+  const candidates = subs.filter(
+    (s) =>
+      Number(s?.customerId) === cid &&
+      (s?.companyId == null || Number(s.companyId) === 0)
+  );
+  if (candidates.length === 0) return null;
+
+  const rank = (st) => (st === "Active" ? 2 : st === "Pending" ? 1 : 0);
+  const when = (s) => new Date(s?.startDate || s?.updatedAt || 0).getTime();
+
+  candidates.sort((a, b) => {
+    const r = rank(b?.status) - rank(a?.status);
+    if (r !== 0) return r;
+    return when(b) - when(a);
+  });
+
+  return candidates[0];
+};
+
+const buildPlanMap = (servicePackages = []) =>
+  servicePackages.reduce((acc, p) => {
+    const id = Number(p?.subscriptionPlanId ?? p?.planId);
+    if (!Number.isNaN(id)) acc[id] = p?.planName;
+    return acc;
+  }, {});
+
+const pickCompanyLatestInvoice = (invoices, companyId) => {
+  if (!companyId || !Array.isArray(invoices)) return null;
+  const cid = Number(companyId);
+  const list = invoices.filter((i) => Number(i?.companyId) === cid);
+  if (list.length === 0) return null;
+  const when = (x) =>
+    new Date(x?.createdAt || x?.updatedAt || x?.dueDate || 0).getTime();
+  return list.slice().sort((a, b) => when(b) - when(a))[0];
+};
+
+const paymentStatusFromInvoice = (inv) => {
+  if (!inv) return "—";
+  const st = String(inv?.status || "").trim();
+  if (st === "Paid") return "Đã thanh toán";
+  const due = inv?.dueDate ? new Date(inv.dueDate).getTime() : null;
+  if (st !== "Paid" && due && Date.now() > due) return "Quá hạn";
+  return "Chưa thanh toán";
+};
+
+/* =========================================================
+   🔹 RENDER CELL
+   ========================================================= */
+const renderCell = (
+  user,
+  key,
+  index,
+  { userType, pageOffset, subscriptions, planMap, invoices }
+) => {
   const customerInfo =
-    user.customers && user.customers.length > 0 ? user.customers[0] : {};
-  const companyData = user.company || {};
+    user?.customers && user.customers.length > 0 ? user.customers[0] : {};
+  const companyData = user?.company || {};
 
   switch (key) {
     case "STT":
-      return index + 1;
+      return pageOffset + index + 1;
+
     case "accountId":
-      return user.accountId;
+      return user?.accountId ?? "—";
 
     // ======== DOANH NGHIỆP ========
     case "companyName":
       return (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          {companyData.imageUrl && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {companyData?.imageUrl ? (
             <img
               src={companyData.imageUrl}
               alt="logo"
@@ -79,40 +133,59 @@ const renderCell = (user, key, index, servicePackages, subscriptions) => {
                 objectFit: "cover",
               }}
             />
-          )}
-          <span>{companyData.companyName || user.userName || "—"}</span>
+          ) : null}
+          <span>{companyData?.companyName || user?.userName || "—"}</span>
         </div>
       );
+
     case "email":
       return (
-        customerInfo.email || companyData.companyEmail || user.userName || "—"
+        customerInfo?.email ||
+        companyData?.companyEmail ||
+        user?.userName ||
+        "—"
       );
+
     case "taxCode":
-      return companyData.taxCode || "—";
+      return companyData?.taxCode || "—";
+
     case "address":
-      return companyData.address || "—";
-    case "paymentStatus":
-      return companyData.paymentStatus || "—";
+      return companyData?.address || "—";
+
+    case "paymentStatus": {
+      const compId =
+        companyData?.companyId ?? user?.companyId ?? customerInfo?.companyId;
+      const inv = pickCompanyLatestInvoice(invoices, compId);
+      return paymentStatusFromInvoice(inv);
+    }
 
     // ======== CÁ NHÂN ========
     case "fullName":
-      return customerInfo.fullName || "—";
+      return customerInfo?.fullName || "—";
+
     case "phone":
-      return customerInfo.phone || "—";
+      return customerInfo?.phone || "—";
+
     case "planName": {
-      // user.servicePackageName đã được tính toán trong useUserServicesHook
-      // (ví dụ: "Gói Kim Cương" hoặc "Chưa đăng ký")
-      return user.servicePackageName || "—";
+      const sub = pickUserSubscription(subscriptions, customerInfo?.customerId);
+      if (!sub) return "—";
+      const nameFromSub = sub?.planName;
+      const nameFromPlanMap =
+        sub?.subscriptionPlanId != null
+          ? planMap?.[Number(sub.subscriptionPlanId)]
+          : undefined;
+      return nameFromSub || nameFromPlanMap || "—";
     }
 
     case "accountType":
-      return "Cá nhân";
+      return userType === "company" ? "Doanh nghiệp" : "Cá nhân";
 
     // ======== CHUNG ========
     case "role":
-      return user.role || "User";
+      return user?.role || "User";
+
     case "status":
-      return user.status || "Inactive";
+      return user?.status || "Inactive";
 
     default:
       return "—";
@@ -120,7 +193,7 @@ const renderCell = (user, key, index, servicePackages, subscriptions) => {
 };
 
 /* =========================================================
-   🔹 COMPONENT CHÍNH: UserTables
+   🔹 COMPONENT CHÍNH
    ========================================================= */
 export const UserTables = ({
   filteredData = [],
@@ -128,33 +201,53 @@ export const UserTables = ({
   setActiveModal,
   servicePackages = [],
   subscriptions = [],
+  invoices = [],
 }) => {
-  const columns = getColumns(userType);
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10; // số hàng mỗi trang
-  const totalPages = Math.ceil(filteredData.length / pageSize);
-
-  // Chia dữ liệu theo trang
-  const pagedData = filteredData.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
+  const columns = useMemo(() => getColumns(userType), [userType]);
+  const planMap = useMemo(
+    () => buildPlanMap(servicePackages),
+    [servicePackages]
   );
-  if (filteredData.length === 0) {
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
+  const total = filteredData.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+
+  const pagedData = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredData.slice(start, start + pageSize);
+  }, [filteredData, safePage]);
+
+  // Vùng cuộn của bảng: để đưa scrollTop về đầu khi đổi trang
+  const wrapRef = useRef(null);
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    if (wrapRef.current) wrapRef.current.scrollTop = 0;
+  };
+
+  if (total === 0) {
     return (
-      <div className="user-table-section">
+      <div className="user-table-section user-table--users">
         <h3>Thông tin {getTableTitle(userType)} (0 mục)</h3>
         <p>Không tìm thấy dữ liệu người dùng nào phù hợp với bộ lọc.</p>
       </div>
     );
   }
 
+  const pageOffset = (safePage - 1) * pageSize;
+
   return (
-    <div className="user-table-section">
+    <div className="user-table-section user-table--users">
       <h3>
-        Thông tin {getTableTitle(userType)} ({filteredData.length} mục)
+        Thông tin {getTableTitle(userType)} ({total} mục)
       </h3>
-      <div className="table-responsive-wrapper">
-        <table>
+
+      {/* ✅ Vùng CUỘN của nội dung bảng */}
+      <div className="table-responsive-wrapper" ref={wrapRef}>
+        <table className="minimal-table">
           <thead>
             <tr>
               {columns.map((col) => (
@@ -164,41 +257,40 @@ export const UserTables = ({
           </thead>
 
           <tbody>
-            {filteredData.map((user, index) => (
-              <tr key={user.accountId}>
+            {pagedData.map((user, index) => (
+              <tr key={user?.accountId ?? index}>
                 {columns.map((col) => {
                   if (col.key === "action") {
                     return (
                       <td key={col.key} className="action-cell">
-                        <button
-                          className="icon-btn"
+                        <EditOutlined
+                          className="action-icon edit-icon"
+                          title="Chỉnh sửa"
                           onClick={() =>
-                            setActiveModal(`editUser-${user.accountId}`)
+                            setActiveModal?.(`editUser-${user.accountId}`)
                           }
-                        >
-                          <EditOutlined />
-                        </button>
-                        <button
-                          className="icon-btn"
+                        />
+                        <DeleteOutlined
+                          className="action-icon delete-icon"
+                          title="Xóa"
                           onClick={() =>
-                            setActiveModal(`deleteUser-${user.accountId}`)
+                            setActiveModal?.(`deleteUser-${user.accountId}`)
                           }
-                        >
-                          <DeleteOutlined />
-                        </button>
+                        />
                       </td>
                     );
                   }
 
                   if (col.key === "status") {
+                    const isActive = String(user?.status) === "Active";
                     return (
                       <td key={col.key}>
                         <span
                           className={`status ${
-                            user.status === "Active" ? "active" : "inactive"
+                            isActive ? "active" : "inactive"
                           }`}
                         >
-                          {user.status}
+                          {user?.status || "Inactive"}
                         </span>
                       </td>
                     );
@@ -206,13 +298,13 @@ export const UserTables = ({
 
                   return (
                     <td key={col.key}>
-                      {renderCell(
-                        user,
-                        col.key,
-                        index,
-                        servicePackages,
-                        subscriptions
-                      )}
+                      {renderCell(user, col.key, index, {
+                        userType,
+                        pageOffset,
+                        subscriptions,
+                        planMap,
+                        invoices,
+                      })}
                     </td>
                   );
                 })}
@@ -220,16 +312,26 @@ export const UserTables = ({
             ))}
           </tbody>
         </table>
-        <div style={{ marginTop: 12, textAlign: "right" }}>
+      </div>
+
+      {/* ✅ Phân trang đặt NGOÀI vùng cuộn (luôn ở dưới) */}
+      {total > pageSize && (
+        <div className="table-pagination table-pagination--outside">
           <Pagination
-            current={currentPage}
+            current={safePage}
             pageSize={pageSize}
-            total={filteredData.length}
-            onChange={(page) => setCurrentPage(page)}
+            total={total}
+            onChange={handlePageChange}
             showSizeChanger={false}
+            hideOnSinglePage
+            itemRender={(page, type) => {
+              if (type === "prev") return <span>← Trước</span>;
+              if (type === "next") return <span>Sau →</span>;
+              return <span>{page}</span>;
+            }}
           />
         </div>
-      </div>
+      )}
     </div>
   );
 };

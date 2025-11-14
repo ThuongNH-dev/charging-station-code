@@ -7,6 +7,7 @@ import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { GoogleOAuthProvider } from "@react-oauth/google"; // ✅ thêm dòng này
+import "@ant-design/v5-patch-for-react-19";
 
 // === NAV DEBUG: log có chọn lọc ===
 // main.jsx  (DEBUG an toàn – KHÔNG ném lỗi nữa)
@@ -27,11 +28,14 @@ history.replaceState = function (state, title, url) {
 };
 
 // ✅ Dán clientId bạn lấy trong Google Cloud Console
-const clientId = "146566535357-hkhvmq3osejt8f5d4c1mcqmiedjn2568.apps.googleusercontent.com";
+const clientId =
+  "146566535357-hkhvmq3osejt8f5d4c1mcqmiedjn2568.apps.googleusercontent.com";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <GoogleOAuthProvider clientId={clientId}> {/* ✅ Bọc toàn app */}
+    <GoogleOAuthProvider clientId={clientId}>
+      {" "}
+      {/* ✅ Bọc toàn app */}
       <BrowserRouter>
         <AuthProvider>
           <App />

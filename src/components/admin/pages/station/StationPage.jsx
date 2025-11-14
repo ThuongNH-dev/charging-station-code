@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "../StationManagement.css";
-import { Button, message } from "antd";
+import { Button, message, Pagination } from "antd";
 import { useNavigate } from "react-router-dom";
 import { stationApi } from "../../../../api/stationApi";
 import FiltersBar from "./FiltersBar";
@@ -22,6 +22,8 @@ export default function StationPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(9);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newStation, setNewStation] = useState({
     StationName: "",
@@ -62,6 +64,26 @@ export default function StationPage() {
       return matchStatus && name.includes(q);
     });
   }, [stations, statusFilter, searchTerm]);
+
+  // Paginated data
+  const paginatedStations = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    return filtered.slice(start, end);
+  }, [filtered, currentPage, pageSize]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchTerm]);
+
+  const handlePageChange = (page, size) => {
+    setCurrentPage(page);
+    if (size !== pageSize) {
+      setPageSize(size);
+      setCurrentPage(1);
+    }
+  };
 
   const openAdd = () => {
     setNewStation({
@@ -121,65 +143,92 @@ export default function StationPage() {
       />
 
       {loading ? (
-        <div>Đang tải…</div>
-      ) : (
-        <div className="station-list">
-          {filtered.length === 0 ? (
-            <p className="no-stations">Không có trạm phù hợp.</p>
-          ) : (
-            filtered.map((s) => (
-              <div
-                className="station-card"
-                key={s.StationId ?? String(Math.random())}
-              >
-                <div className="station-image-container">
-                  <img
-                    src={s.ImageUrl || "/placeholder.png"}
-                    alt="Hình trạm"
-                    className="station-img"
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = "/placeholder.png";
-                    }}
-                  />
-                </div>
-
-                <div className="station-header">
-                  <div>
-                    <h3>{s.StationName}</h3>
-                    <p>
-                      {s.Address} - {s.City}
-                    </p>
-                  </div>
-                  <span
-                    className={`status-badge ${String(
-                      s.Status || ""
-                    ).toLowerCase()}`}
-                  >
-                    {s.Status === "Open"
-                      ? "🟢 OPEN"
-                      : s.Status === "Maintenance"
-                      ? "🟠 MAINTENANCE"
-                      : "⚫ CLOSED"}
-                  </span>
-                </div>
-
-                <div
-                  className="station-footer"
-                  style={{ justifyContent: "flex-end" }}
-                >
-                  <Button
-                    type="primary"
-                    onClick={() => navigate(`/admin/stations/${s.StationId}`)}
-                    disabled={!s.StationId}
-                  >
-                    Xem chi tiết
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
+        <div className="loading-state">
+          <div className="loading-spinner"></div>
+          <p>Đang tải danh sách trạm...</p>
         </div>
+      ) : (
+        <>
+          <div className="station-list">
+            {filtered.length === 0 ? (
+              <div className="no-stations">
+                <p>Không có trạm phù hợp với bộ lọc của bạn.</p>
+                <p style={{ fontSize: "14px", marginTop: "8px", opacity: 0.7 }}>
+                  Thử thay đổi bộ lọc hoặc tìm kiếm khác.
+                </p>
+              </div>
+            ) : (
+              paginatedStations.map((s) => (
+                <div
+                  className="station-card"
+                  key={s.StationId ?? String(Math.random())}
+                >
+                  <div className="station-image-container">
+                    <img
+                      src={s.ImageUrl || "/placeholder.png"}
+                      alt={s.StationName || "Hình trạm"}
+                      className="station-img"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = "/placeholder.png";
+                      }}
+                    />
+                  </div>
+
+                  <div className="station-content">
+                    <div className="station-header">
+                      <div style={{ flex: 1 }}>
+                        <h3>{s.StationName}</h3>
+                        <p>
+                          {s.Address} - {s.City}
+                        </p>
+                      </div>
+                      <span
+                        className={`status-badge ${String(
+                          s.Status || ""
+                        ).toLowerCase()}`}
+                      >
+                        {s.Status === "Open"
+                          ? "🟢 OPEN"
+                          : s.Status === "Maintenance"
+                          ? "🟠 MAINTENANCE"
+                          : "⚫ CLOSED"}
+                      </span>
+                    </div>
+
+                    <div className="station-footer">
+                      <Button
+                        type="primary"
+                        onClick={() => navigate(`/admin/stations/${s.StationId}`)}
+                        disabled={!s.StationId}
+                      >
+                        Xem chi tiết
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {filtered.length > 0 && (
+            <div className="pagination-wrapper">
+              <Pagination
+                current={currentPage}
+                pageSize={pageSize}
+                total={filtered.length}
+                onChange={handlePageChange}
+                onShowSizeChange={handlePageChange}
+                showSizeChanger
+                showQuickJumper
+                showTotal={(total, range) =>
+                  `${range[0]}-${range[1]} của ${total} trạm`
+                }
+                pageSizeOptions={["6", "9", "12", "18", "24"]}
+              />
+            </div>
+          )}
+        </>
       )}
 
       <AddEditStationModal

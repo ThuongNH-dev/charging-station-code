@@ -222,3 +222,15 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
   padding: 15px 20px;
 }
+.btn-light {
+  background: #f5f5f5;
+  border: 1px solid #ccc;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-light:hover {
+  background: #e6f0ff;
+  border-color: #1677ff;
+}

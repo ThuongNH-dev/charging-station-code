@@ -11,11 +11,13 @@ import {
   Row,
   Col,
   DatePicker,
+  Form,
 } from "antd";
 import {
   EyeOutlined,
   ReloadOutlined,
   ExclamationCircleOutlined,
+  InfoCircleOutlined,
 } from "@ant-design/icons";
 import { fetchAuthJSON, getApiBase } from "../../utils/api";
 import "./IncidentManager.css";
@@ -29,12 +31,19 @@ export default function IncidentManager() {
   const [selectedStation, setSelectedStation] = useState(null);
   const [selectedReport, setSelectedReport] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [detailOpen, setDetailOpen] = useState(false);
   const [severityFilter, setSeverityFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState([]);
   const currentAccountId = localStorage.getItem("accountId") || "12";
+  // === Báo cáo sự cố nhanh ===
+const [reportModalOpen, setReportModalOpen] = useState(false);
+const [reportForm] = Form.useForm();
+const [chargers, setChargers] = useState([]);
+const [ports, setPorts] = useState([]);
+
 
   /* ---------------- Load dữ liệu ---------------- */
   useEffect(() => {
@@ -48,7 +57,7 @@ export default function IncidentManager() {
   // === Lấy danh sách trạm mà nhân viên phụ trách ===
   async function loadStaffStations() {
     try {
-      setLoading(true);
+      if (!isInitialLoad) setLoading(true);
       const allStations = await fetchAuthJSON(`${API_BASE}/Stations`);
       let stationsArr =
         allStations?.data ?? allStations?.$values ?? allStations ?? [];
@@ -72,9 +81,11 @@ export default function IncidentManager() {
       );
       setStations(myStations);
       if (myStations.length > 0) setSelectedStation(myStations[0]);
+      setIsInitialLoad(false);
     } catch (err) {
       console.error(err);
       message.error("Không thể tải danh sách trạm!");
+      setIsInitialLoad(false);
     } finally {
       setLoading(false);
     }
@@ -106,6 +117,38 @@ export default function IncidentManager() {
       setLoading(false);
     }
   }
+
+  // === Load trụ sạc & cổng sạc ===
+async function loadChargers(stationId) {
+  try {
+    const res = await fetchAuthJSON(`${API_BASE}/Chargers`);
+    let data = res?.data ?? res?.$values ?? res ?? [];
+    if (!Array.isArray(data)) data = [data];
+    const filtered = data.filter(
+      (c) => String(c.stationId) === String(stationId)
+    );
+    setChargers(filtered);
+  } catch {
+    console.warn("Không thể tải trụ sạc!");
+    setChargers([]);
+  }
+}
+
+async function loadPorts(chargerId) {
+  try {
+    const res = await fetchAuthJSON(`${API_BASE}/Ports`);
+    let data = res?.data ?? res?.$values ?? res ?? [];
+    if (!Array.isArray(data)) data = [data];
+    const filtered = data.filter(
+      (p) => String(p.chargerId) === String(chargerId)
+    );
+    setPorts(filtered);
+  } catch {
+    console.warn("Không thể tải cổng sạc!");
+    setPorts([]);
+  }
+}
+
 
   // === Cập nhật trạng thái sự cố ===
   async function updateStatus(reportId, newStatus) {
@@ -141,6 +184,37 @@ export default function IncidentManager() {
       message.error("Không thể cập nhật trạng thái!");
     }
   }
+
+  // === Gửi báo cáo sự cố ===
+async function handleCreateReport(values) {
+  if (!selectedStation) {
+    message.warning("Vui lòng chọn trạm trước khi gửi báo cáo!");
+    return;
+  }
+  try {
+    await fetchAuthJSON(`${API_BASE}/reports`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        staffId: Number(currentAccountId),
+        stationId: selectedStation.stationId,
+        chargerId: values.chargerId || null,
+        portId: values.portId || null,
+        title: values.title,
+        description: values.description,
+        severity: values.severity,
+        status: "Pending",
+      }),
+    });
+    message.success("✅ Báo cáo sự cố đã được gửi!");
+    reportForm.resetFields();
+    setReportModalOpen(false);
+    setPorts([]);
+  } catch {
+    message.error("Không thể gửi báo cáo!");
+  }
+}
+
 
   /* ---------------- Bộ lọc ---------------- */
   const filteredReports = reports.filter((r) => {
@@ -206,9 +280,25 @@ export default function IncidentManager() {
 
   return (
     <div className="incident-wrap">
-      <h2 style={{ marginBottom: 20 }}>
-        <ExclamationCircleOutlined style={{ color: "#faad14" }} /> Quản lý sự cố
-      </h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+  <h2 style={{ margin: 0 }}>
+    <ExclamationCircleOutlined style={{ color: "#faad14" }} /> Quản lý sự cố
+  </h2>
+
+  {selectedStation && (
+    <Button
+      type="primary"
+      icon={<InfoCircleOutlined />}
+      onClick={() => {
+        loadChargers(selectedStation.stationId);
+        setReportModalOpen(true);
+      }}
+    >
+      Báo cáo sự cố
+    </Button>
+  )}
+</div>
+
 
       {/* === Bộ lọc === */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
@@ -356,6 +446,90 @@ export default function IncidentManager() {
           </>
         )}
       </Modal>
+      {/* === Modal báo cáo sự cố === */}
+<Modal
+  title={`Báo cáo sự cố - ${selectedStation?.stationName || "Chưa chọn trạm"}`}
+  open={reportModalOpen}
+  onCancel={() => setReportModalOpen(false)}
+  footer={null}
+  width={600}
+>
+  {selectedStation ? (
+    <Form form={reportForm} layout="vertical" onFinish={handleCreateReport}>
+      <Form.Item
+        name="title"
+        label="Tiêu đề"
+        rules={[{ required: true, message: "Vui lòng nhập tiêu đề!" }]}
+      >
+        <Input placeholder="VD: Trụ sạc không phản hồi..." />
+      </Form.Item>
+
+      <Form.Item
+        name="description"
+        label="Mô tả chi tiết"
+        rules={[{ required: true, message: "Nhập mô tả chi tiết!" }]}
+      >
+        <Input.TextArea rows={3} placeholder="Mô tả sự cố..." />
+      </Form.Item>
+
+      <Form.Item
+        name="severity"
+        label="Mức độ nghiêm trọng"
+        rules={[{ required: true, message: "Chọn mức độ!" }]}
+      >
+        <Select
+          options={[
+            { label: "Low", value: "Low" },
+            { label: "Medium", value: "Medium" },
+            { label: "High", value: "High" },
+            { label: "Critical", value: "Critical" },
+          ]}
+        />
+      </Form.Item>
+
+      <Form.Item
+        name="chargerId"
+        label="Trụ sạc"
+        rules={[{ required: true, message: "Chọn trụ sạc!" }]}
+      >
+        <Select
+          placeholder="Chọn trụ sạc..."
+          onChange={(v) => {
+            loadPorts(v);
+            reportForm.setFieldValue("portId", null);
+          }}
+          options={chargers.map((c) => ({
+            label: `${c.code || c.chargerName} (${c.type || "Không rõ"})`,
+            value: c.chargerId,
+          }))}
+        />
+      </Form.Item>
+
+      <Form.Item
+        name="portId"
+        label="Cổng sạc"
+        rules={[{ required: true, message: "Chọn cổng sạc!" }]}
+      >
+        <Select
+          placeholder="Chọn cổng sạc..."
+          options={ports.map((p) => ({
+            label: `${p.connectorType || "Port"} — ${p.status}`,
+            value: p.portId,
+          }))}
+        />
+      </Form.Item>
+
+      <Form.Item>
+        <Button type="primary" htmlType="submit" block>
+          Gửi báo cáo
+        </Button>
+      </Form.Item>
+    </Form>
+  ) : (
+    <p className="muted center">⚠️ Vui lòng chọn trạm trước khi báo cáo!</p>
+  )}
+</Modal>
+
     </div>
   );
 }

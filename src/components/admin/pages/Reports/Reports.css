@@ -5,7 +5,8 @@
 /* Tổng thể trang */
 .reports-page {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  /* ⛳ dùng minmax(0,1fr) để cột trái không bị min-content kẹp width */
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 20px;
   padding: 20px;
   background-color: #f4f7f9;
@@ -114,7 +115,8 @@
 .report-main-container {
   grid-column: 1 / 3;
   display: grid;
-  grid-template-columns: 1fr 320px;
+  /* ⛳ cũng dùng minmax để cột chart không bị co sai */
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 20px;
 }
 
@@ -124,6 +126,9 @@
   padding: 30px;
   border-radius: 10px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  /* ⛳ chống min-content kẹp width */
+  min-width: 0;
+  width: 100%;
 }
 
 /* Sidebar (KPI + Cảnh báo + Danh sách trạm) */
@@ -207,4 +212,34 @@
   .export-buttons {
     align-self: flex-end;
   }
+}
+
+/* ========================================================= */
+/* 🔧 FIX Recharts width(-1)/height(-1) & wrapper chiều cao  */
+/* ========================================================= */
+.reports-page {
+  min-width: 0;
+}
+.report-main-container {
+  min-width: 0;
+}
+.report-main-container > * {
+  min-width: 0;
+}
+
+/* Wrapper có height cố định để ResponsiveContainer = 100% */
+.chart-box-300 {
+  width: 100%;
+  height: 300px;
+  min-width: 0;
+}
+.chart-box-350 {
+  width: 100%;
+  height: 350px;
+  min-width: 0;
+}
+.chart-box-400 {
+  width: 100%;
+  height: 400px;
+  min-width: 0;
 }
