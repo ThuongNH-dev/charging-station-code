@@ -13,6 +13,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { Pagination } from "antd";
 import "./ReportPage.css";
 
 export default function ReportPage() {
@@ -22,6 +23,8 @@ export default function ReportPage() {
   const [users, setUsers] = useState([]);
   const [myStations, setMyStations] = useState([]);
   const [selectedStationId, setSelectedStationId] = useState(null);
+  const [historyPage, setHistoryPage] = useState(1);
+const historyPageSize = 10;
   const [report, setReport] = useState({
     chargers: 0,
     active: 0,
@@ -187,32 +190,65 @@ setUsers(userMap);
               )
             );
           return {
-            session: `S-${s.chargingSessionId}`,
-            charger: s.portId,
-            customer:
-  users.find((u) => String(u.accountId) === String(s.customerId))
-    ?.fullName || "Vãng lai",
+  session: `S-${s.chargingSessionId}`,
+  charger: s.portId,
+  licensePlate: s.licensePlate || "—",
+stationId: s.stationId || null,
 
+  // === Xác định người bắt đầu phiên ===
+  customer: (() => {
+    let starter = "Vãng lai";
 
-            duration: formatDuration(s.startedAt, s.endedAt),
-            kWh: s.energyKwh || 0,
-            cost: s.total || 0,
-            invoice: inv
-              ? inv.invoiceCode || `INV-${inv.invoiceId}`
-              : s.invoiceId || "—",
-          };
+    // Xe của công ty → lấy tên công ty
+    if (s.companyId) {
+      const comp = users.find(
+        (u) => String(u.accountId) === String(s.companyId)
+      );
+      if (comp?.fullName) return comp.fullName;
+    }
+
+    // Khách hàng cá nhân → lấy fullName
+    if (s.customerId) {
+      const cust = users.find(
+        (u) => String(u.accountId) === String(s.customerId)
+      );
+      if (cust?.fullName) return cust.fullName;
+    }
+
+    return starter;
+  })(),
+
+  duration: formatDuration(s.startedAt, s.endedAt),
+  kWh: s.energyKwh || 0,
+  cost: s.total || 0,
+  invoice: inv
+    ? inv.invoiceCode || `INV-${inv.invoiceId}`
+    : s.invoiceId || "—",
+};
+
         });
 
-        // === Biểu đồ doanh thu ===
-        const daily = {};
-        filteredInvoices.forEach((inv) => {
-          const d = new Date(inv.createdAt);
-          const key = d.toISOString().split("T")[0];
-          daily[key] = (daily[key] || 0) + (inv.total || 0);
-        });
-        const chartArr = Object.entries(daily)
-          .sort(([a], [b]) => (a < b ? -1 : 1))
-          .map(([date, revenue]) => ({ date, revenue }));
+// === Biểu đồ doanh thu theo tháng (12 tháng) ===
+const monthly = {};
+
+// Khởi tạo đủ 12 tháng = 0
+for (let m = 0; m < 12; m++) {
+  monthly[m] = 0;
+}
+
+// Cộng doanh thu vào từng tháng
+filteredInvoices.forEach((inv) => {
+  const d = new Date(inv.createdAt);
+  const month = d.getMonth(); // 0 = Jan, 11 = Dec
+  monthly[month] += inv.total || 0;
+});
+
+// Map sang array để vẽ biểu đồ
+const chartArr = Object.keys(monthly).map((m) => ({
+  month: `Tháng ${Number(m) + 1}`,
+  revenue: monthly[m],
+}));
+
 
         // === Cập nhật state ===
         setReport({
@@ -262,6 +298,11 @@ setUsers(userMap);
         <p>Đang tải dữ liệu...</p>
       </div>
     );
+    const paginatedHistory = history.slice(
+  (historyPage - 1) * historyPageSize,
+  historyPage * historyPageSize
+);
+
 
   return (
     <div className="rep-wrap">
@@ -318,7 +359,7 @@ setUsers(userMap);
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
+              <XAxis dataKey="month" />
               <YAxis />
               <Tooltip
                 formatter={(v) => `${v.toLocaleString("vi-VN")} đ`}
@@ -353,7 +394,7 @@ setUsers(userMap);
       </td>
     </tr>
   ) : (
-    history.map((h, i) => (
+    paginatedHistory.map((h, i) => (
       <tr key={i}>
         <td>{h.session}</td>
         <td>{h.charger}</td>
@@ -374,6 +415,9 @@ setUsers(userMap);
                   ...h,
                   chargingSessionId: Number(sessionId),
                   total: h.cost,
+                  portId: h.charger,
+                  licensePlate: h.licensePlate,
+                  stationId: selectedStationId,
                   customerId:
                     users.find(
                       (u) => u.fullName === h.customer
@@ -395,6 +439,16 @@ setUsers(userMap);
 </tbody>
 
         </table>
+        <div style={{ textAlign: "center", marginTop: 12 }}>
+  <Pagination
+    current={historyPage}
+    pageSize={historyPageSize}
+    total={history.length}
+    onChange={(page) => setHistoryPage(page)}
+    showSizeChanger={false}
+  />
+</div>
+
         <button className="export" onClick={exportCSV}>
           ⭳ Xuất CSV
         </button>
