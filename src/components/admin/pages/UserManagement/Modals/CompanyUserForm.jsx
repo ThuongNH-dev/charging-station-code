@@ -1,52 +1,58 @@
-// src/components/UserManagement/Forms/CompanyUserForm.jsx
 import React, { useState } from "react";
 
 const CompanyUserForm = ({ userData, onSave, onCancel }) => {
-  const companyData = userData.company || {};
+  const comp = userData?.company || {};
+
   const [form, setForm] = useState({
-    companyName: companyData.companyName || "",
-    email: companyData.companyEmail || "",
-    taxCode: companyData.taxCode || "",
-    address: companyData.address || "",
-    paymentStatus: companyData.paymentStatus || "",
-    status: userData.status || "Inactive",
+    companyId: comp.companyId ?? comp.CompanyId ?? 0,
+    companyName: comp.name ?? comp.companyName ?? "",
+    email: comp.email ?? userData.email ?? "",
+    taxCode: comp.taxCode ?? "",
+    address: comp.address ?? "Đang cập nhật",
+
+    // hiển thị như bảng (read-only)
+    companyPlan: userData.servicePackageName ?? "Chưa đăng ký",
+    paymentStatus: userData.paymentStatus ?? "—",
+    status: userData.status ?? "Inactive",
   });
 
-  const handleChange = (e) => {
+  const onChange = (e) => {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    setForm((s) => ({ ...s, [name]: value }));
   };
 
-  const handleSubmit = () => {
-    onSave(form);
-  };
+  const submit = () => onSave(form);
 
   return (
     <div className="modal-form">
       <h3>Chỉnh sửa Doanh nghiệp (ID: {userData.accountId})</h3>
+
       <label>Tên công ty:</label>
-      <input name="companyName" value={form.companyName} onChange={handleChange} />
+      <input name="companyName" value={form.companyName} onChange={onChange} />
 
       <label>Email:</label>
-      <input name="email" value={form.email} onChange={handleChange} />
+      <input name="email" value={form.email} onChange={onChange} />
 
       <label>Mã số thuế:</label>
-      <input name="taxCode" value={form.taxCode} onChange={handleChange} />
+      <input name="taxCode" value={form.taxCode} onChange={onChange} />
 
       <label>Địa chỉ:</label>
-      <input name="address" value={form.address} onChange={handleChange} />
+      <input name="address" value={form.address} onChange={onChange} />
+
+      <label>Gói dịch vụ:</label>
+      <input value={form.companyPlan} disabled />
 
       <label>Trạng thái thanh toán:</label>
-      <input name="paymentStatus" value={form.paymentStatus} onChange={handleChange} />
+      <input value={form.paymentStatus} disabled />
 
       <label>Trạng thái:</label>
-      <select name="status" value={form.status} onChange={handleChange}>
+      <select name="status" value={form.status} onChange={onChange}>
         <option value="Active">Active</option>
         <option value="Inactive">Inactive</option>
       </select>
 
       <div className="modal-actions">
-        <button className="btn primary" onClick={handleSubmit}>
+        <button className="btn primary" onClick={submit}>
           Lưu
         </button>
         <button className="btn secondary" onClick={onCancel}>

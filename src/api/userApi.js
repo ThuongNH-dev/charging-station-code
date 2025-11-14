@@ -4,8 +4,16 @@ import axios from "axios";
 const BASE_URL = import.meta.env.DEV ? "/api" : "https://localhost:7268/api";
 
 // Loại bỏ undefined khỏi payload trước khi gửi
+// Loại bỏ undefined / null / "" và trim chuỗi trước khi gửi lên BE
 const clean = (obj = {}) =>
-  Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+  Object.fromEntries(
+    Object.entries(obj)
+      .map(([k, v]) => [k, typeof v === "string" ? v.trim() : v])
+      .filter(
+        ([, v]) =>
+          v !== undefined && v !== null && !(typeof v === "string" && v === "")
+      )
+  );
 
 /* ===== Helpers rút ID an toàn từ object (phòng dữ liệu lồng) ===== */
 const extractCustomerId = (data) =>
@@ -51,10 +59,14 @@ export const userApi = {
         email: data?.email ?? data?.companyEmail,
         phone: data?.phone ?? data?.companyPhone,
         address: data?.address,
-        imageUrl: data?.imageUrl,
+        imageUrl: data?.imageUrl, // có thể rỗng ở UI
       });
 
-      // console.debug("PUT /Auth/update-company payload:", payload);
+      // 🔒 Bảo hiểm cho BE nếu ImageUrl là [Required]
+      if (!payload.imageUrl) {
+        payload.imageUrl = "https://via.placeholder.com/1.png";
+      }
+
       const res = await axios.put(`${BASE_URL}/Auth/update-company`, payload, {
         headers: { "Content-Type": "application/json" },
       });
@@ -121,8 +133,33 @@ export const userApi = {
 
   // ===== VEHICLES =====
   fetchAllVehicles: async () => {
-    const res = await axios.get(`${BASE_URL}/Vehicles?page=1&pageSize=50`);
-    return res.data.items || [];
+    const pageSize = 100; // tuỳ bạn
+    let page = 1;
+    let out = [];
+
+    while (true) {
+      const res = await axios.get(
+        `${BASE_URL}/Vehicles?page=${page}&pageSize=${pageSize}`
+      );
+      const d = res.data;
+
+      // BE có 2 kiểu trả: mảng thuần hoặc PagedResult { totalItems, items }
+      if (Array.isArray(d)) {
+        // kiểu mảng => đã đủ luôn
+        out = d;
+        break;
+      }
+
+      const items = Array.isArray(d?.items) ? d.items : [];
+      out = out.concat(items);
+
+      const total = d?.totalItems ?? d?.total ?? out.length;
+      if (out.length >= total || items.length === 0) break;
+
+      page++;
+    }
+
+    return out;
   },
 
   updateVehicle: async (id, data) => {
@@ -226,6 +263,16 @@ export const userApi = {
   },
 
   // ===== Invoices =====
+  fetchAllInvoices: async () => {
+    const res = await axios.get(`${BASE_URL}/Invoices`);
+    const d = res.data;
+    // Hỗ trợ cả: [], { items: [...] }, { data: [...] }
+    if (Array.isArray(d)) return d;
+    if (Array.isArray(d?.items)) return d.items;
+    if (Array.isArray(d?.data)) return d.data;
+    return [];
+  },
+
   fetchInvoicesByCompany: async (companyId) => {
     const res = await axios.get(`${BASE_URL}/Invoices/by-company/${companyId}`);
     return Array.isArray(res.data) ? res.data : res.data?.items || [];
@@ -235,7 +282,12 @@ export const userApi = {
     const res = await axios.get(
       `${BASE_URL}/Invoices/by-customer/${customerId}`
     );
-    return Array.isArray(res.data) ? res.data : res.data?.items || [];
+    const raw = Array.isArray(res.data) ? res.data : res.data?.items || [];
+    return raw.map((i) => ({
+      ...i,
+      companyId: i.companyId ?? i.CompanyId ?? null,
+      customerId: i.customerId ?? i.CustomerId ?? null,
+    }));
   },
 
   // ===== GET USER BY ID (debug/helper) =====

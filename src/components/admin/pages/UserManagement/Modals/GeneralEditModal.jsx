@@ -2,61 +2,82 @@ import React from "react";
 import IndividualUserForm from "./IndividualUserForm";
 import CompanyUserForm from "./CompanyUserForm";
 
+const PLACEHOLDER_IMG = "https://via.placeholder.com/1.png"; // có đuôi .png
+
+const trimOr = (v, fb = "") => {
+  const s = typeof v === "string" ? v.trim() : v;
+  return s ? s : fb;
+};
+
 const GeneralEditModal = ({ setActiveModal, entityData, crudActions }) => {
   if (!entityData) return null;
 
   const handleSave = async (formData) => {
-    console.log("Đang lưu user:", entityData.accountId, formData);
-    const role = entityData.role;
-    const entityId = entityData.accountId;
+    const role = entityData.role; // "Customer" | "Company"
+    const accountId = entityData.accountId; // AccountId
+    const originalStatus = entityData.status;
 
     try {
       if (role === "Company") {
-        // === CẤU TRÚC CHO DOANH NGHIỆP (ĐÃ SỬA) ===
-        const companyData = entityData.company || {};
-        const dataToSend = {
-          // Gửi dữ liệu phẳng PascalCase
-          AccountId: entityId,
-          CompanyId: companyData.companyId || 0,
-          Name: formData.companyName,
-          TaxCode: formData.taxCode,
-          Email: formData.email,
-          Phone: companyData.phone || "",
-          Address: formData.address,
-          ImageUrl: companyData.imageUrl || "",
-          PaymentStatus: formData.paymentStatus,
-          Status: formData.status,
+        const comp = entityData.company || {};
+
+        // build payload: ưu tiên input; nếu trống -> lấy giá trị đang có
+        const payload = {
+          companyId: formData.companyId ?? comp.companyId ?? comp.CompanyId,
+          name: trimOr(
+            formData.companyName,
+            comp.name ?? comp.companyName ?? ""
+          ),
+          taxCode: trimOr(formData.taxCode, comp.taxCode ?? ""),
+          email: trimOr(formData.email, comp.email ?? entityData.email ?? ""),
+          address: trimOr(formData.address, comp.address ?? "Đang cập nhật"),
+          phone: comp.phone ?? "", // field ẩn
+          imageUrl: (comp.imageUrl && comp.imageUrl.trim()) || PLACEHOLDER_IMG,
         };
-        await crudActions.updateUser(entityId, dataToSend, role);
+
+        await crudActions.updateUser(accountId, payload, "Company");
       } else {
-        // === KHAI BÁO VÀ LẤY DỮ LIỆU CẦN THIẾT ===
-        const customerId = entityData.customers?.[0]?.customerId;
+        const cust = entityData.customers?.[0] || {};
 
-        // ✅ THÊM DÒNG KHAI BÁO VÀ GÁN GIÁ TRỊ TẠI ĐÂY
-        const currentAddress = entityData.customers?.[0]?.address || "-";
-
-        const dataToSend = {
-          // ✅ Gửi dữ liệu phẳng PascalCase (loại bỏ mảng Customers)
-          AccountId: entityId,
-          CustomerId: customerId, // ID chính của Customer
-          FullName: formData.fullName,
-          Phone: formData.phone,
-          Email: formData.email,
-          Address: currentAddress,
-
-          // Các trường cấp root khác
-          PlanName: formData.planName,
-          Status: formData.status,
+        const payload = {
+          customerId: formData.customerId ?? cust.customerId ?? cust.CustomerId,
+          fullName: trimOr(
+            formData.fullName,
+            cust.fullName ?? entityData.userName ?? ""
+          ),
+          phone: trimOr(formData.phone, cust.phone ?? ""),
+          email: trimOr(
+            formData.email,
+            cust.email ?? entityData.email ?? "no-reply@example.com"
+          ),
+          address: trimOr(cust.address, "Đang cập nhật"), // UI không sửa -> gửi lại
         };
 
-        await crudActions.updateUser(entityId, dataToSend, role);
+        await crudActions.updateUser(accountId, payload, "Customer");
       }
+
+      // đổi trạng thái nếu khác
+      if (formData.status && formData.status !== originalStatus) {
+        await crudActions.updateUserStatus(accountId, formData.status);
+      }
+
       setActiveModal(null);
     } catch (err) {
       console.error("❌ Lỗi khi lưu:", err);
-      // Giúp hiển thị thông báo lỗi chi tiết từ server
-      const errorMsg = err.response?.data?.message || err.message;
-      alert("Lưu thất bại: " + errorMsg);
+      const pd = err?.response?.data;
+      let msg =
+        pd?.title ||
+        pd?.message ||
+        err?.message ||
+        "One or more validation errors occurred.";
+      if (pd?.errors && typeof pd.errors === "object") {
+        msg +=
+          "\n\n" +
+          Object.entries(pd.errors)
+            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+            .join("\n");
+      }
+      alert("Lưu thất bại: " + msg);
     }
   };
 
