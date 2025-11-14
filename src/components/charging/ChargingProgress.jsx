@@ -184,44 +184,14 @@ function fmtDateTimeISO(s) {
 }
 
 function showStartSessionToast(data) {
-  const rows = [
-    ["chargingSessionId", data.chargingSessionId],
-    ["portId", data.portId],
-    ["vehicleId", data.vehicleId],
-    ["customerId", data.customerId],
-    ["status", data.status],
-    ["startSoc", data.startSoc],
-    ["startedAt", fmtDateTimeISO(data.startedAt)],
-    ["pricingRuleId", data.pricingRuleId],
-    ["vehicleType", data.vehicleType],
-    ["portStatus", data.portStatus ?? "—"],
-    ["chargerType", data.chargerType ?? "—"],
-    ["chargerPowerKw", data.chargerPowerKw ?? "—"],
-  ];
-
-  message.open({
-    type: "success",
-    duration: 6,
-    content: (
-      <div>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>✅ Bắt đầu phiên sạc theo Booking thành công!</div>
-        <div
-          style={{
-            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-            fontSize: 12,
-            lineHeight: 1.5,
-          }}
-        >
-          {rows.map(([k, v]) => (
-            <div key={k}>
-              <span style={{ color: "#888" }}>{k}:</span> <span>{String(v)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    ),
+  message.destroy(); // xoá hết toast cũ trước khi hiện cái mới
+  message.success({
+    content: "✅ Bắt đầu phiên sạc thành công!",
+    duration: 3,
   });
 }
+
+
 
 // =============================================================
 const ChargingProgress = () => {
@@ -593,16 +563,16 @@ const ChargingProgress = () => {
     state?.portId,
   ]);
 
-  // Show lại toast nếu reload
-  useEffect(() => {
-    const cached = sessionStorage.getItem("charging:start:data");
-    if (cached) {
-      try {
-        const obj = JSON.parse(cached);
-        if (obj?.data) showStartSessionToast(obj.data);
-      } catch { }
-    }
-  }, []);
+  // // Show lại toast nếu reload
+  // useEffect(() => {
+  //   const cached = sessionStorage.getItem("charging:start:data");
+  //   if (cached) {
+  //     try {
+  //       const obj = JSON.parse(cached);
+  //       if (obj?.data) showStartSessionToast(obj.data);
+  //     } catch { }
+  //   }
+  // }, []);
 
   // Resume khi vào từ Menu (không có state): đọc live và hydrate session/charger
   useEffect(() => {
@@ -663,6 +633,7 @@ const ChargingProgress = () => {
         setSession(merged);
         if (charger) setChargerInfo(charger);
         // thông báo nhẹ khi resume
+        message.destroy();
         message.open({
           type: "success",
           duration: 3,
@@ -1183,9 +1154,9 @@ const ChargingProgress = () => {
   };
 
   const canEnd = Boolean(
-  session?.chargingSessionId ||
-  state?.chargingSessionId ||
-  state?.sessionId ||  
+    session?.chargingSessionId ||
+    state?.chargingSessionId ||
+    state?.sessionId ||
     (() => {
       try {
         const cached = JSON.parse(sessionStorage.getItem("charging:start:data") || "null");
