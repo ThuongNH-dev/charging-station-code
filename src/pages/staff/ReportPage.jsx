@@ -189,6 +189,8 @@ setUsers(userMap);
           return {
   session: `S-${s.chargingSessionId}`,
   charger: s.portId,
+  licensePlate: s.licensePlate || "—",
+stationId: s.stationId || null,
 
   // === Xác định người bắt đầu phiên ===
   customer: (() => {
@@ -394,6 +396,9 @@ setUsers(userMap);
                   ...h,
                   chargingSessionId: Number(sessionId),
                   total: h.cost,
+                  portId: h.charger,
+                  licensePlate: h.licensePlate,
+                  stationId: selectedStationId,
                   customerId:
                     users.find(
                       (u) => u.fullName === h.customer
