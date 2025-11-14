@@ -111,6 +111,8 @@ export default function Dashboard() {
               >
                 {s.name ??
                   s.Name ??
+                  s.stationName ??
+                  s.StationName ??
                   `Station #${s.stationId ?? s.StationId ?? s.id}`}
               </option>
             ))}

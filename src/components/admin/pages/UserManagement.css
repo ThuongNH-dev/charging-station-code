@@ -884,11 +884,28 @@ th {
 /* Ô rộng rãi, hiển thị 1 dòng, KHÔNG ellipsis */
 .user-table--users .minimal-table th,
 .user-table--users .minimal-table td {
-  padding: 12px 16px;
+  padding: 12px 18px;
   vertical-align: middle;
   white-space: nowrap !important; /* 1 dòng */
   overflow: visible !important; /* không ẩn nội dung */
   text-overflow: clip !important; /* bỏ dấu … */
+}
+.user-table--users .minimal-table th {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 12px;
+  color: #94a3b8;
+  background: #f9fafb;
+  border-bottom: 1px solid #eef1f5;
+}
+.user-table--users .minimal-table td {
+  color: #111827;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.user-table--users .minimal-table td:nth-child(3),
+.user-table--users .minimal-table td:nth-child(4) {
+  font-weight: 600;
 }
 
 /* STT + ID: cố định nhỏ gọn và căn giữa */
@@ -952,8 +969,26 @@ th {
   top: 0;
   z-index: 10;
   background: #fff;
-  padding: 12px 8px 8px;
+  padding: 16px 20px 12px;
   border-bottom: 1px solid #eee;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.user-table-section .table-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: 0.01em;
+  word-break: keep-all;
+  white-space: nowrap;
+}
+.user-table-section .table-header h3 span {
+  color: #94a3b8;
+  font-weight: 500;
+  margin-left: 6px;
 }
 
 /* Vùng nội dung cuộn giữa header và pagination */
