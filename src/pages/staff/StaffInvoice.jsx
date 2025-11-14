@@ -12,7 +12,8 @@ export default function StaffInvoice() {
   const order = params.get("order");
 
   const [authUsers, setAuthUsers] = useState([]);
-  const [customerName, setCustomerName] = useState("Đang tải...");
+  const [ownerName, setOwnerName] = useState("Đang tải...");
+const [ownerId, setOwnerId] = useState("—");
   const [invoiceId, setInvoiceId] = useState(null);
 
   const data =
@@ -35,27 +36,52 @@ export default function StaffInvoice() {
 
   // ✅ Lấy danh sách user để tìm tên khách hàng
   useEffect(() => {
-    async function loadCustomerName() {
-      try {
-        const res = await fetchAuthJSON(`${API_BASE}/Auth`);
-        const users = res?.data ?? res ?? [];
-        setAuthUsers(users);
+  async function loadOwner() {
+    try {
+      const res = await fetchAuthJSON(`${API_BASE}/Auth`);
+      const users = res?.data ?? res ?? [];
+      setAuthUsers(users);
 
-        const allCustomers = users.flatMap((u) => u.customers || []);
-        const found = allCustomers.find(
-          (c) => c.customerId === data.customerId
+      const custId = data?.customerId;
+      const compId = data?.companyId;
+
+      setOwnerId(custId || compId || "—");
+
+      // ⭐ Nếu là xe công ty
+      if (compId) {
+        const foundCompany = users.find(
+          (u) => u.role === "Company" && String(u.accountId) === String(compId)
         );
-
-        if (found?.fullName) setCustomerName(found.fullName);
-        else setCustomerName("Không có");
-      } catch (err) {
-        console.error("❌ Lỗi khi tải danh sách user:", err);
-        setCustomerName("Không có");
+        if (foundCompany?.company?.companyName) {
+          setOwnerName(foundCompany.company.companyName);
+          return;
+        }
       }
-    }
 
-    if (data?.customerId) loadCustomerName();
-  }, [data?.customerId]);
+      // ⭐ Nếu là khách hàng cá nhân
+      if (custId) {
+        const foundCustomer = users
+          .flatMap((u) => u.customers || [])
+          .find((c) => String(c.customerId) === String(custId));
+
+        if (foundCustomer?.fullName) {
+          setOwnerName(foundCustomer.fullName);
+          return;
+        }
+      }
+
+      // ⭐ Nếu không thuộc 2 loại trên → khách vãng lai
+      setOwnerName("Khách vãng lai");
+
+    } catch (err) {
+      console.error("❌ Lỗi khi tải thông tin chủ xe:", err);
+      setOwnerName("Không có");
+    }
+  }
+
+  loadOwner();
+}, [data?.customerId, data?.companyId]);
+
 
   // ✅ Lấy mã hóa đơn nếu chưa có
   useEffect(() => {
@@ -145,8 +171,8 @@ export default function StaffInvoice() {
           <div>
             <h3>Thông tin khách hàng</h3>
             <div className="ivp-meta">
-              <div><strong>ID:</strong> {data.customerId || "—"}</div>
-              <div><strong>Tên:</strong> {customerName}</div>
+              <div><strong>ID chủ sở hữu:</strong> {ownerId}</div>
+<div><strong>Tên chủ xe:</strong> {ownerName}</div>
             </div>
           </div>
           <div className={`pill ${data.invoiceStatus === "PAID" ? "ok" : "warn"}`}>
