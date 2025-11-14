@@ -13,6 +13,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { Pagination } from "antd";
 import "./ReportPage.css";
 
 export default function ReportPage() {
@@ -22,6 +23,8 @@ export default function ReportPage() {
   const [users, setUsers] = useState([]);
   const [myStations, setMyStations] = useState([]);
   const [selectedStationId, setSelectedStationId] = useState(null);
+  const [historyPage, setHistoryPage] = useState(1);
+const historyPageSize = 10;
   const [report, setReport] = useState({
     chargers: 0,
     active: 0,
@@ -295,6 +298,11 @@ const chartArr = Object.keys(monthly).map((m) => ({
         <p>Đang tải dữ liệu...</p>
       </div>
     );
+    const paginatedHistory = history.slice(
+  (historyPage - 1) * historyPageSize,
+  historyPage * historyPageSize
+);
+
 
   return (
     <div className="rep-wrap">
@@ -386,7 +394,7 @@ const chartArr = Object.keys(monthly).map((m) => ({
       </td>
     </tr>
   ) : (
-    history.map((h, i) => (
+    paginatedHistory.map((h, i) => (
       <tr key={i}>
         <td>{h.session}</td>
         <td>{h.charger}</td>
@@ -431,6 +439,16 @@ const chartArr = Object.keys(monthly).map((m) => ({
 </tbody>
 
         </table>
+        <div style={{ textAlign: "center", marginTop: 12 }}>
+  <Pagination
+    current={historyPage}
+    pageSize={historyPageSize}
+    total={history.length}
+    onChange={(page) => setHistoryPage(page)}
+    showSizeChanger={false}
+  />
+</div>
+
         <button className="export" onClick={exportCSV}>
           ⭳ Xuất CSV
         </button>
