@@ -225,16 +225,27 @@ stationId: s.stationId || null,
 
         });
 
-        // === Biểu đồ doanh thu ===
-        const daily = {};
-        filteredInvoices.forEach((inv) => {
-          const d = new Date(inv.createdAt);
-          const key = d.toISOString().split("T")[0];
-          daily[key] = (daily[key] || 0) + (inv.total || 0);
-        });
-        const chartArr = Object.entries(daily)
-          .sort(([a], [b]) => (a < b ? -1 : 1))
-          .map(([date, revenue]) => ({ date, revenue }));
+// === Biểu đồ doanh thu theo tháng (12 tháng) ===
+const monthly = {};
+
+// Khởi tạo đủ 12 tháng = 0
+for (let m = 0; m < 12; m++) {
+  monthly[m] = 0;
+}
+
+// Cộng doanh thu vào từng tháng
+filteredInvoices.forEach((inv) => {
+  const d = new Date(inv.createdAt);
+  const month = d.getMonth(); // 0 = Jan, 11 = Dec
+  monthly[month] += inv.total || 0;
+});
+
+// Map sang array để vẽ biểu đồ
+const chartArr = Object.keys(monthly).map((m) => ({
+  month: `Tháng ${Number(m) + 1}`,
+  revenue: monthly[m],
+}));
+
 
         // === Cập nhật state ===
         setReport({
@@ -340,7 +351,7 @@ stationId: s.stationId || null,
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
+              <XAxis dataKey="month" />
               <YAxis />
               <Tooltip
                 formatter={(v) => `${v.toLocaleString("vi-VN")} đ`}
