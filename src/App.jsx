@@ -66,7 +66,7 @@ import MyFeedbacks from "./pages/feedback/MyFeedbacks";
 function roleToPath(role) {
   switch ((role || "").toLowerCase()) {
     case "customer":
-      return "/stations";
+      return "/homepage";
     case "admin":
       return "/admin/dashboard";
     case "staff":

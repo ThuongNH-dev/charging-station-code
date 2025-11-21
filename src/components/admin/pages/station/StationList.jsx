@@ -8,6 +8,7 @@ function ChargerBlock({
   charger,
   onEditCharger,
   onDeleteCharger,
+  onDeletePort,
   onStart,
   onEnd,
   onEditPort,
@@ -135,7 +136,7 @@ function ChargerBlock({
               </button>
               <button
                 className="icon-btn"
-                onClick={() => onDeleteCharger(port.PortId, "port")}
+                onClick={() => onDeletePort(port.PortId)}
                 title="Xóa cổng"
               >
                 <DeleteOutlined />
@@ -161,6 +162,7 @@ export default function StationList({
   onDeleteStation,
   onEditCharger,
   onDeleteCharger,
+  onDeletePort,
   onAddCharger,
   onAddPort,
   onEditPort,
@@ -230,7 +232,8 @@ export default function StationList({
             station={station}
             charger={charger}
             onEditCharger={onEditCharger}
-            onDeleteCharger={(idOrPort) => onDeleteCharger(idOrPort, "charger")}
+            onDeleteCharger={(id) => onDeleteCharger(id, "charger")}
+            onDeletePort={(id) => onDeletePort(id, "port")}
             onStart={onStart}
             onEnd={onEnd}
             onEditPort={onEditPort}

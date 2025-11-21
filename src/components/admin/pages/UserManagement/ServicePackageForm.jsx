@@ -1,5 +1,6 @@
 // 📁 src/components/UserManagement/ServicePackageForm.jsx
 import React, { useState, useEffect } from "react";
+import "../UserManagement.css";
 
 // 🔹 Form thêm / chỉnh sửa gói dịch vụ
 const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
@@ -99,148 +100,189 @@ const ServicePackageForm = ({ initialData, crudActions, setActiveModal }) => {
 
   return (
     <form onSubmit={handleSubmit} className="service-form">
-      {/* Tên gói */}
-      <div className="form-group">
-        <label>Tên gói:</label>
-        <input
-          type="text"
-          name="planName"
-          value={formData.planName}
-          onChange={handleChange}
-          required
-        />
-      </div>
+      <div className="form-grid">
+        {/* Tên gói */}
+        <div className="form-group full-width">
+          <label htmlFor="planName" className="form-label">
+            Tên gói <span className="required-asterisk">*</span>
+          </label>
+          <input
+            type="text"
+            id="planName"
+            name="planName"
+            value={formData.planName}
+            onChange={handleChange}
+            className="form-input"
+            placeholder="Nhập tên gói dịch vụ"
+            required
+          />
+        </div>
 
-      {/* Giá hàng tháng */}
-      <div className="form-group">
-        <label>Giá hàng tháng (VND):</label>
-        <input
-          type="number"
-          name="priceMonthly"
-          value={formData.priceMonthly}
-          onChange={handleChange}
-          required
-          min="0"
-        />
-      </div>
+        {/* Giá hàng tháng */}
+        <div className="form-group">
+          <label htmlFor="priceMonthly" className="form-label">
+            Giá hàng tháng (VND) <span className="required-asterisk">*</span>
+          </label>
+          <input
+            type="number"
+            id="priceMonthly"
+            name="priceMonthly"
+            value={formData.priceMonthly}
+            onChange={handleChange}
+            className="form-input"
+            placeholder="0"
+            required
+            min="0"
+            step="1000"
+          />
+        </div>
 
-      {/* Loại (Category) */}
-      <div className="form-group">
-        <label>Loại (Category):</label>
-        <select
-          name="category"
-          value={formData.category}
-          onChange={handleChange}
-          required
-        >
-          <option value="Individual">Cá nhân</option>
-          <option value="Business">Doanh nghiệp</option>
-        </select>
-      </div>
+        {/* Loại (Category) */}
+        <div className="form-group">
+          <label htmlFor="category" className="form-label">
+            Loại (Category) <span className="required-asterisk">*</span>
+          </label>
+          <select
+            id="category"
+            name="category"
+            value={formData.category}
+            onChange={handleChange}
+            className="form-select"
+            required
+          >
+            <option value="Individual">Cá nhân</option>
+            <option value="Business">Doanh nghiệp</option>
+          </select>
+        </div>
 
-      {/* Giảm giá */}
-      <div className="form-group">
-        <label>Giảm giá (%):</label>
-        <input
-          type="number"
-          name="discountPercent"
-          value={formData.discountPercent}
-          onChange={handleChange}
-          max="100"
-          min="0"
-        />
-      </div>
+        {/* Giảm giá */}
+        <div className="form-group">
+          <label htmlFor="discountPercent" className="form-label">
+            Giảm giá (%)
+          </label>
+          <input
+            type="number"
+            id="discountPercent"
+            name="discountPercent"
+            value={formData.discountPercent}
+            onChange={handleChange}
+            className="form-input"
+            placeholder="0"
+            max="100"
+            min="0"
+            step="1"
+          />
+        </div>
 
-      {/* Phút chờ miễn phí */}
-      <div className="form-group">
-        <label>Phút chờ miễn phí:</label>
-        <input
-          type="number"
-          name="freeIdleMinutes"
-          value={formData.freeIdleMinutes}
-          onChange={handleChange}
-          min="0"
-        />
+        {/* Phút chờ miễn phí */}
+        <div className="form-group">
+          <label htmlFor="freeIdleMinutes" className="form-label">
+            Phút chờ miễn phí
+          </label>
+          <input
+            type="number"
+            id="freeIdleMinutes"
+            name="freeIdleMinutes"
+            value={formData.freeIdleMinutes}
+            onChange={handleChange}
+            className="form-input"
+            placeholder="0"
+            min="0"
+            step="1"
+          />
+        </div>
+
+        {/* Trạng thái */}
+        <div className="form-group">
+          <label htmlFor="status" className="form-label">
+            Trạng thái gói <span className="required-asterisk">*</span>
+          </label>
+          <select
+            id="status"
+            name="status"
+            value={formData.status}
+            onChange={handleChange}
+            className="form-select"
+            required
+          >
+            <option value="Active">Đang hoạt động</option>
+            <option value="Inactive">Ngừng hoạt động</option>
+          </select>
+        </div>
       </div>
 
       {/* Checkbox dành cho doanh nghiệp */}
       <div className="form-group checkbox-group">
-        <input
-          type="checkbox"
-          id="isForCompany"
-          name="isForCompany"
-          checked={formData.isForCompany}
-          onChange={handleChange}
-        />
-        <label htmlFor="isForCompany">Áp dụng cho Doanh nghiệp</label>
-      </div>
-
-      {/* Trạng thái */}
-      <div className="form-group">
-        <label>Trạng thái gói:</label>
-        <select
-          name="status"
-          value={formData.status}
-          onChange={handleChange}
-          required
-        >
-          <option value="Active">Đang hoạt động</option>
-          <option value="Inactive">Ngừng hoạt động</option>
-        </select>
+        <label htmlFor="isForCompany" className="checkbox-label">
+          <input
+            type="checkbox"
+            id="isForCompany"
+            name="isForCompany"
+            checked={formData.isForCompany}
+            onChange={handleChange}
+            className="form-checkbox"
+          />
+          <span>Áp dụng cho Doanh nghiệp</span>
+        </label>
       </div>
 
       {/* Mô tả / Quyền lợi */}
       <div className="form-group">
-        <label>
-          Mô tả / Quyền lợi:
-          <span
-            className="hint"
-            style={{ marginLeft: 6, color: "#888", fontSize: 12 }}
-          >
-            Mỗi lợi ích 1 dòng (hoặc dùng dấu “;” hay “•”). Ví dụ:
-            <em> “Phù hợp đi lại hằng ngày”</em>
-          </span>
+        <label htmlFor="benefits" className="form-label">
+          Mô tả / Quyền lợi
         </label>
+        <p className="form-hint">
+          Mỗi lợi ích 1 dòng (hoặc dùng dấu ";" hay "•"). Ví dụ: "Phù hợp đi lại hằng ngày"
+        </p>
         <textarea
+          id="benefits"
           name="benefits"
           value={formData.benefits}
           onChange={handleChange}
-          rows="3"
-          placeholder={`Ví dụ:
-• Phù hợp cá nhân đi lại hằng ngày
+          className="form-textarea"
+          rows="4"
+          placeholder="• Phù hợp cá nhân đi lại hằng ngày
 • Miễn phí chờ 5 phút mỗi phiên
-• Giảm 5% khi thanh toán đủ điều kiện`}
+• Giảm 5% khi thanh toán đủ điều kiện"
         />
       </div>
 
       {/* Mô tả ngắn (tuỳ chọn) */}
       <div className="form-group">
-        <label>Mô tả ngắn (tùy chọn):</label>
+        <label htmlFor="description" className="form-label">
+          Mô tả ngắn (tùy chọn)
+        </label>
         <textarea
+          id="description"
           name="description"
           value={formData.description}
           onChange={handleChange}
-          rows="2"
+          className="form-textarea"
+          rows="3"
           placeholder="Nội dung sẽ được gộp chung với Quyền lợi khi hiển thị"
         />
       </div>
 
       {/* Nút hành động */}
-      <div className="modal-actions form-actions">
-        <button type="submit" className="btn primary" disabled={isSubmitting}>
+      <div className="form-actions">
+        <button
+          type="button"
+          className="btn btn-cancel"
+          onClick={() => setActiveModal(null)}
+          disabled={isSubmitting}
+        >
+          Hủy
+        </button>
+        <button
+          type="submit"
+          className="btn btn-submit"
+          disabled={isSubmitting}
+        >
           {isSubmitting
             ? "Đang xử lý..."
             : packageId
             ? "Lưu thay đổi"
             : "Thêm mới"}
-        </button>
-        <button
-          type="button"
-          className="btn secondary"
-          onClick={() => setActiveModal(null)}
-          disabled={isSubmitting}
-        >
-          Hủy
         </button>
       </div>
     </form>
