@@ -11,12 +11,22 @@ export default function StaffInvoice() {
   const params = new URLSearchParams(search);
   const order = params.get("order");
 
+  const data =
+    state || JSON.parse(sessionStorage.getItem(`chargepay:${order}`) || "{}");
+
+  const initialLicensePlate =
+    data?.vehicle?.licensePlate || data?.licensePlate || "—";
+
+  const vehicleId =
+    data?.vehicleId ??
+    data?.VehicleId ??
+    data?.vehicle?.vehicleId ??
+    data?.vehicle?.VehicleId;
+
   const [authUsers, setAuthUsers] = useState([]);
   const [customerName, setCustomerName] = useState("Đang tải...");
   const [invoiceId, setInvoiceId] = useState(null);
-
-  const data =
-    state || JSON.parse(sessionStorage.getItem(`chargepay:${order}`) || "{}");
+  const [licensePlate, setLicensePlate] = useState(initialLicensePlate);
 
   const fmt = (iso) => {
     if (!iso) return "—";
@@ -56,6 +66,29 @@ export default function StaffInvoice() {
 
     if (data?.customerId) loadCustomerName();
   }, [data?.customerId]);
+
+  // ✅ Lấy biển số xe nếu chưa có
+  useEffect(() => {
+    async function loadVehiclePlate() {
+      try {
+        if (!vehicleId) return;
+
+        const vehicle = await fetchAuthJSON(`${API_BASE}/Vehicles/${vehicleId}`);
+        const fetchedPlate =
+          vehicle?.licensePlate ||
+          vehicle?.data?.licensePlate ||
+          vehicle?.$values?.licensePlate;
+
+        if (fetchedPlate) setLicensePlate(fetchedPlate);
+      } catch (err) {
+        console.error("❌ Không thể tải thông tin xe:", err);
+      }
+    }
+
+    if ((!licensePlate || licensePlate === "—") && vehicleId) {
+      loadVehiclePlate();
+    }
+  }, [vehicleId, licensePlate]);
 
   // ✅ Lấy mã hóa đơn nếu chưa có
   useEffect(() => {
@@ -161,7 +194,7 @@ export default function StaffInvoice() {
         <div className="ivp-meta">
           <div><strong>Mã phiên:</strong> S-{data.chargingSessionId}</div>
           <div><strong>Trụ sạc:</strong> {data.portId || data.gun?.id || "—"}</div>
-          <div><strong>Biển số xe:</strong> {data.vehicle?.licensePlate || data.licensePlate || "—"}</div>
+          <div><strong>Biển số xe:</strong> {licensePlate || "—"}</div>
           <div><strong>Bắt đầu:</strong> {fmt(data.startedAt)}</div>
           <div><strong>Kết thúc:</strong> {fmt(data.endedAt)}</div>
           <div><strong>Năng lượng tiêu thụ:</strong> {(data.energyKwh || 0).toFixed(2)} kWh</div>
