@@ -5,6 +5,7 @@ import { userApi } from "../../../../api/userApi";
 import UserTables from "./Usertables";
 import VehicleTable from "./VehicleTable";
 import ServiceTable from "./ServiceTable";
+import StationStaffTable from "./StationStaffTable";
 import AdminModals from "./Modals/AdminModals";
 import ServiceFilterBar from "./ServiceFilterBar";
 import VehicleFilterBar from "./VehicleFilterBar";
@@ -17,18 +18,22 @@ const useUserServicesHook = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [invoices, setInvoices] = useState([]);
+  const [stationStaffs, setStationStaffs] = useState([]);
+  const [stations, setStations] = useState([]);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [accounts, vehicles, services, subscriptionsData, invoicesData] =
+      const [accounts, vehicles, services, subscriptionsData, invoicesData, stationStaffData, stationsData] =
         await Promise.all([
           userApi.fetchAllUsers(),
           userApi.fetchAllVehicles(),
           userApi.fetchAllServicePackages(),
           userApi.fetchAllSubscriptions(),
           userApi.fetchAllInvoices(), // ✅ thêm dòng này
+          userApi.fetchAllStationStaffs(),
+          userApi.fetchAllStations()
         ]);
 
       // ===== Map id -> tên gói dịch vụ
@@ -98,6 +103,8 @@ const useUserServicesHook = () => {
       setServicePackages(services || []);
       setSubscriptions(subscriptionsData || []);
       setInvoices(invoicesData || []);
+      setStationStaffs(stationStaffData || []);
+      setStations(stationsData || []);
     } catch (err) {
       console.error("❌ Lỗi khi load dữ liệu:", err);
       setError(err.message || "Không thể tải dữ liệu");
@@ -216,6 +223,22 @@ const useUserServicesHook = () => {
       handleUpdate(userApi.updateVehicle, id, data, "Đã cập nhật thông số xe."),
     deleteVehicle: (id) =>
       handleUpdate(userApi.deleteVehicle, id, null, "Đã xóa thông số xe."),
+  // ⭐ THÊM Ở ĐÂY: CRUD nhân viên trạm
+  addStationStaff: (data) =>
+      handleUpdate(
+        userApi.addStationStaff,
+        null,
+        data,
+        "Đã thêm nhân viên vào trạm."
+      ),
+
+  deleteStationStaff: (stationId, staffId) =>
+      handleUpdate(
+        userApi.deleteStationStaff,
+        stationId,
+        staffId,
+        "Đã xóa nhân viên khỏi trạm."
+      ),
   };
 };
 
@@ -489,6 +512,8 @@ const UserManagement = () => {
     servicePackages,
     subscriptions,
     invoices,
+    stationStaffs,
+    stations,
     isLoading,
     error,
     updateUser,
@@ -499,6 +524,8 @@ const UserManagement = () => {
     deleteServicePackage,
     updateVehicle,
     deleteVehicle,
+    addStationStaff,
+    deleteStationStaff,
   } = useUserServicesHook();
 
   const crudActions = {
@@ -510,6 +537,8 @@ const UserManagement = () => {
     deleteServicePackage,
     updateVehicle,
     deleteVehicle,
+    addStationStaff,
+    deleteStationStaff,
   };
 
   const {
@@ -690,6 +719,14 @@ const UserManagement = () => {
             Gói dịch vụ
           </button>
         </div>
+        <div className="tabs">
+          <button
+            className={`btn ${activeTab === "stationStaff" ? "primary" : "secondary"}`}
+            onClick={() => setActiveTab("stationStaff")}
+          >
+            Quản lý nhân viên trạm
+          </button>
+        </div>
 
         {activeTab === "service" && (
           <button
@@ -775,6 +812,15 @@ const UserManagement = () => {
             setActiveModal={setActiveModal}
           />
         )}
+
+        {activeTab === "stationStaff" && (
+          <StationStaffTable
+            stationStaffs={stationStaffs}
+            stations={stations}
+            accounts={allAccounts}
+            setActiveModal={setActiveModal}
+          />
+        )}
       </div>
 
       <AdminModals
@@ -783,6 +829,7 @@ const UserManagement = () => {
         allAccounts={allAccounts}
         allVehicles={allVehicles}
         servicePackages={servicePackages}
+        stations={stations} 
         crudActions={crudActions}
       />
     </div>

@@ -4,6 +4,8 @@ import ServiceModal from "./ServiceModal";
 import GeneralDeleteModal from "./GeneralDeleteModal";
 import GeneralEditModal from "./GeneralEditModal";
 import VehicleModal from "./VehicleModal";
+import AddStationStaffModal from "./AddStationStaffModal";
+import DeleteStationStaffModal from "./DeleteStationStaffModal";
 
 const AdminModals = ({
   activeModal,
@@ -11,11 +13,13 @@ const AdminModals = ({
   allAccounts = [],
   allVehicles = [],
   servicePackages = [],
+  stations = [],
   crudActions = {},
 }) => {
   if (!activeModal) return null;
 
-  const parts = activeModal.split("-");
+const isStringModal = typeof activeModal === "string";
+const parts = isStringModal ? activeModal.split("-") : [];
   const actionType = parts[0]; // addService, editService, editUser, deleteUser, editVehicle, deleteVehicle
   const entityId = parts.length > 1 ? parts[1] : null;
 
@@ -38,6 +42,15 @@ const AdminModals = ({
             crudActions={crudActions}
           />
         )}
+{/* Add Station Staff */}
+{activeModal === "addStationStaff" && (
+  <AddStationStaffModal
+    setActiveModal={setActiveModal}
+    stations={allStations}
+    accounts={allAccounts}
+    onSubmit={(data) => crudActions.addStationStaff(data)}
+  />
+)}
 
         {/* Edit User Modal */}
         {actionType === "editUser" && entityData && (
@@ -51,7 +64,8 @@ const AdminModals = ({
         {/* Delete User/Service Modal */}
         {actionType.startsWith("delete") &&
           entityId &&
-          !actionType.includes("Vehicle") && (
+          !actionType.includes("Vehicle") &&
+          !actionType.includes("StationStaff") && (
             <GeneralDeleteModal
               setActiveModal={setActiveModal}
               entityId={entityId}
@@ -79,6 +93,20 @@ const AdminModals = ({
             crudActions={crudActions}
           />
         )}
+{/* Delete Station Staff */}
+{typeof activeModal === "object" && activeModal.type === "deleteStationStaff" && (
+  <DeleteStationStaffModal
+    setActiveModal={setActiveModal}
+    stationId={activeModal.stationId}
+    staffId={activeModal.staffId}
+    onSubmit={() =>
+      crudActions.deleteStationStaff(
+        activeModal.stationId,
+        activeModal.staffId
+      )
+    }
+  />
+)}
       </div>
     </div>
   );
