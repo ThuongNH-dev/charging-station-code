@@ -33,6 +33,9 @@ export default function ReportPage() {
   const [chartData, setChartData] = useState([]);
   const [timeFilter, setTimeFilter] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [vehicles, setVehicles] = useState([]);
+const [vehicleMap, setVehicleMap] = useState({});
+
 
   const currentAccountId = user?.accountId || localStorage.getItem("accountId");
 
@@ -52,6 +55,18 @@ export default function ReportPage() {
         const allStations = await fetchAuthJSON("/Stations");
         const allUsers = await fetchAuthJSON("/Auth");
         const authList = toArray(allUsers);
+        // === Load Vehicles giống SessionManager ===
+const vehRes = await fetchAuthJSON(`/Vehicles`);
+const vehArr = toArray(vehRes);
+setVehicles(vehArr);
+
+const vmap = {};
+vehArr.forEach(v => {
+  const id = v.vehicleId || v.VehicleId;
+  if (id) vmap[String(id)] = v;
+});
+setVehicleMap(vmap);
+
 
 // Lấy danh sách user có role là Customer
 // Lấy tất cả loại tài khoản có thể xuất hiện trong hệ thống
@@ -178,52 +193,67 @@ setUsers(userMap);
         };
 
         // === Chuẩn bị lịch sử ===
-        const sessionRows = completedSessions.map((s, i) => {
-          const inv =
-            invoices.find((x) => x.invoiceId === s.invoiceId) ||
-            filteredInvoices.find((x) =>
-              x.chargingSessions?.some(
-                (cs) => cs.chargingSessionId === s.chargingSessionId
-              )
-            );
-          return {
-  session: `S-${s.chargingSessionId}`,
-  charger: s.portId,
-  licensePlate: s.licensePlate || "—",
-stationId: s.stationId || null,
+const sessionRows = completedSessions.map((s) => {
+  const inv =
+    invoices.find((x) => x.invoiceId === s.invoiceId) ||
+    filteredInvoices.find((x) =>
+      x.chargingSessions?.some(
+        (cs) => cs.chargingSessionId === s.chargingSessionId
+      )
+    );
 
-  // === Xác định người bắt đầu phiên ===
-  customer: (() => {
-    let starter = "Vãng lai";
+  return {
+    session: `S-${s.chargingSessionId}`,
+    charger: s.portId,
 
-    // Xe của công ty → lấy tên công ty
-    if (s.companyId) {
-      const comp = users.find(
-        (u) => String(u.accountId) === String(s.companyId)
-      );
-      if (comp?.fullName) return comp.fullName;
-    }
+    // ⭐ Lấy biển số xe giống SessionManager
+    licensePlate: (() => {
+      const vid =
+        s.vehicleId ??
+        s.VehicleId ??
+        s.vehicle?.vehicleId ??
+        s.vehicle?.VehicleId;
 
-    // Khách hàng cá nhân → lấy fullName
-    if (s.customerId) {
-      const cust = users.find(
-        (u) => String(u.accountId) === String(s.customerId)
-      );
-      if (cust?.fullName) return cust.fullName;
-    }
+      if (vid && vehicleMap[String(vid)]) {
+        return vehicleMap[String(vid)].licensePlate || "—";
+      }
+      if (s.licensePlate) return s.licensePlate;
 
-    return starter;
-  })(),
+      return "—";
+    })(),
 
-  duration: formatDuration(s.startedAt, s.endedAt),
-  kWh: s.energyKwh || 0,
-  cost: s.total || 0,
-  invoice: inv
-    ? inv.invoiceCode || `INV-${inv.invoiceId}`
-    : s.invoiceId || "—",
-};
+    // ⭐ Thêm vehicleId để Invoice dùng
+    vehicleId: s.vehicleId ?? s.VehicleId ?? null,
 
-        });
+    stationId: s.stationId || null,
+
+    // Ai bắt đầu phiên → đúng
+    customer: (() => {
+      if (s.companyId) {
+        const comp = users.find(
+          (u) => String(u.accountId) === String(s.companyId)
+        );
+        return comp?.fullName || "Xe công ty";
+      }
+      if (s.customerId) {
+        const cust = users.find(
+          (u) => String(u.accountId) === String(s.customerId)
+        );
+        return cust?.fullName || "Khách cá nhân";
+      }
+      return "Vãng lai";
+    })(),
+
+    duration: formatDuration(s.startedAt, s.endedAt),
+    kWh: s.energyKwh || 0,
+    cost: s.total || 0,
+
+    invoice: inv
+      ? inv.invoiceCode || `INV-${inv.invoiceId}`
+      : s.invoiceId || "—",
+  };
+});
+
 
 // === Biểu đồ doanh thu theo tháng (12 tháng) ===
 const monthly = {};
@@ -394,36 +424,44 @@ const chartArr = Object.keys(monthly).map((m) => ({
         <td>{h.duration}</td>
         <td>{h.cost.toLocaleString("vi-VN")} đ</td>
         <td>
-          <button
-            className="btn-light"
-            onClick={() => {
-              // Giống SessionManager: tạo order=S{sessionId}
-              const sessionId = h.session.replace("S-", "");
-              const orderId = `S${sessionId}`;
-              
-              // Gửi sang trang invoice với state chi tiết
-              navigate(`/staff/invoice?order=${orderId}`, {
-                state: {
-                  ...h,
-                  chargingSessionId: Number(sessionId),
-                  total: h.cost,
-                  portId: h.charger,
-                  licensePlate: h.licensePlate,
-                  stationId: selectedStationId,
-                  customerId:
-                    users.find(
-                      (u) => u.fullName === h.customer
-                    )?.accountId || null,
-                  invoiceStatus: "PAID", // vì từ báo cáo
-                  endedAt: new Date().toISOString(),
-                  startedAt: new Date(Date.now() - 3600000).toISOString(),
-                  energyKwh: h.kWh,
-                },
-              });
-            }}
-          >
-            Chi tiết
-          </button>
+<button
+  className="btn-light"
+  onClick={async () => {
+    const sessionId = h.session.replace("S-", "");
+
+    try {
+      // 🔥 1. Lấy phiên thật từ BE
+      const realSession = await fetchAuthJSON(`/ChargingSessions/${sessionId}`);
+      if (!realSession) {
+        console.error("Không tìm thấy session từ BE");
+        return;
+      }
+
+      // 🔥 2. Lấy invoice thật (nếu có)
+      let invoice = null;
+      try {
+        if (realSession.invoiceId) {
+          invoice = await fetchAuthJSON(`/Invoices/${realSession.invoiceId}`);
+        }
+      } catch { invoice = null; }
+
+      // 🔥 3. Gửi dữ liệu thật sang trang hóa đơn
+      navigate(`/staff/invoice?order=S${sessionId}`, {
+        state: {
+          ...realSession,
+          invoiceStatus: invoice ? "PAID" : "UNPAID",
+          invoice: invoice || null,
+        },
+      });
+
+    } catch (err) {
+      console.error("Lỗi khi tải session:", err);
+    }
+  }}
+>
+  Chi tiết
+</button>
+
         </td>
       </tr>
     ))
