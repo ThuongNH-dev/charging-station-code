@@ -49,7 +49,7 @@ export default function StaffPaymentSuccess() {
         <p>
           {sessionId && (
             <>
-              Phiên sạc khách vãng lai <b>#{sessionId}</b>
+              Phiên sạc khách vãng lai {/* <b>#{sessionId}</b> */}
               {success ? " đã được thanh toán." : " chưa được thanh toán."}
             </>
           )}
@@ -68,7 +68,7 @@ export default function StaffPaymentSuccess() {
         )}
 
         {/* Debug info trong development */}
-        {process.env.NODE_ENV === 'development' && (
+        {/* {process.env.NODE_ENV === 'development' && (
           <details style={{ marginTop: '20px', fontSize: '12px' }}>
             <summary style={{ cursor: 'pointer', color: '#1890ff' }}>
               🔍 Debug Info (click to expand)
@@ -84,7 +84,7 @@ export default function StaffPaymentSuccess() {
               {JSON.stringify(Object.fromEntries(params), null, 2)}
             </pre>
           </details>
-        )}
+        )} */}
 
         <button
           className="primary-btn"
