@@ -102,7 +102,7 @@ const GeneralEditModal = ({
 
         const staffPayload = {
           stationId: staffStationId,
-          staffAccountId: Number(userId),
+          StaffId: Number(userId),
         };
 
         await crudActions.addStaffToStation(staffPayload);
