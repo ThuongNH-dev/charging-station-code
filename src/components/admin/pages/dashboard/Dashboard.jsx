@@ -43,24 +43,20 @@ export default function Dashboard() {
 
   const [loading, setLoading] = useState(true);
   const [ym, setYm] = useState(defaultYm); // YYYY-MM
-  const [stationId, setStationId] = useState("all"); // lọc trạm
   const [kpis, setKpis] = useState(null);
   const [series, setSeries] = useState([]);
-  const [stations, setStations] = useState([]);
 
-  const load = async (curYm, curStation) => {
+  const load = async (curYm) => {
     const { start, end } = getMonthRange(curYm);
     try {
       setLoading(true);
       const raw = await fetchDashboard({
         startDate: start,
         endDate: end,
-        stationId: curStation,
       });
       const processed = buildDashboardDataMonthly(raw, start, end);
       setKpis(processed.kpis);
       setSeries(processed.series);
-      setStations(processed.stations);
     } catch (e) {
       console.error("⚠️ Dashboard load error:", e);
     } finally {
@@ -69,9 +65,9 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    load(ym, stationId);
+    load(ym);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ym, stationId]);
+  }, [ym]);
 
   if (loading || !kpis) {
     return (
@@ -97,31 +93,9 @@ export default function Dashboard() {
           />
         </div>
 
-        <div className="db-filter">
-          <label>Trạm</label>
-          <select
-            value={stationId}
-            onChange={(e) => setStationId(e.target.value)}
-          >
-            <option value="all">Tất cả trạm</option>
-            {stations.map((s) => (
-              <option
-                key={s.stationId ?? s.StationId ?? s.id}
-                value={s.stationId ?? s.StationId ?? s.id}
-              >
-                {s.name ??
-                  s.Name ??
-                  s.stationName ??
-                  s.StationName ??
-                  `Station #${s.stationId ?? s.StationId ?? s.id}`}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <button
           className="db-refresh-btn"
-          onClick={() => load(ym, stationId)}
+          onClick={() => load(ym)}
           title="Tải lại"
         >
           Làm mới
