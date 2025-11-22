@@ -8,7 +8,7 @@ import { DownloadOutlined } from "@ant-design/icons";
 import "./Reports.css";
 
 // --- Thành phần con ---
-import OverviewKPIs from "./OverviewKPIs";
+
 import ReportContent from "./ReportContent";
 
 // --- API ---
@@ -16,12 +16,9 @@ import { fetchReportData } from "../../../../api/reportsApi";
 
 // --- Xử lý dữ liệu ---
 import {
-  calculateKpiOverview,
   processServiceStructure,
-  processRegionalComparison,
   processTimeChartData,
   processTimeChartHourly,
-  processWarnings,
 } from "../../../../utils/reportProcessing";
 
 // ⏱️ Mặc định 7 ngày gần nhất
@@ -53,7 +50,6 @@ export default function Reports() {
         const data = await fetchReportData({
           startDate: reportFilter.startDate,
           endDate: reportFilter.endDate,
-          stationId: reportFilter.station !== "all" ? reportFilter.station : "",
         });
         if (isMounted) setRawData(data);
         console.log("📥 Dữ liệu thô:", data);
@@ -87,25 +83,26 @@ export default function Reports() {
   const dataToRender = useMemo(() => {
     if (!rawData) return null;
 
-    const kpi = calculateKpiOverview(rawData);
     const serviceStructure = processServiceStructure(rawData);
-    const regionalComparison = processRegionalComparison(rawData);
-    const timeChart = processTimeChartData(rawData);
-    const timeChartHourly = processTimeChartHourly(rawData);
-    const warnings = processWarnings(rawData);
+
+    const timeChart = processTimeChartData(rawData, {
+      startDate: reportFilter.startDate,
+      endDate: reportFilter.endDate,
+    });
+
+    const timeChartHourly = processTimeChartHourly(rawData, {
+      startDate: reportFilter.startDate,
+      endDate: reportFilter.endDate,
+    });
 
     return {
-      kpi,
-      warnings,
-      stationTable: regionalComparison?.detailedStationTable || [],
-      areaComparison: regionalComparison?.regionalSummary || {},
       timeChart: { ...timeChart, hourly: timeChartHourly },
       serviceStructure: {
         monthlyRevenue: serviceStructure.monthlyRevenue || [],
         pieData: serviceStructure.pieData || [],
       },
     };
-  }, [rawData]);
+  }, [rawData, reportFilter.startDate, reportFilter.endDate]);
 
   // =========================================================
   // GIAO DIỆN LOADING
@@ -151,26 +148,6 @@ export default function Reports() {
             }
           />
 
-          <span className="filter-label">Trạm:</span>
-          <select
-            className="filter-dropdown"
-            value={reportFilter.station}
-            onChange={(e) =>
-              setReportFilter({ ...reportFilter, station: e.target.value })
-            }
-          >
-            <option value="all">Tất cả trạm</option>
-            {stationsList.map((s) => {
-              const id = s.stationId ?? s.StationId ?? s.id ?? s.Id;
-              const name = s.stationName ?? s.name ?? `Trạm #${id}`;
-              return (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              );
-            })}
-          </select>
-
           <button
             className="btn"
             onClick={() => {
@@ -178,7 +155,6 @@ export default function Reports() {
                 ...reportFilter,
                 startDate: sevenDaysAgoISO,
                 endDate: todayISO,
-                station: "all",
               });
               setTimeout(() => window.dispatchEvent(new Event("resize")), 0);
             }}
@@ -221,7 +197,6 @@ export default function Reports() {
       {/* --- Nội dung chính & Sidebar --- */}
       <div className="report-main-container">
         <ReportContent data={dataToRender} reportFilter={reportFilter} />
-        <OverviewKPIs data={dataToRender} />
       </div>
     </div>
   );
