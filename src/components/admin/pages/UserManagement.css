@@ -507,11 +507,13 @@ th {
 
 .segmented-control {
   display: flex;
+  flex-wrap: wrap; /* cho phép nút xuống dòng */
   border: 1px solid #ccc;
   border-radius: 8px;
-  overflow: hidden;
   background-color: white;
+  overflow: visible;
 }
+
 .segmented-button {
   padding: 8px 12px;
   border: none;
