@@ -38,7 +38,7 @@ function getAuthTokenAndIds(authUser) {
       const s = localStorage.getItem("companyId") || sessionStorage.getItem("companyId");
       if (s) companyId = Number(s);
     }
-  } catch {}
+  } catch { }
   return { token, customerId, companyId };
 }
 
@@ -116,19 +116,31 @@ export default function ManageSubscriptions() {
 
   const antApp = App.useApp?.();
   const _msg = antApp?.message;
+
   const msg = {
-    success: (t) => (_msg?.success ? _msg.success(t) : alert(t)),
-    error: (t) => (_msg?.error ? _msg.error(t) : alert(t)),
-    warning: (t) =>
-      _msg?.warning
-        ? _msg.warning(t)
-        : _msg?.open
-          ? _msg.open({ type: "warning", content: t })
-          : alert(t),
+    success: (t) => {
+      if (_msg?.success) _msg.success(t);
+      else console.log("[SUCCESS]", t);
+    },
+    error: (t) => {
+      if (_msg?.error) _msg.error(t);
+      else console.error("[ERROR]", t);
+    },
+    warning: (t) => {
+      if (_msg?.warning) {
+        _msg.warning(t);
+      } else if (_msg?.open) {
+        _msg.open({ type: "warning", content: t });
+      } else {
+        console.warn("[WARNING]", t);
+      }
+    },
     loading: (t, key = "__loading") =>
       _msg?.loading ? _msg.loading({ content: t, key }) : null,
-    dismiss: (key = "__loading") => (_msg?.destroy ? _msg.destroy(key) : null),
+    dismiss: (key = "__loading") =>
+      _msg?.destroy ? _msg.destroy(key) : null,
   };
+
 
   const navigate = useNavigate();
   const [{ loading, rows }, setState] = useState({ loading: true, rows: [] });
@@ -237,6 +249,36 @@ export default function ManageSubscriptions() {
     return await res.json();
   }
 
+  async function deleteSubscription(sub) {
+    const id = sub.subscriptionId;
+    const url = `${API_BASE}/Subscriptions/${id}`;
+    const res = await fetch(url, {
+      method: "DELETE",
+      headers: { accept: "*/*", authorization: headers.authorization },
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      throw new Error(`DELETE ${url} failed (${res.status}) ${t}`);
+    }
+    // nhiều API DELETE trả về body rỗng, nên mình chỉ cần trả true
+    return true;
+  }
+
+  const doDeletePending = async (sub) => {
+    try {
+      await deleteSubscription(sub);
+      msg.success("Đã hủy và xóa gói Pending (chưa thanh toán).");
+      setState((s) => ({
+        ...s,
+        rows: s.rows.filter((r) => r.subscriptionId !== sub.subscriptionId),
+      }));
+    } catch (e) {
+      console.error(e);
+      msg.error("Không thể xóa gói Pending.");
+    }
+  };
+
+
   const handleToggleAutoRenew = async (sub, checked) => {
     const isActive = String(sub.status || "").toLowerCase() === "active";
     if (!isActive) return;
@@ -328,13 +370,40 @@ export default function ManageSubscriptions() {
       render: (_, r) => {
         const status = String(r.status || "").toLowerCase();
         const isActive = status === "active";
+        const isPending = status === "pending";
         const withinWindow = canRenew(r); // <= 10 ngày trước endDate
 
+        // --- Hành vi riêng cho PENDING: cho phép xóa hẳn gói (DELETE) ---
+        if (isPending) {
+          return (
+            <Space
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <Popconfirm
+                title="Xác nhận hủy gói Pending?"
+                description="Gói Pending (chưa thanh toán) sẽ bị xóa hoàn toàn khỏi hệ thống."
+                okText="Hủy & xóa"
+                cancelText="Không"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => doDeletePending(r)}
+              >
+                <Tooltip title="Hủy và xóa gói này vì chưa thanh toán">
+                  <Button danger icon={<StopOutlined />}>
+                    Hủy (xóa)
+                  </Button>
+                </Tooltip>
+              </Popconfirm>
+            </Space>
+          );
+        }
+
+        // --- Các trạng thái không Active / Pending: không khả dụng ---
         if (!isActive) {
           return <Text type="secondary">Không khả dụng</Text>;
         }
 
-        // Neo kỳ sau theo endDate hiện tại
+        // --- Trạng thái ACTIVE: giữ logic cũ (Gia hạn + Hủy -> Inactive) ---
         const { nextStart, nextEnd } = getNextPeriodAnchored(r);
 
         return (
@@ -346,7 +415,9 @@ export default function ManageSubscriptions() {
               title={
                 withinWindow
                   ? "Gia hạn gói này (kỳ sau tính từ ngày kết thúc hiện tại)"
-                  : `Chỉ có thể gia hạn trong vòng 10 ngày trước khi hết hạn (còn ${daysUntil(r.endDate)} ngày)`
+                  : `Chỉ có thể gia hạn trong vòng 10 ngày trước khi hết hạn (còn ${daysUntil(
+                    r.endDate
+                  )} ngày)`
               }
             >
               <Button
@@ -389,6 +460,7 @@ export default function ManageSubscriptions() {
         );
       },
     },
+
   ];
 
   return (

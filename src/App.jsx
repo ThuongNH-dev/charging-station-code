@@ -154,7 +154,7 @@ export default function App() {
         }
       />
       <Route
-        path="/payment/failure"
+        path="/payment/failluer"
         element={
           <ProtectedRoute allowedRoles={["Customer"]}>
             <PaymentFailure />
@@ -180,7 +180,7 @@ export default function App() {
       <Route
         path="/payment/success"
         element={
-          <ProtectedRoute allowedRoles={["Customer", "Staff"]}>
+          <ProtectedRoute allowedRoles={["Customer","Company","Staff"]}>
             <PaymentSuccess />
           </ProtectedRoute>
         }

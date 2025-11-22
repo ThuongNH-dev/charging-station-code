@@ -100,10 +100,10 @@ function getCompanyIdFromToken() {
   const p = decodeJwtPayload(getToken());
   const n = Number(
     p?.companyId ??
-      p?.CompanyId ??
-      p?.tenantId ??
-      p?.company?.companyId ??
-      p?.company?.id
+    p?.CompanyId ??
+    p?.tenantId ??
+    p?.company?.companyId ??
+    p?.company?.id
   );
   return Number.isFinite(n) && n > 0 ? n : null;
 }
@@ -379,34 +379,51 @@ const ServicePlans = () => {
         msgApi.error("Thiếu thông tin gói hoặc ngày bắt đầu.");
         return;
       }
+
+      // 1) Tạo subscription như cũ
       const sub = await createSubscription(selectedPlan);
       const subscriptionId = Number(sub?.subscriptionId ?? sub?.id ?? 0);
       if (!Number.isFinite(subscriptionId) || subscriptionId <= 0) {
         throw new Error("Tạo thuê bao thất bại: không nhận được subscriptionId.");
       }
 
-      const created = await createInvoiceForSubscription({
-        subscriptionId,
-        plan: selectedPlan,
-        startDate,
-      });
+      // 2) Gọi API Payment/create-subscription/{subscriptionId} để lấy URL VNPAY
+      const payRes = await fetchAuthJSON(
+        `${API_ABS}/Payment/create-subscription/${subscriptionId}`,
+        {
+          method: "POST",
+          headers: {
+            // Nếu BE không cần Content-Type thì có thể bỏ dòng này,
+            // nhưng thường để cũng không sao
+            "Content-Type": "application/json",
+          },
+          // body: "" // Curl đang để body rỗng, mình có thể bỏ body luôn
+        }
+      );
 
+      const paymentUrl =
+        payRes?.paymentUrl ??
+        payRes?.PaymentUrl ??
+        payRes?.data?.paymentUrl ??
+        payRes?.Data?.PaymentUrl;
+
+      if (!paymentUrl) {
+        throw new Error("Không nhận được paymentUrl từ server.");
+      }
+
+      // 3) Đóng modal và redirect sang VNPAY
       setOpen(false);
-      msgApi.success("Đã tạo hoá đơn. Chuyển sang xác nhận thanh toán…");
-      navigate("/payment", {
-        state: {
-          from: "service-plans",
-          invoiceId: created.invoiceId,
-          subscriptionId,
-          companyId: created.companyId ?? null,
-          presetAmount: normalizeMonthlyPriceVND(selectedPlan.priceMonthly),
-        },
-      });
+      msgApi.success("Đang chuyển đến cổng thanh toán VNPAY...");
+      window.location.href = paymentUrl; // Redirect thẳng sang VNPAY
     } catch (e) {
-      console.error("Create subscription error:", e);
-      msgApi.error(e?.message || "Tạo thuê bao/hoá đơn thất bại. Vui lòng thử lại.");
+      console.error("Create subscription / redirect VNPAY error:", e);
+      msgApi.error(
+        e?.message || "Tạo thuê bao hoặc tạo URL thanh toán VNPAY thất bại. Vui lòng thử lại."
+      );
     }
   };
+
+
 
   /* ==================== UI ==================== */
   const renderBenefits = (plan) => {
