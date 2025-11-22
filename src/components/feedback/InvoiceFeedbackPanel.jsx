@@ -28,8 +28,7 @@ function getCustomerIdFromStorage() {
         const s2 = localStorage.getItem("customerId");
         const u = getStoredUser();
         const fromUser = u?.customerId;
-        const n =
-            Number(fromUser ?? s1 ?? s2 ?? u?.userId ?? u?.id ?? NaN);
+        const n = Number(fromUser ?? s1 ?? s2 ?? u?.userId ?? u?.id ?? NaN);
         return Number.isFinite(n) ? n : null;
     } catch {
         return null;
@@ -51,12 +50,20 @@ export default function InvoiceFeedbackPanel({ apiBase, endData, orderId }) {
     const canRate = Boolean(endedAt);
 
     // Id liên quan (thô từ endData)
-    const rawStationId = Number(endData?.stationId ?? endData?.StationId ?? endData?.port?.stationId);
-    const chargerId = Number(endData?.chargerId ?? endData?.ChargerId ?? endData?.charger?.chargerId);
-    const portId = Number(endData?.portId ?? endData?.PortId ?? endData?.port?.portId);
+    const rawStationId = Number(
+        endData?.stationId ?? endData?.StationId ?? endData?.port?.stationId
+    );
+    const chargerId = Number(
+        endData?.chargerId ?? endData?.ChargerId ?? endData?.charger?.chargerId
+    );
+    const portId = Number(
+        endData?.portId ?? endData?.PortId ?? endData?.port?.portId
+    );
+
     // Khóa chống gửi trùng trên phiên
     const dedupKey = React.useMemo(() => {
-        const oid = orderId ?? endData?.orderId ?? endData?.OrderId ?? endData?.id;
+        const oid =
+            orderId ?? endData?.orderId ?? endData?.OrderId ?? endData?.id;
         return oid ? `feedback:done:${oid}` : null;
     }, [orderId, endData]);
 
@@ -86,11 +93,17 @@ export default function InvoiceFeedbackPanel({ apiBase, endData, orderId }) {
             try {
                 // Ưu tiên port -> station
                 if (Number.isFinite(portId) && portId > 0) {
-                    const r = await fetch(`${base}/Ports/${encodeURIComponent(String(portId))}`, { headers });
+                    const r = await fetch(
+                        `${base}/Ports/${encodeURIComponent(String(portId))}`,
+                        { headers }
+                    );
                     if (r.ok) {
                         const j = await r.json().catch(() => null);
                         const sid = Number(
-                            j?.stationId ?? j?.StationId ?? j?.station?.stationId ?? j?.station?.id
+                            j?.stationId ??
+                                j?.StationId ??
+                                j?.station?.stationId ??
+                                j?.station?.id
                         );
                         if (Number.isFinite(sid) && sid > 0) {
                             setStationId(sid);
@@ -100,11 +113,17 @@ export default function InvoiceFeedbackPanel({ apiBase, endData, orderId }) {
                 }
                 // Fallback: charger -> station
                 if (Number.isFinite(chargerId) && chargerId > 0) {
-                    const r = await fetch(`${base}/Chargers/${encodeURIComponent(String(chargerId))}`, { headers });
+                    const r = await fetch(
+                        `${base}/Chargers/${encodeURIComponent(String(chargerId))}`,
+                        { headers }
+                    );
                     if (r.ok) {
                         const j = await r.json().catch(() => null);
                         const sid = Number(
-                            j?.stationId ?? j?.StationId ?? j?.station?.stationId ?? j?.station?.id
+                            j?.stationId ??
+                                j?.StationId ??
+                                j?.station?.stationId ??
+                                j?.station?.id
                         );
                         if (Number.isFinite(sid) && sid > 0) {
                             setStationId(sid);
@@ -135,14 +154,23 @@ export default function InvoiceFeedbackPanel({ apiBase, endData, orderId }) {
         e.preventDefault();
         setError("");
 
-        // Không bắt buộc, nhưng nếu họ bấm Gửi thì cần ít nhất 1 sao
+        // Không bắt buộc trước đây, nhưng BE đang require Comment => validate rõ ràng phía client
         if (!rating || rating < 1) {
             setError("Hãy chọn số sao bạn muốn đánh giá.");
             return;
         }
-        // Chắn chớ: không có stationId thì không gửi để tránh 500
+
+        const trimmedComment = comment.trim();
+        if (!trimmedComment) {
+            setError("Vui lòng nhập nhận xét (ít nhất 1 ký tự).");
+            return;
+        }
+
+        // Chắn chắn: không có stationId thì không gửi để tránh 500
         if (!Number.isFinite(stationId) || stationId <= 0) {
-            setError("Không xác định được trạm (stationId) từ dữ liệu hóa đơn. Vui lòng thử lại sau hoặc kiểm tra BE trả stationId/Ports/Chargers.");
+            setError(
+                "Không xác định được trạm sạc từ dữ liệu hóa đơn, nên chưa thể gửi đánh giá. Vui lòng thử lại sau hoặc liên hệ hỗ trợ."
+            );
             return;
         }
 
@@ -153,7 +181,7 @@ export default function InvoiceFeedbackPanel({ apiBase, endData, orderId }) {
             chargerId: Number.isFinite(chargerId) ? chargerId : 0,
             portId: Number.isFinite(portId) ? portId : 0,
             rating: rating,
-            comment: comment?.trim() || "",
+            comment: trimmedComment,
         };
 
         const token = getTokenFromStorage();
@@ -170,18 +198,57 @@ export default function InvoiceFeedbackPanel({ apiBase, endData, orderId }) {
                 headers,
                 body: JSON.stringify(payload),
             });
+
             if (!res.ok) {
-                const t = await res.text().catch(() => "");
-                // Bắt riêng case KeyNotFound/Station
-                if (t && /Station/i.test(t)) {
-                    throw new Error("Gửi đánh giá thất bại: Station không tồn tại (có thể stationId gửi lên sai hoặc chưa resolve được).");
+                let userMessage = "";
+                let rawText = "";
+                let data = null;
+
+                const contentType = res.headers.get("content-type") || "";
+
+                // Thử parse JSON trước
+                if (contentType.includes("application/json")) {
+                    data = await res.json().catch(() => null);
+                } else {
+                    rawText = await res.text().catch(() => "");
                 }
-                throw new Error(`Gửi đánh giá thất bại (${res.status}). ${t}`);
+
+                // Ưu tiên các lỗi validation (400)
+                if (res.status === 400 && data?.errors) {
+                    // Lỗi comment (trùng case bạn thấy ở trên)
+                    if (data.errors.Comment) {
+                        userMessage =
+                            "Nhận xét chưa hợp lệ. Vui lòng nhập nhận xét (ít nhất 1 ký tự).";
+                    } else {
+                        userMessage =
+                            "Thông tin đánh giá chưa hợp lệ. Vui lòng kiểm tra lại và thử gửi lại.";
+                    }
+                } else if (
+                    (rawText && /Station/i.test(rawText)) ||
+                    (data?.title && /Station/i.test(data.title))
+                ) {
+                    // Case lỗi Station không tồn tại, map lại message cho dễ hiểu
+                    userMessage =
+                        "Không tìm thấy trạm sạc tương ứng. Vui lòng thử lại sau hoặc liên hệ bộ phận hỗ trợ.";
+                } else if (res.status === 401 || res.status === 403) {
+                    userMessage =
+                        "Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại rồi gửi đánh giá.";
+                } else if (res.status >= 500) {
+                    userMessage =
+                        "Hệ thống đang gặp sự cố, vui lòng thử lại sau.";
+                } else {
+                    // Fallback chung (không show raw JSON nữa)
+                    userMessage =
+                        "Không gửi được đánh giá. Vui lòng thử lại sau.";
+                }
+
+                throw new Error(userMessage);
             }
+
             setDone(true);
             if (dedupKey) sessionStorage.setItem(dedupKey, "1");
         } catch (err) {
-            setError(err?.message || "Không gửi được đánh giá.");
+            setError(err?.message || "Không gửi được đánh giá. Vui lòng thử lại sau.");
         } finally {
             setLoading(false);
         }
@@ -192,35 +259,47 @@ export default function InvoiceFeedbackPanel({ apiBase, endData, orderId }) {
             <div className="bp-title">Đánh giá trải nghiệm</div>
 
             {done ? (
-                <div className="bp-hint">Cảm ơn bạn! Đánh giá của bạn đã được ghi nhận.</div>
+                <div className="bp-hint">
+                    Cảm ơn bạn! Đánh giá của bạn đã được ghi nhận.
+                </div>
             ) : (
                 <>
                     {!Number.isFinite(stationId) || stationId <= 0 ? (
-                        <div className="bp-hint" style={{ marginBottom: 8 }}>
+                        <div
+                            className="bp-hint"
+                            style={{ marginBottom: 8 }}
+                        >
                             {resolving
                                 ? "Đang xác định trạm từ dữ liệu phiên sạc…"
-                                : "Không xác định được trạm từ dữ liệu hóa đơn, không thể gửi đánh giá."}
+                                : "Không xác định được trạm từ dữ liệu hóa đơn, chưa thể gửi đánh giá."}
                         </div>
                     ) : null}
                     <form onSubmit={handleSubmit}>
                         {/* Hàng chọn sao */}
-                        {/* Hàng chọn sao */}
-                        <div className="bp-review" style={{ alignItems: "center" }}>
-                            {/* BỎ avatar nếu không cần ngôi sao dư */}
-                            {/* <div className="bp-avatar">⭐️</div> */}
+                        <div
+                            className="bp-review"
+                            style={{ alignItems: "center" }}
+                        >
                             <div>
-                                <div className="bp-review-head" style={{ gap: 8 }}>
+                                <div
+                                    className="bp-review-head"
+                                    style={{ gap: 8 }}
+                                >
                                     <b>Chọn số sao</b>
                                     <span>{renderStarsEmoji(rating)}</span>
                                 </div>
 
-                                {/* thêm className="bp-star-row" để xếp ngang */}
-                                <div className="bp-star-row" style={{ marginTop: 6 }}>
+                                <div
+                                    className="bp-star-row"
+                                    style={{ marginTop: 6 }}
+                                >
                                     {[1, 2, 3, 4, 5].map((n) => (
                                         <button
                                             key={n}
                                             type="button"
-                                            className={`bp-btn-secondary ${n === rating ? "is-active" : ""}`}
+                                            className={`bp-btn-secondary ${
+                                                n === rating ? "is-active" : ""
+                                            }`}
                                             onClick={() => handlePick(n)}
                                             aria-pressed={n === rating}
                                         >
@@ -233,8 +312,15 @@ export default function InvoiceFeedbackPanel({ apiBase, endData, orderId }) {
 
                         {/* Ghi chú */}
                         <div style={{ marginTop: 12 }}>
-                            <label className="bp-subtle" style={{ display: "block", marginBottom: 6 }}>
-                                Nhận xét (không bắt buộc)
+                            <label
+                                className="bp-subtle"
+                                style={{
+                                    display: "block",
+                                    marginBottom: 6,
+                                }}
+                            >
+                                Nhận xét
+                                <span style={{ color: "red" }}> *</span>
                             </label>
                             <textarea
                                 value={comment}
@@ -247,20 +333,37 @@ export default function InvoiceFeedbackPanel({ apiBase, endData, orderId }) {
                         </div>
 
                         {error && (
-                            <div className="error-text" style={{ marginTop: 8 }}>
+                            <div
+                                className="error-text"
+                                style={{ marginTop: 8 }}
+                            >
                                 {error}
                             </div>
                         )}
 
                         {/* Action */}
-                        <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                            <button className="bp-btn-secondary" type="button" onClick={() => setDone(true)}>
+                        <div
+                            style={{
+                                marginTop: 10,
+                                display: "flex",
+                                gap: 8,
+                            }}
+                        >
+                            <button
+                                className="bp-btn-secondary"
+                                type="button"
+                                onClick={() => setDone(true)}
+                            >
                                 Bỏ qua
                             </button>
                             <button
                                 className="bp-btn-secondary"
                                 type="submit"
-                                disabled={loading || !Number.isFinite(stationId) || stationId <= 0}
+                                disabled={
+                                    loading ||
+                                    !Number.isFinite(stationId) ||
+                                    stationId <= 0
+                                }
                                 aria-busy={loading}
                             >
                                 {loading ? "Đang gửi…" : "Gửi đánh giá"}
@@ -268,11 +371,17 @@ export default function InvoiceFeedbackPanel({ apiBase, endData, orderId }) {
                         </div>
                     </form>
 
-                    {/* Gợi ý: hiển thị thông tin trụ/cổng nếu có */}
                     {(endData?.chargerCode || endData?.portCode) && (
-                        <div className="bp-subtle" style={{ marginTop: 8 }}>
-                            {endData?.chargerCode ? `Trụ: ${endData.chargerCode}` : ""}
-                            {endData?.portCode ? ` • Cổng: ${endData.portCode}` : ""}
+                        <div
+                            className="bp-subtle"
+                            style={{ marginTop: 8 }}
+                        >
+                            {endData?.chargerCode
+                                ? `Trụ: ${endData.chargerCode}`
+                                : ""}
+                            {endData?.portCode
+                                ? ` • Cổng: ${endData.portCode}`
+                                : ""}
                         </div>
                     )}
                 </>
