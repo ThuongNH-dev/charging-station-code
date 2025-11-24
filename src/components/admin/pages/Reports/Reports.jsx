@@ -124,12 +124,7 @@ export default function Reports() {
       },
       analytics: analyticsData,
     };
-  }, [
-    rawData,
-    reportFilter.startDate,
-    reportFilter.endDate,
-    analyticsData,
-  ]);
+  }, [rawData, reportFilter.startDate, reportFilter.endDate, analyticsData]);
 
   // Giao diện loading
   if (isLoading || !dataToRender) {
@@ -141,6 +136,17 @@ export default function Reports() {
     );
   }
 
+  // Danh sách các báo cáo cần xem theo THÁNG (logic Admin)
+  const ADMIN_MONTHLY_VIEWS = [
+    "admin-company", // Báo cáo theo công ty
+    "admin-utilization", // Hiệu suất trạm
+    "admin-top-under", // Top/Under/Zero
+    "admin-vehicle", // Doanh thu xe
+    "admin-vehicle-type", // (Nếu có)
+  ];
+
+  // Biến kiểm tra: True nếu đang ở tab báo cáo tháng, False nếu ở tab thường
+  const isMonthlyView = ADMIN_MONTHLY_VIEWS.includes(reportFilter.viewType);
   // Giao diện chính
   return (
     <div className="reports-page">
@@ -148,42 +154,88 @@ export default function Reports() {
 
       {/* Bộ lọc */}
       <div className="report-header-controls">
+        {/* 👇 2. THAY THẾ TOÀN BỘ DIV filter-group CŨ BẰNG ĐOẠN NÀY */}
         <div className="filter-group">
-          <span className="filter-label">Từ ngày:</span>
-          <input
-            type="date"
-            className="filter-dropdown"
-            value={reportFilter.startDate}
-            max={reportFilter.endDate}
-            onChange={(e) =>
-              setReportFilter({ ...reportFilter, startDate: e.target.value })
-            }
-          />
+          {isMonthlyView ? (
+            /* --- GIAO DIỆN 1: CHỌN THÁNG (Cho các tab Admin) --- */
+            <>
+              <span className="filter-label" style={{ fontWeight: 600 }}>
+                Chọn tháng báo cáo:
+              </span>
+              <input
+                type="month"
+                className="filter-dropdown"
+                // Lấy YYYY-MM từ endDate hiện tại
+                value={reportFilter.endDate.slice(0, 7)}
+                onChange={(e) => {
+                  const val = e.target.value; // Kết quả dạng: "2025-10"
+                  if (!val) return;
 
-          <span className="filter-label">Đến ngày:</span>
-          <input
-            type="date"
-            className="filter-dropdown"
-            value={reportFilter.endDate}
-            min={reportFilter.startDate}
-            onChange={(e) =>
-              setReportFilter({ ...reportFilter, endDate: e.target.value })
-            }
-          />
+                  // Tính ngày cuối cùng của tháng được chọn
+                  const [y, m] = val.split("-");
+                  const lastDay = new Date(y, m, 0).getDate();
 
-          <button
-            className="btn"
-            onClick={() => {
-              setReportFilter({
-                ...reportFilter,
-                startDate: sevenDaysAgoISO,
-                endDate: todayISO,
-              });
-              setTimeout(() => window.dispatchEvent(new Event("resize")), 0);
-            }}
-          >
-            ĐẶT LẠI
-          </button>
+                  // Cập nhật cả startDate và endDate cho chuẩn logic
+                  setReportFilter({
+                    ...reportFilter,
+                    startDate: `${val}-01`,
+                    endDate: `${val}-${lastDay}`, // Ví dụ: 2025-10-31
+                  });
+
+                  // Trigger resize màn hình để biểu đồ vẽ lại (nếu cần)
+                  setTimeout(
+                    () => window.dispatchEvent(new Event("resize")),
+                    0
+                  );
+                }}
+              />
+            </>
+          ) : (
+            /* --- GIAO DIỆN 2: CHỌN TỪ NGÀY - ĐẾN NGÀY (Cho biểu đồ thời gian) --- */
+            <>
+              <span className="filter-label">Từ ngày:</span>
+              <input
+                type="date"
+                className="filter-dropdown"
+                value={reportFilter.startDate}
+                max={reportFilter.endDate}
+                onChange={(e) =>
+                  setReportFilter({
+                    ...reportFilter,
+                    startDate: e.target.value,
+                  })
+                }
+              />
+
+              <span className="filter-label">Đến ngày:</span>
+              <input
+                type="date"
+                className="filter-dropdown"
+                value={reportFilter.endDate}
+                min={reportFilter.startDate}
+                onChange={(e) =>
+                  setReportFilter({ ...reportFilter, endDate: e.target.value })
+                }
+              />
+
+              <button
+                className="btn"
+                onClick={() => {
+                  setReportFilter({
+                    ...reportFilter,
+                    startDate: sevenDaysAgoISO,
+                    endDate: todayISO,
+                  });
+                  setTimeout(
+                    () => window.dispatchEvent(new Event("resize")),
+                    0
+                  );
+                }}
+              >
+                ĐẶT LẠI
+              </button>
+            </>
+          )}
         </div>
 
         <div className="export-buttons">
@@ -201,11 +253,10 @@ export default function Reports() {
         {[
           ["time-chart", "Biểu đồ thời gian"],
           ["service-structure", "Cơ cấu dịch vụ"],
+          ["admin-vehicle", "Doanh Thu Xe"],
           ["admin-company", "Theo công ty"],
           ["admin-utilization", "Hiệu suất trạm"],
           ["admin-top-under", "Top / Under / Zero"],
-          ["admin-vehicle", "Doanh thu theo xe"],
-          ["admin-vehicle-type", "Xe công ty theo loại"],
         ].map(([key, label]) => (
           <button
             key={key}

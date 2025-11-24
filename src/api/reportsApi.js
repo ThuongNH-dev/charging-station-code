@@ -19,7 +19,7 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
-  console.log("Token:", token); // Debug log
+  // console.log("Token:", token); // Debug log
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   } else {
@@ -35,13 +35,6 @@ const settledData = (res, fallback = []) =>
 /**
  * 🔹 Lấy tất cả dữ liệu thô cần thiết cho báo cáo
  * @param {{startDate?: string, endDate?: string, stationId?: string|number}} params
- * @returns {Promise<{
- *   sessionsData: any[],
- *   invoicesData: any[],
- *   stationsData: any[],
- *   subscriptionPlansData: any[],
- *   subscriptionsData: any[]
- * }>}
  */
 export const fetchReportData = async (params = {}) => {
   const { startDate, endDate, stationId } = params;
@@ -61,7 +54,7 @@ export const fetchReportData = async (params = {}) => {
       params: { page: 1, pageSize: 200 },
     });
 
-    // ✅ THÊM 2 API này
+    // ✅ THÊM 2 API này để lấy danh sách gốc Port/Charger
     const portsPromise = api.get("/Ports", {
       params: { page: 1, pageSize: 1000 },
     });
@@ -74,8 +67,8 @@ export const fetchReportData = async (params = {}) => {
       sessionsPromise,
       invoicesPromise,
       stationsPromise,
-      portsPromise, // ✅
-      chargersPromise, // ✅
+      portsPromise,
+      chargersPromise,
       subscriptionPlansPromise,
       subscriptionsPromise,
     ]);
@@ -84,8 +77,8 @@ export const fetchReportData = async (params = {}) => {
       sessionsResult,
       invoicesResult,
       stationsResult,
-      portsResult, // ✅
-      chargersResult, // ✅
+      portsResult,
+      chargersResult,
       subscriptionPlansResult,
       subscriptionsResult,
     ] = results;
@@ -142,21 +135,32 @@ export const fetchAdminAnalytics = async ({ month, year }) => {
       params: baseParams,
     });
 
+    // 👇 ĐÃ SỬA: Thêm minUtilization=0 và minSessions=0 để lấy TẤT CẢ trạm
     const utilizationStationPromise = api.get("/Analytics/utilization", {
-      params: { ...baseParams, scope: "Station" },
+      params: {
+        ...baseParams,
+        scope: "Station",
+        minUtilization: 0, // Quan trọng: Lấy cả trạm 0%
+        minSessions: 0, // Quan trọng: Lấy cả trạm ít phiên
+      },
     });
 
+    // 👇 ĐÃ SỬA: Thêm tham số tương tự cho Top/Under để lấy danh sách đầy đủ
     const topUnderPromise = api.get("/Analytics/top-under", {
-      params: baseParams,
+      params: {
+        ...baseParams,
+        minUtilization: 0.05,
+        minSessions: 5,
+      },
     });
 
-    // ✅ MỚI: breakdown theo xe & theo loại xe
-    const vehicleBreakdownPromise = api.get("/Analytics/breakdown/vehicle", {
-      params: baseParams,
-    });
+    const vehicleBreakdownPromise = Promise.resolve({ data: [] });
+
     const vehicleTypeBreakdownPromise = api.get(
       "/Analytics/breakdown/vehicle-types",
-      { params: baseParams }
+      {
+        params: baseParams,
+      }
     );
 
     const results = await Promise.allSettled([
@@ -166,7 +170,7 @@ export const fetchAdminAnalytics = async ({ month, year }) => {
       stationBreakdownPromise,
       utilizationStationPromise,
       topUnderPromise,
-      vehicleBreakdownPromise, // ✅
+      vehicleBreakdownPromise,
       vehicleTypeBreakdownPromise,
     ]);
 
@@ -177,7 +181,7 @@ export const fetchAdminAnalytics = async ({ month, year }) => {
       stationBreakdownResult,
       utilizationStationResult,
       topUnderResult,
-      vehicleBreakdownResult, // ✅
+      vehicleBreakdownResult,
       vehicleTypeBreakdownResult,
     ] = results;
 
@@ -200,4 +204,21 @@ export const fetchAdminAnalytics = async ({ month, year }) => {
   }
 };
 
-export default { fetchReportData, fetchAdminAnalytics };
+/**
+ * 🔹 Hàm xóa Port (Dùng cho mục Zero Activity)
+ */
+export const deletePort = async (portId) => {
+  try {
+    // Thay đổi đường dẫn '/Ports' tùy theo Controller của bạn
+    await api.delete(`/Ports/${portId}`);
+    return true;
+  } catch (error) {
+    console.error("Lỗi khi xóa Port:", error);
+    // Kiểm tra lỗi chi tiết từ server trả về nếu có
+    const serverMsg = error.response?.data?.message || error.message;
+    alert(`Không thể xóa Port. Lỗi: ${serverMsg}`);
+    return false;
+  }
+};
+
+export default { fetchReportData, fetchAdminAnalytics, deletePort };

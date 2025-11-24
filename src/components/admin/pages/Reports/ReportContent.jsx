@@ -1,7 +1,6 @@
-// =========================================================
-// ReportContent.jsx — HOÀN CHỈNH (Recharts + dữ liệu từ API)
-// =========================================================
 import React, { useState, useEffect, useMemo } from "react";
+import { DeleteOutlined } from "@ant-design/icons"; // Nhớ import icon thùng rác
+import { deletePort } from "../../../../api/reportsApi";
 
 import {
   BarChart,
@@ -54,9 +53,6 @@ const regionLabel = (key) => {
 // =========================================================
 // 🔹 1. Biểu đồ HEATMAP 7×24 (theo giờ)
 // =========================================================
-// =========================================================
-// 🔹 1. Biểu đồ HEATMAP 7×24 (theo giờ, gộp theo THỨ)
-// =========================================================
 function HeatmapHourly({ data = [] }) {
   if (!data.length) {
     return (
@@ -73,7 +69,6 @@ function HeatmapHourly({ data = [] }) {
     );
   }
 
-  // 0 = CN, 1 = T2, ...
   const WEEKDAY_LABELS = [
     "CN",
     "Thứ 2",
@@ -84,7 +79,6 @@ function HeatmapHourly({ data = [] }) {
     "Thứ 7",
   ];
 
-  // Chuẩn hoá dữ liệu: gộp theo (hour, weekday)
   const chartData = Array.from({ length: 24 }, (_, hour) => {
     const row = { hour: `${hour}:00` };
 
@@ -93,7 +87,7 @@ function HeatmapHourly({ data = [] }) {
         .filter((d) => {
           if (d.hour !== hour) return false;
           const dateObj = new Date(d.date);
-          const dow = dateObj.getDay(); // 0..6
+          const dow = dateObj.getDay();
           return dow === weekdayIndex;
         })
         .reduce((acc, d) => acc + Number(d.value || 0), 0);
@@ -104,7 +98,6 @@ function HeatmapHourly({ data = [] }) {
     return row;
   });
 
-  // Tìm max để set Y-axis domain
   const maxVal = Math.max(
     1,
     ...chartData.flatMap((row) =>
@@ -122,7 +115,6 @@ function HeatmapHourly({ data = [] }) {
             <XAxis dataKey="hour" />
             <YAxis domain={[0, maxVal]} />
             <Tooltip
-              // name = label (Thứ 2, Thứ 3...), value = số phiên
               formatter={(value, name) => [`${value} phiên`, name]}
               labelFormatter={(label) => `Giờ: ${label}`}
             />
@@ -152,7 +144,6 @@ function HeatmapHourly({ data = [] }) {
 function DailyCharts({ dailySessions = [], dailyRevenue = [] }) {
   return (
     <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 20 }}>
-      {/* Số phiên sạc */}
       <div style={{ flex: 1, minWidth: 350 }}>
         <h4>Số phiên sạc theo ngày</h4>
         <div className="chart-box-300">
@@ -177,7 +168,6 @@ function DailyCharts({ dailySessions = [], dailyRevenue = [] }) {
         </p>
       </div>
 
-      {/* Doanh thu */}
       <div style={{ flex: 1, minWidth: 350 }}>
         <h4>Doanh thu theo ngày (nghìn ₫)</h4>
         <div className="chart-box-300">
@@ -420,7 +410,7 @@ function AdminMonthlyOverview({ summary, revenueSources }) {
     month,
     year,
   } = {
-    sessionCount: summary.sessionCount ?? summary.sessionCount ?? 0,
+    sessionCount: summary.sessionCount ?? 0,
     energyKwh: summary.energyKwh ?? 0,
     subtotal: summary.subtotal ?? 0,
     tax: summary.tax ?? 0,
@@ -518,6 +508,53 @@ function AdminMonthlyOverview({ summary, revenueSources }) {
   );
 }
 
+function VehicleBreakdownTable({ data = [] }) {
+  if (!data.length) {
+    return (
+      <div style={{ padding: 20, color: "#777", fontStyle: "italic" }}>
+        Không có dữ liệu doanh thu xe.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h4>Doanh Thu Theo Xe</h4>
+      <table className="report-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Biển số xe</th>
+            <th>Loại xe</th>
+            <th>Số phiên</th>
+            <th>kWh</th>
+            <th>Doanh thu (₫)</th>
+            <th>Thời gian sạc (phút)</th>
+            <th>Idle (phút)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, idx) => (
+            <tr key={row.key ?? idx}>
+              <td>{idx + 1}</td>
+              <td>{row.licensePlate || "N/A"}</td>
+              <td>{row.vehicleType || "Không có dữ liệu"}</td>
+              <td>{row.sessionCount?.toLocaleString("vi-VN") || "0"}</td>
+              <td>{row.energyKwh?.toLocaleString("vi-VN") || "0"}</td>
+              <td>{row.total?.toLocaleString("vi-VN") || "0"}</td>
+              <td>{row.durationMin?.toLocaleString("vi-VN") || "0"}</td>
+              <td>{row.idleMin?.toLocaleString("vi-VN") || "0"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="table-footnote">
+        Ghi chú: Dữ liệu đã được sắp xếp theo doanh thu giảm dần từ backend.
+      </p>
+    </div>
+  );
+}
+
 // =========================================================
 // 🔹 7. Bảng breakdown theo Công ty
 // =========================================================
@@ -566,26 +603,76 @@ function CompanyBreakdownTable({ data = [] }) {
   );
 }
 
+// File: ReportContent.jsx
+
 // =========================================================
-// 🔹 8. Bảng Utilization theo Trạm
+// 🔹 8. Bảng Utilization theo Trạm (ĐÃ SỬA: GỘP DỮ LIỆU FE)
 // =========================================================
-function StationUtilizationTable({ data = [] }) {
-  if (!data.length) {
+function StationUtilizationTable({ data = [], allStations = [] }) {
+  // 1. Logic Gộp dữ liệu (Merge):
+  // Lấy danh sách trạm gốc làm chuẩn, ghép với dữ liệu hiệu suất
+  const mergedData = useMemo(() => {
+    if (!allStations.length) return data; // Fallback nếu chưa có list gốc
+
+    // Tạo Map để tra cứu nhanh dữ liệu hiệu suất từ BE trả về
+    // Key là tên trạm (theo logic BE mapping: code = stationName)
+    const statsMap = new Map();
+    data.forEach((item) => {
+      if (item.code) {
+        statsMap.set(item.code, item); // Key gốc
+        statsMap.set(item.code.trim().toLowerCase(), item); // Key chuẩn hóa
+      }
+    });
+
+    // Duyệt qua tất cả trạm trong hệ thống
+    const result = allStations.map((station) => {
+      // Lấy tên trạm từ danh sách gốc (Thử nhiều trường khác nhau để chắc ăn)
+      const rawName =
+        station.name ||
+        station.stationName ||
+        station.code ||
+        station.title ||
+        "Unknown";
+      const searchName = String(rawName).trim().toLowerCase();
+
+      // Thử tìm trong Map
+      let stats = statsMap.get(rawName) || statsMap.get(searchName);
+
+      if (stats) {
+        return { ...stats, status: "active" }; // Đã có số liệu
+      }
+
+      // Nếu không tìm thấy -> Tạo dữ liệu 0
+      return {
+        code: rawName,
+        sessionCount: 0,
+        energyKwh: 0,
+        chargingMinutes: 0,
+        utilization: 0,
+        status: "inactive",
+      };
+    });
+
+    return result.sort((a, b) => (b.utilization || 0) - (a.utilization || 0));
+  }, [data, allStations]);
+
+  if (!mergedData.length) {
     return (
       <div style={{ padding: 20, color: "#777", fontStyle: "italic" }}>
-        Không có dữ liệu hiệu suất trạm.
+        Không có dữ liệu trạm.
       </div>
     );
   }
 
   return (
     <div>
-      <h4>Hiệu suất sử dụng trạm sạc</h4>
+      <h4>Hiệu suất sử dụng trạm sạc (Toàn hệ thống)</h4>
       <table className="report-table">
         <thead>
           <tr>
             <th>#</th>
             <th>Trạm</th>
+            <th>Trạng thái</th> {/* Cột mới cảnh báo */}
             <th>Số phiên</th>
             <th>kWh</th>
             <th>Thời gian sạc (phút)</th>
@@ -593,30 +680,92 @@ function StationUtilizationTable({ data = [] }) {
           </tr>
         </thead>
         <tbody>
-          {data.map((row, idx) => (
-            <tr key={row.code ?? idx}>
-              <td>{idx + 1}</td>
-              <td>{row.code}</td>
-              <td>{row.sessionCount?.toLocaleString("vi-VN")}</td>
-              <td>{row.energyKwh?.toLocaleString("vi-VN")}</td>
-              <td>{row.chargingMinutes?.toLocaleString("vi-VN")}</td>
-              <td>{((row.utilization ?? 0) * 100).toFixed(2)}%</td>
-            </tr>
-          ))}
+          {mergedData.map((row, idx) => {
+            // Logic tô màu cảnh báo
+            const isInactive =
+              row.status === "inactive" || row.sessionCount === 0;
+            const isLowPerformance = !isInactive && row.utilization < 0.05; // Dưới 5%
+
+            let rowStyle = {};
+            let statusBadge = (
+              <span style={{ color: "green", fontWeight: "bold" }}>
+                Hoạt động tốt
+              </span>
+            );
+
+            if (isInactive) {
+              rowStyle = { backgroundColor: "#ffebeb" }; // Đỏ nhạt
+              statusBadge = (
+                <span style={{ color: "#d63031", fontWeight: "bold" }}>
+                  Không hoạt động
+                </span>
+              );
+            } else if (isLowPerformance) {
+              rowStyle = { backgroundColor: "#fffbe6" }; // Vàng nhạt
+              statusBadge = (
+                <span style={{ color: "#f39c12", fontWeight: "bold" }}>
+                  Hiệu suất thấp
+                </span>
+              );
+            }
+
+            return (
+              <tr key={idx} style={rowStyle}>
+                <td>{idx + 1}</td>
+                <td style={{ fontWeight: 500 }}>{row.code}</td>
+                <td>{statusBadge}</td>
+                <td>{row.sessionCount?.toLocaleString("vi-VN")}</td>
+                <td>{row.energyKwh?.toLocaleString("vi-VN")}</td>
+                <td>{row.chargingMinutes?.toLocaleString("vi-VN")}</td>
+                <td>
+                  <strong>{((row.utilization ?? 0) * 100).toFixed(2)}%</strong>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       <p className="table-footnote">
-        Ghi chú: chỉ hiển thị các trạm có Utilization và số phiên vượt qua
-        ngưỡng minUtilization / minSessions (backend).
+        <span
+          style={{
+            display: "inline-block",
+            width: 10,
+            height: 10,
+            background: "#ffebeb",
+            border: "1px solid #ccc",
+            marginRight: 5,
+          }}
+        ></span>
+        Màu đỏ: Trạm không phát sinh doanh thu (0 phiên). <br />
+        <span
+          style={{
+            display: "inline-block",
+            width: 10,
+            height: 10,
+            background: "#fffbe6",
+            border: "1px solid #ccc",
+            marginRight: 5,
+          }}
+        ></span>
+        Màu vàng: Hiệu suất thấp (dưới 5%).
       </p>
     </div>
   );
 }
 
 // =========================================================
-// 🔹 9. Top / Under / Zero activity (theo Port)
+// 🔹 9. Top / Under / Zero activity (theo Port) - ĐÃ CHỈNH SỬA
 // =========================================================
+
 function TopUnderZeroSection({ topUnder }) {
+  const [zeroList, setZeroList] = useState([]);
+
+  useEffect(() => {
+    if (topUnder?.zeroActivity) {
+      setZeroList(topUnder.zeroActivity);
+    }
+  }, [topUnder]);
+
   if (!topUnder) {
     return (
       <div style={{ padding: 20, color: "#777", fontStyle: "italic" }}>
@@ -625,22 +774,67 @@ function TopUnderZeroSection({ topUnder }) {
     );
   }
 
-  const { topActive = [], underUtilized = [], zeroActivity = [] } = topUnder;
+  const { topActive = [], underUtilized = [] } = topUnder;
+
+  // 👇 --- LOGIC LỌC TRÙNG (MỚI THÊM) --- 👇
+  // Mục đích: Nếu cổng sạc đã nằm trong Top 10 thì không hiển thị ở bảng Hiệu suất thấp nữa
+  const filteredUnderUtilized = useMemo(() => {
+    // 1. Tạo danh sách các Key của Top Active để tra cứu (Kết hợp Port + Charger để không nhầm)
+    const topKeys = new Set(
+      topActive.map((item) => `${item.key}_${item.key2}`)
+    );
+
+    // 2. Lọc danh sách Under: Chỉ giữ lại những item KHÔNG nằm trong Top
+    return underUtilized.filter((item) => {
+      const uniqueKey = `${item.key}_${item.key2}`;
+      return !topKeys.has(uniqueKey);
+    });
+  }, [topActive, underUtilized]);
+  // 👆 ---------------------------------- 👆
+
+  // --- HÀM XỬ LÝ XÓA ---
+  const handleDeleteClick = async (item) => {
+    const confirm = window.confirm(
+      `Bạn chắc chắn muốn xóa cổng sạc: ${item.key}? \nHành động này không thể hoàn tác!`
+    );
+    if (!confirm) return;
+
+    const idToDelete =
+      item.portId ||
+      (item.key && item.key.includes("#") ? item.key.split("#")[1] : null);
+
+    if (!idToDelete) {
+      alert("Lỗi: Không tìm thấy ID của cổng sạc để xóa.");
+      return;
+    }
+
+    try {
+      const success = await deletePort(idToDelete);
+      if (success) {
+        setZeroList((prev) => prev.filter((p) => p.key !== item.key));
+        alert("Đã xóa thành công!");
+      }
+    } catch (error) {
+      alert("Có lỗi xảy ra khi xóa.");
+    }
+  };
 
   const renderPortTable = (rows, type) => (
     <table className="report-table" key={type}>
       <thead>
         <tr>
           <th>#</th>
-          <th>Port</th>
-          <th>Charger</th>
-          {type !== "zero" && (
+          <th>Cổng sạc (Port)</th>
+          <th>Trụ sạc (Charger)</th>
+          {type !== "zero" ? (
             <>
               <th>Số phiên</th>
               <th>kWh</th>
               <th>Doanh thu (₫)</th>
               <th>Thời gian sạc (phút)</th>
             </>
+          ) : (
+            <th style={{ textAlign: "center", width: 120 }}>Hành động</th>
           )}
         </tr>
       </thead>
@@ -648,15 +842,37 @@ function TopUnderZeroSection({ topUnder }) {
         {rows.map((row, idx) => (
           <tr key={`${type}-${row.key ?? idx}`}>
             <td>{idx + 1}</td>
-            <td>{row.key}</td>
+            <td style={{ fontWeight: 500 }}>{row.key}</td>
             <td>{row.key2}</td>
-            {type !== "zero" && (
+            {type !== "zero" ? (
               <>
                 <td>{row.sessionCount?.toLocaleString("vi-VN")}</td>
                 <td>{row.energyKwh?.toLocaleString("vi-VN")}</td>
                 <td>{row.total?.toLocaleString("vi-VN")}</td>
                 <td>{row.durationMin?.toLocaleString("vi-VN")}</td>
               </>
+            ) : (
+              <td style={{ textAlign: "center" }}>
+                <button
+                  className="btn-icon-delete"
+                  title="Xóa cổng hư/hỏng này"
+                  style={{
+                    border: "none",
+                    background: "#ffebeb",
+                    color: "#c0392b",
+                    cursor: "pointer",
+                    padding: "6px 12px",
+                    borderRadius: 4,
+                    fontSize: "13px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                  onClick={() => handleDeleteClick(row)}
+                >
+                  <DeleteOutlined /> Xóa
+                </button>
+              </td>
             )}
           </tr>
         ))}
@@ -666,42 +882,53 @@ function TopUnderZeroSection({ topUnder }) {
 
   return (
     <div className="top-under-layout">
+      {/* KHỐI 1: TOP ACTIVE */}
       <div className="top-under-block">
-        <h4>Top Active Ports</h4>
+        <h4 style={{ color: "#27ae60" }}>Top hoạt động hiệu quả</h4>
         {topActive.length ? (
           renderPortTable(topActive, "top")
         ) : (
-          <div className="empty-block">Không có dữ liệu.</div>
+          <div className="empty-block">Chưa có dữ liệu.</div>
         )}
       </div>
 
+      {/* KHỐI 2: UNDER UTILIZED (Dùng danh sách đã lọc trùng) */}
       <div className="top-under-block">
-        <h4>Under-utilized Ports</h4>
-        {underUtilized.length ? (
-          renderPortTable(underUtilized, "under")
+        <h4 style={{ color: "#f39c12" }}>Cảnh báo: Hiệu suất thấp</h4>
+        {/* 👇 SỬA Ở ĐÂY: Dùng filteredUnderUtilized thay vì underUtilized */}
+        {filteredUnderUtilized.length ? (
+          renderPortTable(filteredUnderUtilized, "under")
         ) : (
-          <div className="empty-block">Không có dữ liệu.</div>
+          <div className="empty-block">
+            Không có cổng sạc hiệu suất thấp (ngoài top active).
+          </div>
         )}
       </div>
 
+      {/* KHỐI 3: ZERO ACTIVITY */}
       <div className="top-under-block">
-        <h4>Zero-activity Ports</h4>
-        {zeroActivity.length ? (
-          renderPortTable(zeroActivity, "zero")
+        <h4 style={{ color: "#c0392b" }}>
+          Cảnh báo: Không phát sinh giao dịch
+        </h4>
+        {zeroList.length ? (
+          renderPortTable(zeroList, "zero")
         ) : (
-          <div className="empty-block">Không có dữ liệu.</div>
+          <div className="empty-block">
+            Tất cả cổng sạc đều đang hoạt động tốt.
+          </div>
         )}
       </div>
 
       <p className="table-footnote">
-        Ghi chú: Top Active = top 10 port theo doanh thu; Under-utilized = port
-        có utilization thấp hoặc ít phiên trong tháng; Zero-activity = các port
-        không phát sinh phiên nào.
+        Ghi chú:
+        <strong> Top hiệu quả:</strong> 10 cổng sạc doanh thu cao nhất. |
+        <strong> Hiệu suất thấp:</strong> Các cổng sạc hoạt động kém và không
+        nằm trong Top. |<strong> Không giao dịch:</strong> Không có phiên sạc
+        nào trong tháng.
       </p>
     </div>
   );
 }
-
 // =========================================================
 // 🔹 COMPONENT CHÍNH
 // =========================================================
@@ -715,18 +942,13 @@ export default function ReportContent({ data, reportFilter }) {
 
   const { timeChart, serviceStructure, analytics } = data;
 
-  // ====== CHỌN THÁNG + PIE DATA THEO THÁNG ======
   const monthlyRevenue = serviceStructure?.monthlyRevenue || [];
 
-  // state: tháng đang chọn (VD "11/2025")
   const [selectedMonth, setSelectedMonth] = useState(() => {
     if (!monthlyRevenue.length) return "";
-    // mặc định: tháng mới nhất
     return monthlyRevenue[monthlyRevenue.length - 1].month;
   });
 
-  // Khi monthlyRevenue thay đổi (do filter ngày / trạm),
-  // nếu tháng đang chọn không còn trong danh sách thì nhảy về tháng mới nhất
   useEffect(() => {
     if (!monthlyRevenue.length) {
       setSelectedMonth("");
@@ -738,7 +960,6 @@ export default function ReportContent({ data, reportFilter }) {
     }
   }, [monthlyRevenue, selectedMonth]);
 
-  // Tính pieData theo THÁNG đang chọn
   const pieDataForSelectedMonth = useMemo(() => {
     if (!monthlyRevenue.length) return [];
 
@@ -753,7 +974,6 @@ export default function ReportContent({ data, reportFilter }) {
       value: Number(row[name] || 0),
     }));
   }, [monthlyRevenue, selectedMonth]);
-  // ====== HẾT PHẦN THÊM MỚI ======
 
   switch (reportFilter.viewType) {
     case "time-chart":
@@ -812,6 +1032,17 @@ export default function ReportContent({ data, reportFilter }) {
         </div>
       );
 
+    case "admin-vehicle":
+      return (
+        <div className="report-content-area">
+          <h3 className="comparison-title">Báo cáo Doanh Thu Xe</h3>
+          <VehicleBreakdownTable
+            data={analytics?.vehicleBreakdown || []}
+          />{" "}
+          {/* Hiển thị bảng doanh thu xe */}
+        </div>
+      );
+
     // ✅ VIEW MỚI: Breakdown theo Công ty
     case "admin-company":
       return (
@@ -828,6 +1059,7 @@ export default function ReportContent({ data, reportFilter }) {
           <h3 className="comparison-title">Hiệu suất sử dụng trạm</h3>
           <StationUtilizationTable
             data={analytics?.utilizationStations || []}
+            allStations={data?.allStations || []}
           />
         </div>
       );
@@ -836,10 +1068,9 @@ export default function ReportContent({ data, reportFilter }) {
     case "admin-top-under":
       return (
         <div className="report-content-area">
-          <h3 className="comparison-title">
-            Top / Under / Zero activity (theo Port)
-          </h3>
-          <TopUnderZeroSection topUnder={analytics?.topUnder} />
+          <h3 className="comparison-title">Phân loại hiệu suất cổng sạc</h3>
+          <TopUnderZeroSection topUnder={analytics?.topUnder}
+           />
         </div>
       );
 
