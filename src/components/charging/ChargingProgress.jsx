@@ -562,18 +562,7 @@ const ChargingProgress = () => {
     state?.gun?.id,
     state?.portId,
   ]);
-
-  // // Show lại toast nếu reload
-  // useEffect(() => {
-  //   const cached = sessionStorage.getItem("charging:start:data");
-  //   if (cached) {
-  //     try {
-  //       const obj = JSON.parse(cached);
-  //       if (obj?.data) showStartSessionToast(obj.data);
-  //     } catch { }
-  //   }
-  // }, []);
-
+  
   // Resume khi vào từ Menu (không có state): đọc live và hydrate session/charger
   useEffect(() => {
     if (state) return; // có state thì không cần resume
