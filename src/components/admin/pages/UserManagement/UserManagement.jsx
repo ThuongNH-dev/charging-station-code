@@ -456,19 +456,17 @@ const UserFilterBar = ({
     );
     return [...names].sort().map((name) => (
       <option key={name} value={name}>
-                        {name}           {" "}
+        {name}
       </option>
     ));
   }, [servicePackages]);
 
   return (
     <div className="filter-bar">
-                       {" "}
+      {/* Tìm kiếm */}
       <div className="filter-group">
-                        <label className="filter-label">Tìm kiếm:</label>       {" "}
-               {" "}
+        <label className="filter-label">Tìm kiếm:</label>
         <div className="search-box">
-                                       {" "}
           <input
             type="text"
             placeholder="Tên, Email..."
@@ -477,51 +475,56 @@ const UserFilterBar = ({
               setUserFilter({ ...userFilter, search: e.target.value })
             }
           />
-                              <i className="fas fa-search search-icon"></i>     
-                   {" "}
+          <i className="fas fa-search search-icon"></i>
         </div>
-                           {" "}
       </div>
-                       {" "}
+
+      {/* 🔹 LOẠI NGƯỜI DÙNG: THÊM NÚT NHÂN VIÊN Ở ĐÂY */}
       <div className="filter-group">
-                        <label className="filter-label">Loại người dùng:</label>
-                       {" "}
+        <label className="filter-label">Loại người dùng:</label>
         <div className="segmented-control">
-                                       {" "}
           <button
             className={`segmented-button ${
               userTypeFilter === "all" ? "active" : ""
             }`}
             onClick={() => setUserTypeFilter("all")}
           >
-                                    Tất cả                    {" "}
+            Tất cả
           </button>
-                                       {" "}
+
           <button
             className={`segmented-button ${
               userTypeFilter === "individual" ? "active" : ""
             }`}
             onClick={() => setUserTypeFilter("individual")}
           >
-                                    Cá nhân                    {" "}
+            Cá nhân
           </button>
-                                       {" "}
+
           <button
             className={`segmented-button ${
               userTypeFilter === "company" ? "active" : ""
             }`}
             onClick={() => setUserTypeFilter("company")}
           >
-                                    Doanh nghiệp                    {" "}
+            Doanh nghiệp
           </button>
-                                   {" "}
+
+          {/* ✅ NÚT NHÂN VIÊN */}
+          <button
+            className={`segmented-button ${
+              userTypeFilter === "staff" ? "active" : ""
+            }`}
+            onClick={() => setUserTypeFilter("staff")}
+          >
+            Nhân viên
+          </button>
         </div>
-                           {" "}
       </div>
-                       {" "}
+
+      {/* Gói dịch vụ */}
       <div className="filter-group">
-                        <label className="filter-label">Gói dịch vụ:</label>   
-                   {" "}
+        <label className="filter-label">Gói dịch vụ:</label>
         <select
           value={userFilter.servicePackage}
           onChange={(e) =>
@@ -532,16 +535,15 @@ const UserFilterBar = ({
           }
           className="filter-dropdown"
         >
-                              <option value="all">Tất cả Gói</option>           
-                  <option value="Chưa đăng ký">Chưa đăng ký</option>           
-                  {packageOptions}               {" "}
+          <option value="all">Tất cả Gói</option>
+          <option value="Chưa đăng ký">Chưa đăng ký</option>
+          {packageOptions}
         </select>
-                             {" "}
       </div>
-                       {" "}
+
+      {/* Trạng thái */}
       <div className="filter-group">
-                        <label className="filter-label">Trạng thái:</label>     
-                 {" "}
+        <label className="filter-label">Trạng thái:</label>
         <select
           value={userFilter.status}
           onChange={(e) =>
@@ -549,13 +551,11 @@ const UserFilterBar = ({
           }
           className="filter-dropdown"
         >
-                              <option value="all">Tất cả</option>               
-              <option value="Active">Active</option>                   {" "}
-          <option value="Inactive">Inactive</option>               {" "}
+          <option value="all">Tất cả</option>
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
         </select>
-                           {" "}
       </div>
-                   {" "}
     </div>
   );
 };
@@ -739,22 +739,24 @@ const UserManagement = () => {
       return;
     } // Nếu đang ở tab users, xuất Staff CSV
 
-    if (
-      activeTab === "users" &&
-      selectedStationId &&
-      staffsByStation[selectedStationId]
-    ) {
-      const rows = (staffsByStation[selectedStationId] || []).map((s) => ({
-        StationID: s.stationId ?? "",
-        StaffID: s.staffId ?? s.id ?? "",
-        UserName: s.staffName ?? s.userName ?? "",
-        Email: s.staffEmail ?? s.email ?? "",
-      }));
-      exportCsv(rows, `station_${selectedStationId}_staffs.csv`);
-      return;
-    } // users
-
     if (activeTab === "users") {
+      // Nếu đang xem Nhân viên -> xuất CSV nhân viên theo Station
+      if (
+        userTypeFilter === "staff" &&
+        selectedStationId &&
+        staffsByStation[selectedStationId]
+      ) {
+        const rows = (staffsByStation[selectedStationId] || []).map((s) => ({
+          StationID: s.stationId ?? "",
+          StaffID: s.staffId ?? s.id ?? "",
+          UserName: s.staffName ?? s.userName ?? "",
+          Email: s.staffEmail ?? s.email ?? "",
+        }));
+        exportCsv(rows, `station_${selectedStationId}_staffs.csv`);
+        return;
+      }
+
+      // Ngược lại: xuất CSV người dùng (cá nhân + DN)
       const allUsersForCsv = [...individualUsers, ...companyUsers];
       const rows = allUsersForCsv.map((u) => ({
         ID: u.id ?? "",
@@ -765,6 +767,7 @@ const UserManagement = () => {
         GoiDichVu: u.servicePackageName ?? "",
       }));
       exportCsv(rows, "users.csv");
+      return;
     }
   };
 
@@ -850,40 +853,22 @@ const UserManagement = () => {
         )}
         {/* KHU VỰC BOTTOM BAR CỦA TAB USERS */}
         <div className="filter-group-bottom">
-          {activeTab === "users" && (
+          {activeTab === "users" && userTypeFilter === "staff" && (
             <div className="flex space-x-4 items-center">
-              {/* KHÔNG CÒN NÚT ẨN/HIỆN */}
               <div className="filter-group">
                 <label className="filter-label !mb-0">Station ID Staff:</label>
-
                 <input
                   type="number"
                   placeholder="Nhập ID"
                   value={selectedStationId}
                   onChange={(e) => {
-                    const id = Number(e.target.value); // SetStationId chỉ khi giá trị là số hợp lệ
+                    const id = Number(e.target.value);
                     if (!isNaN(id) && id > 0) setSelectedStationId(id);
                   }}
                   className="filter-input !w-20"
                   min="1"
                 />
               </div>
-
-              <button
-                className="btn primary icon-btn"
-                onClick={() => {
-                  if (selectedStationId) {
-                    setActiveModal({
-                      type: "addStaff",
-                      stationId: selectedStationId,
-                    });
-                  } else {
-                    alert("Vui lòng chọn Station ID trước.");
-                  }
-                }}
-              >
-                <PlusOutlined /> Thêm nhân viên
-              </button>
             </div>
           )}
 
@@ -917,8 +902,9 @@ const UserManagement = () => {
                 invoices={invoices}
               />
             )}
-            {/* BẢNG STAFF LUÔN HIỂN THỊ TRONG TAB USERS */}
-            {activeTab === "users" && (
+
+            {/* ✅ Bảng staff CHỈ hiện khi chọn "Nhân viên" */}
+            {(userTypeFilter === "staff" || userTypeFilter === "all") && (
               <div className="mt-8">
                 <StationStaffTable
                   staffs={staffsByStation[selectedStationId] || []}
