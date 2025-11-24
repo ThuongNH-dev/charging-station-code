@@ -1,27 +1,18 @@
-// =========================================================
-// Reports.jsx - PHIÊN BẢN HOÀN CHỈNH + LIÊN KẾT API & DỮ LIỆU
-// (Chỉ cập nhật FILTER: Từ ngày – Đến ngày – Trạm)
-// =========================================================
-
 import React, { useState, useEffect, useMemo } from "react";
 import { DownloadOutlined } from "@ant-design/icons";
 import "./Reports.css";
-
-// --- Thành phần con ---
-
 import ReportContent from "./ReportContent";
-
-// --- API ---
-import { fetchReportData } from "../../../../api/reportsApi";
-
-// --- Xử lý dữ liệu ---
+import {
+  fetchReportData,
+  fetchAdminAnalytics,
+} from "../../../../api/reportsApi";
 import {
   processServiceStructure,
   processTimeChartData,
   processTimeChartHourly,
 } from "../../../../utils/reportProcessing";
 
-// ⏱️ Mặc định 7 ngày gần nhất
+// Mặc định 7 ngày gần nhất
 const todayISO = new Date().toISOString().slice(0, 10);
 const sevenDaysAgoISO = new Date(Date.now() - 6 * 24 * 3600 * 1000)
   .toISOString()
@@ -36,11 +27,44 @@ export default function Reports() {
   });
 
   const [rawData, setRawData] = useState(null);
+  const [analyticsData, setAnalyticsData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // =========================================================
-  // GỌI API LẤY DỮ LIỆU
-  // =========================================================
+  // Gọi API Analytics cho Admin (theo tháng)
+  useEffect(() => {
+    const adminViews = [
+      "admin-company",
+      "admin-utilization",
+      "admin-top-under",
+      "admin-vehicle", // ✅ mới
+      "admin-vehicle-type",
+    ];
+
+    if (!adminViews.includes(reportFilter.viewType)) return;
+
+    let isMounted = true;
+
+    const loadAnalytics = async () => {
+      try {
+        const dateStr = reportFilter.endDate || todayISO;
+        const d = new Date(dateStr);
+        const month = d.getMonth() + 1;
+        const year = d.getFullYear();
+
+        const analytics = await fetchAdminAnalytics({ month, year });
+        if (isMounted) setAnalyticsData(analytics);
+      } catch (err) {
+        console.error("❌ Lỗi load Analytics admin:", err);
+      }
+    };
+
+    loadAnalytics();
+    return () => {
+      isMounted = false;
+    };
+  }, [reportFilter.viewType, reportFilter.endDate]);
+
+  // Gọi API lấy dữ liệu
   useEffect(() => {
     let isMounted = true;
 
@@ -53,7 +77,6 @@ export default function Reports() {
         });
         if (isMounted) setRawData(data);
         console.log("📥 Dữ liệu thô:", data);
-        // ép Recharts re-calc khi dữ liệu/filter đổi
         setTimeout(() => window.dispatchEvent(new Event("resize")), 0);
       } catch (error) {
         console.error("❌ Lỗi tải dữ liệu báo cáo:", error);
@@ -77,9 +100,7 @@ export default function Reports() {
     return [];
   }, [rawData]);
 
-  // =========================================================
-  // TIỀN XỬ LÝ DỮ LIỆU
-  // =========================================================
+  // Tiền xử lý dữ liệu
   const dataToRender = useMemo(() => {
     if (!rawData) return null;
 
@@ -101,12 +122,16 @@ export default function Reports() {
         monthlyRevenue: serviceStructure.monthlyRevenue || [],
         pieData: serviceStructure.pieData || [],
       },
+      analytics: analyticsData,
     };
-  }, [rawData, reportFilter.startDate, reportFilter.endDate]);
+  }, [
+    rawData,
+    reportFilter.startDate,
+    reportFilter.endDate,
+    analyticsData,
+  ]);
 
-  // =========================================================
-  // GIAO DIỆN LOADING
-  // =========================================================
+  // Giao diện loading
   if (isLoading || !dataToRender) {
     return (
       <div className="reports-page loading-screen">
@@ -116,14 +141,12 @@ export default function Reports() {
     );
   }
 
-  // =========================================================
-  // GIAO DIỆN CHÍNH
-  // =========================================================
+  // Giao diện chính
   return (
     <div className="reports-page">
       <h2 className="admin-title">Báo cáo & Thống kê</h2>
 
-      {/* --- Bộ lọc --- */}
+      {/* Bộ lọc */}
       <div className="report-header-controls">
         <div className="filter-group">
           <span className="filter-label">Từ ngày:</span>
@@ -173,11 +196,16 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* --- Nút chọn chế độ xem --- */}
+      {/* Nút chọn chế độ xem */}
       <div className="report-view-options">
         {[
           ["time-chart", "Biểu đồ thời gian"],
           ["service-structure", "Cơ cấu dịch vụ"],
+          ["admin-company", "Theo công ty"],
+          ["admin-utilization", "Hiệu suất trạm"],
+          ["admin-top-under", "Top / Under / Zero"],
+          ["admin-vehicle", "Doanh thu theo xe"],
+          ["admin-vehicle-type", "Xe công ty theo loại"],
         ].map(([key, label]) => (
           <button
             key={key}
@@ -194,7 +222,7 @@ export default function Reports() {
         ))}
       </div>
 
-      {/* --- Nội dung chính & Sidebar --- */}
+      {/* Nội dung chính & Sidebar */}
       <div className="report-main-container">
         <ReportContent data={dataToRender} reportFilter={reportFilter} />
       </div>

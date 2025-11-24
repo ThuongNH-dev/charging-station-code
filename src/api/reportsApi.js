@@ -1,4 +1,3 @@
-// ✅ src/api/reportsApi.js
 import axios from "axios";
 
 /**
@@ -18,6 +17,17 @@ const api = axios.create({
   timeout: 20000,
 });
 
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  console.log("Token:", token); // Debug log
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  } else {
+    console.error("Không có token");
+  }
+  return config;
+});
+
 // Helper: đọc dữ liệu an toàn từ Promise.allSettled
 const settledData = (res, fallback = []) =>
   res?.status === "fulfilled" ? res.value?.data ?? fallback : fallback;
@@ -33,7 +43,6 @@ const settledData = (res, fallback = []) =>
  *   subscriptionsData: any[]
  * }>}
  */
-// ... giữ nguyên phần đầu file
 export const fetchReportData = async (params = {}) => {
   const { startDate, endDate, stationId } = params;
 
@@ -81,9 +90,6 @@ export const fetchReportData = async (params = {}) => {
       subscriptionsResult,
     ] = results;
 
-    const settledData = (res, fb = []) =>
-      res?.status === "fulfilled" ? res.value?.data ?? fb : fb;
-
     const payload = {
       sessionsData: settledData(sessionsResult, []),
       invoicesData: settledData(invoicesResult, []),
@@ -109,4 +115,89 @@ export const fetchReportData = async (params = {}) => {
   }
 };
 
-export default { fetchReportData };
+/**
+ * 🔹 Lấy dữ liệu Analytics cho ADMIN (tổng hợp theo tháng)
+ */
+export const fetchAdminAnalytics = async ({ month, year }) => {
+  try {
+    const baseParams = {
+      month,
+      year,
+      adminView: true,
+    };
+
+    const summaryPromise = api.get("/Analytics/summary", {
+      params: baseParams,
+    });
+
+    const revenueSourcesPromise = api.get("/Analytics/revenue-sources", {
+      params: baseParams,
+    });
+
+    const companyBreakdownPromise = api.get("/Analytics/breakdown/company", {
+      params: baseParams,
+    });
+
+    const stationBreakdownPromise = api.get("/Analytics/breakdown/stations", {
+      params: baseParams,
+    });
+
+    const utilizationStationPromise = api.get("/Analytics/utilization", {
+      params: { ...baseParams, scope: "Station" },
+    });
+
+    const topUnderPromise = api.get("/Analytics/top-under", {
+      params: baseParams,
+    });
+
+    // ✅ MỚI: breakdown theo xe & theo loại xe
+    const vehicleBreakdownPromise = api.get("/Analytics/breakdown/vehicle", {
+      params: baseParams,
+    });
+    const vehicleTypeBreakdownPromise = api.get(
+      "/Analytics/breakdown/vehicle-types",
+      { params: baseParams }
+    );
+
+    const results = await Promise.allSettled([
+      summaryPromise,
+      revenueSourcesPromise,
+      companyBreakdownPromise,
+      stationBreakdownPromise,
+      utilizationStationPromise,
+      topUnderPromise,
+      vehicleBreakdownPromise, // ✅
+      vehicleTypeBreakdownPromise,
+    ]);
+
+    const [
+      summaryResult,
+      revenueSourcesResult,
+      companyBreakdownResult,
+      stationBreakdownResult,
+      utilizationStationResult,
+      topUnderResult,
+      vehicleBreakdownResult, // ✅
+      vehicleTypeBreakdownResult,
+    ] = results;
+
+    const payload = {
+      summary: settledData(summaryResult, null),
+      revenueSources: settledData(revenueSourcesResult, null),
+      companyBreakdown: settledData(companyBreakdownResult, []),
+      stationBreakdown: settledData(stationBreakdownResult, []),
+      utilizationStations: settledData(utilizationStationResult, []),
+      topUnder: settledData(topUnderResult, null),
+      vehicleBreakdown: settledData(vehicleBreakdownResult, []),
+      vehicleTypeBreakdown: settledData(vehicleTypeBreakdownResult, []),
+    };
+
+    if (DEBUG) console.log("📊 Admin analytics:", payload);
+    return payload;
+  } catch (error) {
+    console.error("❌ Lỗi khi tải Analytics admin:", error);
+    throw error;
+  }
+};
+
+export default { fetchReportData, fetchAdminAnalytics };

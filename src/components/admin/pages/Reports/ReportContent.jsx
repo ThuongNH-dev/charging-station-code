@@ -397,6 +397,312 @@ function AreaComparison({ areaData = {} }) {
 }
 
 // =========================================================
+// 🔹 6. KPI tổng quan tháng cho Admin
+// =========================================================
+function AdminMonthlyOverview({ summary, revenueSources }) {
+  if (!summary) {
+    return (
+      <div style={{ padding: 20, color: "#777", fontStyle: "italic" }}>
+        Không có dữ liệu tổng quan tháng.
+      </div>
+    );
+  }
+
+  const {
+    sessionCount,
+    energyKwh,
+    subtotal,
+    tax,
+    total,
+    durationMin,
+    idleMin,
+    avgPricePerKwh,
+    month,
+    year,
+  } = {
+    sessionCount: summary.sessionCount ?? summary.sessionCount ?? 0,
+    energyKwh: summary.energyKwh ?? 0,
+    subtotal: summary.subtotal ?? 0,
+    tax: summary.tax ?? 0,
+    total: summary.total ?? 0,
+    durationMin: summary.durationMin ?? 0,
+    idleMin: summary.idleMin ?? 0,
+    avgPricePerKwh: summary.avgPricePerKwh ?? 0,
+    month: summary.month,
+    year: summary.year,
+  };
+
+  const safeRevenueSources = revenueSources || {};
+  const customerTotal = safeRevenueSources.customerTotal ?? 0;
+  const companyTotal = safeRevenueSources.companyTotal ?? 0;
+  const guestTotal = safeRevenueSources.guestTotal ?? 0;
+  const allRev = customerTotal + companyTotal + guestTotal || 1;
+
+  const mixRows = [
+    { label: "Khách cá nhân", value: customerTotal },
+    { label: "Xe công ty", value: companyTotal },
+    { label: "Khách vãng lai", value: guestTotal },
+  ];
+
+  return (
+    <>
+      <p style={{ marginBottom: 16, color: "#4b5563" }}>
+        Tổng quan tháng{" "}
+        <strong>
+          {month}/{year}
+        </strong>{" "}
+        (theo dữ liệu Analytics).
+      </p>
+
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <span className="kpi-label">Doanh thu sau thuế</span>
+          <span className="kpi-value">{total.toLocaleString("vi-VN")} ₫</span>
+          <span className="kpi-sub">
+            Trước thuế: {subtotal.toLocaleString("vi-VN")} ₫ | Thuế:{" "}
+            {tax.toLocaleString("vi-VN")} ₫
+          </span>
+        </div>
+        <div className="kpi-card">
+          <span className="kpi-label">Điện năng tiêu thụ</span>
+          <span className="kpi-value">
+            {energyKwh.toLocaleString("vi-VN")} kWh
+          </span>
+          <span className="kpi-sub">
+            Giá TB: {avgPricePerKwh.toLocaleString("vi-VN")} ₫/kWh
+          </span>
+        </div>
+        <div className="kpi-card">
+          <span className="kpi-label">Số phiên sạc</span>
+          <span className="kpi-value">
+            {sessionCount.toLocaleString("vi-VN")}
+          </span>
+          <span className="kpi-sub">
+            Thời gian sạc: {durationMin.toLocaleString("vi-VN")} phút
+          </span>
+        </div>
+        <div className="kpi-card">
+          <span className="kpi-label">Thời gian đỗ chiếm chỗ</span>
+          <span className="kpi-value">
+            {idleMin.toLocaleString("vi-VN")} phút
+          </span>
+          <span className="kpi-sub">
+            Tỷ lệ Idle / Sạc:{" "}
+            {durationMin > 0 ? ((idleMin / durationMin) * 100).toFixed(1) : 0}%
+          </span>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 24 }}>
+        <h4>Cơ cấu nguồn doanh thu (tháng)</h4>
+        <table className="report-table">
+          <thead>
+            <tr>
+              <th>Nguồn</th>
+              <th>Doanh thu (₫)</th>
+              <th>Tỷ lệ (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {mixRows.map((row) => (
+              <tr key={row.label}>
+                <td>{row.label}</td>
+                <td>{row.value.toLocaleString("vi-VN")}</td>
+                <td>{((row.value / allRev) * 100).toFixed(1)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+// =========================================================
+// 🔹 7. Bảng breakdown theo Công ty
+// =========================================================
+function CompanyBreakdownTable({ data = [] }) {
+  if (!data.length) {
+    return (
+      <div style={{ padding: 20, color: "#777", fontStyle: "italic" }}>
+        Không có dữ liệu công ty.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h4>Doanh thu theo công ty</h4>
+      <table className="report-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Công ty</th>
+            <th>Số phiên</th>
+            <th>kWh</th>
+            <th>Doanh thu (₫)</th>
+            <th>Thời gian sạc (phút)</th>
+            <th>Idle (phút)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, idx) => (
+            <tr key={row.key ?? idx}>
+              <td>{idx + 1}</td>
+              <td>{row.key}</td>
+              <td>{row.sessionCount?.toLocaleString("vi-VN")}</td>
+              <td>{row.energyKwh?.toLocaleString("vi-VN")}</td>
+              <td>{row.total?.toLocaleString("vi-VN")}</td>
+              <td>{row.durationMin?.toLocaleString("vi-VN")}</td>
+              <td>{row.idleMin?.toLocaleString("vi-VN")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="table-footnote">
+        Ghi chú: dữ liệu đã được sắp xếp theo doanh thu giảm dần từ backend.
+      </p>
+    </div>
+  );
+}
+
+// =========================================================
+// 🔹 8. Bảng Utilization theo Trạm
+// =========================================================
+function StationUtilizationTable({ data = [] }) {
+  if (!data.length) {
+    return (
+      <div style={{ padding: 20, color: "#777", fontStyle: "italic" }}>
+        Không có dữ liệu hiệu suất trạm.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h4>Hiệu suất sử dụng trạm sạc</h4>
+      <table className="report-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Trạm</th>
+            <th>Số phiên</th>
+            <th>kWh</th>
+            <th>Thời gian sạc (phút)</th>
+            <th>Utilization (%)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, idx) => (
+            <tr key={row.code ?? idx}>
+              <td>{idx + 1}</td>
+              <td>{row.code}</td>
+              <td>{row.sessionCount?.toLocaleString("vi-VN")}</td>
+              <td>{row.energyKwh?.toLocaleString("vi-VN")}</td>
+              <td>{row.chargingMinutes?.toLocaleString("vi-VN")}</td>
+              <td>{((row.utilization ?? 0) * 100).toFixed(2)}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="table-footnote">
+        Ghi chú: chỉ hiển thị các trạm có Utilization và số phiên vượt qua
+        ngưỡng minUtilization / minSessions (backend).
+      </p>
+    </div>
+  );
+}
+
+// =========================================================
+// 🔹 9. Top / Under / Zero activity (theo Port)
+// =========================================================
+function TopUnderZeroSection({ topUnder }) {
+  if (!topUnder) {
+    return (
+      <div style={{ padding: 20, color: "#777", fontStyle: "italic" }}>
+        Không có dữ liệu Top/Under/Zero.
+      </div>
+    );
+  }
+
+  const { topActive = [], underUtilized = [], zeroActivity = [] } = topUnder;
+
+  const renderPortTable = (rows, type) => (
+    <table className="report-table" key={type}>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Port</th>
+          <th>Charger</th>
+          {type !== "zero" && (
+            <>
+              <th>Số phiên</th>
+              <th>kWh</th>
+              <th>Doanh thu (₫)</th>
+              <th>Thời gian sạc (phút)</th>
+            </>
+          )}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, idx) => (
+          <tr key={`${type}-${row.key ?? idx}`}>
+            <td>{idx + 1}</td>
+            <td>{row.key}</td>
+            <td>{row.key2}</td>
+            {type !== "zero" && (
+              <>
+                <td>{row.sessionCount?.toLocaleString("vi-VN")}</td>
+                <td>{row.energyKwh?.toLocaleString("vi-VN")}</td>
+                <td>{row.total?.toLocaleString("vi-VN")}</td>
+                <td>{row.durationMin?.toLocaleString("vi-VN")}</td>
+              </>
+            )}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+
+  return (
+    <div className="top-under-layout">
+      <div className="top-under-block">
+        <h4>Top Active Ports</h4>
+        {topActive.length ? (
+          renderPortTable(topActive, "top")
+        ) : (
+          <div className="empty-block">Không có dữ liệu.</div>
+        )}
+      </div>
+
+      <div className="top-under-block">
+        <h4>Under-utilized Ports</h4>
+        {underUtilized.length ? (
+          renderPortTable(underUtilized, "under")
+        ) : (
+          <div className="empty-block">Không có dữ liệu.</div>
+        )}
+      </div>
+
+      <div className="top-under-block">
+        <h4>Zero-activity Ports</h4>
+        {zeroActivity.length ? (
+          renderPortTable(zeroActivity, "zero")
+        ) : (
+          <div className="empty-block">Không có dữ liệu.</div>
+        )}
+      </div>
+
+      <p className="table-footnote">
+        Ghi chú: Top Active = top 10 port theo doanh thu; Under-utilized = port
+        có utilization thấp hoặc ít phiên trong tháng; Zero-activity = các port
+        không phát sinh phiên nào.
+      </p>
+    </div>
+  );
+}
+
+// =========================================================
 // 🔹 COMPONENT CHÍNH
 // =========================================================
 export default function ReportContent({ data, reportFilter }) {
@@ -407,7 +713,7 @@ export default function ReportContent({ data, reportFilter }) {
       </div>
     );
 
-  const { areaComparison, stationTable, timeChart, serviceStructure } = data;
+  const { timeChart, serviceStructure, analytics } = data;
 
   // ====== CHỌN THÁNG + PIE DATA THEO THÁNG ======
   const monthlyRevenue = serviceStructure?.monthlyRevenue || [];
@@ -503,6 +809,37 @@ export default function ReportContent({ data, reportFilter }) {
 
           <RevenueByPlan data={monthlyRevenue} />
           <ServiceStructurePie data={pieDataForSelectedMonth} />
+        </div>
+      );
+
+    // ✅ VIEW MỚI: Breakdown theo Công ty
+    case "admin-company":
+      return (
+        <div className="report-content-area">
+          <h3 className="comparison-title">Báo cáo theo công ty</h3>
+          <CompanyBreakdownTable data={analytics?.companyBreakdown || []} />
+        </div>
+      );
+
+    // ✅ VIEW MỚI: Hiệu suất trạm
+    case "admin-utilization":
+      return (
+        <div className="report-content-area">
+          <h3 className="comparison-title">Hiệu suất sử dụng trạm</h3>
+          <StationUtilizationTable
+            data={analytics?.utilizationStations || []}
+          />
+        </div>
+      );
+
+    // ✅ VIEW MỚI: Top / Under / Zero activity
+    case "admin-top-under":
+      return (
+        <div className="report-content-area">
+          <h3 className="comparison-title">
+            Top / Under / Zero activity (theo Port)
+          </h3>
+          <TopUnderZeroSection topUnder={analytics?.topUnder} />
         </div>
       );
 
