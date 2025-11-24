@@ -3,6 +3,22 @@ import axios from "axios";
 
 const BASE_URL = import.meta.env.DEV ? "/api" : "https://localhost:7268/api";
 
+// Tạo axios instance (sau này có thể gắn interceptor token nếu cần)
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 20000,
+  // withCredentials: true, // nếu backend dùng cookie auth
+});
+
+// ✅ GẮN INTERCEPTOR TOKEN
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token"); // hoặc từ AuthContext
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 /**
  * Lấy dữ liệu Dashboard theo khoảng ngày (mặc định: hôm nay)
  * @param {{startDate?: string, endDate?: string, stationId?: string|number}} params
@@ -16,14 +32,12 @@ export const fetchDashboard = async (params = {}) => {
   if (endDate) qs.set("endDate", endDate);
   if (stationId && stationId !== "all") qs.set("stationId", stationId);
 
-  const sessionsReq = axios.get(
-    `${BASE_URL}/ChargingSessions${qs.toString() ? `?${qs}` : ""}`
+  const sessionsReq = api.get(
+    `/ChargingSessions${qs.toString() ? `?${qs}` : ""}`
   );
 
   // Lấy list trạm để đổ dropdown + tính % sử dụng
-  const stationsReq = axios.get(
-    `${BASE_URL}/Stations/paged?page=1&pageSize=200`
-  );
+  const stationsReq = api.get(`/Stations/paged?page=1&pageSize=200`);
 
   const [sessionsRes, stationsRes] = await Promise.allSettled([
     sessionsReq,
@@ -48,5 +62,32 @@ export const fetchDashboard = async (params = {}) => {
       toArr(
         stationsRes.status === "fulfilled" ? stationsRes.value.data?.items : []
       ),
+  };
+};
+
+/**
+ * 🔹 Lấy tổng quan tháng cho Admin từ Analytics (Summary + RevenueSources)
+ *  - /Analytics/summary
+ *  - /Analytics/revenue-sources
+ */
+export const fetchAdminMonthlyOverview = async ({ month, year }) => {
+  const baseParams = { month, year, adminView: true };
+
+  const summaryReq = api.get("/Analytics/summary", { params: baseParams });
+  const revenueReq = api.get("/Analytics/revenue-sources", {
+    params: baseParams,
+  });
+
+  const [summaryRes, revenueRes] = await Promise.allSettled([
+    summaryReq,
+    revenueReq,
+  ]);
+
+  const safe = (res, fb = null) =>
+    res?.status === "fulfilled" ? res.value?.data ?? fb : fb;
+
+  return {
+    summary: safe(summaryRes, null),
+    revenueSources: safe(revenueRes, null),
   };
 };
