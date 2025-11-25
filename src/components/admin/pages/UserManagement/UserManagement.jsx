@@ -2,14 +2,16 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { PlusOutlined } from "@ant-design/icons";
 import "../UserManagement.css";
 import { userApi } from "../../../../api/userApi";
-import UserTables from "./Usertables";
+import { UserTables, StationStaffTable } from "./Usertables";
 import VehicleTable from "./VehicleTable";
 import ServiceTable from "./ServiceTable";
-import StationStaffTable from "./StationStaffTable";
 import AdminModals from "./Modals/AdminModals";
 import ServiceFilterBar from "./ServiceFilterBar";
 import VehicleFilterBar from "./VehicleFilterBar";
 
+// =================================================================
+// HOOK QUẢN LÝ DỮ LIỆU & API
+// =================================================================
 const useUserServicesHook = () => {
   const [allAccounts, setAllAccounts] = useState([]);
   const [allVehicles, setAllVehicles] = useState([]);
@@ -17,33 +19,45 @@ const useUserServicesHook = () => {
   const [subscriptions, setSubscriptions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [invoices, setInvoices] = useState([]);
-  const [stationStaffs, setStationStaffs] = useState([]);
-  const [stations, setStations] = useState([]);
+  const [invoices, setInvoices] = useState([]); // STATE MỚI CHO STAFF
+  const [staffsByStation, setStaffsByStation] = useState({}); // HÀM FETCH STAFF THEO STATION ID
+
+  const fetchStaffsByStationId = useCallback(async (stationId) => {
+    if (!stationId || isNaN(Number(stationId)) || Number(stationId) <= 0)
+      return;
+    setIsLoading(true);
+    try {
+      const staffs = await userApi.fetchStaffsByStation(stationId); // Lưu trữ staff theo stationId
+      setStaffsByStation((prev) => ({
+        ...prev,
+        [stationId]: staffs || [],
+      }));
+    } catch (err) {
+      console.error(`❌ Lỗi khi tải nhân viên Station ${stationId}:`, err); // Có thể hiển thị lỗi cụ thể nếu cần
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [accounts, vehicles, services, subscriptionsData, invoicesData, stationStaffData, stationsData] =
+      const [accounts, vehicles, services, subscriptionsData, invoicesData] =
         await Promise.all([
           userApi.fetchAllUsers(),
           userApi.fetchAllVehicles(),
           userApi.fetchAllServicePackages(),
           userApi.fetchAllSubscriptions(),
-          userApi.fetchAllInvoices(), // ✅ thêm dòng này
-          userApi.fetchAllStationStaffs(),
-          userApi.fetchAllStations()
-        ]);
+          userApi.fetchAllInvoices(),
+        ]); // ===== Map id -> tên gói dịch vụ
 
-      // ===== Map id -> tên gói dịch vụ
       const serviceMap = (services || []).reduce((map, p) => {
         const id = p.subscriptionPlanId ?? p.id ?? p.packageId;
         if (id != null) map[id] = p.planName;
         return map;
-      }, {});
+      }, {}); // ===== Lấy sub ACTIVE mới nhất theo customerId
 
-      // ===== Lấy sub ACTIVE mới nhất theo customerId
       const pickActiveSubByCustomer = (subs, customerId) => {
         if (!customerId) return null;
         const mine = (subs || []).filter(
@@ -57,9 +71,8 @@ const useUserServicesHook = () => {
             new Date(a?.startDate || a?.updatedAt || 0)
         );
         return active[0];
-      };
+      }; // ===== Lấy sub ACTIVE mới nhất theo companyId
 
-      // ===== Lấy sub ACTIVE mới nhất theo companyId
       const pickActiveSubByCompany = (subs, companyId) => {
         if (!companyId) return null;
         const mine = (subs || []).filter(
@@ -73,9 +86,8 @@ const useUserServicesHook = () => {
             new Date(a?.startDate || a?.updatedAt || a?.createdAt || 0)
         );
         return active[0];
-      };
+      }; // ===== Gắn servicePackageName cho MỌI user (cả cá nhân & DN)
 
-      // ===== Gắn servicePackageName cho MỌI user (cả cá nhân & DN)
       const accountsWithPackage = (accounts || []).map((u) => {
         const customerId = u?.customers?.[0]?.customerId;
         const companyId = u?.company?.companyId ?? u?.companyId;
@@ -103,8 +115,6 @@ const useUserServicesHook = () => {
       setServicePackages(services || []);
       setSubscriptions(subscriptionsData || []);
       setInvoices(invoicesData || []);
-      setStationStaffs(stationStaffData || []);
-      setStations(stationsData || []);
     } catch (err) {
       console.error("❌ Lỗi khi load dữ liệu:", err);
       setError(err.message || "Không thể tải dữ liệu");
@@ -115,10 +125,9 @@ const useUserServicesHook = () => {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData]); // HÀM CHUNG CHO CẬP NHẬT/THÊM/XÓA
 
-  // ... bên trong useUserServicesHook
-  const handleUpdate = async (apiFunc, id, data, successMsg, role) => {
+  const handleUpdate = async (apiFunc, id, data, successMsg, afterSuccess) => {
     if (typeof apiFunc !== "function") {
       console.error("❌ apiFunc không phải function", apiFunc);
       return false;
@@ -127,28 +136,40 @@ const useUserServicesHook = () => {
     setError(null);
     try {
       if (id !== undefined && id !== null) {
-        await apiFunc(id, data, role);
+        // Đặc biệt xử lý cho deleteStaffFromStation
+        if (apiFunc === userApi.deleteStaffFromStation) {
+          await apiFunc(id, data);
+        } else {
+          // Các hàm update khác (có id và data)
+          await apiFunc(id, data);
+        }
       } else {
+        // Các hàm create (chỉ có data)
         await apiFunc(data);
       }
-      alert(successMsg || "Cập nhật thành công!");
-      await fetchData();
+      alert(successMsg || "Cập nhật thành công!"); // Thực hiện hành động tiếp theo (fetch lại data chính, hoặc staff)
+
+      if (typeof afterSuccess === "function") {
+        await afterSuccess();
+      } else {
+        // Mặc định fetch lại toàn bộ dữ liệu (trừ staff)
+        await fetchData();
+      }
+
       return true;
     } catch (err) {
       const resp = err?.response;
       const pd = resp?.data; // ProblemDetails từ ASP.NET
-      const sentBody = resp?.config?.data;
+      const sentBody = resp?.config?.data; // In ra toàn bộ để debug nhanh
 
-      // 🔎 In ra toàn bộ để debug nhanh
       console.error("❌ AxiosError detail:", {
         status: resp?.status,
         url: resp?.config?.url,
         method: resp?.config?.method,
         sentBody, // <= body FE đã gửi
         problemDetails: pd, // <= ProblemDetails từ BE
-      });
+      }); // Gom lỗi ModelState cho người dùng
 
-      // 🔎 Gom lỗi ModelState cho người dùng
       let msg =
         pd?.title ||
         pd?.message ||
@@ -180,68 +201,91 @@ const useUserServicesHook = () => {
     invoices,
     isLoading,
     error,
-    fetchData,
+    fetchData, // TRẢ VỀ STAFF STATE & ACTIONS
+    staffsByStation,
+    fetchStaffsByStationId, // CÁC HÀM CRUD CŨ
+
     updateUser: (id, data, role) =>
       handleUpdate(
         userApi.updateUser,
         id,
         data,
         "Đã cập nhật người dùng.",
-        role
+        () => fetchData()
       ),
     updateUserStatus: (id, data) =>
       handleUpdate(
         userApi.updateUserStatus,
         id,
         data,
-        "Đã cập nhật trạng thái người dùng."
+        "Đã cập nhật trạng thái người dùng.",
+        () => fetchData()
       ),
     deleteUser: (id) =>
-      handleUpdate(userApi.deleteUser, id, null, "Đã xóa người dùng."),
+      handleUpdate(userApi.deleteUser, id, null, "Đã xóa người dùng.", () =>
+        fetchData()
+      ),
     createServicePackage: (data) =>
       handleUpdate(
         userApi.createServicePackage,
         null,
         data,
-        "Đã thêm mới gói dịch vụ."
+        "Đã thêm mới gói dịch vụ.",
+        () => fetchData()
       ),
     updateServicePackage: (id, data) =>
       handleUpdate(
         userApi.updateServicePackage,
         id,
         data,
-        "Đã cập nhật gói dịch vụ."
+        "Đã cập nhật gói dịch vụ.",
+        () => fetchData()
       ),
     deleteServicePackage: (id) =>
       handleUpdate(
         userApi.deleteServicePackage,
         id,
         null,
-        "Đã xóa gói dịch vụ."
+        "Đã xóa gói dịch vụ.",
+        () => fetchData()
       ),
     updateVehicle: (id, data) =>
-      handleUpdate(userApi.updateVehicle, id, data, "Đã cập nhật thông số xe."),
-    deleteVehicle: (id) =>
-      handleUpdate(userApi.deleteVehicle, id, null, "Đã xóa thông số xe."),
-  // ⭐ THÊM Ở ĐÂY: CRUD nhân viên trạm
-  addStationStaff: (data) =>
       handleUpdate(
-        userApi.addStationStaff,
-        null,
+        userApi.updateVehicle,
+        id,
         data,
-        "Đã thêm nhân viên vào trạm."
+        "Đã cập nhật thông số xe.",
+        () => fetchData()
+      ),
+    deleteVehicle: (id) =>
+      handleUpdate(userApi.deleteVehicle, id, null, "Đã xóa thông số xe.", () =>
+        fetchData()
+      ), // HÀM CRUD MỚI CHO STAFF
+
+    addStaffToStation: (payload) =>
+      handleUpdate(
+        userApi.addStaffToStation,
+        null, // Không dùng ID 1
+        payload,
+        "Đã thêm nhân viên vào Station.",
+        () => fetchStaffsByStationId(payload.stationId) // Reload Staff
       ),
 
-  deleteStationStaff: (stationId, staffId) =>
+    deleteStaffFromStation: (stationId, staffId) =>
       handleUpdate(
-        userApi.deleteStationStaff,
-        stationId,
-        staffId,
-        "Đã xóa nhân viên khỏi trạm."
+        userApi.deleteStaffFromStation,
+        stationId, // ID 1 (Station ID)
+        staffId, // data (Staff ID)
+        "Đã xóa nhân viên khỏi Station.",
+        () => fetchStaffsByStationId(stationId) // Reload Staff
       ),
   };
 };
 
+// =================================================================
+// HOOK LOGIC LỌC
+// =================================================================
+// Cần phải nhận allAccounts, allVehicles, servicePackages từ đối số
 const useFilterLogicHook = ({
   allAccounts,
   allVehicles,
@@ -255,7 +299,6 @@ const useFilterLogicHook = ({
     role: "all",
   });
 
-  // ✅ BỔ SUNG status cho serviceFilter để lọc theo Active/Inactive/All
   const [serviceFilter, setServiceFilter] = useState({
     search: "",
     category: "all",
@@ -276,9 +319,8 @@ const useFilterLogicHook = ({
 
     return allAccounts.filter((user) => {
       const c = user?.customers?.[0] || {};
-      const comp = user?.company || {};
+      const comp = user?.company || {}; // Ghép chuỗi để search trên nhiều trường:
 
-      // Ghép chuỗi để search trên nhiều trường:
       const hay = [
         user?.userName,
         String(user?.accountId ?? user?.id ?? ""),
@@ -318,9 +360,8 @@ const useFilterLogicHook = ({
   const companyUsers = useMemo(
     () => filteredUsers.filter((u) => u.role === "Company"),
     [filteredUsers]
-  );
+  ); // LỌC GÓI DỊCH VỤ: search + category + status
 
-  // ✅ LỌC GÓI DỊCH VỤ: search + category + status
   const filteredServices = useMemo(() => {
     const search = (serviceFilter.search || "").toLowerCase().trim();
     const cat = serviceFilter.category || "all";
@@ -399,7 +440,9 @@ const useFilterLogicHook = ({
   };
 };
 
-// Thanh lọc Users
+// =================================================================
+// COMPONENT LỌC USER
+// =================================================================
 const UserFilterBar = ({
   userFilter,
   setUserFilter,
@@ -420,6 +463,7 @@ const UserFilterBar = ({
 
   return (
     <div className="filter-bar">
+      {/* Tìm kiếm */}
       <div className="filter-group">
         <label className="filter-label">Tìm kiếm:</label>
         <div className="search-box">
@@ -435,6 +479,7 @@ const UserFilterBar = ({
         </div>
       </div>
 
+      {/* 🔹 LOẠI NGƯỜI DÙNG: THÊM NÚT NHÂN VIÊN Ở ĐÂY */}
       <div className="filter-group">
         <label className="filter-label">Loại người dùng:</label>
         <div className="segmented-control">
@@ -446,6 +491,7 @@ const UserFilterBar = ({
           >
             Tất cả
           </button>
+
           <button
             className={`segmented-button ${
               userTypeFilter === "individual" ? "active" : ""
@@ -454,6 +500,7 @@ const UserFilterBar = ({
           >
             Cá nhân
           </button>
+
           <button
             className={`segmented-button ${
               userTypeFilter === "company" ? "active" : ""
@@ -462,9 +509,20 @@ const UserFilterBar = ({
           >
             Doanh nghiệp
           </button>
+
+          {/* ✅ NÚT NHÂN VIÊN */}
+          <button
+            className={`segmented-button ${
+              userTypeFilter === "staff" ? "active" : ""
+            }`}
+            onClick={() => setUserTypeFilter("staff")}
+          >
+            Nhân viên
+          </button>
         </div>
       </div>
 
+      {/* Gói dịch vụ */}
       <div className="filter-group">
         <label className="filter-label">Gói dịch vụ:</label>
         <select
@@ -483,6 +541,7 @@ const UserFilterBar = ({
         </select>
       </div>
 
+      {/* Trạng thái */}
       <div className="filter-group">
         <label className="filter-label">Trạng thái:</label>
         <select
@@ -501,19 +560,20 @@ const UserFilterBar = ({
   );
 };
 
+// =================================================================
+// COMPONENT CHÍNH
+// =================================================================
 const UserManagement = () => {
   const [activeTab, setActiveTab] = useState("users");
   const [activeModal, setActiveModal] = useState(null);
-  const [userTypeFilter, setUserTypeFilter] = useState("all");
-
+  const [userTypeFilter, setUserTypeFilter] = useState("all"); // STATE MỚI CHO STATION ID MẶC ĐỊNH
+  const [selectedStationId, setSelectedStationId] = useState(1); // ❌ ĐÃ BỎ showStaffTable STATE
   const {
     allAccounts,
     allVehicles,
     servicePackages,
     subscriptions,
     invoices,
-    stationStaffs,
-    stations,
     isLoading,
     error,
     updateUser,
@@ -523,9 +583,11 @@ const UserManagement = () => {
     updateServicePackage,
     deleteServicePackage,
     updateVehicle,
-    deleteVehicle,
-    addStationStaff,
-    deleteStationStaff,
+    deleteVehicle, // THÊM STAFF STATE & ACTIONS TỪ HOOK
+    staffsByStation,
+    fetchStaffsByStationId,
+    addStaffToStation,
+    deleteStaffFromStation,
   } = useUserServicesHook();
 
   const crudActions = {
@@ -536,9 +598,9 @@ const UserManagement = () => {
     updateServicePackage,
     deleteServicePackage,
     updateVehicle,
-    deleteVehicle,
-    addStationStaff,
-    deleteStationStaff,
+    deleteVehicle, // THÊM STAFF ACTIONS
+    addStaffToStation,
+    deleteStaffFromStation,
   };
 
   const {
@@ -554,11 +616,24 @@ const UserManagement = () => {
     filteredServices,
     vehicleFilterOptions,
   } = useFilterLogicHook({
+    // Truyền các biến state cần thiết vào hook
     allAccounts,
     allVehicles,
     servicePackages,
     userTypeFilter,
-  });
+  }); // LOGIC FETCH STAFF KHI CHỌN STATION VÀ KHI Ở TAB 'users'
+
+  useEffect(() => {
+    // Tự động fetch khi component mount lần đầu (selectedStationId mặc định là 1)
+    // Hoặc khi selectedStationId thay đổi, CHỈ KHI Ở TAB 'users'
+    if (
+      activeTab === "users" &&
+      selectedStationId &&
+      !staffsByStation[selectedStationId]
+    ) {
+      fetchStaffsByStationId(selectedStationId);
+    }
+  }, [selectedStationId, staffsByStation, fetchStaffsByStationId, activeTab]);
 
   useEffect(() => {
     console.log("================== DEBUG USER MANAGEMENT ==================");
@@ -589,9 +664,8 @@ const UserManagement = () => {
     servicePackages,
     allAccounts,
     individualUsers,
-  ]);
+  ]); // ===== Export CSV helper (Giữ nguyên) =====
 
-  // ===== Export CSV helper =====
   const exportCsv = (rows, filename) => {
     if (!rows || rows.length === 0) {
       alert("Không có dữ liệu để xuất CSV.");
@@ -608,16 +682,15 @@ const UserManagement = () => {
       lines.push(headers.map((h) => escapeCell(r[h])).join(","))
     );
     const csv = "\uFEFF" + lines.join("\n"); // BOM
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-is-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }; // ===== Handlers Xuất CSV theo tab (Cập nhật logic Staff) =====
 
-  // ===== Handlers Xuất CSV theo tab =====
   const handleExportCsv = () => {
     if (activeTab === "service") {
       const rows = (filteredServices || []).map((p) => ({
@@ -664,10 +737,26 @@ const UserManagement = () => {
       });
       exportCsv(rows, "vehicles.csv");
       return;
-    }
+    } // Nếu đang ở tab users, xuất Staff CSV
 
-    // users
     if (activeTab === "users") {
+      // Nếu đang xem Nhân viên -> xuất CSV nhân viên theo Station
+      if (
+        userTypeFilter === "staff" &&
+        selectedStationId &&
+        staffsByStation[selectedStationId]
+      ) {
+        const rows = (staffsByStation[selectedStationId] || []).map((s) => ({
+          StationID: s.stationId ?? "",
+          StaffID: s.staffId ?? s.id ?? "",
+          UserName: s.staffName ?? s.userName ?? "",
+          Email: s.staffEmail ?? s.email ?? "",
+        }));
+        exportCsv(rows, `station_${selectedStationId}_staffs.csv`);
+        return;
+      }
+
+      // Ngược lại: xuất CSV người dùng (cá nhân + DN)
       const allUsersForCsv = [...individualUsers, ...companyUsers];
       const rows = allUsersForCsv.map((u) => ({
         ID: u.id ?? "",
@@ -678,6 +767,7 @@ const UserManagement = () => {
         GoiDichVu: u.servicePackageName ?? "",
       }));
       exportCsv(rows, "users.csv");
+      return;
     }
   };
 
@@ -689,16 +779,20 @@ const UserManagement = () => {
   return (
     <div className="user-page">
       <h2 className="admin-title">Quản lý Người dùng & Dịch vụ</h2>
-
       <div className="user-actions">
         <div className="tabs">
           <button
             className={`btn ${activeTab === "users" ? "primary" : "secondary"}`}
-            onClick={() => setActiveTab("users")}
+            onClick={() => {
+              setActiveTab("users"); // SỬA LỖI TẠI ĐÂY: Thêm dấu chấm phẩy sau lệnh fetch
+              if (!staffsByStation[selectedStationId])
+                fetchStaffsByStationId(selectedStationId);
+            }}
           >
             Người dùng
           </button>
         </div>
+
         <div className="tabs">
           <button
             className={`btn ${
@@ -709,6 +803,7 @@ const UserManagement = () => {
             Thông số xe
           </button>
         </div>
+
         <div className="tabs">
           <button
             className={`btn ${
@@ -717,14 +812,6 @@ const UserManagement = () => {
             onClick={() => setActiveTab("service")}
           >
             Gói dịch vụ
-          </button>
-        </div>
-        <div className="tabs">
-          <button
-            className={`btn ${activeTab === "stationStaff" ? "primary" : "secondary"}`}
-            onClick={() => setActiveTab("stationStaff")}
-          >
-            Quản lý nhân viên trạm
           </button>
         </div>
 
@@ -764,8 +851,27 @@ const UserManagement = () => {
             setActiveModal={setActiveModal}
           />
         )}
-
+        {/* KHU VỰC BOTTOM BAR CỦA TAB USERS */}
         <div className="filter-group-bottom">
+          {activeTab === "users" && userTypeFilter === "staff" && (
+            <div className="flex space-x-4 items-center">
+              <div className="filter-group">
+                <label className="filter-label !mb-0">Station ID Staff:</label>
+                <input
+                  type="number"
+                  placeholder="Nhập ID"
+                  value={selectedStationId}
+                  onChange={(e) => {
+                    const id = Number(e.target.value);
+                    if (!isNaN(id) && id > 0) setSelectedStationId(id);
+                  }}
+                  className="filter-input !w-20"
+                  min="1"
+                />
+              </div>
+            </div>
+          )}
+
           <button className="btn export" onClick={handleExportCsv}>
             Xuất CSV
           </button>
@@ -796,6 +902,18 @@ const UserManagement = () => {
                 invoices={invoices}
               />
             )}
+
+            {/* ✅ Bảng staff CHỈ hiện khi chọn "Nhân viên" */}
+            {(userTypeFilter === "staff" || userTypeFilter === "all") && (
+              <div className="mt-8">
+                <StationStaffTable
+                  staffs={staffsByStation[selectedStationId] || []}
+                  stationId={selectedStationId}
+                  isLoading={isLoading}
+                  setActiveModal={setActiveModal}
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -812,15 +930,6 @@ const UserManagement = () => {
             setActiveModal={setActiveModal}
           />
         )}
-
-        {activeTab === "stationStaff" && (
-          <StationStaffTable
-            stationStaffs={stationStaffs}
-            stations={stations}
-            accounts={allAccounts}
-            setActiveModal={setActiveModal}
-          />
-        )}
       </div>
 
       <AdminModals
@@ -829,8 +938,8 @@ const UserManagement = () => {
         allAccounts={allAccounts}
         allVehicles={allVehicles}
         servicePackages={servicePackages}
-        stations={stations} 
-        crudActions={crudActions}
+        crudActions={crudActions} // TRUYỀN STAFF STATE XUỐNG CHO MODALS
+        staffsByStation={staffsByStation}
       />
     </div>
   );

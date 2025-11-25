@@ -623,13 +623,18 @@ export const processRegionalComparison = (rawData) => {
 /* =========================================================
  * 4) BIỂU ĐỒ THỜI GIAN 7 NGÀY — sessions + revenue theo ngày
  * ========================================================= */
-export const processTimeChartData = (rawData) => {
+export const processTimeChartData = (rawData, filter = {}) => {
   const sessions = toArray(rawData?.sessionsData);
+  const { startDate, endDate } = filter;
 
-  const today = moment();
+  // Lấy mốc cuối: ưu tiên endDate filter, fallback về hôm nay
+  let end = endDate ? moment(endDate) : moment();
+  if (!end.isValid()) end = moment();
+
+  // Vẫn giữ 7 ngày, nhưng là 7 ngày kết thúc tại endDate
   const days = {};
   for (let i = 6; i >= 0; i--) {
-    const d = today.clone().subtract(i, "days");
+    const d = end.clone().subtract(i, "days");
     const key = d.format("YYYY-MM-DD");
     days[key] = { day: weekdayVN(d), sessions: 0, revenue: 0 };
   }
@@ -639,7 +644,7 @@ export const processTimeChartData = (rawData) => {
     const m = getSessionMoment(s);
     if (!m) return;
     const key = m.format("YYYY-MM-DD");
-    if (!days[key]) return;
+    if (!days[key]) return; // nằm ngoài 7 ngày thì bỏ
     days[key].sessions += 1;
     days[key].revenue += Number(s.total ?? s.Total ?? 0);
   });
@@ -649,7 +654,6 @@ export const processTimeChartData = (rawData) => {
     sessions: d.sessions,
   }));
 
-  // Trả theo "nghìn ₫" để khớp label ở UI
   const dailyRevenue = Object.values(days).map((d) => ({
     day: d.day,
     revenue: Math.round(d.revenue / 1000),
@@ -669,14 +673,19 @@ export const processTimeChartData = (rawData) => {
 /* =========================================================
  * 5) HEATMAP THEO GIỜ — 7 ngày x 24h, theo số phiên
  * ========================================================= */
-export const processTimeChartHourly = (rawData) => {
+export const processTimeChartHourly = (rawData, filter = {}) => {
   const sessions = toArray(rawData?.sessionsData);
+  const { endDate } = filter;
+
+  let end = endDate ? moment(endDate) : moment();
+  if (!end.isValid()) end = moment();
 
   const hourlyData = {};
-  const today = moment();
   for (let i = 6; i >= 0; i--) {
-    const d = today.clone().subtract(i, "days").format("YYYY-MM-DD");
-    for (let h = 0; h < 24; h++) hourlyData[`${d}-${h}`] = 0;
+    const d = end.clone().subtract(i, "days").format("YYYY-MM-DD");
+    for (let h = 0; h < 24; h++) {
+      hourlyData[`${d}-${h}`] = 0;
+    }
   }
 
   sessions.forEach((s) => {

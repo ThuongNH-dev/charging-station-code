@@ -357,23 +357,7 @@ export default function FeedbackSection({
         footer={<Pager page={page} totalPages={totalPages} onChange={setPage} />}
       >
         <div className="fb-toolbar" style={{ marginBottom: 8 }}>
-          <label>
-            Lọc theo sao:&nbsp;
-            <select
-              className="fb-select"
-              value={star}
-              onChange={(e) => setStar(Number(e.target.value))}
-            >
-              <option value={0}>Tất cả</option>
-              <option value={5}>5 sao</option>
-              <option value={4}>4 sao</option>
-              <option value={3}>3 sao</option>
-              <option value={2}>2 sao</option>
-              <option value={1}>1 sao</option>
-            </select>
-          </label>
-          {loading && <span className="bp-hint" style={{ marginLeft: 12 }}>Đang tải…</span>}
-          {error && <span className="error-text" style={{ marginLeft: 12 }}>Lỗi: {error}</span>}
+          {/* ... */}
         </div>
 
         {modalFiltered.length === 0 && !loading ? (
@@ -381,9 +365,14 @@ export default function FeedbackSection({
         ) : (
           <ul className="bp-review-list" style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {paged.map((rv) => (
-              <li key={rv.feedbackId ?? rv.id} className="bp-review-item" style={{ marginBottom: 12 }}>
+              <li
+                key={rv.feedbackId ?? rv.id}
+                className="bp-review-item"
+              >
                 <div className="bp-review">
-                  <div className="bp-avatar" />
+                  <div className="bp-avatar">
+                    {(rv.customerName || "N")[0].toUpperCase()}
+                  </div>
                   <div>
                     <div className="bp-review-head">
                       <b>{rv.customerName || `Khách #${rv.customerId || "?"}`}</b>
@@ -408,6 +397,7 @@ export default function FeedbackSection({
           </ul>
         )}
       </Modal>
+
     </section>
   );
 }

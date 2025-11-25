@@ -214,16 +214,16 @@ export default function StaffInvoice() {
           <tbody>
             <tr>
               <td>Tiền điện năng tiêu thụ</td>
-              <td className="right">{formatCurrency(data.total || 0)}</td>
+              <td className="right">{formatCurrency(data.subtotal || 0)}</td>
             </tr>
             <tr>
               <td>VAT (10%)</td>
-              <td className="right">{formatCurrency((data.total || 0) * 0.1)}</td>
+              <td className="right">{formatCurrency((data.subtotal || 0) * 0.1)}</td>
             </tr>
             <tr>
               <td><strong>Tổng cộng</strong></td>
               <td className="right">
-                <strong>{formatCurrency((data.total || 0) * 1.1)}</strong>
+                <strong>{formatCurrency((data.subtotal || 0) * 1.1)}</strong>
               </td>
             </tr>
           </tbody>

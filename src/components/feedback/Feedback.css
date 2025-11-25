@@ -273,3 +273,81 @@
   user-select: none;
   overflow: hidden;      /* phòng khi font quá to */
 }
+
+/* ===== POPUP MODAL (overlay toàn màn hình) ===== */
+.fb-modal-backdrop{
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,0.55); /* nền tối phủ màn hình */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;            /* cao hơn mọi thứ khác */
+}
+
+.fb-modal{
+  width: min(880px, 100vw - 32px);
+  max-height: 80vh;
+  background: #f3f4f6;      /* nền xám nhẹ cho thân modal */
+  border-radius: 18px;
+  box-shadow: 0 24px 80px rgba(15,23,42,0.5);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* header và footer trắng cho nổi */
+.fb-modal__header{
+  background: #ffffff;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.fb-modal__body{
+  padding: 12px 18px;
+  background: #f3f4f6;
+}
+.fb-modal__footer{
+  background: #ffffff;
+  padding: 10px 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* ===== LIST REVIEW BÊN TRONG MODAL ===== */
+.fb-modal .bp-review-list{
+  margin: 4px 0 8px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* mỗi review là 1 card riêng, có nền + shadow */
+.fb-modal .bp-review-list .bp-review-item{
+  background:#ffffff;
+  border:1px solid #e2e8f0;
+  border-radius:12px;
+  padding:14px 16px;
+  box-shadow:0 4px 14px rgba(15,23,42,0.08);
+  transition: background .15s ease, transform .06s ease, box-shadow .15s ease;
+}
+
+.fb-modal .bp-review-list .bp-review-item:hover{
+  background:#f9fafb;
+  transform: translateY(-1px);
+  box-shadow:0 8px 22px rgba(15,23,42,0.15);
+}
+
+/* avatar trong modal nhỏ lại chút cho đỡ chiếm chỗ */
+.fb-modal .bp-review .bp-avatar{
+  width: 38px;
+  height: 38px;
+}
+
+/* chữ trong modal gọn hơn 1 tí */
+.fb-modal .bp-review-head{
+  font-size: 14px;
+}
+.fb-modal .bp-subtle{
+  font-size: 14px;
+}

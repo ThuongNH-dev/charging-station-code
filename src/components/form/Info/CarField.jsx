@@ -87,7 +87,7 @@ export default function CarField({
           </Form.Item>
 
           {/* ➕ Mã công ty (không bắt buộc) */}
-          <Form.Item
+          {/* <Form.Item
             label={<strong>Mã công ty</strong>}
             name="companyCode" // <— key lưu vào form
             rules={[
@@ -95,7 +95,7 @@ export default function CarField({
             ]}
           >
             <Input placeholder="VD: C001, ABC-123..." allowClear />
-          </Form.Item>
+          </Form.Item> */}
 
           <Form.Item
             label={<strong>Dung lượng pin (kWh)</strong>}

@@ -1,11 +1,10 @@
-// src/components/admin/pages/UserManagement/Usertables.jsx
 import React, { useState, useMemo, useRef } from "react";
-import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { EditOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { Pagination } from "antd";
 
 /* =========================================================
-   🔹 TIÊU ĐỀ
-   ========================================================= */
+   🔹 TIÊU ĐỀ
+   ========================================================= */
 
 const getTableTitle = (userType) => {
   switch (userType) {
@@ -19,8 +18,8 @@ const getTableTitle = (userType) => {
 };
 
 /* =========================================================
-   🔹 CỘT BẢNG THEO LOẠI USER
-   ========================================================= */
+   🔹 CỘT BẢNG THEO LOẠI USER & STAFF
+   ========================================================= */
 const getColumns = (userType) => {
   const cols = [
     { key: "STT", header: "STT" },
@@ -33,7 +32,7 @@ const getColumns = (userType) => {
     cols.push({ key: "email", header: "Email" });
     cols.push({ key: "accountType", header: "Loại tài khoản" });
     cols.push({ key: "planName", header: "Gói dịch vụ" });
-    cols.push({ key: "paymentStatus", header: "Trạng thái thanh toán" }); // <-- thêm
+    cols.push({ key: "paymentStatus", header: "Trạng thái thanh toán" });
   } else if (userType === "company") {
     cols.push({ key: "companyName", header: "Công ty" });
     cols.push({ key: "email", header: "Email" });
@@ -50,10 +49,23 @@ const getColumns = (userType) => {
   return cols;
 };
 
+const getStaffColumns = () => {
+  return [
+    { key: "STT", header: "STT" },
+    { key: "stationId", header: "Station ID" },
+    { key: "staffId", header: "Nhân viên ID" },
+    { key: "staffName", header: "Tên nhân viên" },
+    { key: "staffEmail", header: "Email" },
+    { key: "action", header: "Thao tác" },
+  ];
+};
+
 /* =========================================================
-   🔹 HELPERS
-   ========================================================= */
-// ✅ Chỉ chọn gói đang ACTIVE cho người dùng cá nhân
+   🔹 HELPERS (GIỮ NGUYÊN)
+   ========================================================= */
+
+// ... (Các hàm helper: pickUserSubscription, pickCompanySubscription, buildPlanMap,
+//      pickCompanyLatestInvoice, pickCustomerLatestInvoice, paymentStatusFromInvoice) ...
 const pickUserSubscription = (subs, customerId) => {
   if (!customerId || !Array.isArray(subs)) return null;
   const cid = Number(customerId);
@@ -64,20 +76,17 @@ const pickUserSubscription = (subs, customerId) => {
       (s?.companyId == null || Number(s.companyId) === 0)
   );
 
-  if (mine.length === 0) return null;
+  if (mine.length === 0) return null; // 👉 Lọc chỉ gói đang ACTIVE
 
-  // 👉 Lọc chỉ gói đang ACTIVE
   const active = mine.filter((s) => String(s?.status) === "Active");
-  if (active.length === 0) return null;
+  if (active.length === 0) return null; // Lấy gói mới nhất
 
-  // Lấy gói mới nhất
   const when = (s) => new Date(s?.startDate || s?.updatedAt || 0).getTime();
   active.sort((a, b) => when(b) - when(a));
 
   return active[0];
 };
 
-// ✅ Lấy gói dịch vụ đang ACTIVE cho company, ưu tiên bản mới nhất
 const pickCompanySubscription = (subs, companyId) => {
   if (!companyId || !Array.isArray(subs)) return null;
   const cid = Number(companyId);
@@ -157,9 +166,6 @@ const paymentStatusFromInvoice = (inv) => {
   return "Chưa thanh toán";
 };
 
-/* =========================================================
-   🔹 RENDER CELL
-   ========================================================= */
 const renderCell = (
   user,
   key,
@@ -175,9 +181,8 @@ const renderCell = (
       return pageOffset + index + 1;
 
     case "accountId":
-      return user?.accountId ?? "—";
+      return user?.accountId ?? "—"; // ======== DOANH NGHIỆP ========
 
-    // ======== DOANH NGHIỆP ========
     case "companyName":
       return <span>{companyData?.name || user?.userName || "—"}</span>;
 
@@ -190,7 +195,6 @@ const renderCell = (
     case "address":
       return companyData?.address || "—";
 
-    // ✅ Gói dịch vụ của doanh nghiệp (chỉ hiển thị khi có subscription ACTIVE)
     case "companyPlan": {
       const compId =
         companyData?.companyId ??
@@ -220,11 +224,9 @@ const renderCell = (
           customerInfo?.CompanyId;
 
         const inv = pickCompanyLatestInvoice(invoices, compId);
-        // console.log('PAYMENT DEBUG COMPANY', { compId, inv, invoicesLen: invoices?.length });
         return paymentStatusFromInvoice(inv);
-      }
+      } // Nếu là cá nhân: dùng customerId
 
-      // Nếu là cá nhân: dùng customerId
       const custId =
         customerInfo?.customerId ??
         customerInfo?.CustomerId ??
@@ -232,11 +234,9 @@ const renderCell = (
         user?.Customers?.[0]?.CustomerId;
 
       const inv = pickCustomerLatestInvoice(invoices, custId);
-      // console.log('PAYMENT DEBUG CUSTOMER', { custId, inv, invoicesLen: invoices?.length });
       return paymentStatusFromInvoice(inv);
-    }
+    } // ======== CÁ NHÂN ========
 
-    // ======== CÁ NHÂN ========
     case "fullName":
       return customerInfo?.fullName || "—";
 
@@ -255,9 +255,8 @@ const renderCell = (
     }
 
     case "accountType":
-      return userType === "company" ? "Doanh nghiệp" : "Cá nhân";
+      return userType === "company" ? "Doanh nghiệp" : "Cá nhân"; // ======== CHUNG ========
 
-    // ======== CHUNG ========
     case "role":
       return user?.role || "User";
 
@@ -269,9 +268,6 @@ const renderCell = (
   }
 };
 
-/* =========================================================
-   🔹 COMPONENT CHÍNH
-   ========================================================= */
 export const UserTables = ({
   filteredData = [],
   userType = "individual",
@@ -296,9 +292,8 @@ export const UserTables = ({
   const pagedData = useMemo(() => {
     const start = (safePage - 1) * pageSize;
     return filteredData.slice(start, start + pageSize);
-  }, [filteredData, safePage]);
+  }, [filteredData, safePage]); // Vùng cuộn của bảng: để đưa scrollTop về đầu khi đổi trang
 
-  // Vùng cuộn của bảng: để đưa scrollTop về đầu khi đổi trang
   const wrapRef = useRef(null);
   const handlePageChange = (page) => {
     setCurrentPage(page);
@@ -324,7 +319,6 @@ export const UserTables = ({
           Thông tin {getTableTitle(userType)} ({total} mục)
         </h3>
       </div>
-
       {/* Vùng CUỘN của nội dung bảng */}
       <div className="table-responsive-wrapper" ref={wrapRef}>
         <table className="minimal-table">
@@ -350,6 +344,7 @@ export const UserTables = ({
                             setActiveModal?.(`editUser-${user.accountId}`)
                           }
                         />
+
                         <DeleteOutlined
                           className="action-icon delete-icon"
                           title="Xóa"
@@ -393,7 +388,6 @@ export const UserTables = ({
           </tbody>
         </table>
       </div>
-
       {/* ✅ Phân trang đặt NGOÀI vùng cuộn (luôn ở dưới) */}
       {total > pageSize && (
         <div className="table-pagination table-pagination--outside">
@@ -416,4 +410,119 @@ export const UserTables = ({
   );
 };
 
+/* =========================================================
+🔹 COMPONENT BẢNG NHÂN VIÊN STATION (BỔ SUNG)
+========================================================= */
+export const StationStaffTable = ({
+ staffs = [],
+ stationId,
+ isLoading,
+ setActiveModal,
+}) => {
+ const columns = useMemo(() => getStaffColumns(), []);
+ const total = staffs.length;
+
+ // Render cell đơn giản cho bảng Staff
+ const renderStaffCell = (staff, key, index) => {
+ switch (key) {
+ case "STT":
+ return index + 1;
+ case "stationId":
+ return staff?.StationId ?? staff?.stationId ?? "—";
+ case "staffId":
+ return staff?.StaffId ?? staff?.staffId ?? "—"; // SỬ DỤNG staff.StaffId / staff.staffId
+ case "staffName":
+ return staff?.StaffName || staff?.staffName || "—";
+ case "staffEmail":
+ // DTO chỉ trả về StaffName, nên email sẽ là "—" nếu không fetch thêm Account
+ return staff?.StaffEmail || staff?.staffEmail || "—";
+ default:
+ return "—";
+ }
+ };
+
+ if (!stationId) {
+ return (
+ <div className="user-table-section user-table--staffs">
+ <h3>Quản lý Nhân viên Station (Chưa chọn Station)</h3>
+ <p>Vui lòng chọn một **Station ID** hợp lệ để xem hoặc thêm nhân viên.</p>
+ </div>
+ );
+ }
+
+ return (
+ <div className="user-table-section user-table--staffs">
+{/* Header */}
+ <div className="table-header">
+ <h3>
+ Nhân viên tại Station **{stationId}** ({total} mục)
+ </h3>
+ {/* Nút THÊM Nhân viên - Sử dụng cú pháp object cho AdminModals */}
+ <button
+ className="btn-primary"
+ onClick={() => setActiveModal?.({ type: "addStaff", stationId: stationId })}
+ disabled={isLoading}
+ >
+ <PlusOutlined /> Thêm Nhân viên
+ </button>
+ </div>
+
+ {isLoading ? (
+ <p>Đang tải danh sách nhân viên...</p>
+ ) : total === 0 ? (
+ <p>Station **{stationId}** chưa có nhân viên nào.</p>
+ ) : (
+ <div className="table-responsive-wrapper">
+ <table className="minimal-table">
+ <thead>
+ <tr>
+ {columns.map((col) => (
+ <th key={col.key}>{col.header}</th>
+ ))}
+</tr>
+ </thead>
+
+ <tbody>
+ {staffs.map((staff, index) => (
+// Sử dụng cả staffId và StationId làm key
+ <tr key={`${staff.StationId || staff.stationId}-${staff.StaffId || staff.staffId}`}>
+ {columns.map((col) => {
+ if (col.key === "action") {
+ const staffAccountId = staff.StaffId ?? staff.staffId ?? staff.id;
+ const currentStationId = staff.StationId ?? staff.stationId;
+
+ return (
+ <td key={col.key} className="action-cell">
+ <DeleteOutlined
+className="action-icon delete-icon"
+ title="Xóa nhân viên khỏi Station"
+ onClick={() =>
+setActiveModal?.(
+`deleteStaffFromStation-Station${currentStationId}-Staff${staffAccountId}`
+)
+ }
+/>
+ </td>
+ );
+}
+
+ return (
+ <td key={col.key}>
+{renderStaffCell(staff, col.key, index)}
+ </td>
+ );
+ })}
+</tr>
+ ))}
+ </tbody>
+</table>
+ </div>
+ )}
+</div>
+);
+};
+
+// Đảm bảo cả hai component đều được export.
 export default UserTables;
+
+// Dòng gây lỗi đã được sửa: Loại bỏ UserTables khỏi Named Export vì nó đã là default export

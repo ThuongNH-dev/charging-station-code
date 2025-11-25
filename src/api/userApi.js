@@ -327,4 +327,41 @@ fetchAllStations: async () => {
     const res = await axios.get(`${BASE_URL}/Auth/${id}`);
     return res.data;
   },
+
+  fetchStaffsByStation: async (stationId) => {
+    if (!stationId) {
+      throw new Error("Phải cung cấp stationId để lấy danh sách nhân viên.");
+    }
+    const res = await axios.get(
+      `${BASE_URL}/station-staffs?stationId=${stationId}`
+    );
+    // BE trả về List<StationStaffReadDto>
+    return res.data;
+  },
+
+  /**
+   * POST /api/station-staffs
+   * payload: { stationId, staffId }
+   */
+  addStaffToStation: async (payload) => {
+    const res = await axios.post(`${BASE_URL}/station-staffs`, clean(payload), {
+      headers: { "Content-Type": "application/json" },
+    });
+    // BE trả về StationStaffReadDto
+    return res.data;
+  },
+
+  /**
+   * DELETE /api/station-staffs/{stationId}/{staffId}
+   */
+  deleteStaffFromStation: async (stationId, staffId) => {
+    if (!stationId || !staffId) {
+      throw new Error("Phải cung cấp cả stationId và staffId để xóa.");
+    }
+    const res = await axios.delete(
+      `${BASE_URL}/station-staffs/${stationId}/${staffId}`
+    );
+    // BE trả về true/false
+    return res.data;
+  },
 };

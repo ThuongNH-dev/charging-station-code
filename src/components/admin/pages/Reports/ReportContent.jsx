@@ -19,8 +19,6 @@ import {
   ResponsiveContainer,
   ComposedChart,
 } from "recharts";
-import AreaBox from "./AreaBox";
-import DetailedStationTable from "./DetailedStationTable";
 
 const COLORS = [
   "#4285F4",
@@ -56,6 +54,9 @@ const regionLabel = (key) => {
 // =========================================================
 // 🔹 1. Biểu đồ HEATMAP 7×24 (theo giờ)
 // =========================================================
+// =========================================================
+// 🔹 1. Biểu đồ HEATMAP 7×24 (theo giờ, gộp theo THỨ)
+// =========================================================
 function HeatmapHourly({ data = [] }) {
   if (!data.length) {
     return (
@@ -72,17 +73,44 @@ function HeatmapHourly({ data = [] }) {
     );
   }
 
-  const days = [...new Set(data.map((d) => d.date))].sort();
+  // 0 = CN, 1 = T2, ...
+  const WEEKDAY_LABELS = [
+    "CN",
+    "Thứ 2",
+    "Thứ 3",
+    "Thứ 4",
+    "Thứ 5",
+    "Thứ 6",
+    "Thứ 7",
+  ];
+
+  // Chuẩn hoá dữ liệu: gộp theo (hour, weekday)
   const chartData = Array.from({ length: 24 }, (_, hour) => {
-    const obj = { hour: `${hour}:00` };
-    days.forEach((day) => {
-      const item = data.find((d) => d.date === day && d.hour === hour);
-      obj[day] = item?.value || 0;
+    const row = { hour: `${hour}:00` };
+
+    WEEKDAY_LABELS.forEach((label, weekdayIndex) => {
+      const sum = data
+        .filter((d) => {
+          if (d.hour !== hour) return false;
+          const dateObj = new Date(d.date);
+          const dow = dateObj.getDay(); // 0..6
+          return dow === weekdayIndex;
+        })
+        .reduce((acc, d) => acc + Number(d.value || 0), 0);
+
+      row[label] = sum;
     });
-    return obj;
+
+    return row;
   });
 
-  const maxVal = Math.max(1, ...data.map((d) => d.value || 0));
+  // Tìm max để set Y-axis domain
+  const maxVal = Math.max(
+    1,
+    ...chartData.flatMap((row) =>
+      WEEKDAY_LABELS.map((label) => Number(row[label] || 0))
+    )
+  );
 
   return (
     <div style={{ marginTop: 30 }}>
@@ -94,23 +122,25 @@ function HeatmapHourly({ data = [] }) {
             <XAxis dataKey="hour" />
             <YAxis domain={[0, maxVal]} />
             <Tooltip
-              formatter={(v) => [`${v} phiên`, "Số phiên"]}
+              // name = label (Thứ 2, Thứ 3...), value = số phiên
+              formatter={(value, name) => [`${value} phiên`, name]}
               labelFormatter={(label) => `Giờ: ${label}`}
             />
-            {days.map((day, idx) => (
+            {WEEKDAY_LABELS.map((label, idx) => (
               <Bar
-                key={day}
-                dataKey={day}
+                key={label}
+                dataKey={label}
                 stackId="a"
-                fill={`hsl(${(idx * 360) / days.length}, 70%, 50%)`}
+                fill={`hsl(${(idx * 360) / WEEKDAY_LABELS.length}, 70%, 50%)`}
               />
             ))}
           </ComposedChart>
         </ResponsiveContainer>
       </div>
       <p style={{ marginTop: 8, color: "#666", fontSize: 12 }}>
-        Chú thích: Mỗi cột là một ngày; trục ngang là giờ (0–23h); màu biểu thị
-        số phiên trong từng giờ.
+        Chú thích: Mỗi cột là một giờ (0–23h). Màu sắc thể hiện tổng số phiên
+        trong 7 ngày gần nhất của từng thứ (CN, Thứ 2, …, Thứ 7) tại khung giờ
+        đó.
       </p>
     </div>
   );
@@ -420,29 +450,6 @@ export default function ReportContent({ data, reportFilter }) {
   // ====== HẾT PHẦN THÊM MỚI ======
 
   switch (reportFilter.viewType) {
-    case "area-comparison":
-      return (
-        <div className="report-content-area">
-          <h3 className="comparison-title">So sánh khu vực</h3>
-
-          <div
-            className="area-boxes-container"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: 16,
-            }}
-          >
-            {Object.entries(areaComparison || {}).map(([key, val]) => (
-              <AreaBox key={key} name={regionLabel(key)} data={val} />
-            ))}
-          </div>
-
-          <DetailedStationTable data={stationTable || []} />
-          <AreaComparison areaData={areaComparison} />
-        </div>
-      );
-
     case "time-chart":
       return (
         <div className="report-content-area">
@@ -494,19 +501,8 @@ export default function ReportContent({ data, reportFilter }) {
             </div>
           )}
 
-          {/* Bar: tất cả tháng trong range */}
           <RevenueByPlan data={monthlyRevenue} />
-
-          {/* Pie: riêng tháng đang chọn */}
           <ServiceStructurePie data={pieDataForSelectedMonth} />
-        </div>
-      );
-
-    case "station-output":
-      return (
-        <div className="report-content-area">
-          <h3 className="comparison-title">Hiệu suất xuất trạm</h3>
-          <DetailedStationTable data={stationTable || []} />
         </div>
       );
 

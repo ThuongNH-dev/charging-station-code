@@ -26,15 +26,33 @@ const Card = ({ title, value, sub }) => (
 );
 
 function getMonthRange(ym) {
-  // ym = "2025-11"
   const [y, m] = ym.split("-").map((x) => Number(x));
   const start = new Date(y, m - 1, 1, 0, 0, 0, 0).toISOString();
-  const end = new Date(y, m, 0, 23, 59, 59, 999).toISOString(); // last day of month
+  const end = new Date(y, m, 0, 23, 59, 59, 999).toISOString();
   return { start, end };
 }
 
+// 🔹 helper: đọc CustomerId / CompanyId (camelCase + PascalCase)
+const getCustomerId = (s) => s.customerId ?? s.CustomerId ?? null;
+const getCompanyId = (s) => s.companyId ?? s.CompanyId ?? null;
+
+// 🔹 helper: lọc theo loại khách
+const filterByCustomerType = (sessions, type) => {
+  if (!Array.isArray(sessions)) return [];
+
+  switch (type) {
+    case "customer": // khách cá nhân
+      return sessions.filter((s) => getCustomerId(s) && !getCompanyId(s));
+    case "company": // doanh nghiệp
+      return sessions.filter((s) => getCompanyId(s));
+    case "guest": // khách vãng lai
+      return sessions.filter((s) => !getCustomerId(s) && !getCompanyId(s));
+    default:
+      return sessions; // "all"
+  }
+};
+
 export default function Dashboard() {
-  // mặc định: tháng hiện tại
   const defaultYm = useMemo(() => {
     const d = new Date();
     const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -42,25 +60,37 @@ export default function Dashboard() {
   }, []);
 
   const [loading, setLoading] = useState(true);
-  const [ym, setYm] = useState(defaultYm); // YYYY-MM
-  const [stationId, setStationId] = useState("all"); // lọc trạm
+  const [ym, setYm] = useState(defaultYm);
   const [kpis, setKpis] = useState(null);
   const [series, setSeries] = useState([]);
-  const [stations, setStations] = useState([]);
 
-  const load = async (curYm, curStation) => {
+  // 🔹 bộ lọc loại khách
+  const [customerType, setCustomerType] = useState("all"); // all | customer | company | guest
+
+  const load = async (curYm, curCustomerType = customerType) => {
     const { start, end } = getMonthRange(curYm);
     try {
       setLoading(true);
+
       const raw = await fetchDashboard({
         startDate: start,
         endDate: end,
-        stationId: curStation,
       });
-      const processed = buildDashboardDataMonthly(raw, start, end);
+
+      // 🔹 lọc sessions theo loại khách ở FE
+      const filteredSessions = filterByCustomerType(
+        raw.sessions,
+        curCustomerType
+      );
+
+      const processed = buildDashboardDataMonthly(
+        { ...raw, sessions: filteredSessions },
+        start,
+        end
+      );
+
       setKpis(processed.kpis);
       setSeries(processed.series);
-      setStations(processed.stations);
     } catch (e) {
       console.error("⚠️ Dashboard load error:", e);
     } finally {
@@ -68,10 +98,11 @@ export default function Dashboard() {
     }
   };
 
+  // đổi tháng hoặc đổi loại khách → reload & xử lý lại
   useEffect(() => {
-    load(ym, stationId);
+    load(ym, customerType);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ym, stationId]);
+  }, [ym, customerType]);
 
   if (loading || !kpis) {
     return (
@@ -97,38 +128,30 @@ export default function Dashboard() {
           />
         </div>
 
+        {/* 🔹 BỘ LỌC MỚI: LOẠI KHÁCH HÀNG */}
         <div className="db-filter">
-          <label>Trạm</label>
+          <label>Loại khách</label>
           <select
-            value={stationId}
-            onChange={(e) => setStationId(e.target.value)}
+            value={customerType}
+            onChange={(e) => setCustomerType(e.target.value)}
           >
-            <option value="all">Tất cả trạm</option>
-            {stations.map((s) => (
-              <option
-                key={s.stationId ?? s.StationId ?? s.id}
-                value={s.stationId ?? s.StationId ?? s.id}
-              >
-                {s.name ??
-                  s.Name ??
-                  s.stationName ??
-                  s.StationName ??
-                  `Station #${s.stationId ?? s.StationId ?? s.id}`}
-              </option>
-            ))}
+            <option value="all">Tất cả</option>
+            <option value="customer">Khách cá nhân</option>
+            <option value="company">Doanh nghiệp</option>
+            <option value="guest">Khách vãng lai</option>
           </select>
         </div>
 
         <button
           className="db-refresh-btn"
-          onClick={() => load(ym, stationId)}
+          onClick={() => load(ym, customerType)}
           title="Tải lại"
         >
           Làm mới
         </button>
       </div>
 
-      {/* === KPIs theo tháng === */}
+      {/* === KPIs theo tháng (đã áp dụng lọc loại khách) === */}
       <div className="db-kpi-grid">
         <Card
           title="Phiên sạc trong tháng"
