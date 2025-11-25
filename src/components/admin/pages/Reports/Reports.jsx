@@ -123,6 +123,8 @@ export default function Reports() {
         pieData: serviceStructure.pieData || [],
       },
       analytics: analyticsData,
+      allStations: rawData.stationsData || [], // Để vẽ bảng "trạm chết"
+      portsData: rawData.portsData || [],
     };
   }, [rawData, reportFilter.startDate, reportFilter.endDate, analyticsData]);
 
@@ -275,7 +277,11 @@ export default function Reports() {
 
       {/* Nội dung chính & Sidebar */}
       <div className="report-main-container">
-        <ReportContent data={dataToRender} reportFilter={reportFilter} />
+        <ReportContent
+          data={dataToRender}
+          reportFilter={reportFilter}
+          portsData={dataToRender?.portsData || []}
+        />
       </div>
     </div>
   );

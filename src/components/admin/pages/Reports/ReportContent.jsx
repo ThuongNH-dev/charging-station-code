@@ -603,7 +603,105 @@ function CompanyBreakdownTable({ data = [] }) {
   );
 }
 
-// File: ReportContent.jsx
+// =========================================================
+// 🔹 7.1 Biểu đồ Doanh thu & Phiên sạc theo Công ty (MỚI)
+// =========================================================
+function CompanyRevenueChart({ data = [] }) {
+  if (!data.length) return null;
+
+  // Sắp xếp giảm dần theo doanh thu và lấy Top 10 để biểu đồ không bị rối
+  const chartData = [...data]
+    .sort((a, b) => (b.total || 0) - (a.total || 0))
+    .slice(0, 10)
+    .map((item) => ({
+      name: item.key, // Tên công ty
+      revenue: item.total || 0,
+      sessions: item.sessionCount || 0,
+    }));
+
+  return (
+    <div style={{ marginBottom: 30 }}>
+      <h4>Biểu đồ doanh thu Top 10 Công ty</h4>
+      <div className="chart-box-400">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart
+            data={chartData}
+            margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+          >
+            <CartesianGrid stroke="#f5f5f5" />
+            <XAxis
+              dataKey="name"
+              scale="band"
+              angle={-15}
+              textAnchor="end"
+              interval={0}
+              height={60}
+              tick={{ fontSize: 12 }}
+            />
+            {/* Trục trái: Doanh thu */}
+            <YAxis
+              yAxisId="left"
+              orientation="left"
+              stroke="#34A853"
+              tickFormatter={(val) => `${(val / 1000000).toFixed(1)}M`}
+              label={{
+                value: "Doanh thu (VNĐ)",
+                angle: -90,
+                position: "insideLeft",
+              }}
+            />
+            {/* Trục phải: Số phiên */}
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              stroke="#4285F4"
+              label={{ value: "Số phiên", angle: 90, position: "insideRight" }}
+            />
+            <Tooltip
+              formatter={(value, name) => {
+                if (name === "Doanh thu")
+                  return `${value.toLocaleString("vi-VN")} ₫`;
+                return `${value} phiên`;
+              }}
+              labelStyle={{ color: "#333", fontWeight: "bold" }}
+            />
+            <Legend />
+            {/* Cột doanh thu */}
+            <Bar
+              yAxisId="left"
+              dataKey="revenue"
+              name="Doanh thu"
+              barSize={40}
+              fill="#34A853"
+              radius={[4, 4, 0, 0]}
+            />
+            {/* Đường số phiên */}
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="sessions"
+              name="Số phiên"
+              stroke="#4285F4"
+              strokeWidth={3}
+              dot={{ r: 4, fill: "#4285F4", strokeWidth: 2, stroke: "#fff" }}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+      <p
+        style={{
+          marginTop: 8,
+          color: "#666",
+          fontSize: 12,
+          textAlign: "center",
+        }}
+      >
+        Biểu đồ thể hiện mối tương quan giữa Doanh thu (Cột xanh lá) và Số lượng
+        phiên sạc (Đường xanh dương).
+      </p>
+    </div>
+  );
+}
 
 // =========================================================
 // 🔹 8. Bảng Utilization theo Trạm (ĐÃ SỬA: GỘP DỮ LIỆU FE)
@@ -749,6 +847,170 @@ function StationUtilizationTable({ data = [], allStations = [] }) {
         ></span>
         Màu vàng: Hiệu suất thấp (dưới 5%).
       </p>
+    </div>
+  );
+}
+
+// =========================================================
+// 🔹 8.1 Biểu đồ Hiệu suất Trạm (ĐÃ SỬA LỖI TOOLTIP)
+// =========================================================
+function StationUtilizationCharts({ data = [], allStations = [] }) {
+  // 1. Logic Gộp dữ liệu (Giữ nguyên)
+  const mergedData = useMemo(() => {
+    if (!allStations.length) return [];
+
+    const statsMap = new Map();
+    data.forEach((item) => {
+      if (item.code) {
+        statsMap.set(item.code, item);
+        statsMap.set(item.code.trim().toLowerCase(), item);
+      }
+    });
+
+    return allStations.map((station) => {
+      const rawName =
+        station.name || station.stationName || station.code || "Unknown";
+      const searchName = String(rawName).trim().toLowerCase();
+      const stats = statsMap.get(rawName) || statsMap.get(searchName);
+
+      if (stats) return { ...stats, name: rawName, status: "active" };
+
+      return {
+        name: rawName,
+        sessionCount: 0,
+        energyKwh: 0,
+        utilization: 0,
+        status: "inactive",
+      };
+    });
+  }, [data, allStations]);
+
+  if (!mergedData.length) return null;
+
+  // 2. Chuẩn bị dữ liệu (Giữ nguyên)
+  let goodCount = 0;
+  let lowCount = 0;
+  let inactiveCount = 0;
+
+  mergedData.forEach((item) => {
+    if (item.status === "inactive" || !item.sessionCount) {
+      inactiveCount++;
+    } else if (item.utilization < 0.05) {
+      lowCount++;
+    } else {
+      goodCount++;
+    }
+  });
+
+  const pieData = [
+    { name: "Hoạt động tốt", value: goodCount, color: "#27ae60" },
+    { name: "Hiệu suất thấp", value: lowCount, color: "#f39c12" },
+    { name: "Không doanh thu", value: inactiveCount, color: "#c0392b" },
+  ].filter((d) => d.value > 0);
+
+  const barData = [...mergedData]
+    .sort((a, b) => (b.utilization || 0) - (a.utilization || 0))
+    .slice(0, 10)
+    .map((item) => ({
+      name: item.name,
+      util: ((item.utilization || 0) * 100).toFixed(2),
+      sessions: item.sessionCount || 0,
+    }));
+
+  return (
+    <div
+      style={{ display: "flex", flexWrap: "wrap", gap: 20, marginBottom: 30 }}
+    >
+      {/* --- CHART 1: DONUT CHART --- */}
+      <div
+        style={{
+          flex: "1 1 350px",
+          border: "1px solid #eee",
+          borderRadius: 12,
+          padding: 20,
+          background: "#fff",
+        }}
+      >
+        <h4 style={{ textAlign: "center", marginBottom: 10 }}>
+          Tỷ lệ hoạt động trạm
+        </h4>
+        <div style={{ width: "100%", height: 300 }}>
+          <ResponsiveContainer>
+            <PieChart>
+              <Pie
+                data={pieData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={100}
+                paddingAngle={5}
+              >
+                {pieData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(val) => [`${val} trạm`, "Số lượng"]} />
+              <Legend verticalAlign="bottom" height={36} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <p style={{ textAlign: "center", fontSize: 12, color: "#666" }}>
+          Tổng số trạm: <strong>{mergedData.length}</strong>
+        </p>
+      </div>
+
+      {/* --- CHART 2: BAR CHART (SỬA TOOLTIP Ở ĐÂY) --- */}
+      <div
+        style={{
+          flex: "2 1 500px",
+          border: "1px solid #eee",
+          borderRadius: 12,
+          padding: 20,
+          background: "#fff",
+        }}
+      >
+        <h4 style={{ textAlign: "center", marginBottom: 10 }}>
+          Top 10 Trạm có hiệu suất cao nhất (%)
+        </h4>
+        <div style={{ width: "100%", height: 300 }}>
+          <ResponsiveContainer>
+            <BarChart
+              data={barData}
+              layout="vertical"
+              margin={{ left: 20, right: 30 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis type="number" domain={[0, "auto"]} unit="%" />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={150}
+                tick={{ fontSize: 12 }}
+                interval={0}
+              />
+              {/* 👇 ĐÃ SỬA: Bỏ logic điều kiện phức tạp, ép cứng hiển thị đúng label */}
+              <Tooltip
+                formatter={(val) => [`${val}%`, "Hiệu suất"]}
+                cursor={{ fill: "transparent" }}
+                contentStyle={{ borderRadius: 8 }}
+              />
+              <Bar
+                dataKey="util"
+                name="Hiệu suất" // Đổi tên hiển thị cho khớp
+                fill="#4285F4"
+                radius={[0, 4, 4, 0]}
+                barSize={20}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <p style={{ textAlign: "center", fontSize: 12, color: "#666" }}>
+          Chỉ số Utilization thể hiện tỷ lệ thời gian trạm được sử dụng sạc
+          trong tháng.
+        </p>
+      </div>
     </div>
   );
 }
@@ -1048,6 +1310,11 @@ export default function ReportContent({ data, reportFilter }) {
       return (
         <div className="report-content-area">
           <h3 className="comparison-title">Báo cáo theo công ty</h3>
+
+          {/* 1. Hiển thị Biểu đồ trước */}
+          <CompanyRevenueChart data={analytics?.companyBreakdown || []} />
+
+          {/* 2. Hiển thị Bảng số liệu chi tiết sau */}
           <CompanyBreakdownTable data={analytics?.companyBreakdown || []} />
         </div>
       );
@@ -1057,6 +1324,12 @@ export default function ReportContent({ data, reportFilter }) {
       return (
         <div className="report-content-area">
           <h3 className="comparison-title">Hiệu suất sử dụng trạm</h3>
+
+          <StationUtilizationCharts
+            data={analytics?.utilizationStations || []}
+            allStations={data?.allStations || []}
+          />
+
           <StationUtilizationTable
             data={analytics?.utilizationStations || []}
             allStations={data?.allStations || []}
@@ -1069,8 +1342,7 @@ export default function ReportContent({ data, reportFilter }) {
       return (
         <div className="report-content-area">
           <h3 className="comparison-title">Phân loại hiệu suất cổng sạc</h3>
-          <TopUnderZeroSection topUnder={analytics?.topUnder}
-           />
+          <TopUnderZeroSection topUnder={analytics?.topUnder} />
         </div>
       );
 

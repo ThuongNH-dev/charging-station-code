@@ -51,7 +51,7 @@ export const fetchReportData = async (params = {}) => {
 
     const invoicesPromise = api.get("/Invoices");
     const stationsPromise = api.get("/Stations/paged", {
-      params: { page: 1, pageSize: 200 },
+      params: { page: 1, pageSize: 2000 },
     });
 
     // ✅ THÊM 2 API này để lấy danh sách gốc Port/Charger
