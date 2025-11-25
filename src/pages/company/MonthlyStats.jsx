@@ -8,13 +8,41 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getApiBase } from "../../utils/api";
-import { buildMonthlyStats } from "../../utils/billingStats";
+// import { buildMonthlyStats } from "../../utils/billingStats";
 import MainLayout from "../../layouts/MainLayout";
 import "./MonthlyStats.css";
 
 const API_BASE = (getApiBase() || "").replace(/\/+$/, "");
 
 // ===== Helpers =====
+// 🔥 ADD: Analytics API for Company
+async function apiSummary(token, month, year) {
+  const params = new URLSearchParams({ month, year });
+  const res = await fetch(`${API_BASE}/Analytics/summary?${params}`, {
+    headers: { accept: "application/json", authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error("Lỗi summary");
+  return res.json();
+}
+
+async function apiRevenueSources(token, month, year) {
+  const params = new URLSearchParams({ month, year });
+  const res = await fetch(`${API_BASE}/Analytics/revenue-sources?${params}`, {
+    headers: { accept: "application/json", authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error("Lỗi revenue sources");
+  return res.json();
+}
+
+async function apiBreakdownVehicle(token, month, year) {
+  const params = new URLSearchParams({ month, year });
+  const res = await fetch(`${API_BASE}/Analytics/breakdown/vehicle?${params}`, {
+    headers: { accept: "application/json", authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error("Lỗi breakdown vehicle");
+  return res.json();
+}
+
 function getAuthTokenAndIds(authUser) {
   let token =
     authUser?.token ||
@@ -122,6 +150,10 @@ export default function MonthlyStats() {
   const hasKwh = !isCustomer;
 
   // ===== State report =====
+// 🔥 ADD new states for Analytics
+const [revenueSources, setRevenueSources] = useState(null);
+const [vehicleBreakdown, setVehicleBreakdown] = useState([]);
+
   const [when, setWhen] = useState(dayjs());           // <-- tháng+năm đang chọn
   const [statsLoading, setStatsLoading] = useState(false);
   const [spendByMonth, setSpendByMonth] = useState(Array(12).fill(0));
@@ -220,23 +252,23 @@ export default function MonthlyStats() {
   }
 
 
-  async function fetchMonthlyStats() {
-    if (!Number.isFinite(companyId)) return;
-    setStatsLoading(true);
-    try {
-      // buildMonthlyStats trả về đủ 12 tháng; nếu backend hỗ trợ lọc theo năm,
-      // bạn có thể truyền selectedYear tại đây (tùy API của bạn).
-      const { spendByMonth, kwhByMonth } = await buildMonthlyStats(companyId);
-      setSpendByMonth(spendByMonth);
-      setKwhByMonth(kwhByMonth);
-    } catch (e) {
-      console.error("[MonthlyStats] error:", e);
-      setSpendByMonth(Array(12).fill(0));
-      setKwhByMonth(Array(12).fill(0));
-    } finally {
-      setStatsLoading(false);
-    }
-  }
+  // async function fetchMonthlyStats() {
+  //   if (!Number.isFinite(companyId)) return;
+  //   setStatsLoading(true);
+  //   try {
+  //     // buildMonthlyStats trả về đủ 12 tháng; nếu backend hỗ trợ lọc theo năm,
+  //     // bạn có thể truyền selectedYear tại đây (tùy API của bạn).
+  //     const { spendByMonth, kwhByMonth } = await buildMonthlyStats(companyId);
+  //     setSpendByMonth(spendByMonth);
+  //     setKwhByMonth(kwhByMonth);
+  //   } catch (e) {
+  //     console.error("[MonthlyStats] error:", e);
+  //     setSpendByMonth(Array(12).fill(0));
+  //     setKwhByMonth(Array(12).fill(0));
+  //   } finally {
+  //     setStatsLoading(false);
+  //   }
+  // }
 
   async function fetchInvoicesByCompany() {
     if (!Number.isFinite(companyId)) return;
@@ -314,19 +346,58 @@ export default function MonthlyStats() {
         setSpendByMonth(Array(12).fill(0));
         setKwhByMonth(Array(12).fill(0));
       }
-    } else {
-      // Thống kê theo company
-      if (Number.isFinite(companyId)) {
-        fetchMonthlyStats();        // có kWh
-        fetchInvoicesByCompany();
-      } else {
-        setAllInvoices([]);
-        setSpendByMonth(Array(12).fill(0));
-        setKwhByMonth(Array(12).fill(0));
-      }
-    }
+// 🔥 REPLACE THIS BLOCK for COMPANY analytics
+} else {
+  if (Number.isFinite(companyId)) {
+
+    const m = selectedMonthIndex + 1;
+    const y = selectedYear;
+
+    setStatsLoading(true);
+
+    Promise.all([
+      apiSummary(token, m, y),
+      apiRevenueSources(token, m, y),
+      apiBreakdownVehicle(token, m, y)
+    ])
+    .then(([summary, sources, vehicles]) => {
+      
+      // 🔥 summary → build spend/kWh
+      const spendArr = Array(12).fill(0);
+      const kwhArr = Array(12).fill(0);
+      spendArr[m - 1] = summary.total ?? 0;
+      kwhArr[m - 1] = summary.kwh ?? 0;
+
+      setSpendByMonth(spendArr);
+      setKwhByMonth(kwhArr);
+
+      // 🔥 save extra analytics if needed
+setRevenueSources(
+  sources?.data ?? sources?.items ?? sources ?? null
+);
+
+setVehicleBreakdown(
+  vehicles?.data ?? vehicles?.items ?? vehicles ?? []
+);
+    })
+    .catch(err => {
+      console.error(err);
+      message.error("Lỗi tải thống kê công ty");
+    })
+    .finally(() => {
+      setStatsLoading(false);
+    });
+
+    // vẫn giữ invoice cũ
+    fetchInvoicesByCompany();
+  } else {
+    setAllInvoices([]);
+    setSpendByMonth(Array(12).fill(0));
+    setKwhByMonth(Array(12).fill(0));
+  }
+}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, customerId, isCustomer, selectedYear]);
+  }, [companyId, customerId, isCustomer, selectedYear, selectedMonthIndex]);
 
   return (
     <MainLayout>
