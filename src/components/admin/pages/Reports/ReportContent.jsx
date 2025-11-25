@@ -1019,68 +1019,67 @@ function StationUtilizationCharts({ data = [], allStations = [] }) {
 // 🔹 9. Top / Under / Zero activity (theo Port) - ĐÃ CHỈNH SỬA
 // =========================================================
 
+// =========================================================
+// 🔹 9.3 Bảng chi tiết Top / Under / Zero (ĐÃ FIX LỖI HOOK)
+// =========================================================
 function TopUnderZeroSection({ topUnder }) {
+  // 1. KHAI BÁO HOOK TRƯỚC (QUAN TRỌNG ĐỂ TRÁNH CRASH)
   const [zeroList, setZeroList] = useState([]);
 
+  // 2. Logic lọc trùng (useMemo) phải khai báo luôn, xử lý null bên trong
+  const filteredUnderUtilized = useMemo(() => {
+    if (!topUnder) return []; // Xử lý null ở đây thay vì return cả component
+
+    const { topActive = [], underUtilized = [] } = topUnder;
+    const topKeys = new Set(
+      topActive.map((item) => `${item.key}_${item.key2}`)
+    );
+
+    return underUtilized.filter((item) => {
+      const uniqueKey = `${item.key}_${item.key2}`;
+      return !topKeys.has(uniqueKey);
+    });
+  }, [topUnder]);
+
+  // 3. useEffect cập nhật zeroList
   useEffect(() => {
     if (topUnder?.zeroActivity) {
       setZeroList(topUnder.zeroActivity);
     }
   }, [topUnder]);
 
+  // 4. Bây giờ mới được return null nếu không có data
   if (!topUnder) {
     return (
       <div style={{ padding: 20, color: "#777", fontStyle: "italic" }}>
-        Không có dữ liệu Top/Under/Zero.
+        Đang tải hoặc không có dữ liệu phân loại.
       </div>
     );
   }
 
-  const { topActive = [], underUtilized = [] } = topUnder;
+  const { topActive = [] } = topUnder;
 
-  // 👇 --- LOGIC LỌC TRÙNG (MỚI THÊM) --- 👇
-  // Mục đích: Nếu cổng sạc đã nằm trong Top 10 thì không hiển thị ở bảng Hiệu suất thấp nữa
-  const filteredUnderUtilized = useMemo(() => {
-    // 1. Tạo danh sách các Key của Top Active để tra cứu (Kết hợp Port + Charger để không nhầm)
-    const topKeys = new Set(
-      topActive.map((item) => `${item.key}_${item.key2}`)
-    );
-
-    // 2. Lọc danh sách Under: Chỉ giữ lại những item KHÔNG nằm trong Top
-    return underUtilized.filter((item) => {
-      const uniqueKey = `${item.key}_${item.key2}`;
-      return !topKeys.has(uniqueKey);
-    });
-  }, [topActive, underUtilized]);
-  // 👆 ---------------------------------- 👆
-
-  // --- HÀM XỬ LÝ XÓA ---
+  // --- HÀM XỬ LÝ XÓA (Giữ nguyên) ---
   const handleDeleteClick = async (item) => {
     const confirm = window.confirm(
-      `Bạn chắc chắn muốn xóa cổng sạc: ${item.key}? \nHành động này không thể hoàn tác!`
+      `Bạn chắc chắn muốn xóa cổng sạc: ${item.key}?`
     );
     if (!confirm) return;
-
     const idToDelete =
       item.portId ||
       (item.key && item.key.includes("#") ? item.key.split("#")[1] : null);
-
-    if (!idToDelete) {
-      alert("Lỗi: Không tìm thấy ID của cổng sạc để xóa.");
-      return;
-    }
-
+    if (!idToDelete) return alert("Lỗi ID");
     try {
-      const success = await deletePort(idToDelete);
-      if (success) {
+      if (await deletePort(idToDelete)) {
         setZeroList((prev) => prev.filter((p) => p.key !== item.key));
         alert("Đã xóa thành công!");
       }
     } catch (error) {
-      alert("Có lỗi xảy ra khi xóa.");
+      alert("Lỗi xóa");
     }
   };
 
+  // Hàm render bảng con
   const renderPortTable = (rows, type) => (
     <table className="report-table" key={type}>
       <thead>
@@ -1117,20 +1116,15 @@ function TopUnderZeroSection({ topUnder }) {
               <td style={{ textAlign: "center" }}>
                 <button
                   className="btn-icon-delete"
-                  title="Xóa cổng hư/hỏng này"
+                  onClick={() => handleDeleteClick(row)}
                   style={{
                     border: "none",
                     background: "#ffebeb",
                     color: "#c0392b",
-                    cursor: "pointer",
                     padding: "6px 12px",
                     borderRadius: 4,
-                    fontSize: "13px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "6px",
+                    cursor: "pointer",
                   }}
-                  onClick={() => handleDeleteClick(row)}
                 >
                   <DeleteOutlined /> Xóa
                 </button>
@@ -1144,7 +1138,6 @@ function TopUnderZeroSection({ topUnder }) {
 
   return (
     <div className="top-under-layout">
-      {/* KHỐI 1: TOP ACTIVE */}
       <div className="top-under-block">
         <h4 style={{ color: "#27ae60" }}>Top hoạt động hiệu quả</h4>
         {topActive.length ? (
@@ -1153,21 +1146,14 @@ function TopUnderZeroSection({ topUnder }) {
           <div className="empty-block">Chưa có dữ liệu.</div>
         )}
       </div>
-
-      {/* KHỐI 2: UNDER UTILIZED (Dùng danh sách đã lọc trùng) */}
       <div className="top-under-block">
         <h4 style={{ color: "#f39c12" }}>Cảnh báo: Hiệu suất thấp</h4>
-        {/* 👇 SỬA Ở ĐÂY: Dùng filteredUnderUtilized thay vì underUtilized */}
         {filteredUnderUtilized.length ? (
           renderPortTable(filteredUnderUtilized, "under")
         ) : (
-          <div className="empty-block">
-            Không có cổng sạc hiệu suất thấp (ngoài top active).
-          </div>
+          <div className="empty-block">Không có cổng sạc hiệu suất thấp.</div>
         )}
       </div>
-
-      {/* KHỐI 3: ZERO ACTIVITY */}
       <div className="top-under-block">
         <h4 style={{ color: "#c0392b" }}>
           Cảnh báo: Không phát sinh giao dịch
@@ -1180,14 +1166,165 @@ function TopUnderZeroSection({ topUnder }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
 
-      <p className="table-footnote">
-        Ghi chú:
-        <strong> Top hiệu quả:</strong> 10 cổng sạc doanh thu cao nhất. |
-        <strong> Hiệu suất thấp:</strong> Các cổng sạc hoạt động kém và không
-        nằm trong Top. |<strong> Không giao dịch:</strong> Không có phiên sạc
-        nào trong tháng.
-      </p>
+// =========================================================
+// 🔹 9.1 Biểu đồ Tròn: Phân loại trạng thái
+// =========================================================
+function PortStatusPieChart({ topUnderData }) {
+  if (!topUnderData) return null;
+  const {
+    topActive = [],
+    underUtilized = [],
+    zeroActivity = [],
+  } = topUnderData;
+
+  const pieData = [
+    { name: "Hiệu quả cao", value: topActive.length, color: "#27ae60" },
+    { name: "Hiệu suất thấp", value: underUtilized.length, color: "#f39c12" },
+    { name: "Không giao dịch", value: zeroActivity.length, color: "#c0392b" },
+  ].filter((d) => d.value > 0);
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        padding: 20,
+        borderRadius: 12,
+        border: "1px solid #eee",
+        marginBottom: 20,
+        flex: "1 1 300px", // Chia tỷ lệ cột
+        minWidth: 0,
+      }}
+    >
+      <h4 style={{ textAlign: "center", marginBottom: 15 }}>
+        Tổng quan trạng thái cổng sạc
+      </h4>
+      <div style={{ width: "100%", height: 300 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={pieData}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              innerRadius={60}
+              outerRadius={100}
+              paddingAngle={5}
+            >
+              {pieData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Pie>
+            <Tooltip formatter={(val) => [`${val} cổng`, "Số lượng"]} />
+            <Legend verticalAlign="bottom" />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div
+        style={{
+          textAlign: "center",
+          marginTop: 10,
+          fontSize: 13,
+          color: "#666",
+        }}
+      >
+        Tổng số cổng ghi nhận:{" "}
+        <strong>
+          {topActive.length + underUtilized.length + zeroActivity.length}
+        </strong>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================
+// 🔹 9.2 Biểu đồ Cột: Top 10 Doanh thu (FIX LỖI HIỂN THỊ)
+// =========================================================
+function TopPortRevenueChart({ topUnderData }) {
+  if (!topUnderData || !topUnderData.topActive) return null;
+
+  const data = topUnderData.topActive.slice(0, 10).map((item) => ({
+    name: item.key || "Unknown",
+    revenue: item.total || 0,
+    sessions: item.sessionCount || 0,
+  }));
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        padding: 20,
+        borderRadius: 12,
+        border: "1px solid #eee",
+        marginBottom: 20,
+        flex: "2 1 500px", // Quan trọng: Giúp flex-box chia cột đúng
+        minWidth: 0, // Quan trọng: Tránh lỗi co cụm trong Flex/Grid
+      }}
+    >
+      <h4 style={{ marginBottom: 15 }}>
+        Top 10 Cổng sạc có doanh thu cao nhất
+      </h4>
+      <div style={{ width: "100%", height: 350 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart
+            data={data}
+            margin={{ top: 20, right: 20, left: 20, bottom: 5 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+
+            {/* Đã bỏ scale="band" để Recharts tự tính toán */}
+            <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+
+            <YAxis
+              yAxisId="left"
+              orientation="left"
+              stroke="#34A853"
+              tickFormatter={(val) => `${(val / 1000000).toFixed(1)}M`}
+              width={60}
+              label={{ value: "Doanh thu", angle: -90, position: "insideLeft" }}
+            />
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              stroke="#4285F4"
+              width={50}
+              label={{ value: "Số phiên", angle: 90, position: "insideRight" }}
+            />
+            <Tooltip
+              cursor={{ fill: "transparent" }}
+              formatter={(value, name) => {
+                if (name === "Doanh thu")
+                  return `${value.toLocaleString("vi-VN")} ₫`;
+                return `${value} phiên`;
+              }}
+            />
+            <Legend />
+            <Bar
+              yAxisId="left"
+              dataKey="revenue"
+              name="Doanh thu"
+              fill="#34A853"
+              barSize={40} // Đặt kích thước cố định để cột không bị mất
+              radius={[4, 4, 0, 0]}
+              isAnimationActive={false} // Tắt hiệu ứng để tránh lỗi render
+            />
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="sessions"
+              name="Số phiên"
+              stroke="#4285F4"
+              strokeWidth={3}
+              dot={{ r: 4, fill: "#4285F4", strokeWidth: 2 }}
+              isAnimationActive={false}
+            />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
@@ -1342,10 +1479,16 @@ export default function ReportContent({ data, reportFilter }) {
       return (
         <div className="report-content-area">
           <h3 className="comparison-title">Phân loại hiệu suất cổng sạc</h3>
+
+          {/* 👇 THAY ĐỔI Ở ĐÂY: Dùng Flexbox thay vì Grid */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
+            <PortStatusPieChart topUnderData={analytics?.topUnder} />
+            <TopPortRevenueChart topUnderData={analytics?.topUnder} />
+          </div>
+
           <TopUnderZeroSection topUnder={analytics?.topUnder} />
         </div>
       );
-
     default:
       return (
         <div className="report-content-area">
