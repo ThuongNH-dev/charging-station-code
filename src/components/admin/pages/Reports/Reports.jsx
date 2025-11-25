@@ -36,7 +36,7 @@ export default function Reports() {
       "admin-company",
       "admin-utilization",
       "admin-top-under",
-      "admin-vehicle", // ✅ mới
+
       "admin-vehicle-type",
     ];
 
@@ -143,8 +143,8 @@ export default function Reports() {
     "admin-company", // Báo cáo theo công ty
     "admin-utilization", // Hiệu suất trạm
     "admin-top-under", // Top/Under/Zero
-    "admin-vehicle", // Doanh thu xe
-    "admin-vehicle-type", // (Nếu có)
+    "admin-vehicle", // 👈 THÊM DÒNG NÀY (Doanh thu xe)
+    "admin-vehicle-type",
   ];
 
   // Biến kiểm tra: True nếu đang ở tab báo cáo tháng, False nếu ở tab thường
@@ -253,12 +253,17 @@ export default function Reports() {
       {/* Nút chọn chế độ xem */}
       <div className="report-view-options">
         {[
-          ["time-chart", "Biểu đồ thời gian"],
-          ["service-structure", "Cơ cấu dịch vụ"],
-          ["admin-vehicle", "Doanh Thu Xe"],
-          ["admin-company", "Theo công ty"],
-          ["admin-utilization", "Hiệu suất trạm"],
-          ["admin-top-under", "Top / Under / Zero"],
+          // --- NHÓM 1: TỔNG QUAN ---
+          ["time-chart", "Tổng quan thời gian"],
+
+          // --- NHÓM 2: PHÂN TÍCH DOANH THU ---
+          ["service-structure", "Doanh thu theo Gói"],
+          ["admin-vehicle-type", "Doanh thu theo Xe"], // Đổi tên từ "Phân loại xe" cho sang
+          ["admin-company", "Doanh thu Công ty"],
+
+          // --- NHÓM 3: HIỆU SUẤT HẠ TẦNG ---
+          ["admin-utilization", "Hiệu suất Trạm sạc"],
+          ["admin-top-under", "Xếp hạng & Cảnh báo"],
         ].map(([key, label]) => (
           <button
             key={key}

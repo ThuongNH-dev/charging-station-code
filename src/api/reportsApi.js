@@ -154,13 +154,9 @@ export const fetchAdminAnalytics = async ({ month, year }) => {
       },
     });
 
-    const vehicleBreakdownPromise = Promise.resolve({ data: [] });
-
     const vehicleTypeBreakdownPromise = api.get(
       "/Analytics/breakdown/vehicle-types",
-      {
-        params: baseParams,
-      }
+      { params: baseParams }
     );
 
     const results = await Promise.allSettled([
@@ -170,7 +166,7 @@ export const fetchAdminAnalytics = async ({ month, year }) => {
       stationBreakdownPromise,
       utilizationStationPromise,
       topUnderPromise,
-      vehicleBreakdownPromise,
+
       vehicleTypeBreakdownPromise,
     ]);
 
@@ -181,7 +177,7 @@ export const fetchAdminAnalytics = async ({ month, year }) => {
       stationBreakdownResult,
       utilizationStationResult,
       topUnderResult,
-      vehicleBreakdownResult,
+
       vehicleTypeBreakdownResult,
     ] = results;
 
@@ -192,7 +188,7 @@ export const fetchAdminAnalytics = async ({ month, year }) => {
       stationBreakdown: settledData(stationBreakdownResult, []),
       utilizationStations: settledData(utilizationStationResult, []),
       topUnder: settledData(topUnderResult, null),
-      vehicleBreakdown: settledData(vehicleBreakdownResult, []),
+
       vehicleTypeBreakdown: settledData(vehicleTypeBreakdownResult, []),
     };
 

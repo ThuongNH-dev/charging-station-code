@@ -508,53 +508,6 @@ function AdminMonthlyOverview({ summary, revenueSources }) {
   );
 }
 
-function VehicleBreakdownTable({ data = [] }) {
-  if (!data.length) {
-    return (
-      <div style={{ padding: 20, color: "#777", fontStyle: "italic" }}>
-        Không có dữ liệu doanh thu xe.
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <h4>Doanh Thu Theo Xe</h4>
-      <table className="report-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Biển số xe</th>
-            <th>Loại xe</th>
-            <th>Số phiên</th>
-            <th>kWh</th>
-            <th>Doanh thu (₫)</th>
-            <th>Thời gian sạc (phút)</th>
-            <th>Idle (phút)</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, idx) => (
-            <tr key={row.key ?? idx}>
-              <td>{idx + 1}</td>
-              <td>{row.licensePlate || "N/A"}</td>
-              <td>{row.vehicleType || "Không có dữ liệu"}</td>
-              <td>{row.sessionCount?.toLocaleString("vi-VN") || "0"}</td>
-              <td>{row.energyKwh?.toLocaleString("vi-VN") || "0"}</td>
-              <td>{row.total?.toLocaleString("vi-VN") || "0"}</td>
-              <td>{row.durationMin?.toLocaleString("vi-VN") || "0"}</td>
-              <td>{row.idleMin?.toLocaleString("vi-VN") || "0"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="table-footnote">
-        Ghi chú: Dữ liệu đã được sắp xếp theo doanh thu giảm dần từ backend.
-      </p>
-    </div>
-  );
-}
-
 // =========================================================
 // 🔹 7. Bảng breakdown theo Công ty
 // =========================================================
@@ -1328,6 +1281,147 @@ function TopPortRevenueChart({ topUnderData }) {
     </div>
   );
 }
+
+// =========================================================
+// 🔹 11.1 Biểu đồ Tròn: Cơ cấu loại xe (MỚI)
+// =========================================================
+function VehicleTypePieChart({ data = [] }) {
+  if (!data.length) return null;
+  const validData = data.filter((i) => (i.total || 0) > 0);
+  return (
+    <div
+      style={{
+        background: "#fff",
+        padding: 20,
+        borderRadius: 12,
+        border: "1px solid #eee",
+        marginBottom: 20,
+        flex: "1 1 300px",
+        minWidth: 0,
+      }}
+    >
+      <h4 style={{ textAlign: "center", marginBottom: 15 }}>
+        Tỷ trọng doanh thu theo loại xe
+      </h4>
+      <div style={{ width: "100%", height: 300 }}>
+        <ResponsiveContainer>
+          <PieChart>
+            <Pie
+              data={validData}
+              dataKey="total"
+              nameKey="key"
+              cx="50%"
+              cy="50%"
+              innerRadius={60}
+              outerRadius={100}
+              paddingAngle={2}
+            >
+              {validData.map((entry, index) => (
+                <Cell key={index} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip formatter={(val) => `${val.toLocaleString("vi-VN")} ₫`} />
+            <Legend />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================
+// 🔹 11.2 Bảng chi tiết Loại xe (FIX GIAO DIỆN TRÀN)
+// =========================================================
+function VehicleTypeTable({ data = [] }) {
+  if (!data.length) {
+    return (
+      <div style={{ padding: 20, color: "#777", fontStyle: "italic" }}>
+        Chưa có dữ liệu phân loại xe.
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        padding: 20,
+        borderRadius: 12,
+        border: "1px solid #eee",
+        flex: "2 1 500px",
+        minWidth: 0, // Quan trọng để không bị đẩy layout
+        overflowX: "auto", // Quan trọng: Tạo thanh cuộn ngang nếu bảng quá to
+      }}
+    >
+      <h4 style={{ marginBottom: 15 }}>Thống kê chi tiết theo loại xe</h4>
+      <table
+        className="report-table"
+        style={{ width: "100%", minWidth: "650px" }}
+      >
+        <thead>
+          <tr>
+            <th style={{ width: 40 }}>#</th>
+            <th>Loại xe</th>
+            <th style={{ textAlign: "right" }}>Số phiên</th>
+            <th style={{ textAlign: "right" }}>Sản lượng (kWh)</th>
+            <th style={{ textAlign: "right" }}>Doanh thu (₫)</th>
+            <th style={{ textAlign: "right" }}>Thời gian sạc</th>
+            <th style={{ textAlign: "right" }}>Idle</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, idx) => (
+            <tr key={row.key || idx}>
+              <td>{idx + 1}</td>
+
+              <td
+                style={{
+                  fontWeight: 600,
+                  color: "#2980b9",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {row.key || "Unknown"}
+              </td>
+
+              <td style={{ textAlign: "right" }}>
+                {row.sessionCount?.toLocaleString("vi-VN")}
+              </td>
+
+              <td style={{ textAlign: "right" }}>
+                {row.energyKwh?.toLocaleString("vi-VN", {
+                  maximumFractionDigits: 1,
+                })}
+              </td>
+
+              <td
+                style={{
+                  textAlign: "right",
+                  fontWeight: "bold",
+                  color: "#27ae60",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {row.total?.toLocaleString("vi-VN")}
+              </td>
+
+              <td style={{ textAlign: "right" }}>
+                {row.durationMin?.toLocaleString("vi-VN")} p
+              </td>
+
+              <td style={{ textAlign: "right", color: "#7f8c8d" }}>
+                {row.idleMin?.toLocaleString("vi-VN")} p
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="table-footnote">
+        Ghi chú: <strong>Idle</strong> là thời gian xe đỗ nhưng không sạc.
+      </p>
+    </div>
+  );
+}
 // =========================================================
 // 🔹 COMPONENT CHÍNH
 // =========================================================
@@ -1431,17 +1525,6 @@ export default function ReportContent({ data, reportFilter }) {
         </div>
       );
 
-    case "admin-vehicle":
-      return (
-        <div className="report-content-area">
-          <h3 className="comparison-title">Báo cáo Doanh Thu Xe</h3>
-          <VehicleBreakdownTable
-            data={analytics?.vehicleBreakdown || []}
-          />{" "}
-          {/* Hiển thị bảng doanh thu xe */}
-        </div>
-      );
-
     // ✅ VIEW MỚI: Breakdown theo Công ty
     case "admin-company":
       return (
@@ -1487,6 +1570,18 @@ export default function ReportContent({ data, reportFilter }) {
           </div>
 
           <TopUnderZeroSection topUnder={analytics?.topUnder} />
+        </div>
+      );
+
+    // ✅ VIEW MỚI: Phân loại xe
+    case "admin-vehicle-type":
+      return (
+        <div className="report-content-area">
+          <h3 className="comparison-title">Báo cáo theo Loại Xe</h3>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
+            <VehicleTypePieChart data={analytics?.vehicleTypeBreakdown || []} />
+            <VehicleTypeTable data={analytics?.vehicleTypeBreakdown || []} />
+          </div>
         </div>
       );
     default:
