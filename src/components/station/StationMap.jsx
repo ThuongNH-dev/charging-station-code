@@ -78,7 +78,7 @@ export default function StationMap({ stations = [], onMarkerClick }) {
 
     points.forEach((p) => {
       const el = document.createElement("div");
-      el.textContent = "⚡";
+      el.textContent = "⚡";  
       el.style.cssText = `
         width:28px;height:28px;border-radius:50%;
         background:#2563eb;color:#fff;display:grid;place-items:center;

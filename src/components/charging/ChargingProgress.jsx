@@ -15,7 +15,7 @@ const vnd = (n) => (Number(n) || 0).toLocaleString("vi-VN") + " VND";
 // Bật/tắt tăng tốc (đặt DEMO_SPEED=1 là tốc độ thật)
 const DEMO_SPEED = 40;          // tăng ~8x
 const TICK_MS = 100;            // mỗi tick UI mượt (không ảnh hưởng logic)
-const PENALTY_TICK_MS = 200;    // không còn dùng (đồng hồ phạt dựa trên real-time)
+// const PENALTY_TICK_MS = 200;    
 
 // ================== Helpers ==================
 function normalizeApiBase(s) {
