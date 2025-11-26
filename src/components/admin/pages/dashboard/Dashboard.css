@@ -240,3 +240,41 @@
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+/* ---- Bảng tổng quan tháng (Analytics) ---- */
+.db-kpi-grid-small {
+  /* override layout để tự co giãn đẹp với 5 card */
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--gap);
+  margin-bottom: 12px;
+}
+
+.db-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  background: #ffffff;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.db-table thead {
+  background: #f3f4f6;
+}
+
+.db-table th,
+.db-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.db-table th {
+  font-weight: 600;
+  color: #374151;
+}
+
+.db-table tbody tr:nth-child(even) {
+  background: #f9fafb;
+}

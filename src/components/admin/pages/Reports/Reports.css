@@ -383,3 +383,96 @@
     width: 100%;
   }
 }
+
+/* ========================================================= */
+/* KPI & TABLE CHO CÁC BÁO CÁO ADMIN                        */
+/* ========================================================= */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.kpi-card {
+  background-color: #f9fafb;
+  border-radius: 10px;
+  padding: 14px 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.kpi-label {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.kpi-value {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.kpi-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.report-table thead {
+  background-color: #f3f4f6;
+}
+
+.report-table th,
+.report-table td {
+  border: 1px solid #e5e7eb;
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.report-table th {
+  font-weight: 600;
+  color: #374151;
+}
+
+.report-table tbody tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+
+.table-footnote {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.top-under-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.top-under-block h4 {
+  margin-bottom: 8px;
+}
+
+.empty-block {
+  padding: 16px;
+  border-radius: 8px;
+  background-color: #f9fafb;
+  border: 1px dashed #d1d5db;
+  color: #6b7280;
+  font-style: italic;
+}
