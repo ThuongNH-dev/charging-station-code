@@ -366,7 +366,7 @@ const [vehicleBreakdown, setVehicleBreakdown] = useState([]);
       const spendArr = Array(12).fill(0);
       const kwhArr = Array(12).fill(0);
       spendArr[m - 1] = summary.total ?? 0;
-      kwhArr[m - 1] = summary.kwh ?? 0;
+      kwhArr[m - 1] = summary.energyKwh ?? 0;
 
       setSpendByMonth(spendArr);
       setKwhByMonth(kwhArr);
