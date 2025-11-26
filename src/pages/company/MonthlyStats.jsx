@@ -316,21 +316,36 @@ const [vehicleBreakdown, setVehicleBreakdown] = useState([]);
   }
 
   // Tính danh sách invoice hiển thị theo tháng+năm đang chọn (fallback mới nhất)
-  const invoices = useMemo(() => {
-    if (!allInvoices.length) return [];
-    const matched = allInvoices.filter(
-      (inv) =>
-        num(inv?.billingYear) === selectedYear &&
-        num(inv?.billingMonth) === selectedMonthIndex + 1
-    );
-    if (matched.length) {
-      const latestInSelected = pickLatestInvoice(matched);
-      return latestInSelected ? [latestInSelected] : [];
-    }
-    // Không có hóa đơn đúng tháng/năm -> fallback invoice mới nhất toàn bộ
-    const latestOverall = pickLatestInvoice(allInvoices);
-    return latestOverall ? [latestOverall] : [];
-  }, [allInvoices, selectedYear, selectedMonthIndex]);
+const invoices = useMemo(() => {
+  if (!allInvoices.length) return [];
+
+  // 🔥 Ưu tiên lấy tất cả hóa đơn Unpaid trong tháng + năm đang chọn
+  const unpaidInMonth = allInvoices.filter(
+    (inv) =>
+      normalizeInvoiceStatus(inv?.status) === "Unpaid" &&
+      num(inv?.billingYear) === selectedYear &&
+      num(inv?.billingMonth) === selectedMonthIndex + 1
+  );
+
+  if (unpaidInMonth.length > 0) {
+    return unpaidInMonth; // 🔥 trả về toàn bộ hóa đơn Unpaid
+  }
+
+  // 🔥 Nếu tháng đó không có Unpaid -> fallback: toàn bộ Unpaid trong năm đang chọn
+  const unpaidInYear = allInvoices.filter(
+    (inv) =>
+      normalizeInvoiceStatus(inv?.status) === "Unpaid" &&
+      num(inv?.billingYear) === selectedYear
+  );
+
+  if (unpaidInYear.length > 0) {
+    return unpaidInYear;
+  }
+
+  // 🔥 Nếu cả năm không có Unpaid -> không hiển thị hóa đơn nào
+  return [];
+}, [allInvoices, selectedYear, selectedMonthIndex]);
+
 
   // Invoices trong THÁNG đang chọn (áp dụng cho KPI Customer)
   const invoicesInSelectedMonth = useMemo(() => {
