@@ -47,7 +47,7 @@ function getMonthRange(ym) {
 const COLORS = ["#234C6A", "#6DC3BB", "#F2AEBB"];
 
 // ======================= Tổng quan tháng Analytics =======================
-const AdminMonthlyOverview = ({ summary, revenueSources, kpisSnapshot }) => {
+const AdminMonthlyOverview = ({ summary, revenueSources, kpisSnapshot, subscriptionRevenue = 0 }) => {
   if (!summary) {
     return (
       <div style={{ padding: 16, color: "#6b7280", fontStyle: "italic" }}>
@@ -68,6 +68,10 @@ const AdminMonthlyOverview = ({ summary, revenueSources, kpisSnapshot }) => {
     idleMin = 0,
     avgPricePerKwh = 0,
   } = summary;
+
+  // Tính tổng doanh thu bao gồm cả subscription
+  const chargingRevenue = total - subscriptionRevenue;
+  const totalRevenue = total; // Đã được cộng subscription revenue trong API
 
   const openRate = kpisSnapshot?.usagePercent ?? 0;
   const stationsOnline = kpisSnapshot?.stationsOnline ?? 0;
@@ -101,11 +105,9 @@ const AdminMonthlyOverview = ({ summary, revenueSources, kpisSnapshot }) => {
       {/* KPI Cards giữ nguyên */}
       <div className="db-kpi-grid db-kpi-grid-small">
         <Card
-          title="Doanh thu sau thuế"
-          value={formatCurrency(total)}
-          sub={`Trước thuế: ${formatCurrency(
-            subtotal
-          )} – Thuế: ${formatCurrency(tax)}`}
+          title="Tổng doanh thu"
+          value={formatCurrency(totalRevenue)}
+          sub={`Sạc điện: ${formatCurrency(chargingRevenue)} – Subscription: ${formatCurrency(subscriptionRevenue)}`}
         />
         <Card
           title="Điện năng tiêu thụ"
@@ -183,9 +185,9 @@ const AdminMonthlyOverview = ({ summary, revenueSources, kpisSnapshot }) => {
         </div>
       </div>
 
-      {/* Bảng dữ liệu giữ nguyên */}
+      {/* Bảng dữ liệu nguồn doanh thu sạc điện */}
       <div style={{ marginTop: 14 }}>
-        <h4 style={{ marginBottom: 6 }}>Cơ cấu nguồn doanh thu (tháng)</h4>
+        <h4 style={{ marginBottom: 6 }}>Cơ cấu doanh thu sạc điện (tháng)</h4>
         <table className="db-table">
           <thead>
             <tr>
@@ -202,6 +204,37 @@ const AdminMonthlyOverview = ({ summary, revenueSources, kpisSnapshot }) => {
                 <td>{((row.value / sumRev) * 100).toFixed(1)}%</td>
               </tr>
             ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Bảng tổng hợp doanh thu */}
+      <div style={{ marginTop: 20 }}>
+        <h4 style={{ marginBottom: 6 }}>Tổng hợp doanh thu (tháng)</h4>
+        <table className="db-table">
+          <thead>
+            <tr>
+              <th>Loại doanh thu</th>
+              <th>Số tiền (₫)</th>
+              <th>Tỷ lệ (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Doanh thu sạc điện</td>
+              <td>{chargingRevenue.toLocaleString("vi-VN")}</td>
+              <td>{((chargingRevenue / totalRevenue) * 100).toFixed(1)}%</td>
+            </tr>
+            <tr>
+              <td>Doanh thu Subscription Plans</td>
+              <td>{subscriptionRevenue.toLocaleString("vi-VN")}</td>
+              <td>{((subscriptionRevenue / totalRevenue) * 100).toFixed(1)}%</td>
+            </tr>
+            <tr style={{ fontWeight: 'bold', borderTop: '2px solid #ddd' }}>
+              <td>Tổng doanh thu</td>
+              <td>{totalRevenue.toLocaleString("vi-VN")}</td>
+              <td>100.0%</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -299,6 +332,7 @@ export default function Dashboard() {
             summary={adminOverview.summary}
             revenueSources={adminOverview.revenueSources}
             kpisSnapshot={kpis}
+            subscriptionRevenue={adminOverview.subscriptionRevenue || 0}
           />
         </div>
       )}

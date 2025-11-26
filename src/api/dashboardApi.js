@@ -66,9 +66,46 @@ export const fetchDashboard = async (params = {}) => {
 };
 
 /**
- * 🔹 Lấy tổng quan tháng cho Admin từ Analytics (Summary + RevenueSources)
- *  - /Analytics/summary
+ * 🔹 Lấy doanh thu từ Subscription Plans (Invoice có invoiceType = "subscription")
+ */
+export const fetchSubscriptionRevenue = async ({ month, year }) => {
+  try {
+    // Lấy tất cả invoices trong tháng
+    const invoicesRes = await api.get("/Invoices", {
+      params: {
+        month,
+        year,
+        invoiceType: "subscription", // Lọc chỉ lấy subscription invoices
+      },
+    });
+
+    const invoices = Array.isArray(invoicesRes.data?.items) 
+      ? invoicesRes.data.items 
+      : Array.isArray(invoicesRes.data) 
+      ? invoicesRes.data 
+      : [];
+
+    // Tính tổng doanh thu từ subscription plans
+    const subscriptionRevenue = invoices
+      .filter(inv => 
+        inv.billingMonth === month && 
+        inv.billingYear === year &&
+        String(inv.invoiceType || "").toLowerCase() === "subscription"
+      )
+      .reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
+
+    return subscriptionRevenue;
+  } catch (error) {
+    console.error("Error fetching subscription revenue:", error);
+    return 0;
+  }
+};
+
+/**
+ * 🔹 Lấy tổng quan tháng cho Admin từ Analytics (Summary + RevenueSources + Subscription Revenue)
+ *  - /Analytics/summary (charging revenue)
  *  - /Analytics/revenue-sources
+ *  - Subscription revenue từ invoices
  */
 export const fetchAdminMonthlyOverview = async ({ month, year }) => {
   const baseParams = { month, year, adminView: true };
@@ -77,17 +114,32 @@ export const fetchAdminMonthlyOverview = async ({ month, year }) => {
   const revenueReq = api.get("/Analytics/revenue-sources", {
     params: baseParams,
   });
+  
+  // Thêm lấy doanh thu subscription
+  const subscriptionRevenueReq = fetchSubscriptionRevenue({ month, year });
 
-  const [summaryRes, revenueRes] = await Promise.allSettled([
+  const [summaryRes, revenueRes, subscriptionRevenue] = await Promise.allSettled([
     summaryReq,
     revenueReq,
+    subscriptionRevenueReq,
   ]);
 
   const safe = (res, fb = null) =>
     res?.status === "fulfilled" ? res.value?.data ?? fb : fb;
 
+  const summary = safe(summaryRes, null);
+  const revenueSources = safe(revenueRes, null);
+  const subRevenue = subscriptionRevenue?.status === "fulfilled" ? subscriptionRevenue.value : 0;
+
+  // Cộng doanh thu subscription vào tổng doanh thu
+  if (summary && subRevenue > 0) {
+    summary.total = (Number(summary.total) || 0) + subRevenue;
+    summary.subtotal = (Number(summary.subtotal) || 0) + subRevenue;
+  }
+
   return {
-    summary: safe(summaryRes, null),
-    revenueSources: safe(revenueRes, null),
+    summary,
+    revenueSources,
+    subscriptionRevenue: subRevenue,
   };
 };
