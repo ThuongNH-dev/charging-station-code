@@ -1417,7 +1417,7 @@ function VehicleTypeTable({ data = [] }) {
         </tbody>
       </table>
       <p className="table-footnote">
-        Ghi chú: <strong>Idle</strong> là thời gian xe đỗ nhưng không sạc.
+        Ghi chú: <strong>Idle</strong> là thời gian xe chiếm chỗ.
       </p>
     </div>
   );

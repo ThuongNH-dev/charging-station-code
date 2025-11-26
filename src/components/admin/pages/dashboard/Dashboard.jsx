@@ -1,4 +1,5 @@
 // ✅ src/pages/admin/dashboard/Dashboard.jsx
+
 import React, { useEffect, useMemo, useState } from "react";
 import {
   fetchDashboard,
@@ -11,6 +12,7 @@ import {
 } from "../../../../utils/dashboardProcessing";
 import "./Dashboard.css";
 
+// 1. CẬP NHẬT IMPORT TỪ RECHARTS
 import {
   ResponsiveContainer,
   LineChart,
@@ -19,8 +21,10 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  BarChart,
-  Bar,
+  PieChart, // Mới
+  Pie, // Mới
+  Cell, // Mới
+  Legend, // Mới
 } from "recharts";
 
 const Card = ({ title, value, sub }) => (
@@ -37,6 +41,10 @@ function getMonthRange(ym) {
   const end = new Date(y, m, 0, 23, 59, 59, 999).toISOString();
   return { start, end };
 }
+
+// 2. KHAI BÁO MÀU SẮC CHO BIỂU ĐỒ TRÒN
+// Tương ứng: [Xanh dương, Xanh lá, Cam]
+const COLORS = ["#234C6A", "#6DC3BB", "#F2AEBB"];
 
 // ======================= Tổng quan tháng Analytics =======================
 const AdminMonthlyOverview = ({ summary, revenueSources, kpisSnapshot }) => {
@@ -61,7 +69,6 @@ const AdminMonthlyOverview = ({ summary, revenueSources, kpisSnapshot }) => {
     avgPricePerKwh = 0,
   } = summary;
 
-  // lấy snapshot KPI để hiển thị cùng hàng
   const openRate = kpisSnapshot?.usagePercent ?? 0;
   const stationsOnline = kpisSnapshot?.stationsOnline ?? 0;
 
@@ -91,7 +98,7 @@ const AdminMonthlyOverview = ({ summary, revenueSources, kpisSnapshot }) => {
         </strong>
       </p>
 
-      {/* Hàng KPI chính – gộp luôn tỷ lệ mở trạm & số trạm online */}
+      {/* KPI Cards giữ nguyên */}
       <div className="db-kpi-grid db-kpi-grid-small">
         <Card
           title="Doanh thu sau thuế"
@@ -124,28 +131,59 @@ const AdminMonthlyOverview = ({ summary, revenueSources, kpisSnapshot }) => {
         />
       </div>
 
-      {/* Biểu đồ cơ cấu nguồn doanh thu */}
+      {/* 3. THAY THẾ KHỐI BIỂU ĐỒ CỘT BẰNG BIỂU ĐỒ DONUT */}
       <div style={{ marginTop: 14, marginBottom: 10 }}>
         <h4 style={{ marginBottom: 6 }}>
           Biểu đồ cơ cấu nguồn doanh thu (tháng)
         </h4>
-        <div style={{ width: "100%", height: 260 }}>
+        <div style={{ width: "100%", height: 300 }}>
+          {" "}
+          {/* Tăng chiều cao xíu cho đẹp */}
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="source" />
-              <YAxis />
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                innerRadius={50} // Tạo lỗ tròn ở giữa (Donut)
+                outerRadius={85}
+                paddingAngle={5} // Khoảng cách giữa các miếng
+                dataKey="value"
+                nameKey="source"
+              >
+                {chartData.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={COLORS[index % COLORS.length]}
+                    stroke="none"
+                  />
+                ))}
+              </Pie>
               <Tooltip
-                formatter={(v) => `${Number(v).toLocaleString("vi-VN")} ₫`}
-                labelFormatter={(label) => `Nguồn: ${label}`}
+                formatter={(value) =>
+                  `${Number(value).toLocaleString("vi-VN")} ₫`
+                }
               />
-              <Bar dataKey="value" fill="#3b82f6" />
-            </BarChart>
+              <Legend
+                verticalAlign="bottom"
+                height={36}
+                formatter={(value, entry) => {
+                  // Tùy chọn: hiển thị thêm % trong legend nếu muốn
+                  const item = chartData.find((d) => d.source === value);
+                  const percent = ((item.value / sumRev) * 100).toFixed(1);
+                  return (
+                    <span style={{ color: "#334155" }}>
+                      {value} ({percent}%)
+                    </span>
+                  );
+                }}
+              />
+            </PieChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Bảng cơ cấu nguồn doanh thu */}
+      {/* Bảng dữ liệu giữ nguyên */}
       <div style={{ marginTop: 14 }}>
         <h4 style={{ marginBottom: 6 }}>Cơ cấu nguồn doanh thu (tháng)</h4>
         <table className="db-table">
@@ -171,8 +209,9 @@ const AdminMonthlyOverview = ({ summary, revenueSources, kpisSnapshot }) => {
   );
 };
 
-// ======================= COMPONENT CHÍNH =======================
+// ... Phần còn lại của file (Dashboard component chính) giữ nguyên ...
 export default function Dashboard() {
+  // ... code cũ của bạn
   const defaultYm = useMemo(() => {
     const d = new Date();
     const mm = String(d.getMonth() + 1).padStart(2, "0");
