@@ -102,6 +102,16 @@
   font-size: 14px;
 }
 
+/* Input nhỏ cho Station ID Staff */
+.filter-input {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  width: 80px;
+  font-size: 14px;
+  background-color: #fff;
+}
+
 .search-box {
   /* Hộp bao quanh ô input và icon tìm kiếm */
   display: flex;
