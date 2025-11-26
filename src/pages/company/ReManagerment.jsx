@@ -1,4 +1,3 @@
-// src/components/ResourceManagement.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -16,14 +15,14 @@ import "./ReManagerment.css";
 const { Option } = Select;
 const API_BASE = (getApiBase() || "").replace(/\/+$/, "");
 
-/* CSV helpers */
+/* ================= CSV helpers ================= */
 function csvEscape(v) {
   if (v == null) return "";
   const s = String(v);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 function downloadCSV(filename, csvText) {
-  const BOM = "\uFEFF";
+  const BOM = "\uFEFF"; // để Excel hiển thị Unicode
   const blob = new Blob([BOM + csvText], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -65,11 +64,13 @@ function buildVehiclesCSV(list = []) {
     r?.status ?? "",
     r?.companyId ?? r?.CompanyId ?? r?.company?.companyId ?? r?.company?.id ?? "",
   ]);
+
   const lines = [header, ...rows].map((row) => row.map(csvEscape).join(","));
   return lines.join("\n");
 }
+/* ===================================================== */
 
-/* Helpers */
+/* Helper: lấy companyId từ object xe */
 function getVehicleCompanyId(v) {
   return Number(
     v?.companyId ??
@@ -80,6 +81,7 @@ function getVehicleCompanyId(v) {
   );
 }
 
+/* Helpers chuyển kiểu an toàn */
 function toNumOr(val, fallback) {
   const n = Number(val);
   return Number.isFinite(n) ? n : fallback;
@@ -88,6 +90,7 @@ function pick(v, fallback) {
   return v !== undefined && v !== null && v !== "" ? v : fallback;
 }
 
+/* Auth helpers */
 function getAuthTokenAndCompanyId(authUser) {
   let token =
     authUser?.token ||
@@ -113,18 +116,19 @@ function getAuthTokenAndCompanyId(authUser) {
   return { token, companyId: Number.isFinite(companyId) ? companyId : null };
 }
 
-/* ===================== LẤY FULLNAME CHỦ XE ===================== */
 export default function ResourceManagement() {
   const { user: authUser } = useAuth();
   const navigate = useNavigate();
   const { token, companyId } = getAuthTokenAndCompanyId(authUser);
 
-  // CACHE tên theo customerId
+  // Lưu cache tên để không gọi API nhiều lần
   const [customerNames, setCustomerNames] = useState({});
 
-  async function fetchCustomerFullName(customerId) {
+  // Lấy tên từ API /Auth/{id}
+  async function fetchCustomerName(customerId) {
     if (!customerId) return null;
 
+    // Nếu đã có tên → không fetch nữa
     if (customerNames[customerId]) return customerNames[customerId];
 
     try {
@@ -143,7 +147,7 @@ export default function ResourceManagement() {
       const fullName =
         data?.customers?.[0]?.fullName ||
         data?.fullName ||
-        data?.name ||
+        data?.userName ||
         null;
 
       setCustomerNames((prev) => ({
@@ -152,49 +156,25 @@ export default function ResourceManagement() {
       }));
 
       return fullName;
-    } catch (err) {
-      console.warn("fetchCustomerFullName error:", err);
+    } catch (e) {
+      console.warn("fetchCustomerName error:", e);
       return null;
     }
   }
 
-    /* =================== STATE CHÍNH =================== */
-  const [loading, setLoading] = useState(false);
 
-  const USE_CLIENT_SIDE_PAGING = true;
-
-  const [allItemsRaw, setAllItemsRaw] = useState([]);
-
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [total, setTotal] = useState(0);
-
-  const [items, setItems] = useState([]);
-
-  const [kw, setKw] = useState("");
-  const [status, setStatus] = useState("");
-
-  /* Modal thêm/sửa */
-  const [addOpen, setAddOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [form] = Form.useForm();
-
-  const [editOpen, setEditOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [editForm] = Form.useForm();
-  const [editRecord, setEditRecord] = useState(null);
-
-  /* STATUS hợp lệ */
+  /* ===== Trạng thái hợp lệ (mirror BE) ===== */
   const ALLOWED_STATUSES = ["Active", "Inactive", "Blacklisted", "Retired"];
   const normalizeStatusFE = (s) => {
     const v = String(s || "").trim();
-    return ALLOWED_STATUSES.includes(v) ? v : "Active";
+    return ALLOWED_STATUSES.indexOf(v) !== -1 ? v : "Active";
   };
 
+  /* Chuyển record BE -> giá trị form (đảm bảo kiểu số/chuỗi đúng) */
   function normalizeVehicleForForm(r) {
     if (!r) return {};
     return {
-      customerId: r.customerId ? Number(r.customerId) : undefined,
+      customerId: Number(r.customerId),
       companyId:
         Number(getVehicleCompanyId(r)) || Number(companyId) || undefined,
 
@@ -219,20 +199,51 @@ export default function ResourceManagement() {
     };
   }
 
-  /* ========== FETCH TẤT CẢ DỮ LIỆU XE ========== */
+  /* ====== STATE CHÍNH ====== */
+  const [loading, setLoading] = useState(false);
+
+  // Client-side paging mode (fallback khi BE chưa lọc companyId)
+  const USE_CLIENT_SIDE_PAGING = true;
+
+  // Dùng cho client-side paging
+  const [allItemsRaw, setAllItemsRaw] = useState([]); // toàn bộ items BE trả (đã gom nhiều trang)
+
+  // UI paging (client)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
+
+  // dữ liệu đang hiển thị (đã slice theo page)
+  const [items, setItems] = useState([]);
+
+  // filter
+  const [kw, setKw] = useState("");
+  const [status, setStatus] = useState("");
+
+  /* ====== STATE + FORM CHO MODAL THÊM/SỬA ====== */
+  const [addOpen, setAddOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [form] = Form.useForm();
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editForm] = Form.useForm();
+  const [editRecord, setEditRecord] = useState(null);
+
+  /* ====================== FETCH HELPERS (CLIENT MODE) ====================== */
   async function fetchAllVehiclesRaw(keyword = kw, st = status) {
     if (!Number.isFinite(companyId)) return [];
-    const pageSizeServer = 100;
-
+    // Lấy toàn bộ từ server bằng cách lặp trang server
+    const pageSizeServer = 100; // chỉnh theo khả năng BE
     let p = 1;
     let out = [];
-
-    for (;;) {
+    for (; ;) {
       const qs = new URLSearchParams();
       qs.set("page", String(p));
       qs.set("pageSize", String(pageSizeServer));
+      // BE chưa lọc companyId -> không set companyId ở đây
       if (keyword?.trim()) qs.set("keyword", keyword.trim());
-      if (st && ALLOWED_STATUSES.includes(st)) qs.set("status", st);
+      if (st && ALLOWED_STATUSES.indexOf(st) !== -1) qs.set("status", st);
 
       const url = `${API_BASE}/Vehicles?${qs.toString()}`;
       const res = await fetch(url, {
@@ -242,31 +253,34 @@ export default function ResourceManagement() {
           ...(token ? { authorization: `Bearer ${token}` } : {}),
         },
       });
-
-      if (!res.ok) break;
-
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`GET /Vehicles ${res.status}: ${text}`);
+      }
       const data = await res.json();
       const itemsPage = Array.isArray(data?.items) ? data.items : [];
       out = out.concat(itemsPage);
 
+      // Dừng nếu ít hơn pageSizeServer hoặc đã đủ totalItems
       if (itemsPage.length < pageSizeServer) break;
-      const totalItems = Number(data?.totalItems);
-      if (totalItems && out.length >= totalItems) break;
+      const totalItemsServer = Number.isFinite(data?.totalItems) ? data.totalItems : null;
+      if (totalItemsServer && out.length >= totalItemsServer) break;
 
       p += 1;
-      if (p > 1000) break;
+      if (p > 1000) break; // chốt chặn an toàn
     }
     return out;
   }
 
-  /* =============== LỌC =============== */
   function filterByCompanyKeywordStatus(list, keyword = kw, st = status) {
     let filtered = Array.isArray(list) ? list : [];
 
+    // lọc theo companyId (bắt buộc)
     filtered = filtered.filter(
       (v) => Number(getVehicleCompanyId(v)) === Number(companyId)
     );
 
+    // keyword
     const q = (keyword || "").trim().toLowerCase();
     if (q) {
       filtered = filtered.filter((v) => {
@@ -287,11 +301,11 @@ export default function ResourceManagement() {
       });
     }
 
+    // status
     const stNorm = st && ALLOWED_STATUSES.includes(st) ? st : "";
     if (stNorm) {
       filtered = filtered.filter((v) => normalizeStatusFE(v?.status) === stNorm);
     }
-
     return filtered;
   }
 
@@ -300,7 +314,6 @@ export default function ResourceManagement() {
     return list.slice(start, start + ps);
   }
 
-  /* =============== REFRESH =============== */
   async function refreshVehicles(p = page, ps = pageSize, keyword = kw, st = status) {
     setLoading(true);
     try {
@@ -311,20 +324,26 @@ export default function ResourceManagement() {
       }
 
       if (USE_CLIENT_SIDE_PAGING) {
+        // 1) tải tất cả từ BE (chưa theo companyId)
         const all = await fetchAllVehiclesRaw(keyword, st);
         setAllItemsRaw(all);
 
+        // 2) lọc theo companyId + keyword + status
         const filtered = filterByCompanyKeywordStatus(all, keyword, st);
 
+        // 3) cắt trang
         const pageSlice = slicePage(filtered, p, ps);
 
         setItems(pageSlice);
         setTotal(filtered.length);
 
-        // 🔥 FETCH TÊN CHỦ XE CHO TỪNG RECORD
+        // Fetch tên chủ xe cho các record trên trang
         pageSlice.forEach((v) => {
-          if (v.customerId) fetchCustomerFullName(v.customerId);
+          if (v.customerId) fetchCustomerName(v.customerId);
         });
+
+      } else {
+        // (không dùng trong Cách 2)
       }
     } catch (e) {
       console.error("refreshVehicles error:", e);
@@ -335,17 +354,18 @@ export default function ResourceManagement() {
     }
   }
 
+  /* ====================== LIFECYCLE ====================== */
   useEffect(() => {
     refreshVehicles(page, pageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, pageSize, companyId]);
 
-    /* ======================= HANDLERS THÊM XE ======================= */
+  /* ====== HANDLERS THÊM XE ====== */
   function openAddModal() {
     form.resetFields();
     form.setFieldsValue({ vehicleType: "Car", status: "Active" });
     setAddOpen(true);
   }
-
   function closeAddModal() {
     setAddOpen(false);
   }
@@ -353,27 +373,23 @@ export default function ResourceManagement() {
   async function submitAdd() {
     try {
       const values = await form.validateFields();
-
       if (!Number.isFinite(companyId)) {
         notification.error({
           message: "Thiếu companyId",
-          description: "Vui lòng đăng nhập lại.",
+          description:
+            "Không xác định được công ty từ phiên đăng nhập. Vui lòng đăng nhập lại.",
         });
         return;
       }
-
       const statusVal =
         String(form.getFieldValue("status") ?? "Active").trim() || "Active";
 
-      // 🔥 Cho phép customerId = null
       const payload = {
-        customerId: values.customerId ? Number(values.customerId) : null,
+        customerId: toNumOr(values.customerId, 0),
         companyId: Number(companyId),
-
         carMaker: String(values.carMaker ?? ""),
         model: String(values.model ?? ""),
         licensePlate: String(values.licensePlate ?? ""),
-
         batteryCapacity: toNumOr(values.batteryCapacity, 0),
         currentSoc: toNumOr(values.currentSoc, 0),
         connectorType: String(values.connectorType ?? ""),
@@ -381,11 +397,9 @@ export default function ResourceManagement() {
         vehicleType: String(values.vehicleType ?? ""),
         status: statusVal,
       };
-
       if (values.imageUrl && String(values.imageUrl).trim() !== "") {
         payload.imageUrl = String(values.imageUrl).trim();
       }
-
       if (!token) {
         notification.error({
           message: "Thiếu token đăng nhập",
@@ -393,9 +407,7 @@ export default function ResourceManagement() {
         });
         return;
       }
-
       setSubmitting(true);
-
       const url = `${API_BASE}/Vehicles`;
       const res = await fetch(url, {
         method: "POST",
@@ -406,26 +418,22 @@ export default function ResourceManagement() {
         },
         body: JSON.stringify(payload),
       });
-
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`POST /Vehicles ${res.status}: ${text}`);
       }
-
       const created = await res.json();
-
       notification.success({
         message: "Thêm xe thành công",
         description: `Xe #${created?.vehicleId} đã được tạo.`,
       });
 
+      // Sau khi tạo mới -> refresh lại theo filter hiện tại, về trang 1
       setPage(1);
       await refreshVehicles(1, pageSize, kw, status);
-
       closeAddModal();
     } catch (err) {
       if (err?.errorFields) return;
-
       console.error("Create vehicle error:", err);
       notification.error({
         message: "Thêm xe thất bại",
@@ -436,7 +444,7 @@ export default function ResourceManagement() {
     }
   }
 
-  /* ======================= HANDLERS SỬA XE ======================= */
+  /* ====== HANDLERS SỬA XE ====== */
   async function openEditModal(record) {
     try {
       const res = await fetch(`${API_BASE}/Vehicles/${record.vehicleId}`, {
@@ -446,13 +454,11 @@ export default function ResourceManagement() {
           ...(token ? { authorization: `Bearer ${token}` } : {}),
         },
       });
-
       const fresh = res.ok ? await res.json() : record;
-
       setEditRecord(fresh);
-      setEditOpen(true);
+      setEditOpen(true); // mở trước, set form sau trong afterOpenChange
     } catch (e) {
-      console.warn("GET vehicle before edit failed:", e);
+      console.warn("GET vehicle before edit failed, fallback to record:", e);
       setEditRecord(record);
       setEditOpen(true);
     }
@@ -467,10 +473,9 @@ export default function ResourceManagement() {
   async function submitEdit() {
     try {
       if (!editRecord?.vehicleId) {
-        notification.error({ message: "Thiếu ID xe" });
+        notification.error({ message: "Thiếu ID xe để sửa" });
         return;
       }
-
       if (!token) {
         notification.error({
           message: "Thiếu token",
@@ -481,13 +486,12 @@ export default function ResourceManagement() {
 
       const values = await editForm.validateFields();
 
-      // 🔥 Cho phép customerId null + merge
+      // MERGE an toàn: field nào user để trống -> giữ giá trị cũ
       const payload = {
-        customerId: values.customerId
-          ? Number(values.customerId)
-          // : (editRecord.customerId ?? null),
-          : (editRecord.customerId),
-
+        customerId: toNumOr(
+          values.customerId,
+          toNumOr(editRecord.customerId, 0)
+        ),
         companyId: toNumOr(
           values.companyId,
           toNumOr(getVehicleCompanyId(editRecord) ?? companyId, 0)
@@ -522,8 +526,9 @@ export default function ResourceManagement() {
       };
 
       setEditing(true);
-
-      const url = `${API_BASE}/Vehicles/${editRecord.vehicleId}`;
+      const url = `${API_BASE}/Vehicles/${encodeURIComponent(
+        editRecord.vehicleId
+      )}`;
       const res = await fetch(url, {
         method: "PUT",
         headers: {
@@ -533,20 +538,17 @@ export default function ResourceManagement() {
         },
         body: JSON.stringify(payload),
       });
-
       if (!res.ok) {
         const text = await res.text();
         throw new Error(`PUT /Vehicles ${res.status}: ${text}`);
       }
-
       notification.success({ message: "Cập nhật xe thành công" });
 
+      // Sau khi sửa -> refresh theo filter hiện tại, giữ trang hiện tại
       await refreshVehicles(page, pageSize, kw, status);
-
       closeEditModal();
     } catch (err) {
-      if (err?.errorFields) return;
-
+      if (err?.errorFields) return; // lỗi validate của antd
       console.error("Update vehicle error:", err);
       notification.error({
         message: "Sửa xe thất bại",
@@ -556,7 +558,7 @@ export default function ResourceManagement() {
       setEditing(false);
     }
   }
-  /* ======================== COLUMNS TABLE ======================== */
+
   const columns = [
     {
       title: "ID Xe",
@@ -565,9 +567,7 @@ export default function ResourceManagement() {
       render: (id) => <a>A{id?.toString().padStart(3, "0")}</a>,
       width: 60,
     },
-
     { title: "Biển số", dataIndex: "licensePlate", key: "licensePlate", width: 130 },
-
     {
       title: "Chủ xe",
       key: "owner",
@@ -588,14 +588,13 @@ export default function ResourceManagement() {
     {
       title: "Model",
       key: "model",
-      width: 120,
       render: (_, r) => (
         <span>
           {r?.carMaker} {r?.model}
         </span>
       ),
+      width: 90,
     },
-
     {
       title: "Pin (kWh)",
       dataIndex: "batteryCapacity",
@@ -603,21 +602,20 @@ export default function ResourceManagement() {
       align: "right",
       width: 110,
     },
-
     {
       title: "Sạc tối đa (kW)",
+      dataIndex: "maxChargePower",
       key: "maxChargePower",
       align: "right",
-      width: 110,
+      width: 100,
       render: (_, r) =>
         r?.maxChargePower ?? r?.chargingPower ?? r?.batteryCapacity ?? "-",
     },
-
     {
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
-      width: 120,
+      width: 100,
       render: (s) => {
         const v = normalizeStatusFE(s);
         const map = {
@@ -626,24 +624,20 @@ export default function ResourceManagement() {
           Blacklisted: { color: "red", label: "● CẤM" },
           Retired: { color: "orange", label: "● NGỪNG SỬ DỤNG" },
         };
-
         const entry = map[v] || { color: "blue", label: v || "—" };
-
         return <Tag color={entry.color}>{entry.label}</Tag>;
       },
     },
-
     {
       title: "Hành động",
       key: "actions",
       fixed: "right",
-      width: 170,
+      width: 160,
       render: (_, r) => (
         <Space>
           <Button type="link" icon={<EditOutlined />} onClick={() => openEditModal(r)}>
             Sửa
           </Button>
-
           <Button
             type="link"
             icon={<EyeOutlined />}
@@ -667,18 +661,17 @@ export default function ResourceManagement() {
     },
   ];
 
-  /* ====================== Export CSV handler ====================== */
+  /* ===== Export CSV handler ===== */
   const handleExportCSV = () => {
     try {
+      // Xuất theo dữ liệu đang hiển thị (trang hiện tại)
       const csv = buildVehiclesCSV(items || []);
       const ts = new Date();
       const pad = (n) => String(n).padStart(2, "0");
       const stamp = `${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(
         ts.getDate()
       )}-${pad(ts.getHours())}${pad(ts.getMinutes())}`;
-
       const fname = `vehicles_${companyId || "all"}_${stamp}.csv`;
-
       downloadCSV(fname, csv);
     } catch (e) {
       console.error("Export CSV error:", e);
@@ -689,20 +682,20 @@ export default function ResourceManagement() {
     }
   };
 
-  /* InputNumber parser */
+  /* InputNumber parser dùng chung */
   const parseNum = (v) => (v ?? "").toString().replace(/\s+/g, "");
 
   const statusChip = normalizeStatusFE(
     editForm.getFieldValue("status") || editRecord?.status || "Active"
   );
   const statusColor = statusChip === "Active" ? "green" : "default";
-  /* ======================== UI RENDER ======================== */
+
   return (
     <MainLayout>
       <div className="page vehicles">
         <h2 style={{ marginBottom: 16 }}>Quản lý xe</h2>
 
-        {/* ========== TOOLBAR ========== */}
+        {/* TOOLBAR + BẢNG */}
         <Space style={{ marginBottom: 16 }} wrap>
           <Input
             allowClear
@@ -710,13 +703,9 @@ export default function ResourceManagement() {
             placeholder="Tìm kiếm"
             value={kw}
             onChange={(e) => setKw(e.target.value)}
-            onPressEnter={() => {
-              setPage(1);
-              refreshVehicles(1, pageSize, kw, status);
-            }}
+            onPressEnter={() => { setPage(1); refreshVehicles(1, pageSize, kw, status); }}
             style={{ width: 260 }}
           />
-
           <Select
             placeholder="Trạng thái"
             value={status || undefined}
@@ -736,7 +725,7 @@ export default function ResourceManagement() {
               refreshVehicles(1, pageSize, kw, status);
             }}
           >
-            Tìm kiếm
+            Tìm Kiếm
           </Button>
 
           <span style={{ flex: 1 }} />
@@ -750,7 +739,6 @@ export default function ResourceManagement() {
           </Button>
         </Space>
 
-        {/* ========== BẢNG ========== */}
         {!Number.isFinite(companyId) ? (
           <Empty description="Không tìm thấy companyId. Hãy đăng nhập lại." />
         ) : loading ? (
@@ -785,7 +773,7 @@ export default function ResourceManagement() {
         )}
       </div>
 
-      {/* ======================== MODAL THÊM XE ======================== */}
+      {/* Modal thêm xe */}
       <Modal
         title="Thêm xe"
         open={addOpen}
@@ -803,9 +791,12 @@ export default function ResourceManagement() {
           </div>
 
           <div className="vehicle-form-grid">
-            {/* CHO PHÉP BỎ TRỐNG */}
-            <Form.Item name="customerId" label="Mã Nhân Viên" rules={[{ required: true }]}>
-              <InputNumber style={{ width: "100%" }} placeholder="(Có thể để trống)" />
+            <Form.Item
+              name="customerId"
+              label="Mã Nhân Viên"
+              rules={[{ required: true, message: "Nhập customerId" }]}
+            >
+              <InputNumber style={{ width: "100%" }} placeholder="VD: 10" parser={parseNum} />
             </Form.Item>
 
             <Form.Item label="Mã công ty">
@@ -813,23 +804,23 @@ export default function ResourceManagement() {
             </Form.Item>
 
             <Form.Item name="carMaker" label="Hãng xe" rules={[{ required: true }]}>
-              <Input placeholder="Ví dụ: VinFast" />
+              <Input placeholder="VD: Vin" />
             </Form.Item>
 
             <Form.Item name="model" label="Model" rules={[{ required: true }]}>
-              <Input placeholder="Ví dụ: VF6" />
+              <Input placeholder="VD: VF2" />
             </Form.Item>
 
             <Form.Item name="licensePlate" label="Biển số" rules={[{ required: true }]}>
-              <Input placeholder="Ví dụ: 51A-12345" />
+              <Input placeholder="VD: 1548877" />
             </Form.Item>
 
-            <Form.Item name="batteryCapacity" label="Dung lượng pin (kWh)" rules={[{ required: true }]}>
-              <InputNumber style={{ width: "100%" }} placeholder="100" parser={parseNum} />
+            <Form.Item name="batteryCapacity" label="Dung lượng pin" rules={[{ required: true }]}>
+              <InputNumber style={{ width: "100%" }} placeholder="VD: 100" parser={parseNum} />
             </Form.Item>
 
-            <Form.Item name="currentSoc" label="Lượng pin hiện tại (%)" rules={[{ required: true }]}>
-              <InputNumber style={{ width: "100%" }} placeholder="80" parser={parseNum} />
+            <Form.Item name="currentSoc" label="Lượng pin hiện tại" rules={[{ required: true }]}>
+              <InputNumber style={{ width: "100%" }} placeholder="VD: 100" parser={parseNum} />
             </Form.Item>
 
             <Form.Item name="connectorType" label="Cổng sạc" rules={[{ required: true }]}>
@@ -837,7 +828,7 @@ export default function ResourceManagement() {
             </Form.Item>
 
             <Form.Item name="manufactureYear" label="Năm sản xuất" rules={[{ required: true }]}>
-              <InputNumber style={{ width: "100%" }} placeholder="2024" parser={parseNum} />
+              <InputNumber style={{ width: "100%" }} placeholder="VD: 2024" parser={parseNum} />
             </Form.Item>
 
             <Form.Item name="imageUrl" label="Ảnh">
@@ -862,7 +853,7 @@ export default function ResourceManagement() {
         </Form>
       </Modal>
 
-      {/* ======================== MODAL SỬA XE ======================== */}
+      {/* Modal sửa xe */}
       <Modal
         title={`Sửa xe${editRecord?.vehicleId ? ` #${editRecord.vehicleId}` : ""}`}
         open={editOpen}
@@ -871,8 +862,8 @@ export default function ResourceManagement() {
         confirmLoading={editing}
         okText="Lưu"
         cancelText="Hủy"
-        width={900}
         destroyOnClose
+        width={900}
         forceRender
         afterOpenChange={(opened) => {
           if (opened && editRecord) {
@@ -882,10 +873,10 @@ export default function ResourceManagement() {
         }}
       >
         <Form layout="vertical" form={editForm} preserve={false}>
+          {/* Field ẩn để giữ giá trị khi validate */}
           <Form.Item name="customerId" hidden initialValue={editRecord?.customerId}>
             <InputNumber />
           </Form.Item>
-
           <Form.Item name="companyId" hidden initialValue={companyId}>
             <InputNumber />
           </Form.Item>
@@ -904,35 +895,35 @@ export default function ResourceManagement() {
             </Form.Item>
 
             <Form.Item name="carMaker" label="Hãng xe" rules={[{ required: true }]}>
-              <Input />
+              <Input placeholder="VD: Vin" />
             </Form.Item>
 
             <Form.Item name="model" label="Model" rules={[{ required: true }]}>
-              <Input />
+              <Input placeholder="VD: VF2" />
             </Form.Item>
 
             <Form.Item name="licensePlate" label="Biển số" rules={[{ required: true }]}>
-              <Input />
+              <Input placeholder="VD: 1548877" />
             </Form.Item>
 
-            <Form.Item name="batteryCapacity" label="Dung lượng pin (kWh)" rules={[{ required: true }]}>
-              <InputNumber style={{ width: "100%" }} parser={parseNum} />
+            <Form.Item name="batteryCapacity" label="Dung lượng pin" rules={[{ required: true }]}>
+              <InputNumber style={{ width: "100%" }} placeholder="VD: 100" parser={parseNum} />
             </Form.Item>
 
-            <Form.Item name="currentSoc" label="Lượng pin hiện tại (%)" rules={[{ required: true }]}>
-              <InputNumber style={{ width: "100%" }} parser={parseNum} />
+            <Form.Item name="currentSoc" label="Lượng pin hiện tại" rules={[{ required: true }]}>
+              <InputNumber style={{ width: "100%" }} placeholder="VD: 100" parser={parseNum} />
             </Form.Item>
 
             <Form.Item name="connectorType" label="Cổng sạc" rules={[{ required: true }]}>
-              <Input />
+              <Input placeholder="VD: CCS2" />
             </Form.Item>
 
             <Form.Item name="manufactureYear" label="Năm sản xuất" rules={[{ required: true }]}>
-              <InputNumber style={{ width: "100%" }} parser={parseNum} />
+              <InputNumber style={{ width: "100%" }} placeholder="VD: 2024" parser={parseNum} />
             </Form.Item>
 
             <Form.Item name="imageUrl" label="Ảnh">
-              <Input />
+              <Input placeholder="https://..." />
             </Form.Item>
 
             <Form.Item
@@ -940,14 +931,14 @@ export default function ResourceManagement() {
               label="Loại phương tiện"
               rules={[{ required: true, message: "Chọn loại xe" }]}
             >
-              <Select>
+              <Select placeholder="Chọn loại xe">
                 <Option value="Car">Car</Option>
                 <Option value="Motorbike">Motorbike</Option>
               </Select>
             </Form.Item>
 
             <Form.Item name="status" label="Trạng thái" rules={[{ required: true }]}>
-              <Select>
+              <Select placeholder="Chọn trạng thái">
                 <Option value="Active">Hoạt động</Option>
                 <Option value="Inactive">Vô hiệu hóa</Option>
                 <Option value="Blacklisted">Cấm</Option>
