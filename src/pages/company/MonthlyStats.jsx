@@ -556,7 +556,7 @@ fetchInvoicesByCompany();
             <div className="charts-grid">
               {hasKwh && (
                 <Card>
-                  <div className="chart-title">kWh theo tháng</div>
+                  <div className="chart-title">Biểu đồ năng lượng sử dụng</div>
                   <div className="chart-wrap">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={chartData}>
@@ -609,7 +609,7 @@ fetchInvoicesByCompany();
               {/* ================= VEHICLE BREAKDOWN SECTION ================= */}
               <div className="vehicle-section">
                 <Card>
-                  <div className="chart-title">Thống kê theo phương tiện</div>
+                  <div className="chart-title">Thống kê theo phương tiện (Tháng)</div>
 
                   {/* Biểu đồ tổng tiền theo xe */}
                   <div className="chart-wrap" style={{ height: 350 }}>
