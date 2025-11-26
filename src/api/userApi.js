@@ -290,6 +290,38 @@ export const userApi = {
     }));
   },
 
+  // ===== Station Staffs =====
+fetchAllStationStaffs: async () => {
+  const res = await axios.get(`${BASE_URL}/station-staffs`);
+  const d = res.data;
+  if (Array.isArray(d)) return d;
+  if (Array.isArray(d?.items)) return d.items;
+  return [];
+},
+
+addStationStaff: async (payload) => {
+  const res = await axios.post(`${BASE_URL}/station-staffs`, clean(payload), {
+    headers: { "Content-Type": "application/json" },
+  });
+  return res.data;
+},
+
+deleteStationStaff: async (stationId, staffId) => {
+  const res = await axios.delete(
+    `${BASE_URL}/station-staffs/${stationId}/${staffId}`
+  );
+  return res.data;
+},
+
+// ===== Stations =====
+fetchAllStations: async () => {
+  const res = await axios.get(`${BASE_URL}/Stations`);
+  const d = res.data;
+  if (Array.isArray(d)) return d;
+  if (Array.isArray(d?.items)) return d.items;
+  return [];
+},
+
   // ===== GET USER BY ID (debug/helper) =====
   getUserById: async (id) => {
     const res = await axios.get(`${BASE_URL}/Auth/${id}`);
