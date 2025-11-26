@@ -349,6 +349,24 @@ const [vehicleBreakdown, setVehicleBreakdown] = useState([]);
     [invoicesInSelectedMonth]
   );
 
+async function fetchFullYearStats(token, year) {
+  const spendArr = Array(12).fill(0);
+  const kwhArr = Array(12).fill(0);
+
+  // Gọi đủ 12 tháng
+  for (let m = 1; m <= 12; m++) {
+    try {
+      const summary = await apiSummary(token, m, year);
+      spendArr[m - 1] = summary.total ?? 0;
+      kwhArr[m - 1] = summary.energyKwh ?? 0;
+    } catch (err) {
+      console.warn(`Không có dữ liệu tháng ${m}/${year}`);
+    }
+  }
+
+  setSpendByMonth(spendArr);
+  setKwhByMonth(kwhArr);
+}
 
   useEffect(() => {
     if (isCustomer) {
@@ -367,43 +385,35 @@ const [vehicleBreakdown, setVehicleBreakdown] = useState([]);
     const m = selectedMonthIndex + 1;
     const y = selectedYear;
 
-    setStatsLoading(true);
+setStatsLoading(true);
 
-    Promise.all([
-      apiSummary(token, m, y),
-      apiRevenueSources(token, m, y),
-      apiBreakdownVehicle(token, m, y)
-    ])
-    .then(([summary, sources, vehicles]) => {
-      
-      // 🔥 summary → build spend/kWh
-      const spendArr = Array(12).fill(0);
-      const kwhArr = Array(12).fill(0);
-      spendArr[m - 1] = summary.total ?? 0;
-      kwhArr[m - 1] = summary.energyKwh ?? 0;
+Promise.all([
+  apiRevenueSources(token, m, y),
+  apiBreakdownVehicle(token, m, y)
+])
+.then(async ([sources, vehicles]) => {
 
-      setSpendByMonth(spendArr);
-      setKwhByMonth(kwhArr);
+  // 🔥 Load FULL YEAR data cho 2 biểu đồ
+  await fetchFullYearStats(token, selectedYear);
 
-      // 🔥 save extra analytics if needed
-setRevenueSources(
-  sources?.data ?? sources?.items ?? sources ?? null
-);
+  setRevenueSources(
+    sources?.data ?? sources?.items ?? sources ?? null
+  );
 
-setVehicleBreakdown(
-  vehicles?.data ?? vehicles?.items ?? vehicles ?? []
-);
-    })
-    .catch(err => {
-      console.error(err);
-      message.error("Lỗi tải thống kê công ty");
-    })
-    .finally(() => {
-      setStatsLoading(false);
-    });
+  setVehicleBreakdown(
+    vehicles?.data ?? vehicles?.items ?? vehicles ?? []
+  );
+})
+.catch(err => {
+  console.error(err);
+  message.error("Lỗi tải thống kê công ty");
+})
+.finally(() => {
+  setStatsLoading(false);
+});
 
-    // vẫn giữ invoice cũ
-    fetchInvoicesByCompany();
+// giữ invoice
+fetchInvoicesByCompany();
   } else {
     setAllInvoices([]);
     setSpendByMonth(Array(12).fill(0));

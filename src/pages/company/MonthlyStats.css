@@ -86,8 +86,12 @@
   color: #0f1b2d;
 }
 .chart-wrap {
+  min-height: 260px;
   height: 260px;              /* Quan trọng: ResponsiveContainer cần chiều cao cha */
   width: 100%;
+}
+.charts-grid > .ant-card {
+  min-height: 350px;
 }
 
 /* Responsive */
