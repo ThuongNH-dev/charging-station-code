@@ -522,7 +522,7 @@ export default function Login() {
 
             <div className="signup-link">
               Chưa có tài khoản?{" "}
-              <a onClick={() => navigate("/register")}>Đăng kí ngay</a>
+              <a onClick={() => navigate("/register/select")}>Đăng kí ngay</a>
             </div>
           </form>
         </div>
