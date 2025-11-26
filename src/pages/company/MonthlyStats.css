@@ -97,3 +97,21 @@
 @media (max-width: 768px) {
   .kpi-grid { grid-template-columns: 1fr; }
 }
+.vehicle-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  background: white;
+}
+
+.vehicle-table th,
+.vehicle-table td {
+  padding: 8px 12px;
+  border: 1px solid #eee;
+  text-align: center;
+}
+
+.vehicle-table th {
+  background: #fafafa;
+  font-weight: 600;
+}

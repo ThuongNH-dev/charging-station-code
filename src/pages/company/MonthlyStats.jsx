@@ -581,6 +581,63 @@ setVehicleBreakdown(
                   </ResponsiveContainer>
                 </div>
               </Card>
+
+              {/* --- Vehicle Breakdown --- */}
+              <Card style={{ marginTop: 24 }}>
+                <div className="chart-title">Thống kê theo phương tiện</div>
+
+                {/* Biểu đồ: Top xe theo tổng tiền */}
+                <div className="chart-wrap" style={{ height: 350 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={vehicleBreakdown}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="licensePlate" />
+                      <YAxis />
+                      <RTooltip formatter={(v) => fmtMoney(v)} />
+                      <Legend />
+                      <Bar dataKey="total" name="Tổng chi tiêu" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Bảng chi tiết theo xe */}
+                <div style={{ marginTop: 24 }}>
+                  <h4 style={{ marginBottom: 12 }}>Chi tiết theo xe</h4>
+
+                  <table className="vehicle-table">
+                    <thead>
+                      <tr>
+                        <th>Biển số</th>
+                        <th>Loại xe</th>
+                        <th>Số phiên</th>
+                        <th>kWh</th>
+                        <th>Tổng tiền</th>
+                        <th>Phút sạc</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {vehicleBreakdown?.length === 0 && (
+                        <tr>
+                          <td colSpan="6" style={{ textAlign: "center" }}>
+                            Không có dữ liệu
+                          </td>
+                        </tr>
+                      )}
+
+                      {vehicleBreakdown?.map(v => (
+                        <tr key={v.vehicleId}>
+                          <td>{v.licensePlate}</td>
+                          <td>{v.vehicleType}</td>
+                          <td>{v.sessionCount}</td>
+                          <td>{v.energyKwh.toLocaleString("vi-VN")}</td>
+                          <td>{fmtMoney(v.total)}</td>
+                          <td>{v.durationMin}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
             </div>
 
             {statsLoading && <div className="center-pad"><Spin /></div>}
