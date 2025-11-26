@@ -11,6 +11,7 @@ import { getApiBase } from "../../utils/api";
 // import { buildMonthlyStats } from "../../utils/billingStats";
 import MainLayout from "../../layouts/MainLayout";
 import "./MonthlyStats.css";
+import { Cell } from "recharts";
 
 const API_BASE = (getApiBase() || "").replace(/\/+$/, "");
 
@@ -170,6 +171,19 @@ const [vehicleBreakdown, setVehicleBreakdown] = useState([]);
   // KPI theo đúng tháng được chọn
   const totalSpendSelected = spendByMonth[selectedMonthIndex] || 0;
   const totalKwhSelected = kwhByMonth[selectedMonthIndex] || 0;
+
+  const colors = [
+  "#4e79a7",
+  "#f28e2b",
+  "#e15759",
+  "#76b7b2",
+  "#59a14f",
+  "#edc949",
+  "#af7aa1",
+  "#ff9da7",
+  "#9c755f",
+  "#bab0ab",
+];
 
   // Dữ liệu biểu đồ (giữ 12 tháng của năm — nếu cần có thể thay đổi theo yêu cầu)
   const chartData = useMemo(() => {
@@ -596,7 +610,14 @@ setVehicleBreakdown(
                         <YAxis />
                         <RTooltip formatter={(v) => fmtMoney(v)} />
                         <Legend />
-                        <Bar dataKey="total" name="Tổng chi tiêu" />
+                        <Bar dataKey="total" name="Tổng chi tiêu">
+                          {vehicleBreakdown.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={colors[index % colors.length]}
+                            />
+                          ))}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
