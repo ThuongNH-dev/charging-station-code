@@ -131,6 +131,7 @@ export default function Reports() {
       analytics: analyticsData,
       allStations: rawData.stationsData || [], // Để vẽ bảng "trạm chết"
       portsData: rawData.portsData || [],
+      chargersData: rawData.chargersData || [],
     };
   }, [rawData, reportFilter.startDate, reportFilter.endDate, analyticsData]);
 

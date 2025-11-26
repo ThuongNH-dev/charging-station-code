@@ -1022,39 +1022,73 @@ function StationUtilizationCharts({ data = [], allStations = [] }) {
 }
 
 // =========================================================
-// 🔹 9. Top / Under / Zero activity (theo Port) - ĐÃ CHỈNH SỬA
+// 🔹 9.3 Bảng chi tiết Top / Under / Zero (BẢN FIX LỖI MAPPING)
 // =========================================================
-
-// =========================================================
-// 🔹 9.3 Bảng chi tiết Top / Under / Zero (ĐÃ FIX LỖI HOOK)
-// =========================================================
-function TopUnderZeroSection({ topUnder }) {
-  // 1. KHAI BÁO HOOK TRƯỚC (QUAN TRỌNG ĐỂ TRÁNH CRASH)
+function TopUnderZeroSection({ topUnder, chargers = [], stations = [] }) {
   const [zeroList, setZeroList] = useState([]);
 
-  // 2. Logic lọc trùng (useMemo) phải khai báo luôn, xử lý null bên trong
-  const filteredUnderUtilized = useMemo(() => {
-    if (!topUnder) return []; // Xử lý null ở đây thay vì return cả component
+  // 1. Tạo Map tra cứu: ChargerCode -> StationName (Cực kỳ mạnh mẽ)
+  const stationLookup = useMemo(() => {
+    const sMap = {}; // ID -> Name
+    const cMap = {}; // Code -> Name
 
+    // B1: Map StationID -> StationName
+    stations.forEach((s) => {
+      const sId = s.stationId || s.StationId || s.id;
+      const sName = s.stationName || s.StationName || s.name || "Unknown";
+      if (sId) sMap[sId] = sName;
+    });
+
+    // B2: Map ChargerCode -> StationName (Chuẩn hóa Key)
+    chargers.forEach((c) => {
+      // Lấy code, chuyển về chuỗi, cắt khoảng trắng, viết thường
+      const rawCode = c.code || c.Code || "";
+      const cCode = String(rawCode).trim().toLowerCase();
+
+      const sId = c.stationId || c.StationId;
+
+      if (cCode && sId && sMap[sId]) {
+        cMap[cCode] = sMap[sId];
+      }
+    });
+
+    // Debug xem map được bao nhiêu cái (F12 xem console)
+    console.log(
+      "🗺️ Mapping Chargers:",
+      Object.keys(cMap).length,
+      "trụ sạc đã map thành công."
+    );
+
+    return cMap;
+  }, [chargers, stations]);
+
+  // Hàm lấy tên trạm an toàn (Có chuẩn hóa đầu vào)
+  const getStationName = (chargerCode) => {
+    if (!chargerCode) return "---";
+    // Chuẩn hóa input giống hệt lúc tạo Map
+    const lookupKey = String(chargerCode).trim().toLowerCase();
+    return stationLookup[lookupKey] || "Không xác định";
+  };
+
+  // 2. Logic lọc trùng (Giữ nguyên)
+  const filteredUnderUtilized = useMemo(() => {
+    if (!topUnder) return [];
     const { topActive = [], underUtilized = [] } = topUnder;
     const topKeys = new Set(
       topActive.map((item) => `${item.key}_${item.key2}`)
     );
-
     return underUtilized.filter((item) => {
       const uniqueKey = `${item.key}_${item.key2}`;
       return !topKeys.has(uniqueKey);
     });
   }, [topUnder]);
 
-  // 3. useEffect cập nhật zeroList
   useEffect(() => {
     if (topUnder?.zeroActivity) {
       setZeroList(topUnder.zeroActivity);
     }
   }, [topUnder]);
 
-  // 4. Bây giờ mới được return null nếu không có data
   if (!topUnder) {
     return (
       <div style={{ padding: 20, color: "#777", fontStyle: "italic" }}>
@@ -1090,18 +1124,22 @@ function TopUnderZeroSection({ topUnder }) {
     <table className="report-table" key={type}>
       <thead>
         <tr>
-          <th>#</th>
+          <th style={{ width: "50px" }}>#</th>
           <th>Cổng sạc (Port)</th>
           <th>Trụ sạc (Charger)</th>
+
+          {/* CỘT TRẠM */}
+          <th style={{ color: "#444" }}>Trạm (Station)</th>
+
           {type !== "zero" ? (
             <>
-              <th>Số phiên</th>
-              <th>kWh</th>
-              <th>Doanh thu (₫)</th>
-              <th>Thời gian sạc (phút)</th>
+              <th style={{ textAlign: "right" }}>Số phiên</th>
+              <th style={{ textAlign: "right" }}>kWh</th>
+              <th style={{ textAlign: "right" }}>Doanh thu (₫)</th>
+              <th style={{ textAlign: "right" }}>Thời gian sạc</th>
             </>
           ) : (
-            <th style={{ textAlign: "center", width: 120 }}>Hành động</th>
+            <th style={{ textAlign: "center", width: 100 }}>Hành động</th>
           )}
         </tr>
       </thead>
@@ -1109,27 +1147,53 @@ function TopUnderZeroSection({ topUnder }) {
         {rows.map((row, idx) => (
           <tr key={`${type}-${row.key ?? idx}`}>
             <td>{idx + 1}</td>
-            <td style={{ fontWeight: 500 }}>{row.key}</td>
+            <td style={{ fontWeight: 600, color: "#2980b9" }}>{row.key}</td>
+
+            {/* Cột Trụ Sạc */}
             <td>{row.key2}</td>
+
+            {/* Cột Tên Trạm: Gọi hàm getStationName với key2 (ChargerCode) */}
+            <td style={{ fontWeight: 500, color: "#2c3e50" }}>
+              {getStationName(row.key2 || row.chargerCode)}
+            </td>
+
             {type !== "zero" ? (
               <>
-                <td>{row.sessionCount?.toLocaleString("vi-VN")}</td>
-                <td>{row.energyKwh?.toLocaleString("vi-VN")}</td>
-                <td>{row.total?.toLocaleString("vi-VN")}</td>
-                <td>{row.durationMin?.toLocaleString("vi-VN")}</td>
+                <td style={{ textAlign: "right" }}>
+                  {row.sessionCount?.toLocaleString("vi-VN")}
+                </td>
+                <td style={{ textAlign: "right" }}>
+                  {row.energyKwh?.toLocaleString("vi-VN", {
+                    maximumFractionDigits: 1,
+                  })}
+                </td>
+                <td
+                  style={{
+                    textAlign: "right",
+                    fontWeight: "bold",
+                    color: "#27ae60",
+                  }}
+                >
+                  {row.total?.toLocaleString("vi-VN")}
+                </td>
+                <td style={{ textAlign: "right" }}>
+                  {row.durationMin?.toLocaleString("vi-VN")} p
+                </td>
               </>
             ) : (
               <td style={{ textAlign: "center" }}>
                 <button
                   className="btn-icon-delete"
                   onClick={() => handleDeleteClick(row)}
+                  title="Xóa cổng này"
                   style={{
                     border: "none",
                     background: "#ffebeb",
                     color: "#c0392b",
-                    padding: "6px 12px",
+                    padding: "6px 10px",
                     borderRadius: 4,
                     cursor: "pointer",
+                    fontSize: "12px",
                   }}
                 >
                   <DeleteOutlined /> Xóa
@@ -1175,7 +1239,6 @@ function TopUnderZeroSection({ topUnder }) {
     </div>
   );
 }
-
 // =========================================================
 // 🔹 9.1 Biểu đồ Tròn: Phân loại trạng thái
 // =========================================================
@@ -1816,7 +1879,11 @@ export default function ReportContent({ data, reportFilter, onRefresh }) {
             <TopPortRevenueChart topUnderData={analytics?.topUnder} />
           </div>
 
-          <TopUnderZeroSection topUnder={analytics?.topUnder} />
+          <TopUnderZeroSection
+            topUnder={analytics?.topUnder}
+            chargers={data?.chargersData || []}
+            stations={data?.allStations || []}
+          />
         </div>
       );
 
