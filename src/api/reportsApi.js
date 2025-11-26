@@ -217,4 +217,34 @@ export const deletePort = async (portId) => {
   }
 };
 
-export default { fetchReportData, fetchAdminAnalytics, deletePort };
+/**
+ * 🔹 Hàm xóa Station (Khớp với Swagger: DELETE /api/Stations/{id})
+ */
+export const deleteStation = async (stationId) => {
+  try {
+    // Swagger của bạn là: /api/Stations/{id}
+    // Vì axios instance 'api' đã có baseURL='/api', nên ở đây chỉ cần ghi '/Stations/...'
+    await api.delete(`/Stations/${stationId}`);
+    return true;
+  } catch (error) {
+    console.error("Lỗi khi xóa Station:", error);
+    const serverMsg = error.response?.data?.message || error.message;
+
+    // Xử lý lỗi thường gặp: Foreign Key constraint (nếu trạm đang có dữ liệu ràng buộc)
+    if (error.response?.status === 500 || error.response?.status === 400) {
+      alert(
+        `Không thể xóa trạm này do dữ liệu ràng buộc (còn session hoặc charger). Lỗi server: ${serverMsg}`
+      );
+    } else {
+      alert(`Không thể xóa Trạm. Lỗi: ${serverMsg}`);
+    }
+    return false;
+  }
+};
+
+export default {
+  fetchReportData,
+  fetchAdminAnalytics,
+  deletePort,
+  deleteStation,
+};

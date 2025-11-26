@@ -19,6 +19,7 @@ const sevenDaysAgoISO = new Date(Date.now() - 6 * 24 * 3600 * 1000)
   .slice(0, 10);
 
 export default function Reports() {
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [reportFilter, setReportFilter] = useState({
     startDate: sevenDaysAgoISO,
     endDate: todayISO,
@@ -62,7 +63,7 @@ export default function Reports() {
     return () => {
       isMounted = false;
     };
-  }, [reportFilter.viewType, reportFilter.endDate]);
+  }, [reportFilter.viewType, reportFilter.endDate, refreshTrigger]);
 
   // Gọi API lấy dữ liệu
   useEffect(() => {
@@ -89,7 +90,12 @@ export default function Reports() {
     return () => {
       isMounted = false;
     };
-  }, [reportFilter.startDate, reportFilter.endDate, reportFilter.station]);
+  }, [
+    reportFilter.startDate,
+    reportFilter.endDate,
+    reportFilter.station,
+    refreshTrigger,
+  ]);
 
   // Danh sách trạm cho dropdown
   const stationsList = useMemo(() => {
@@ -143,7 +149,7 @@ export default function Reports() {
     "admin-company", // Báo cáo theo công ty
     "admin-utilization", // Hiệu suất trạm
     "admin-top-under", // Top/Under/Zero
-   "service-structure",
+    "service-structure",
     "admin-vehicle-type",
   ];
 
@@ -286,6 +292,7 @@ export default function Reports() {
           data={dataToRender}
           reportFilter={reportFilter}
           portsData={dataToRender?.portsData || []}
+          onRefresh={() => setRefreshTrigger((prev) => prev + 1)}
         />
       </div>
     </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { DeleteOutlined } from "@ant-design/icons"; // Nhớ import icon thùng rác
-import { deletePort } from "../../../../api/reportsApi";
+import { deletePort, deleteStation } from "../../../../api/reportsApi";
 
 import {
   BarChart,
@@ -657,27 +657,22 @@ function CompanyRevenueChart({ data = [] }) {
 }
 
 // =========================================================
-// 🔹 8. Bảng Utilization theo Trạm (ĐÃ SỬA: GỘP DỮ LIỆU FE)
+// 🔹 8. Bảng Utilization theo Trạm (ĐÃ CẬP NHẬT NÚT XÓA)
 // =========================================================
-function StationUtilizationTable({ data = [], allStations = [] }) {
-  // 1. Logic Gộp dữ liệu (Merge):
-  // Lấy danh sách trạm gốc làm chuẩn, ghép với dữ liệu hiệu suất
+function StationUtilizationTable({ data = [], allStations = [], onRefresh }) {
+  // Logic Gộp dữ liệu (Giữ nguyên như cũ)
   const mergedData = useMemo(() => {
-    if (!allStations.length) return data; // Fallback nếu chưa có list gốc
+    if (!allStations.length) return data;
 
-    // Tạo Map để tra cứu nhanh dữ liệu hiệu suất từ BE trả về
-    // Key là tên trạm (theo logic BE mapping: code = stationName)
     const statsMap = new Map();
     data.forEach((item) => {
       if (item.code) {
-        statsMap.set(item.code, item); // Key gốc
-        statsMap.set(item.code.trim().toLowerCase(), item); // Key chuẩn hóa
+        statsMap.set(item.code, item);
+        statsMap.set(item.code.trim().toLowerCase(), item);
       }
     });
 
-    // Duyệt qua tất cả trạm trong hệ thống
     const result = allStations.map((station) => {
-      // Lấy tên trạm từ danh sách gốc (Thử nhiều trường khác nhau để chắc ăn)
       const rawName =
         station.name ||
         station.stationName ||
@@ -685,16 +680,15 @@ function StationUtilizationTable({ data = [], allStations = [] }) {
         station.title ||
         "Unknown";
       const searchName = String(rawName).trim().toLowerCase();
+      const stats = statsMap.get(rawName) || statsMap.get(searchName);
 
-      // Thử tìm trong Map
-      let stats = statsMap.get(rawName) || statsMap.get(searchName);
-
+      // 👈 Lưu ý: Phải spread ...station để lấy được stationId/id
       if (stats) {
-        return { ...stats, status: "active" }; // Đã có số liệu
+        return { ...station, ...stats, status: "active" };
       }
 
-      // Nếu không tìm thấy -> Tạo dữ liệu 0
       return {
+        ...station, // 👈 Quan trọng: giữ lại ID của trạm để xóa
         code: rawName,
         sessionCount: 0,
         energyKwh: 0,
@@ -706,6 +700,32 @@ function StationUtilizationTable({ data = [], allStations = [] }) {
 
     return result.sort((a, b) => (b.utilization || 0) - (a.utilization || 0));
   }, [data, allStations]);
+
+  // 👇 2. Hàm xử lý xóa trạm
+  const handleDeleteStation = async (station) => {
+    // Lấy ID: backend trả về thường là stationId hoặc id
+    const idToDelete = station.stationId || station.id;
+
+    if (!idToDelete) {
+      alert("Không tìm thấy ID trạm để xóa!");
+      return;
+    }
+
+    const confirm = window.confirm(
+      `CẢNH BÁO: Bạn có chắc muốn xóa trạm "${
+        station.code || station.name
+      }" khỏi hệ thống không?`
+    );
+
+    if (confirm) {
+      const success = await deleteStation(idToDelete);
+      if (success) {
+        alert("Đã xóa trạm thành công!");
+        // Reload lại trang để cập nhật dữ liệu mới nhất
+        if (onRefresh) onRefresh();
+      }
+    }
+  };
 
   if (!mergedData.length) {
     return (
@@ -723,19 +743,20 @@ function StationUtilizationTable({ data = [], allStations = [] }) {
           <tr>
             <th>#</th>
             <th>Trạm</th>
-            <th>Trạng thái</th> {/* Cột mới cảnh báo */}
+            <th>Trạng thái</th>
             <th>Số phiên</th>
             <th>kWh</th>
             <th>Thời gian sạc (phút)</th>
             <th>Utilization (%)</th>
+            {/* 👇 3. Thêm cột Hành động */}
+            <th style={{ textAlign: "center", width: "100px" }}>Hành động</th>
           </tr>
         </thead>
         <tbody>
           {mergedData.map((row, idx) => {
-            // Logic tô màu cảnh báo
             const isInactive =
               row.status === "inactive" || row.sessionCount === 0;
-            const isLowPerformance = !isInactive && row.utilization < 0.05; // Dưới 5%
+            const isLowPerformance = !isInactive && row.utilization < 0.05;
 
             let rowStyle = {};
             let statusBadge = (
@@ -745,14 +766,14 @@ function StationUtilizationTable({ data = [], allStations = [] }) {
             );
 
             if (isInactive) {
-              rowStyle = { backgroundColor: "#ffebeb" }; // Đỏ nhạt
+              rowStyle = { backgroundColor: "#ffebeb" };
               statusBadge = (
                 <span style={{ color: "#d63031", fontWeight: "bold" }}>
                   Không hoạt động
                 </span>
               );
             } else if (isLowPerformance) {
-              rowStyle = { backgroundColor: "#fffbe6" }; // Vàng nhạt
+              rowStyle = { backgroundColor: "#fffbe6" };
               statusBadge = (
                 <span style={{ color: "#f39c12", fontWeight: "bold" }}>
                   Hiệu suất thấp
@@ -763,7 +784,9 @@ function StationUtilizationTable({ data = [], allStations = [] }) {
             return (
               <tr key={idx} style={rowStyle}>
                 <td>{idx + 1}</td>
-                <td style={{ fontWeight: 500 }}>{row.code}</td>
+                <td style={{ fontWeight: 500 }}>
+                  {row.code || row.stationName}
+                </td>
                 <td>{statusBadge}</td>
                 <td>{row.sessionCount?.toLocaleString("vi-VN")}</td>
                 <td>{row.energyKwh?.toLocaleString("vi-VN")}</td>
@@ -771,11 +794,41 @@ function StationUtilizationTable({ data = [], allStations = [] }) {
                 <td>
                   <strong>{((row.utilization ?? 0) * 100).toFixed(2)}%</strong>
                 </td>
+
+                {/* 👇 4. Hiển thị nút xóa nếu trạm không hoạt động */}
+                <td style={{ textAlign: "center" }}>
+                  {isInactive ? (
+                    <button
+                      className="btn-icon-delete"
+                      onClick={() => handleDeleteStation(row)}
+                      title="Xóa trạm này"
+                      style={{
+                        border: "none",
+                        background: "#fff",
+                        color: "#c0392b",
+                        padding: "6px 10px",
+                        borderRadius: 4,
+                        cursor: "pointer",
+                        border: "1px solid #fab1a0",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        margin: "0 auto",
+                      }}
+                    >
+                      <DeleteOutlined /> Xóa
+                    </button>
+                  ) : (
+                    <span style={{ color: "#ccc" }}>—</span>
+                  )}
+                </td>
               </tr>
             );
           })}
         </tbody>
       </table>
+
+      {/* Footer ghi chú giữ nguyên */}
       <p className="table-footnote">
         <span
           style={{
@@ -1425,7 +1478,7 @@ function VehicleTypeTable({ data = [] }) {
 // =========================================================
 // 🔹 COMPONENT CHÍNH
 // =========================================================
-export default function ReportContent({ data, reportFilter }) {
+export default function ReportContent({ data, reportFilter, onRefresh }) {
   if (!data)
     return (
       <div style={{ padding: 30, textAlign: "center" }}>
@@ -1530,6 +1583,7 @@ export default function ReportContent({ data, reportFilter }) {
           <StationUtilizationTable
             data={analytics?.utilizationStations || []}
             allStations={data?.allStations || []}
+            onRefresh={onRefresh}
           />
         </div>
       );
