@@ -1437,36 +1437,36 @@ export default function ReportContent({ data, reportFilter }) {
 
   const monthlyRevenue = serviceStructure?.monthlyRevenue || [];
 
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    if (!monthlyRevenue.length) return "";
-    return monthlyRevenue[monthlyRevenue.length - 1].month;
-  });
-
-  useEffect(() => {
-    if (!monthlyRevenue.length) {
-      setSelectedMonth("");
-      return;
-    }
-    const exists = monthlyRevenue.some((row) => row.month === selectedMonth);
-    if (!selectedMonth || !exists) {
-      setSelectedMonth(monthlyRevenue[monthlyRevenue.length - 1].month);
-    }
-  }, [monthlyRevenue, selectedMonth]);
-
   const pieDataForSelectedMonth = useMemo(() => {
     if (!monthlyRevenue.length) return [];
 
-    const row =
-      monthlyRevenue.find((r) => r.month === selectedMonth) ||
-      monthlyRevenue[monthlyRevenue.length - 1];
+    // Lấy tháng và năm từ bộ lọc tổng (reportFilter.endDate có dạng "YYYY-MM-DD")
+    const dateObj = new Date(reportFilter.endDate);
+    const filterMonth = dateObj.getMonth() + 1; // Tháng 1-12
+    const filterYear = dateObj.getFullYear();
 
-    if (!row) return [];
+    // Tìm dòng dữ liệu trong monthlyRevenue khớp với tháng/năm của bộ lọc
+    const targetRow = monthlyRevenue.find((row) => {
+      // row.month thường có dạng "MM-YYYY" hoặc "MM/YYYY" hoặc "M-YYYY"
+      // Tách chuỗi để so sánh chính xác
+      const parts = row.month.split(/[-/]/);
+      if (parts.length < 2) return false;
+
+      const m = parseInt(parts[0], 10);
+      const y = parseInt(parts[1], 10);
+      return m === filterMonth && y === filterYear;
+    });
+
+    // Nếu tìm thấy thì dùng, nếu không thì fallback về cái cuối cùng (để tránh lỗi crash chart)
+    const rowToRender = targetRow || monthlyRevenue[monthlyRevenue.length - 1];
+
+    if (!rowToRender) return [];
 
     return OFFICIAL_PLANS.map((name) => ({
       name,
-      value: Number(row[name] || 0),
+      value: Number(rowToRender[name] || 0),
     }));
-  }, [monthlyRevenue, selectedMonth]);
+  }, [monthlyRevenue, reportFilter.endDate]);
 
   switch (reportFilter.viewType) {
     case "time-chart":
@@ -1486,39 +1486,16 @@ export default function ReportContent({ data, reportFilter }) {
         <div className="report-content-area">
           <h3 className="comparison-title">Cơ cấu dịch vụ</h3>
 
-          {/* Bộ lọc tháng cho view Cơ cấu dịch vụ */}
-          {monthlyRevenue.length > 0 && (
-            <div
-              style={{
-                marginBottom: 12,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <span style={{ fontWeight: 500 }}>Tháng:</span>
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                style={{
-                  padding: "4px 8px",
-                  borderRadius: 6,
-                  border: "1px solid #ccc",
-                  minWidth: 120,
-                }}
-              >
-                {monthlyRevenue.map((row) => (
-                  <option key={row.month} value={row.month}>
-                    {row.month}
-                  </option>
-                ))}
-              </select>
-              <span style={{ fontSize: 12, color: "#666" }}>
-                (Bar hiển thị toàn bộ các tháng trong khoảng lọc. Pie hiển thị
-                riêng tháng đang chọn.)
-              </span>
-            </div>
-          )}
+          {/* 🔴 3. XÓA CÁI DROPDOWN SELECT CŨ Ở ĐÂY ĐI */}
+
+          {/* Thay bằng dòng text hiển thị tháng đang chọn cho người dùng biết */}
+          <div style={{ marginBottom: 15, color: "#555", fontSize: "14px" }}>
+            Đang hiển thị dữ liệu tháng:{" "}
+            <strong>
+              {new Date(reportFilter.endDate).getMonth() + 1}/
+              {new Date(reportFilter.endDate).getFullYear()}
+            </strong>
+          </div>
 
           <RevenueByPlan data={monthlyRevenue} />
           <ServiceStructurePie data={pieDataForSelectedMonth} />

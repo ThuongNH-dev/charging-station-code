@@ -143,7 +143,7 @@ export default function Reports() {
     "admin-company", // Báo cáo theo công ty
     "admin-utilization", // Hiệu suất trạm
     "admin-top-under", // Top/Under/Zero
-    "admin-vehicle", // 👈 THÊM DÒNG NÀY (Doanh thu xe)
+   "service-structure",
     "admin-vehicle-type",
   ];
 
