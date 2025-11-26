@@ -1185,8 +1185,21 @@ function StationUtilizationCharts({ data = [], allStations = [] }) {
 // =========================================================
 // 🔹 9.3 Bảng chi tiết Top / Under / Zero (BẢN FIX LỖI MAPPING)
 // =========================================================
-function TopUnderZeroSection({ topUnder, chargers = [], stations = [] }) {
+function TopUnderZeroSection({ topUnder, chargers = [], stations = [], ports = [] }) {
   const [zeroList, setZeroList] = useState([]);
+
+  // 0. Tạo Map tra cứu: PortName (key) -> PortId
+  const portIdMap = useMemo(() => {
+    const map = {};
+    ports.forEach((p) => {
+      const portId = p.portId || p.PortId || p.id || p.Id;
+      const portName = p.portName || p.PortName || p.name || p.code || p.Code || "";
+      if (portId && portName) {
+        map[portName] = portId;
+      }
+    });
+    return map;
+  }, [ports]);
 
   // 1. Tạo Map tra cứu: ChargerCode -> StationName (Cực kỳ mạnh mẽ)
   const stationLookup = useMemo(() => {
@@ -1260,23 +1273,47 @@ function TopUnderZeroSection({ topUnder, chargers = [], stations = [] }) {
 
   const { topActive = [] } = topUnder;
 
-  // --- HÀM XỬ LÝ XÓA (Giữ nguyên) ---
+  // --- HÀM XỬ LÝ XÓA (ĐÃ SỬA: Lấy portId từ map) ---
   const handleDeleteClick = async (item) => {
     const confirm = window.confirm(
       `Bạn chắc chắn muốn xóa cổng sạc: ${item.key}?`
     );
     if (!confirm) return;
-    const idToDelete =
-      item.portId ||
-      (item.key && item.key.includes("#") ? item.key.split("#")[1] : null);
-    if (!idToDelete) return alert("Lỗi ID");
+    
+    // Lấy portId từ nhiều nguồn: portId trực tiếp, từ map, hoặc parse từ key
+    let idToDelete = item.portId || item.PortId || item.id || item.Id;
+    
+    // Nếu không có, thử lấy từ map dựa trên tên cổng (key)
+    if (!idToDelete && item.key) {
+      idToDelete = portIdMap[item.key];
+    }
+    
+    // Nếu vẫn không có, thử parse từ key (ví dụ: "P016" -> 16)
+    if (!idToDelete && item.key) {
+      const match = item.key.match(/P(\d+)/i);
+      if (match) {
+        idToDelete = match[1];
+      }
+    }
+    
+    if (!idToDelete) {
+      console.error("Không tìm thấy portId cho:", item);
+      alert("Lỗi: Không tìm thấy ID cổng sạc để xóa!");
+      return;
+    }
+    
     try {
       if (await deletePort(idToDelete)) {
         setZeroList((prev) => prev.filter((p) => p.key !== item.key));
         alert("Đã xóa thành công!");
+        // Gọi onRefresh nếu có để reload dữ liệu
+        if (window.location) {
+          window.location.reload();
+        }
       }
     } catch (error) {
-      alert("Lỗi xóa");
+      console.error("Lỗi khi xóa cổng:", error);
+      alert(`Lỗi xóa: ${error.message || "Vui lòng thử lại"}`);
     }
   };
 
@@ -2031,6 +2068,7 @@ export default function ReportContent({ data, reportFilter, onRefresh }) {
             topUnder={analytics?.topUnder}
             chargers={data?.chargersData || []}
             stations={data?.allStations || []}
+            ports={data?.portsData || []}
           />
         </div>
       );
