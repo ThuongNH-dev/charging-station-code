@@ -115,3 +115,28 @@
   background: #fafafa;
   font-weight: 600;
 }
+.vehicle-section {
+  grid-column: 1 / -1; /* FULL WIDTH nếu nằm trong grid */
+  width: 100%;
+}
+
+.vehicle-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.vehicle-table th,
+.vehicle-table td {
+  padding: 10px 12px;
+  border: 1px solid #e6e6e6;
+  text-align: center;
+}
+
+.vehicle-table th {
+  background: #f5f7fa;
+  font-weight: 600;
+}
+.vehicle-section {
+  grid-column: 1 / -1 !important;
+}

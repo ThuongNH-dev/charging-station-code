@@ -582,27 +582,27 @@ setVehicleBreakdown(
                 </div>
               </Card>
 
-              {/* --- Vehicle Breakdown --- */}
-              <Card style={{ marginTop: 24 }}>
-                <div className="chart-title">Thống kê theo phương tiện</div>
+              {/* ================= VEHICLE BREAKDOWN SECTION ================= */}
+              <div className="vehicle-section">
+                <Card>
+                  <div className="chart-title">Thống kê theo phương tiện</div>
 
-                {/* Biểu đồ: Top xe theo tổng tiền */}
-                <div className="chart-wrap" style={{ height: 350 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={vehicleBreakdown}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="licensePlate" />
-                      <YAxis />
-                      <RTooltip formatter={(v) => fmtMoney(v)} />
-                      <Legend />
-                      <Bar dataKey="total" name="Tổng chi tiêu" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                  {/* Biểu đồ tổng tiền theo xe */}
+                  <div className="chart-wrap" style={{ height: 350 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={vehicleBreakdown}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="licensePlate" />
+                        <YAxis />
+                        <RTooltip formatter={(v) => fmtMoney(v)} />
+                        <Legend />
+                        <Bar dataKey="total" name="Tổng chi tiêu" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
 
-                {/* Bảng chi tiết theo xe */}
-                <div style={{ marginTop: 24 }}>
-                  <h4 style={{ marginBottom: 12 }}>Chi tiết theo xe</h4>
+                  {/* Bảng chi tiết xe */}
+                  <h4 style={{ marginTop: 24, marginBottom: 12 }}>Chi tiết theo xe</h4>
 
                   <table className="vehicle-table">
                     <thead>
@@ -616,15 +616,13 @@ setVehicleBreakdown(
                       </tr>
                     </thead>
                     <tbody>
-                      {vehicleBreakdown?.length === 0 && (
+                      {(!vehicleBreakdown || vehicleBreakdown.length === 0) && (
                         <tr>
-                          <td colSpan="6" style={{ textAlign: "center" }}>
-                            Không có dữ liệu
-                          </td>
+                          <td colSpan="6" style={{ textAlign: "center" }}>Không có dữ liệu</td>
                         </tr>
                       )}
 
-                      {vehicleBreakdown?.map(v => (
+                      {vehicleBreakdown?.map((v) => (
                         <tr key={v.vehicleId}>
                           <td>{v.licensePlate}</td>
                           <td>{v.vehicleType}</td>
@@ -636,8 +634,8 @@ setVehicleBreakdown(
                       ))}
                     </tbody>
                   </table>
-                </div>
-              </Card>
+                </Card>
+              </div>
             </div>
 
             {statsLoading && <div className="center-pad"><Spin /></div>}
