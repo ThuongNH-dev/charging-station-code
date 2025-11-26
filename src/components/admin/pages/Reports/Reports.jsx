@@ -37,8 +37,8 @@ export default function Reports() {
       "admin-company",
       "admin-utilization",
       "admin-top-under",
-
       "admin-vehicle-type",
+      "time-range-analysis",
     ];
 
     if (!adminViews.includes(reportFilter.viewType)) return;
@@ -151,6 +151,7 @@ export default function Reports() {
     "admin-top-under", // Top/Under/Zero
     "service-structure",
     "admin-vehicle-type",
+    "time-range-analysis",
   ];
 
   // Biến kiểm tra: True nếu đang ở tab báo cáo tháng, False nếu ở tab thường
@@ -261,6 +262,7 @@ export default function Reports() {
         {[
           // --- NHÓM 1: TỔNG QUAN ---
           ["time-chart", "Tổng quan thời gian"],
+          ["time-range-analysis", "Hiệu quả Khung giờ"],
 
           // --- NHÓM 2: PHÂN TÍCH DOANH THU ---
           ["service-structure", "Doanh thu theo Gói"],

@@ -159,6 +159,9 @@ export const fetchAdminAnalytics = async ({ month, year }) => {
       { params: baseParams }
     );
 
+    const timeRangePromise = api.get("/Analytics/breakdown/time-range", {
+      params: baseParams,
+    });
     const results = await Promise.allSettled([
       summaryPromise,
       revenueSourcesPromise,
@@ -168,6 +171,7 @@ export const fetchAdminAnalytics = async ({ month, year }) => {
       topUnderPromise,
 
       vehicleTypeBreakdownPromise,
+      timeRangePromise,
     ]);
 
     const [
@@ -179,6 +183,7 @@ export const fetchAdminAnalytics = async ({ month, year }) => {
       topUnderResult,
 
       vehicleTypeBreakdownResult,
+      timeRangeResult,
     ] = results;
 
     const payload = {
@@ -190,6 +195,7 @@ export const fetchAdminAnalytics = async ({ month, year }) => {
       topUnder: settledData(topUnderResult, null),
 
       vehicleTypeBreakdown: settledData(vehicleTypeBreakdownResult, []),
+      timeRangeBreakdown: settledData(timeRangeResult, []),
     };
 
     if (DEBUG) console.log("📊 Admin analytics:", payload);

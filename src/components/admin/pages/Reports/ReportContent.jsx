@@ -1476,6 +1476,204 @@ function VehicleTypeTable({ data = [] }) {
   );
 }
 // =========================================================
+// 🔹 12. Báo cáo theo Khung giờ (Time Range) - ĐÃ NÂNG CẤP
+// =========================================================
+function TimeRangeSection({ data = [] }) {
+  if (!data || data.length === 0) return null;
+
+  const validData = data.filter((i) => (i.total || 0) > 0);
+
+  // Hàm dịch từ khóa sang tiếng Việt
+  const translateKey = (key) => {
+    const k = (key || "").toLowerCase();
+    if (k.includes("peak") && !k.includes("off")) return "Cao điểm (Peak)";
+    if (k.includes("low") || k.includes("off")) return "Thấp điểm (Low)";
+    if (k.includes("normal") || k.includes("standard"))
+      return "Bình thường (Normal)";
+    return key || "Khác";
+  };
+
+  // Hàm lấy màu sắc tương ứng (Cao điểm = Đỏ/Cam, Bình thường = Xanh, Thấp điểm = Xanh lá)
+  const getColor = (key) => {
+    const k = (key || "").toLowerCase();
+    if (k.includes("peak")) return "#EA4335"; // Đỏ
+    if (k.includes("low") || k.includes("off")) return "#34A853"; // Xanh lá
+    return "#4285F4"; // Xanh dương (Bình thường)
+  };
+
+  return (
+    <div style={{ marginTop: 30 }}>
+      <h4
+        style={{
+          marginBottom: 15,
+          borderLeft: "4px solid #4285F4",
+          paddingLeft: 10,
+        }}
+      >
+        Phân tích hiệu quả theo Khung giờ
+      </h4>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
+        {/* --- Biểu đồ tròn --- */}
+        <div
+          style={{
+            flex: "1 1 300px",
+            background: "#fff",
+            padding: 20,
+            borderRadius: 12,
+            border: "1px solid #eee",
+          }}
+        >
+          <h5 style={{ textAlign: "center", marginBottom: 10 }}>
+            Tỷ trọng Doanh thu
+          </h5>
+          <div style={{ width: "100%", height: 280 }}>
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie
+                  data={validData}
+                  dataKey="total"
+                  nameKey="key"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={50} // Làm rỗng giữa cho đẹp
+                  outerRadius={80}
+                  paddingAngle={2}
+                  label={({ name, percent }) =>
+                    `${translateKey(name).split("(")[0]} ${(
+                      percent * 100
+                    ).toFixed(0)}%`
+                  }
+                >
+                  {validData.map((entry, index) => (
+                    <Cell key={index} fill={getColor(entry.key)} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(val) => `${val.toLocaleString("vi-VN")} ₫`}
+                />
+                <Legend
+                  formatter={(val) => translateKey(val)} // Dịch chú thích
+                  verticalAlign="bottom"
+                  height={36}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* --- Bảng chi tiết --- */}
+        <div
+          style={{
+            flex: "2 1 450px",
+            background: "#fff",
+            padding: 20,
+            borderRadius: 12,
+            border: "1px solid #eee",
+            overflowX: "auto",
+          }}
+        >
+          <h5 style={{ marginBottom: 15 }}>Chi tiết số liệu</h5>
+          <table className="report-table" style={{ width: "100%" }}>
+            <thead>
+              <tr>
+                <th>Khung giờ</th>
+                <th style={{ textAlign: "right" }}>Số phiên</th>
+                <th style={{ textAlign: "right" }}>Sản lượng (kWh)</th>
+                <th style={{ textAlign: "right" }}>Doanh thu (₫)</th>
+                <th style={{ textAlign: "right" }}>TB/Phiên</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((row, idx) => (
+                <tr key={idx}>
+                  <td
+                    style={{
+                      fontWeight: 600,
+                      color: getColor(row.key),
+                    }}
+                  >
+                    {translateKey(row.key)}
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    {row.sessionCount?.toLocaleString("vi-VN")}
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    {row.energyKwh?.toLocaleString("vi-VN", {
+                      maximumFractionDigits: 1,
+                    })}
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      fontWeight: "bold",
+                      color: "#333",
+                    }}
+                  >
+                    {row.total?.toLocaleString("vi-VN")}
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      fontSize: 13,
+                      color: "#7f8c8d",
+                    }}
+                  >
+                    {(row.sessionCount > 0
+                      ? row.total / row.sessionCount
+                      : 0
+                    ).toLocaleString("vi-VN", {
+                      maximumFractionDigits: 0,
+                    })}{" "}
+                    ₫
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* 👇 PHẦN CHÚ THÍCH BẠN YÊU CẦU */}
+          <div
+            style={{
+              marginTop: 15,
+              padding: "10px 15px",
+              backgroundColor: "#f8f9fa",
+              borderRadius: 8,
+              fontSize: "13px",
+              color: "#555",
+              lineHeight: "1.6",
+            }}
+          >
+            <strong>Ghi chú:</strong>
+            <ul style={{ margin: "5px 0 0 20px", padding: 0 }}>
+              <li>
+                <span style={{ color: "#EA4335", fontWeight: "bold" }}>
+                  Cao điểm (Peak):
+                </span>{" "}
+                Khung giờ giá điện cao nhất (thường là 09:30-11:30,
+                17:00-20:00). Doanh thu thường cao dù số phiên ít.
+              </li>
+              <li>
+                <span style={{ color: "#4285F4", fontWeight: "bold" }}>
+                  Bình thường (Normal):
+                </span>{" "}
+                Khung giờ tiêu chuẩn, mức giá trung bình.
+              </li>
+              <li>
+                <span style={{ color: "#34A853", fontWeight: "bold" }}>
+                  Thấp điểm (Low/Off-peak):
+                </span>{" "}
+                Khung giờ đêm khuya hoặc sáng sớm (22:00-04:00), giá rẻ nhất để
+                khuyến khích sạc đêm.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+// =========================================================
 // 🔹 COMPONENT CHÍNH
 // =========================================================
 export default function ReportContent({ data, reportFilter, onRefresh }) {
@@ -1530,6 +1728,24 @@ export default function ReportContent({ data, reportFilter, onRefresh }) {
           <DailyCharts
             dailySessions={timeChart?.dailySessions || []}
             dailyRevenue={timeChart?.dailyRevenue || []}
+          />
+        </div>
+      );
+
+    case "time-range-analysis":
+      return (
+        <div className="report-content-area">
+          <h3 className="comparison-title">
+            Phân tích hiệu quả theo Khung giờ
+          </h3>
+
+          {/* Sử dụng dữ liệu timeRangeRaw (đã tính toán theo ngày) */}
+          <TimeRangeSection
+            data={
+              data.timeRangeRaw && data.timeRangeRaw.length > 0
+                ? data.timeRangeRaw
+                : analytics?.timeRangeBreakdown || []
+            }
           />
         </div>
       );
