@@ -11,6 +11,9 @@ import {
   processTimeChartData,
   processTimeChartHourly,
 } from "../../../../utils/reportProcessing";
+import { saveAs } from "file-saver";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 // Mặc định 7 ngày gần nhất
 const todayISO = new Date().toISOString().slice(0, 10);
@@ -157,6 +160,74 @@ export default function Reports() {
 
   // Biến kiểm tra: True nếu đang ở tab báo cáo tháng, False nếu ở tab thường
   const isMonthlyView = ADMIN_MONTHLY_VIEWS.includes(reportFilter.viewType);
+  // --- 1. Hàm lấy dữ liệu hiện tại để xuất ---
+  const getCurrentDataForExport = () => {
+    switch (reportFilter.viewType) {
+      case "admin-company":
+        return dataToRender?.analytics?.companyBreakdown || [];
+      case "admin-utilization":
+        return dataToRender?.analytics?.utilizationStations || [];
+      case "admin-vehicle-type":
+        return dataToRender?.analytics?.vehicleTypeBreakdown || [];
+      case "time-chart":
+        return dataToRender?.timeChart?.dailyRevenue || [];
+      case "time-range-analysis":
+        return dataToRender?.analytics?.timeRangeBreakdown || [];
+      case "service-structure":
+        return dataToRender?.serviceStructure?.monthlyRevenue || [];
+      case "admin-top-under":
+        return dataToRender?.analytics?.topUnder?.topActive || [];
+      default:
+        return [];
+    }
+  };
+
+  // --- 2. Hàm xử lý nút Xuất CSV ---
+  const handleExportCSV = () => {
+    const data = getCurrentDataForExport();
+    if (!data || data.length === 0)
+      return alert("Không có dữ liệu bảng để xuất!");
+
+    // Lấy tiêu đề cột từ dòng đầu tiên
+    const headers = Object.keys(data[0]);
+    // Tạo nội dung CSV
+    const csvContent = [
+      headers.join(","),
+      ...data.map((row) =>
+        headers.map((key) => JSON.stringify(row[key] || "")).join(",")
+      ),
+    ].join("\n");
+
+    // Lưu file (Thêm \uFEFF để Excel đọc tiếng Việt không lỗi font)
+    const blob = new Blob(["\uFEFF" + csvContent], {
+      type: "text/csv;charset=utf-8;",
+    });
+    saveAs(blob, `Bao_cao_${reportFilter.viewType}.csv`);
+  };
+
+  // --- 3. Hàm xử lý nút Xuất PDF ---
+  const handleExportPDF = async () => {
+    const element = document.querySelector(".report-main-container"); // Chọn vùng nội dung báo cáo
+    if (!element) return;
+
+    try {
+      document.body.style.cursor = "wait"; // Đổi con trỏ chuột loading
+      const canvas = await html2canvas(element, { scale: 2 }); // Chụp ảnh nét gấp đôi
+      const imgData = canvas.toDataURL("image/png");
+
+      const pdf = new jsPDF("l", "mm", "a4"); // Khổ A4 ngang
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`Bao_cao_${reportFilter.viewType}.pdf`);
+    } catch (err) {
+      console.error("Lỗi xuất PDF:", err);
+      alert("Lỗi khi tạo PDF.");
+    } finally {
+      document.body.style.cursor = "default";
+    }
+  };
   // Giao diện chính
   return (
     <div className="reports-page">
@@ -249,10 +320,12 @@ export default function Reports() {
         </div>
 
         <div className="export-buttons">
-          <button className="btn secondary">
+          <button className="btn secondary" onClick={handleExportCSV}>
             <DownloadOutlined /> XUẤT CSV
           </button>
-          <button className="btn secondary">
+
+          {/* 👇 Nút PDF đã sửa */}
+          <button className="btn secondary" onClick={handleExportPDF}>
             <DownloadOutlined /> XUẤT PDF
           </button>
         </div>

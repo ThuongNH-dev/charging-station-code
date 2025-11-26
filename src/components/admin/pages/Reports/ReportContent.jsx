@@ -201,76 +201,160 @@ function DailyCharts({ dailySessions = [], dailyRevenue = [] }) {
 }
 
 // =========================================================
-// 🔹 3. Biểu đồ doanh thu theo gói (Stacked Bar)
+// 🔹 3. Biểu đồ doanh thu theo gói (Stacked Bar) - PHIÊN BẢN MINI
 // =========================================================
 function RevenueByPlan({ data = [] }) {
-  if (!data.length) {
-    return (
-      <div className="chart-empty">Không có dữ liệu doanh thu theo gói</div>
-    );
-  }
+  if (!data.length) return null;
 
   return (
-    <div className="plan-revenue-card">
-      <div className="plan-revenue-top">
+    <div
+      className="plan-revenue-card"
+      style={{
+        background: "#fff",
+        padding: "15px 20px", // Giảm padding
+        borderRadius: 12,
+        border: "1px solid #eee",
+        height: "100%",
+      }}
+    >
+      <div
+        className="plan-revenue-top"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 15,
+        }}
+      >
         <div>
-          <p className="eyebrow">Cơ cấu dịch vụ</p>
-          <h4>Doanh thu theo gói dịch vụ</h4>
-          <span className="subtitle">Đơn vị: đồng (₫)</span>
+          <p
+            className="eyebrow"
+            style={{
+              fontSize: 11,
+              textTransform: "uppercase",
+              color: "#888",
+              marginBottom: 4,
+            }}
+          >
+            Cơ cấu dịch vụ
+          </p>
+          <h4 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+            Doanh thu theo gói
+          </h4>
+          <span className="subtitle" style={{ fontSize: 12, color: "#999" }}>
+            Đơn vị: đồng (₫)
+          </span>
         </div>
-        <div className="mini-legend">
+
+        {/* Legend nhỏ gọn */}
+        <div
+          className="mini-legend"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "8px 12px",
+            maxWidth: 220,
+            justifyContent: "flex-end",
+          }}
+        >
           {OFFICIAL_PLANS.map((plan, i) => (
-            <span key={plan}>
-              <i style={{ background: COLORS[i % COLORS.length] }} />
+            <span
+              key={plan}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                fontSize: 12,
+                color: "#555",
+              }}
+            >
+              <i
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: COLORS[i % COLORS.length],
+                  marginRight: 4,
+                }}
+              />
               {plan}
             </span>
           ))}
         </div>
       </div>
 
-      <div className="plan-revenue-chart">
+      <div
+        className="plan-revenue-chart"
+        style={{ width: "100%", height: 320 }}
+      >
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="month" />
-            <YAxis />
-            <Tooltip formatter={(v) => `${v.toLocaleString()} ₫`} />
+          <BarChart
+            data={data}
+            margin={{ top: 10, right: 0, left: -20, bottom: 0 }}
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              vertical={false}
+              stroke="#f0f0f0"
+            />
+            <XAxis
+              dataKey="month"
+              tick={{ fontSize: 12, fill: "#666" }} // Font trục X nhỏ
+              tickLine={false}
+              axisLine={{ stroke: "#eee" }}
+            />
+            <YAxis
+              tickFormatter={(val) =>
+                new Intl.NumberFormat("vi-VN", { notation: "compact" }).format(
+                  val
+                )
+              }
+              tick={{ fontSize: 12, fill: "#666" }} // Font trục Y nhỏ
+              tickLine={false}
+              axisLine={false}
+              width={50}
+            />
+            <Tooltip
+              contentStyle={{
+                fontSize: 12,
+                borderRadius: 8,
+                border: "none",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+              }}
+              formatter={(v) => `${v.toLocaleString("vi-VN")} ₫`}
+              cursor={{ fill: "rgba(0,0,0,0.03)" }}
+            />
             {OFFICIAL_PLANS.map((plan, i) => (
               <Bar
                 key={plan}
                 dataKey={plan}
                 stackId="a"
                 fill={COLORS[i % COLORS.length]}
+                barSize={40}
+                radius={[0, 0, 0, 0]} // Bỏ bo góc để xếp chồng đẹp hơn
               />
             ))}
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <p className="chart-footnote">
-        Chú thích: Mỗi cột là một tháng; màu sắc thể hiện doanh thu từng gói.
+      <p
+        style={{
+          marginTop: 10,
+          fontSize: 11,
+          color: "#aaa",
+          textAlign: "center",
+        }}
+      >
+        * Màu sắc thể hiện doanh thu từng gói trong tháng.
       </p>
     </div>
   );
 }
 
 // =========================================================
-// 🔹 4. Biểu đồ Pie cơ cấu gói dịch vụ
+// 🔹 4. Biểu đồ Pie cơ cấu gói dịch vụ - PHIÊN BẢN MINI
 // =========================================================
 function ServiceStructurePie({ data = [] }) {
-  if (!data.length) {
-    return (
-      <div
-        style={{
-          textAlign: "center",
-          padding: 40,
-          color: "#777",
-          fontStyle: "italic",
-        }}
-      >
-        Không có dữ liệu cơ cấu dịch vụ
-      </div>
-    );
-  }
+  if (!data.length) return null;
 
   const total = data.reduce((s, d) => s + Number(d.value || 0), 0);
   const dominant = data.reduce(
@@ -279,74 +363,151 @@ function ServiceStructurePie({ data = [] }) {
     data[0] || { value: 0 }
   );
 
-  const renderLabel = ({ name, percent }) => {
-    if (percent < 0.06) return "";
-    return `${name} ${(percent * 100).toFixed(1)}%`;
-  };
-
   return (
-    <div className="service-structure-card">
-      <h4>Cơ cấu dịch vụ (theo doanh thu)</h4>
-      <div className="service-structure-pie">
-        <div className="pie-chart-box">
+    <div
+      className="service-structure-card"
+      style={{
+        background: "#fff",
+        padding: "15px 20px",
+        borderRadius: 12,
+        border: "1px solid #eee",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <h4 style={{ marginBottom: 15, fontSize: 16, fontWeight: 600 }}>
+        Cơ cấu dịch vụ
+      </h4>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 15, flex: 1 }}>
+        {/* Chart Tròn */}
+        <div style={{ flex: 1, height: 220, position: "relative" }}>
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart margin={{ top: 8 }}>
+            <PieChart>
               <Pie
                 data={data}
                 dataKey="value"
                 nameKey="name"
-                innerRadius={70}
-                outerRadius={120}
-                paddingAngle={2}
+                innerRadius={50} // Vòng tròn nhỏ lại
+                outerRadius={90}
+                paddingAngle={4}
                 labelLine={false}
-                label={renderLabel}
               >
                 {data.map((entry, index) => (
                   <Cell key={index} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip
-                formatter={(v) => `${v.toLocaleString()} ₫`}
-                labelFormatter={() => `Tổng: ${total.toLocaleString()} ₫`}
-              />
+              <Tooltip formatter={(v) => `${v.toLocaleString("vi-VN")} ₫`} />
             </PieChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="pie-summary">
-          <p className="pie-summary-label">Gói nổi bật</p>
-          <h5>{dominant?.name || "—"}</h5>
-          <span className="pie-summary-percent">
+        {/* Hộp thông tin Top 1 (Đã thu nhỏ) */}
+        <div
+          style={{
+            flex: "0 0 160px", // Cố định chiều rộng
+            background: "#f9f9f9",
+            padding: 15,
+            borderRadius: 8,
+            border: "1px solid #eee",
+          }}
+        >
+          <p
+            style={{
+              fontSize: 12,
+              color: "#888",
+              textTransform: "uppercase",
+              marginBottom: 5,
+            }}
+          >
+            Gói nổi bật nhất
+          </p>
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: "bold",
+              color: "#2c3e50",
+              marginBottom: 2,
+            }}
+          >
+            {dominant?.name || "—"}
+          </div>
+          <div
+            style={{
+              fontSize: 20,
+              fontWeight: "bold",
+              color: "#27ae60",
+              marginBottom: 8,
+            }}
+          >
             {total > 0
               ? `${(((dominant?.value || 0) / total) * 100).toFixed(1)}%`
               : "0%"}
-          </span>
-          <p className="pie-summary-total">
-            Tổng doanh thu: <strong>{total.toLocaleString()} ₫</strong>
-          </p>
+          </div>
+          <div style={{ borderTop: "1px solid #e0e0e0", paddingTop: 8 }}>
+            <p style={{ fontSize: 12, color: "#666" }}>Doanh thu:</p>
+            <strong style={{ fontSize: 15, color: "#333" }}>
+              {dominant.value?.toLocaleString("vi-VN")} ₫
+            </strong>
+          </div>
         </div>
       </div>
 
-      <div className="pie-legend">
+      {/* Legend danh sách gói (Đã thu nhỏ font và khoảng cách) */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr", // Chia 2 cột
+          gap: "8px 15px", // Khoảng cách nhỏ
+          marginTop: 15,
+          paddingTop: 15,
+          borderTop: "1px solid #eee",
+        }}
+      >
         {data.map((item, index) => (
-          <div className="pie-legend-item" key={item.name || index}>
-            <span
-              className="dot"
-              style={{ backgroundColor: COLORS[index % COLORS.length] }}
-            />
-            <span className="name">{item.name}</span>
-            <span className="value">{item.value?.toLocaleString() || 0} ₫</span>
+          <div
+            key={item.name || index}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              fontSize: 12,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <span
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  backgroundColor: COLORS[index % COLORS.length],
+                  marginRight: 6,
+                }}
+              />
+              <span style={{ color: "#555" }}>{item.name}</span>
+            </div>
+            <span style={{ fontWeight: 600, color: "#333" }}>
+              {item.value?.toLocaleString("vi-VN")}
+            </span>
           </div>
         ))}
       </div>
 
-      <p className="pie-footnote">
-        Chú thích: Tỷ trọng doanh thu giữa 6 gói dịch vụ hợp lệ.
-      </p>
+      <div
+        style={{
+          marginTop: 10,
+          textAlign: "right",
+          fontSize: 15,
+          fontWeight: "bold",
+          color: "#1976d2",
+        }}
+      >
+        Tổng: {total.toLocaleString("vi-VN")} ₫
+      </div>
     </div>
   );
 }
-
 // =========================================================
 // 🔹 5. So sánh khu vực (Bar)
 // =========================================================
@@ -951,7 +1112,7 @@ function StationUtilizationCharts({ data = [], allStations = [] }) {
                 cy="50%"
                 innerRadius={60}
                 outerRadius={100}
-                paddingAngle={5}
+                paddingAngle={4}
               >
                 {pieData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
@@ -1694,43 +1855,6 @@ function TimeRangeSection({ data = [] }) {
               ))}
             </tbody>
           </table>
-
-          {/* 👇 PHẦN CHÚ THÍCH BẠN YÊU CẦU */}
-          <div
-            style={{
-              marginTop: 15,
-              padding: "10px 15px",
-              backgroundColor: "#f8f9fa",
-              borderRadius: 8,
-              fontSize: "13px",
-              color: "#555",
-              lineHeight: "1.6",
-            }}
-          >
-            <strong>Ghi chú:</strong>
-            <ul style={{ margin: "5px 0 0 20px", padding: 0 }}>
-              <li>
-                <span style={{ color: "#EA4335", fontWeight: "bold" }}>
-                  Cao điểm (Peak):
-                </span>{" "}
-                Khung giờ giá điện cao nhất (thường là 09:30-11:30,
-                17:00-20:00). Doanh thu thường cao dù số phiên ít.
-              </li>
-              <li>
-                <span style={{ color: "#4285F4", fontWeight: "bold" }}>
-                  Bình thường (Normal):
-                </span>{" "}
-                Khung giờ tiêu chuẩn, mức giá trung bình.
-              </li>
-              <li>
-                <span style={{ color: "#34A853", fontWeight: "bold" }}>
-                  Thấp điểm (Low/Off-peak):
-                </span>{" "}
-                Khung giờ đêm khuya hoặc sáng sớm (22:00-04:00), giá rẻ nhất để
-                khuyến khích sạc đêm.
-              </li>
-            </ul>
-          </div>
         </div>
       </div>
     </div>
@@ -1818,10 +1942,18 @@ export default function ReportContent({ data, reportFilter, onRefresh }) {
         <div className="report-content-area">
           <h3 className="comparison-title">Cơ cấu dịch vụ</h3>
 
-          {/* 🔴 3. XÓA CÁI DROPDOWN SELECT CŨ Ở ĐÂY ĐI */}
-
-          {/* Thay bằng dòng text hiển thị tháng đang chọn cho người dùng biết */}
-          <div style={{ marginBottom: 15, color: "#555", fontSize: "14px" }}>
+          {/* Hiển thị tháng đang chọn */}
+          <div
+            style={{
+              marginBottom: 20,
+              padding: "10px 15px",
+              background: "#e3f2fd",
+              color: "#1976d2",
+              borderRadius: 8,
+              display: "inline-block",
+              fontSize: "14px",
+            }}
+          >
             Đang hiển thị dữ liệu tháng:{" "}
             <strong>
               {new Date(reportFilter.endDate).getMonth() + 1}/
@@ -1829,11 +1961,27 @@ export default function ReportContent({ data, reportFilter, onRefresh }) {
             </strong>
           </div>
 
-          <RevenueByPlan data={monthlyRevenue} />
-          <ServiceStructurePie data={pieDataForSelectedMonth} />
+          {/* 👇 THAY ĐỔI Ở ĐÂY: Sử dụng Flexbox để chia cột */}
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap", // Tự xuống dòng trên màn hình nhỏ
+              gap: 25, // Khoảng cách giữa 2 biểu đồ
+              alignItems: "stretch", // Kéo giãn cho bằng chiều cao
+            }}
+          >
+            {/* Cột trái: Biểu đồ Bar (chiếm 60%) */}
+            <div style={{ flex: "3 1 600px", minWidth: 0 }}>
+              <RevenueByPlan data={monthlyRevenue} />
+            </div>
+
+            {/* Cột phải: Biểu đồ Pie (chiếm 40%) */}
+            <div style={{ flex: "2 1 400px", minWidth: 0 }}>
+              <ServiceStructurePie data={pieDataForSelectedMonth} />
+            </div>
+          </div>
         </div>
       );
-
     // ✅ VIEW MỚI: Breakdown theo Công ty
     case "admin-company":
       return (
