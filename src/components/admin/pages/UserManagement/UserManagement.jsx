@@ -856,7 +856,7 @@ const UserManagement = () => {
           {activeTab === "users" && userTypeFilter === "staff" && (
             <div className="flex space-x-4 items-center">
               <div className="filter-group">
-                <label className="filter-label !mb-0">Station ID Staff:</label>
+                <label className="filter-label !mb-0">StationID:</label>
                 <input
                   type="number"
                   placeholder="Nhập ID"
