@@ -102,6 +102,16 @@
   font-size: 14px;
 }
 
+/* Input nhỏ cho Station ID Staff */
+.filter-input {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  width: 80px;
+  font-size: 14px;
+  background-color: #fff;
+}
+
 .search-box {
   /* Hộp bao quanh ô input và icon tìm kiếm */
   display: flex;
@@ -143,40 +153,39 @@
 /* -------------------- ✅ BỔ SUNG: SEGMENTED CONTROL STYLES -------------------- */
 
 .segmented-control {
-  display: flex; /* Quan trọng: Dùng flex để các nút nằm cạnh nhau */
-  border: 1px solid #ccc; /* Viền bao quanh toàn bộ control */
-  border-radius: 8px; /* Bo góc thống nhất */
-  overflow: hidden; /* Giúp viền trông liền mạch */
-  background-color: white;
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 999px;
+  padding: 2px;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e5e7eb;
 }
 
 .segmented-button {
-  padding: 8px 12px;
-  border: none; /* Xóa viền mặc định */
+  min-width: 90px;
+  padding: 8px 18px;
+  border: none;
   cursor: pointer;
   font-size: 14px;
-  background-color: transparent; /* Nền trong suốt */
-  color: #555;
-  transition: background-color 0.2s, color 0.2s;
-  /* Thêm vạch ngăn cách */
-  border-right: 1px solid #ccc;
+  background-color: transparent;
+  color: #4b5563;
+  border-radius: 999px;
+  transition: background-color 0.18s ease, color 0.18s ease,
+    box-shadow 0.18s ease, transform 0.12s ease;
 }
 
-/* Xóa vạch ngăn cách cho nút cuối cùng */
-.segmented-button:last-child {
-  border-right: none;
-}
-
-/* Định dạng nút đang được chọn */
 .segmented-button.active {
-  background-color: #1677ff; /* Màu nền nổi bật */
-  color: white;
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: #ffffff;
   font-weight: 600;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.25);
+  transform: translateY(-1px);
 }
 
-/* Hiệu ứng khi hover (khi chưa active) */
 .segmented-button:not(.active):hover {
-  background-color: #f0f2f5;
+  background-color: #eff6ff;
+  color: #1d4ed8;
 }
 
 /* -------------------- Bảng Dữ Liệu -------------------- */

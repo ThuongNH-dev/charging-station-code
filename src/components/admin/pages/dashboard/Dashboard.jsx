@@ -1,12 +1,18 @@
 // ✅ src/pages/admin/dashboard/Dashboard.jsx
+
 import React, { useEffect, useMemo, useState } from "react";
-import { fetchDashboard } from "../../../../api/dashboardApi";
+import {
+  fetchDashboard,
+  fetchAdminMonthlyOverview,
+} from "../../../../api/dashboardApi";
+
 import {
   buildDashboardDataMonthly,
   formatCurrency,
 } from "../../../../utils/dashboardProcessing";
 import "./Dashboard.css";
 
+// 1. CẬP NHẬT IMPORT TỪ RECHARTS
 import {
   ResponsiveContainer,
   LineChart,
@@ -15,6 +21,10 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  PieChart, // Mới
+  Pie, // Mới
+  Cell, // Mới
+  Legend, // Mới
 } from "recharts";
 
 const Card = ({ title, value, sub }) => (
@@ -32,27 +42,176 @@ function getMonthRange(ym) {
   return { start, end };
 }
 
-// 🔹 helper: đọc CustomerId / CompanyId (camelCase + PascalCase)
-const getCustomerId = (s) => s.customerId ?? s.CustomerId ?? null;
-const getCompanyId = (s) => s.companyId ?? s.CompanyId ?? null;
+// 2. KHAI BÁO MÀU SẮC CHO BIỂU ĐỒ TRÒN
+// Tương ứng: [Xanh dương, Xanh lá, Cam]
+const COLORS = ["#234C6A", "#6DC3BB", "#F2AEBB"];
 
-// 🔹 helper: lọc theo loại khách
-const filterByCustomerType = (sessions, type) => {
-  if (!Array.isArray(sessions)) return [];
-
-  switch (type) {
-    case "customer": // khách cá nhân
-      return sessions.filter((s) => getCustomerId(s) && !getCompanyId(s));
-    case "company": // doanh nghiệp
-      return sessions.filter((s) => getCompanyId(s));
-    case "guest": // khách vãng lai
-      return sessions.filter((s) => !getCustomerId(s) && !getCompanyId(s));
-    default:
-      return sessions; // "all"
+// ======================= Tổng quan tháng Analytics =======================
+const AdminMonthlyOverview = ({ summary, revenueSources, kpisSnapshot }) => {
+  if (!summary) {
+    return (
+      <div style={{ padding: 16, color: "#6b7280", fontStyle: "italic" }}>
+        Không có dữ liệu tổng quan tháng.
+      </div>
+    );
   }
+
+  const {
+    month,
+    year,
+    sessionCount = 0,
+    energyKwh = 0,
+    subtotal = 0,
+    tax = 0,
+    total = 0,
+    durationMin = 0,
+    idleMin = 0,
+    avgPricePerKwh = 0,
+  } = summary;
+
+  const openRate = kpisSnapshot?.usagePercent ?? 0;
+  const stationsOnline = kpisSnapshot?.stationsOnline ?? 0;
+
+  const customer = revenueSources?.customerTotal ?? 0;
+  const company = revenueSources?.companyTotal ?? 0;
+  const guest = revenueSources?.guestTotal ?? 0;
+  const sumRev = customer + company + guest || 1;
+
+  const mixRows = [
+    { label: "Khách cá nhân", value: customer },
+    { label: "Xe công ty", value: company },
+    { label: "Khách vãng lai", value: guest },
+  ];
+
+  const chartData = [
+    { source: "Khách cá nhân", value: customer },
+    { source: "Xe công ty", value: company },
+    { source: "Khách vãng lai", value: guest },
+  ];
+
+  return (
+    <>
+      <p style={{ marginBottom: 10, color: "#4b5563" }}>
+        Tổng quan theo Analytics – Tháng{" "}
+        <strong>
+          {month}/{year}
+        </strong>
+      </p>
+
+      {/* KPI Cards giữ nguyên */}
+      <div className="db-kpi-grid db-kpi-grid-small">
+        <Card
+          title="Doanh thu sau thuế"
+          value={formatCurrency(total)}
+          sub={`Trước thuế: ${formatCurrency(
+            subtotal
+          )} – Thuế: ${formatCurrency(tax)}`}
+        />
+        <Card
+          title="Điện năng tiêu thụ"
+          value={`${energyKwh.toLocaleString("vi-VN")} kWh`}
+          sub={`Giá TB: ${avgPricePerKwh.toLocaleString("vi-VN")} ₫/kWh`}
+        />
+        <Card
+          title="Số phiên sạc"
+          value={sessionCount.toLocaleString("vi-VN")}
+          sub={`Thời gian sạc: ${durationMin.toLocaleString(
+            "vi-VN"
+          )} phút – Idle: ${idleMin.toLocaleString("vi-VN")} phút`}
+        />
+        <Card
+          title="Tỷ lệ trạm mở"
+          value={`${openRate}%`}
+          sub="Open/Total (snapshot)"
+        />
+        <Card
+          title="Số trạm online"
+          value={stationsOnline.toLocaleString("vi-VN")}
+          sub="Trạng thái Open"
+        />
+      </div>
+
+      {/* 3. THAY THẾ KHỐI BIỂU ĐỒ CỘT BẰNG BIỂU ĐỒ DONUT */}
+      <div style={{ marginTop: 14, marginBottom: 10 }}>
+        <h4 style={{ marginBottom: 6 }}>
+          Biểu đồ cơ cấu nguồn doanh thu (tháng)
+        </h4>
+        <div style={{ width: "100%", height: 300 }}>
+          {" "}
+          {/* Tăng chiều cao xíu cho đẹp */}
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={chartData}
+                cx="50%"
+                cy="50%"
+                innerRadius={50} // Tạo lỗ tròn ở giữa (Donut)
+                outerRadius={85}
+                paddingAngle={5} // Khoảng cách giữa các miếng
+                dataKey="value"
+                nameKey="source"
+              >
+                {chartData.map((entry, index) => (
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={COLORS[index % COLORS.length]}
+                    stroke="none"
+                  />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(value) =>
+                  `${Number(value).toLocaleString("vi-VN")} ₫`
+                }
+              />
+              <Legend
+                verticalAlign="bottom"
+                height={36}
+                formatter={(value, entry) => {
+                  // Tùy chọn: hiển thị thêm % trong legend nếu muốn
+                  const item = chartData.find((d) => d.source === value);
+                  const percent = ((item.value / sumRev) * 100).toFixed(1);
+                  return (
+                    <span style={{ color: "#334155" }}>
+                      {value} ({percent}%)
+                    </span>
+                  );
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Bảng dữ liệu giữ nguyên */}
+      <div style={{ marginTop: 14 }}>
+        <h4 style={{ marginBottom: 6 }}>Cơ cấu nguồn doanh thu (tháng)</h4>
+        <table className="db-table">
+          <thead>
+            <tr>
+              <th>Nguồn</th>
+              <th>Doanh thu (₫)</th>
+              <th>Tỷ lệ (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {mixRows.map((row) => (
+              <tr key={row.label}>
+                <td>{row.label}</td>
+                <td>{row.value.toLocaleString("vi-VN")}</td>
+                <td>{((row.value / sumRev) * 100).toFixed(1)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
 };
 
+// ... Phần còn lại của file (Dashboard component chính) giữ nguyên ...
 export default function Dashboard() {
+  // ... code cũ của bạn
   const defaultYm = useMemo(() => {
     const d = new Date();
     const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -63,34 +222,32 @@ export default function Dashboard() {
   const [ym, setYm] = useState(defaultYm);
   const [kpis, setKpis] = useState(null);
   const [series, setSeries] = useState([]);
+  const [adminOverview, setAdminOverview] = useState(null);
 
-  // 🔹 bộ lọc loại khách
-  const [customerType, setCustomerType] = useState("all"); // all | customer | company | guest
-
-  const load = async (curYm, curCustomerType = customerType) => {
+  // tải dữ liệu theo tháng
+  const load = async (curYm) => {
     const { start, end } = getMonthRange(curYm);
+    const [yearStr, monthStr] = curYm.split("-");
+    const month = Number(monthStr);
+    const year = Number(yearStr);
+
     try {
       setLoading(true);
 
-      const raw = await fetchDashboard({
-        startDate: start,
-        endDate: end,
-      });
+      // gọi song song dashboard + analytics
+      const [raw, overview] = await Promise.all([
+        fetchDashboard({
+          startDate: start,
+          endDate: end,
+        }),
+        fetchAdminMonthlyOverview({ month, year }),
+      ]);
 
-      // 🔹 lọc sessions theo loại khách ở FE
-      const filteredSessions = filterByCustomerType(
-        raw.sessions,
-        curCustomerType
-      );
-
-      const processed = buildDashboardDataMonthly(
-        { ...raw, sessions: filteredSessions },
-        start,
-        end
-      );
+      const processed = buildDashboardDataMonthly(raw, start, end);
 
       setKpis(processed.kpis);
       setSeries(processed.series);
+      setAdminOverview(overview);
     } catch (e) {
       console.error("⚠️ Dashboard load error:", e);
     } finally {
@@ -98,11 +255,9 @@ export default function Dashboard() {
     }
   };
 
-  // đổi tháng hoặc đổi loại khách → reload & xử lý lại
   useEffect(() => {
-    load(ym, customerType);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ym, customerType]);
+    load(ym);
+  }, [ym]);
 
   if (loading || !kpis) {
     return (
@@ -117,7 +272,7 @@ export default function Dashboard() {
     <div className="db-page">
       <h2 className="db-title">Dashboard</h2>
 
-      {/* === Bộ lọc === */}
+      {/* === Bộ lọc (đồng nhất cho toàn bộ số liệu bên dưới) === */}
       <div className="db-filters">
         <div className="db-filter">
           <label>Tháng</label>
@@ -128,52 +283,25 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* 🔹 BỘ LỌC MỚI: LOẠI KHÁCH HÀNG */}
-        <div className="db-filter">
-          <label>Loại khách</label>
-          <select
-            value={customerType}
-            onChange={(e) => setCustomerType(e.target.value)}
-          >
-            <option value="all">Tất cả</option>
-            <option value="customer">Khách cá nhân</option>
-            <option value="company">Doanh nghiệp</option>
-            <option value="guest">Khách vãng lai</option>
-          </select>
-        </div>
-
         <button
           className="db-refresh-btn"
-          onClick={() => load(ym, customerType)}
+          onClick={() => load(ym)}
           title="Tải lại"
         >
           Làm mới
         </button>
       </div>
 
-      {/* === KPIs theo tháng (đã áp dụng lọc loại khách) === */}
-      <div className="db-kpi-grid">
-        <Card
-          title="Phiên sạc trong tháng"
-          value={kpis.sessionsMonth.toLocaleString("vi-VN")}
-          sub="Hoàn tất"
-        />
-        <Card
-          title="Doanh thu trong tháng"
-          value={formatCurrency(kpis.revenueMonth)}
-          sub="Tổng tiền đã thu"
-        />
-        <Card
-          title="Tỷ lệ trạm mở"
-          value={`${kpis.usagePercent}%`}
-          sub="Open/Total (snapshot)"
-        />
-        <Card
-          title="Số trạm online"
-          value={kpis.stationsOnline.toLocaleString("vi-VN")}
-          sub="Trạng thái Open"
-        />
-      </div>
+      {/* === Tổng quan tháng (Analytics + KPI snapshot) === */}
+      {adminOverview && (
+        <div className="db-section" style={{ marginBottom: 20 }}>
+          <AdminMonthlyOverview
+            summary={adminOverview.summary}
+            revenueSources={adminOverview.revenueSources}
+            kpisSnapshot={kpis}
+          />
+        </div>
+      )}
 
       {/* === Biểu đồ theo ngày trong tháng === */}
       <div className="db-section">

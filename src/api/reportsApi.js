@@ -1,4 +1,3 @@
-// ✅ src/api/reportsApi.js
 import axios from "axios";
 
 /**
@@ -18,6 +17,17 @@ const api = axios.create({
   timeout: 20000,
 });
 
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  // console.log("Token:", token); // Debug log
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  } else {
+    console.error("Không có token");
+  }
+  return config;
+});
+
 // Helper: đọc dữ liệu an toàn từ Promise.allSettled
 const settledData = (res, fallback = []) =>
   res?.status === "fulfilled" ? res.value?.data ?? fallback : fallback;
@@ -25,15 +35,7 @@ const settledData = (res, fallback = []) =>
 /**
  * 🔹 Lấy tất cả dữ liệu thô cần thiết cho báo cáo
  * @param {{startDate?: string, endDate?: string, stationId?: string|number}} params
- * @returns {Promise<{
- *   sessionsData: any[],
- *   invoicesData: any[],
- *   stationsData: any[],
- *   subscriptionPlansData: any[],
- *   subscriptionsData: any[]
- * }>}
  */
-// ... giữ nguyên phần đầu file
 export const fetchReportData = async (params = {}) => {
   const { startDate, endDate, stationId } = params;
 
@@ -49,10 +51,10 @@ export const fetchReportData = async (params = {}) => {
 
     const invoicesPromise = api.get("/Invoices");
     const stationsPromise = api.get("/Stations/paged", {
-      params: { page: 1, pageSize: 200 },
+      params: { page: 1, pageSize: 2000 },
     });
 
-    // ✅ THÊM 2 API này
+    // ✅ THÊM 2 API này để lấy danh sách gốc Port/Charger
     const portsPromise = api.get("/Ports", {
       params: { page: 1, pageSize: 1000 },
     });
@@ -65,8 +67,8 @@ export const fetchReportData = async (params = {}) => {
       sessionsPromise,
       invoicesPromise,
       stationsPromise,
-      portsPromise, // ✅
-      chargersPromise, // ✅
+      portsPromise,
+      chargersPromise,
       subscriptionPlansPromise,
       subscriptionsPromise,
     ]);
@@ -75,14 +77,11 @@ export const fetchReportData = async (params = {}) => {
       sessionsResult,
       invoicesResult,
       stationsResult,
-      portsResult, // ✅
-      chargersResult, // ✅
+      portsResult,
+      chargersResult,
       subscriptionPlansResult,
       subscriptionsResult,
     ] = results;
-
-    const settledData = (res, fb = []) =>
-      res?.status === "fulfilled" ? res.value?.data ?? fb : fb;
 
     const payload = {
       sessionsData: settledData(sessionsResult, []),
@@ -109,4 +108,149 @@ export const fetchReportData = async (params = {}) => {
   }
 };
 
-export default { fetchReportData };
+/**
+ * 🔹 Lấy dữ liệu Analytics cho ADMIN (tổng hợp theo tháng)
+ */
+export const fetchAdminAnalytics = async ({ month, year }) => {
+  try {
+    const baseParams = {
+      month,
+      year,
+      adminView: true,
+    };
+
+    const summaryPromise = api.get("/Analytics/summary", {
+      params: baseParams,
+    });
+
+    const revenueSourcesPromise = api.get("/Analytics/revenue-sources", {
+      params: baseParams,
+    });
+
+    const companyBreakdownPromise = api.get("/Analytics/breakdown/company", {
+      params: baseParams,
+    });
+
+    const stationBreakdownPromise = api.get("/Analytics/breakdown/stations", {
+      params: baseParams,
+    });
+
+    // 👇 ĐÃ SỬA: Thêm minUtilization=0 và minSessions=0 để lấy TẤT CẢ trạm
+    const utilizationStationPromise = api.get("/Analytics/utilization", {
+      params: {
+        ...baseParams,
+        scope: "Station",
+        minUtilization: 0, // Quan trọng: Lấy cả trạm 0%
+        minSessions: 0, // Quan trọng: Lấy cả trạm ít phiên
+      },
+    });
+
+    // 👇 ĐÃ SỬA: Thêm tham số tương tự cho Top/Under để lấy danh sách đầy đủ
+    const topUnderPromise = api.get("/Analytics/top-under", {
+      params: {
+        ...baseParams,
+        minUtilization: 0.05,
+        minSessions: 5,
+      },
+    });
+
+    const vehicleTypeBreakdownPromise = api.get(
+      "/Analytics/breakdown/vehicle-types",
+      { params: baseParams }
+    );
+
+    const timeRangePromise = api.get("/Analytics/breakdown/time-range", {
+      params: baseParams,
+    });
+    const results = await Promise.allSettled([
+      summaryPromise,
+      revenueSourcesPromise,
+      companyBreakdownPromise,
+      stationBreakdownPromise,
+      utilizationStationPromise,
+      topUnderPromise,
+
+      vehicleTypeBreakdownPromise,
+      timeRangePromise,
+    ]);
+
+    const [
+      summaryResult,
+      revenueSourcesResult,
+      companyBreakdownResult,
+      stationBreakdownResult,
+      utilizationStationResult,
+      topUnderResult,
+
+      vehicleTypeBreakdownResult,
+      timeRangeResult,
+    ] = results;
+
+    const payload = {
+      summary: settledData(summaryResult, null),
+      revenueSources: settledData(revenueSourcesResult, null),
+      companyBreakdown: settledData(companyBreakdownResult, []),
+      stationBreakdown: settledData(stationBreakdownResult, []),
+      utilizationStations: settledData(utilizationStationResult, []),
+      topUnder: settledData(topUnderResult, null),
+
+      vehicleTypeBreakdown: settledData(vehicleTypeBreakdownResult, []),
+      timeRangeBreakdown: settledData(timeRangeResult, []),
+    };
+
+    if (DEBUG) console.log("📊 Admin analytics:", payload);
+    return payload;
+  } catch (error) {
+    console.error("❌ Lỗi khi tải Analytics admin:", error);
+    throw error;
+  }
+};
+
+/**
+ * 🔹 Hàm xóa Port (Dùng cho mục Zero Activity)
+ */
+export const deletePort = async (portId) => {
+  try {
+    // Thay đổi đường dẫn '/Ports' tùy theo Controller của bạn
+    await api.delete(`/Ports/${portId}`);
+    return true;
+  } catch (error) {
+    console.error("Lỗi khi xóa Port:", error);
+    // Kiểm tra lỗi chi tiết từ server trả về nếu có
+    const serverMsg = error.response?.data?.message || error.message;
+    alert(`Không thể xóa Port. Lỗi: ${serverMsg}`);
+    return false;
+  }
+};
+
+/**
+ * 🔹 Hàm xóa Station (Khớp với Swagger: DELETE /api/Stations/{id})
+ */
+export const deleteStation = async (stationId) => {
+  try {
+    // Swagger của bạn là: /api/Stations/{id}
+    // Vì axios instance 'api' đã có baseURL='/api', nên ở đây chỉ cần ghi '/Stations/...'
+    await api.delete(`/Stations/${stationId}`);
+    return true;
+  } catch (error) {
+    console.error("Lỗi khi xóa Station:", error);
+    const serverMsg = error.response?.data?.message || error.message;
+
+    // Xử lý lỗi thường gặp: Foreign Key constraint (nếu trạm đang có dữ liệu ràng buộc)
+    if (error.response?.status === 500 || error.response?.status === 400) {
+      alert(
+        `Không thể xóa trạm này do dữ liệu ràng buộc (còn session hoặc charger). Lỗi server: ${serverMsg}`
+      );
+    } else {
+      alert(`Không thể xóa Trạm. Lỗi: ${serverMsg}`);
+    }
+    return false;
+  }
+};
+
+export default {
+  fetchReportData,
+  fetchAdminAnalytics,
+  deletePort,
+  deleteStation,
+};
