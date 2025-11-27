@@ -37,19 +37,6 @@ const OFFICIAL_PLANS = [
   "Kim cương",
 ];
 
-const regionLabel = (key) => {
-  switch (key) {
-    case "mienBac":
-      return "Miền Bắc";
-    case "mienTrung":
-      return "Miền Trung";
-    case "mienNam":
-      return "Miền Nam";
-    default:
-      return key;
-  }
-};
-
 // =========================================================
 // 🔹 1. Biểu đồ HEATMAP 7×24 (theo giờ)
 // =========================================================
@@ -508,169 +495,9 @@ function ServiceStructurePie({ data = [] }) {
     </div>
   );
 }
-// =========================================================
-// 🔹 5. So sánh khu vực (Bar)
-// =========================================================
-function AreaComparison({ areaData = {} }) {
-  const data = Object.entries(areaData).map(([key, value]) => ({
-    region: regionLabel(key),
-    revenue: Number(value.revenue || 0),
-    sessions: Number(value.sessions || 0),
-  }));
-
-  return (
-    <div style={{ marginTop: 20 }}>
-      <h4>So sánh hiệu suất khu vực</h4>
-      <div className="chart-box-350">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="region" />
-            <YAxis />
-            <Tooltip
-              formatter={(v, name) =>
-                name === "revenue"
-                  ? [`${v.toLocaleString()} ₫`, "Doanh thu"]
-                  : [`${v.toLocaleString()}`, "Phiên sạc"]
-              }
-            />
-            <Legend />
-            <Bar dataKey="revenue" fill="#34A853" />
-            <Bar dataKey="sessions" fill="#4285F4" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <p style={{ marginTop: 8, color: "#666", fontSize: 12 }}>
-        Chú thích: Doanh thu (₫) và số phiên (lần) theo từng khu vực.
-      </p>
-    </div>
-  );
-}
 
 // =========================================================
-// 🔹 6. KPI tổng quan tháng cho Admin
-// =========================================================
-function AdminMonthlyOverview({ summary, revenueSources }) {
-  if (!summary) {
-    return (
-      <div style={{ padding: 20, color: "#777", fontStyle: "italic" }}>
-        Không có dữ liệu tổng quan tháng.
-      </div>
-    );
-  }
-
-  const {
-    sessionCount,
-    energyKwh,
-    subtotal,
-    tax,
-    total,
-    durationMin,
-    idleMin,
-    avgPricePerKwh,
-    month,
-    year,
-  } = {
-    sessionCount: summary.sessionCount ?? 0,
-    energyKwh: summary.energyKwh ?? 0,
-    subtotal: summary.subtotal ?? 0,
-    tax: summary.tax ?? 0,
-    total: summary.total ?? 0,
-    durationMin: summary.durationMin ?? 0,
-    idleMin: summary.idleMin ?? 0,
-    avgPricePerKwh: summary.avgPricePerKwh ?? 0,
-    month: summary.month,
-    year: summary.year,
-  };
-
-  const safeRevenueSources = revenueSources || {};
-  const customerTotal = safeRevenueSources.customerTotal ?? 0;
-  const companyTotal = safeRevenueSources.companyTotal ?? 0;
-  const guestTotal = safeRevenueSources.guestTotal ?? 0;
-  const allRev = customerTotal + companyTotal + guestTotal || 1;
-
-  const mixRows = [
-    { label: "Khách cá nhân", value: customerTotal },
-    { label: "Xe công ty", value: companyTotal },
-    { label: "Khách vãng lai", value: guestTotal },
-  ];
-
-  return (
-    <>
-      <p style={{ marginBottom: 16, color: "#4b5563" }}>
-        Tổng quan tháng{" "}
-        <strong>
-          {month}/{year}
-        </strong>{" "}
-        (theo dữ liệu Analytics).
-      </p>
-
-      <div className="kpi-grid">
-        <div className="kpi-card">
-          <span className="kpi-label">Doanh thu sau thuế</span>
-          <span className="kpi-value">{total.toLocaleString("vi-VN")} ₫</span>
-          <span className="kpi-sub">
-            Trước thuế: {subtotal.toLocaleString("vi-VN")} ₫ | Thuế:{" "}
-            {tax.toLocaleString("vi-VN")} ₫
-          </span>
-        </div>
-        <div className="kpi-card">
-          <span className="kpi-label">Điện năng tiêu thụ</span>
-          <span className="kpi-value">
-            {energyKwh.toLocaleString("vi-VN")} kWh
-          </span>
-          <span className="kpi-sub">
-            Giá TB: {avgPricePerKwh.toLocaleString("vi-VN")} ₫/kWh
-          </span>
-        </div>
-        <div className="kpi-card">
-          <span className="kpi-label">Số phiên sạc</span>
-          <span className="kpi-value">
-            {sessionCount.toLocaleString("vi-VN")}
-          </span>
-          <span className="kpi-sub">
-            Thời gian sạc: {durationMin.toLocaleString("vi-VN")} phút
-          </span>
-        </div>
-        <div className="kpi-card">
-          <span className="kpi-label">Thời gian đỗ chiếm chỗ</span>
-          <span className="kpi-value">
-            {idleMin.toLocaleString("vi-VN")} phút
-          </span>
-          <span className="kpi-sub">
-            Tỷ lệ Idle / Sạc:{" "}
-            {durationMin > 0 ? ((idleMin / durationMin) * 100).toFixed(1) : 0}%
-          </span>
-        </div>
-      </div>
-
-      <div style={{ marginTop: 24 }}>
-        <h4>Cơ cấu nguồn doanh thu (tháng)</h4>
-        <table className="report-table">
-          <thead>
-            <tr>
-              <th>Nguồn</th>
-              <th>Doanh thu (₫)</th>
-              <th>Tỷ lệ (%)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mixRows.map((row) => (
-              <tr key={row.label}>
-                <td>{row.label}</td>
-                <td>{row.value.toLocaleString("vi-VN")}</td>
-                <td>{((row.value / allRev) * 100).toFixed(1)}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
-
-// =========================================================
-// 🔹 7. Bảng breakdown theo Công ty
+// 🔹 5. Bảng breakdown theo Công ty
 // =========================================================
 function CompanyBreakdownTable({ data = [] }) {
   if (!data.length) {
@@ -718,7 +545,7 @@ function CompanyBreakdownTable({ data = [] }) {
 }
 
 // =========================================================
-// 🔹 7.1 Biểu đồ Doanh thu & Phiên sạc theo Công ty (MỚI)
+// 🔹 5.1 Biểu đồ Doanh thu & Phiên sạc theo Công ty (MỚI)
 // =========================================================
 function CompanyRevenueChart({ data = [] }) {
   if (!data.length) return null;
@@ -818,7 +645,7 @@ function CompanyRevenueChart({ data = [] }) {
 }
 
 // =========================================================
-// 🔹 8. Bảng Utilization theo Trạm (ĐÃ CẬP NHẬT NÚT XÓA)
+// 🔹 6. Bảng Utilization theo Trạm (ĐÃ CẬP NHẬT NÚT XÓA)
 // =========================================================
 function StationUtilizationTable({ data = [], allStations = [], onRefresh }) {
   // Logic Gộp dữ liệu (Giữ nguyên như cũ)
@@ -1019,7 +846,7 @@ function StationUtilizationTable({ data = [], allStations = [], onRefresh }) {
 }
 
 // =========================================================
-// 🔹 8.1 Biểu đồ Hiệu suất Trạm (ĐÃ SỬA LỖI TOOLTIP)
+// 🔹 6.1 Biểu đồ Hiệu suất Trạm (ĐÃ SỬA LỖI TOOLTIP)
 // =========================================================
 function StationUtilizationCharts({ data = [], allStations = [] }) {
   // 1. Logic Gộp dữ liệu (Giữ nguyên)
@@ -1183,7 +1010,7 @@ function StationUtilizationCharts({ data = [], allStations = [] }) {
 }
 
 // =========================================================
-// 🔹 9.3 Bảng chi tiết Top / Under / Zero (BẢN FIX LỖI MAPPING)
+// 🔹 7. Bảng chi tiết Top / Under / Zero (BẢN FIX LỖI MAPPING)
 // =========================================================
 function TopUnderZeroSection({ topUnder, chargers = [], stations = [], ports = [] }) {
   const [zeroList, setZeroList] = useState([]);
@@ -1438,7 +1265,7 @@ function TopUnderZeroSection({ topUnder, chargers = [], stations = [], ports = [
   );
 }
 // =========================================================
-// 🔹 9.1 Biểu đồ Tròn: Phân loại trạng thái
+// 🔹 7.1 Biểu đồ Tròn: Phân loại trạng thái
 // =========================================================
 function PortStatusPieChart({ topUnderData }) {
   if (!topUnderData) return null;
@@ -1509,7 +1336,7 @@ function PortStatusPieChart({ topUnderData }) {
 }
 
 // =========================================================
-// 🔹 9.2 Biểu đồ Cột: Top 10 Doanh thu (FIX LỖI HIỂN THỊ)
+// 🔹 7.2 Biểu đồ Cột: Top 10 Doanh thu (FIX LỖI HIỂN THỊ)
 // =========================================================
 function TopPortRevenueChart({ topUnderData }) {
   if (!topUnderData || !topUnderData.topActive) return null;
@@ -1597,7 +1424,7 @@ function TopPortRevenueChart({ topUnderData }) {
 }
 
 // =========================================================
-// 🔹 11.1 Biểu đồ Tròn: Cơ cấu loại xe (MỚI)
+// 🔹 8. Biểu đồ Tròn: Cơ cấu loại xe (MỚI)
 // =========================================================
 function VehicleTypePieChart({ data = [] }) {
   if (!data.length) return null;
@@ -1644,7 +1471,7 @@ function VehicleTypePieChart({ data = [] }) {
 }
 
 // =========================================================
-// 🔹 11.2 Bảng chi tiết Loại xe (FIX GIAO DIỆN TRÀN)
+// 🔹 8.1 Bảng chi tiết Loại xe (FIX GIAO DIỆN TRÀN)
 // =========================================================
 function VehicleTypeTable({ data = [] }) {
   if (!data.length) {
@@ -1737,7 +1564,7 @@ function VehicleTypeTable({ data = [] }) {
   );
 }
 // =========================================================
-// 🔹 12. Báo cáo theo Khung giờ (Time Range) - ĐÃ NÂNG CẤP
+// 🔹 9. Báo cáo theo Khung giờ (Time Range) - ĐÃ NÂNG CẤP
 // =========================================================
 function TimeRangeSection({ data = [] }) {
   if (!data || data.length === 0) return null;
