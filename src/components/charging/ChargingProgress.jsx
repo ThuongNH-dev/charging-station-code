@@ -67,6 +67,7 @@ function clearLive() {
   } catch { }
 }
 
+// giải mã lấy customerId từ token
 function decodeJwtPayload(token) {
   try {
     const base64Url = token.split(".")[1];
@@ -271,7 +272,7 @@ const ChargingProgress = () => {
   // ==== Pricing dynamic ====
   const [dynPricePerKWh, setDynPricePerKWh] = useState(NaN);
   const [dynPenaltyPerMin, setDynPenaltyPerMin] = useState(NaN);
-  const [dynGraceSeconds, setDynGraceSeconds] = useState(NaN);
+  const [dynGraceSeconds, setDynGraceSeconds] = useState(NaN); // số giây miễn phí trụ
   const [pricingLoading, setPricingLoading] = useState(true);
   const [pricingError, setPricingError] = useState("");
 
@@ -308,7 +309,6 @@ const ChargingProgress = () => {
     }
   }, [session]);
 
-  // const TOTAL_TIME_MINUTES = Number.isFinite(state.totalTimeMinutes) ? state.totalTimeMinutes : 120;
   const TOTAL_TIME_MINUTES = Number.isFinite(state?.totalTimeMinutes) ? state?.totalTimeMinutes : 120;
 
   const [timeLeft, setTimeLeft] = useState("");
@@ -451,7 +451,7 @@ const ChargingProgress = () => {
         const body = { customerId, vehicleId, portId: portIdToUse, bookingId: bookingId ?? null };
         console.log("[ChargingProgress] POST /ChargingSessions/start payload =", body);
 
-        const url = `${API_ABS}/ChargingSessions/start`;     // ✅ thêm dòng này
+        const url = `${API_ABS}/ChargingSessions/start`;    
 
         const res = await fetchAuthJSON(url, {
           method: "POST",
@@ -952,7 +952,6 @@ const ChargingProgress = () => {
   }, [isCharging, session?.chargerPowerKw, state?.charger?.powerKw, state?.batteryCapacity, dynGraceSeconds]);
 
   // --- Không dùng nữa: interval phạt theo tick (đã thay bằng tính theo fullAt)
-  // useEffect(() => { ... })  ← đã xoá
 
   function getChargingSessionIdSafe() {
     let sid = session?.chargingSessionId ?? state?.chargingSessionId ?? state?.sessionId ?? null; // ✅ thêm fallback
